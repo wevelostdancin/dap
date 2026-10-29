@@ -1,0 +1,74 @@
+{
+  "id": "dap.joiner",
+  "name": "Joiner",
+  "category": "/Manipulation/Row/Join",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": false,
+  "description": "Joins two tables on key columns using an inner, left, or right join. Key columns can be merged into one output column.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Left",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 1,
+      "name": "Right",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Joiner configuration",
+    "additionalProperties": false,
+    "properties": {
+      "how": {
+        "type": "string",
+        "title": "Join type",
+        "description": "Join mode between the left and right inputs.",
+        "enum": [
+          "inner",
+          "left",
+          "right"
+        ],
+        "default": "inner"
+      },
+      "left_keys": {
+        "type": "array",
+        "title": "Left keys",
+        "description": "Key columns from the left input.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "right_keys": {
+        "type": "array",
+        "title": "Right keys",
+        "description": "Key columns from the right input, matched positionally with the left keys.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "merge_keys": {
+        "type": "boolean",
+        "title": "Merge keys",
+        "description": "Merge the key columns into one output column.",
+        "default": true
+      }
+    },
+    "required": [
+      "left_keys",
+      "right_keys"
+    ]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "id": "dap.string_manipulation",
+  "name": "String Manipulation",
+  "category": "/Manipulation/Column/String",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": false,
+  "description": "Transforms string values in one column, for example upper-casing, trimming, replacing or concatenating. The result can replace the column or be appended as a new one.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "String Manipulation configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Column",
+        "description": "Input column to transform."
+      },
+      "op": {
+        "type": "string",
+        "title": "Operation",
+        "description": "String operation applied to the column values.",
+        "enum": [
+          "upper",
+          "lower",
+          "trim",
+          "replace",
+          "concat"
+        ]
+      },
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "Replace the source column or append the result as a new column.",
+        "enum": [
+          "replace",
+          "append"
+        ],
+        "default": "replace"
+      },
+      "value": {
+        "type": "string",
+        "title": "Value",
+        "description": "Replacement text for replace or appended text for concat."
+      }
+    },
+    "required": [
+      "column",
+      "op"
+    ]
+  }
+}

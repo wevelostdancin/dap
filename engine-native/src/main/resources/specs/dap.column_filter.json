@@ -1,0 +1,48 @@
+{
+  "id": "dap.column_filter",
+  "name": "Column Filter",
+  "category": "/Manipulation/Column/Filter",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Keeps or drops columns by name. Include and exclude lists are applied to the input schema.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Column Filter configuration",
+    "additionalProperties": false,
+    "properties": {
+      "include": {
+        "type": "array",
+        "title": "Include",
+        "description": "Column names to keep; when set, every other column is dropped.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "exclude": {
+        "type": "array",
+        "title": "Exclude",
+        "description": "Column names to drop from the output.",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

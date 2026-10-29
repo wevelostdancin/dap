@@ -1,0 +1,71 @@
+{
+  "id": "dap.missing_value",
+  "name": "Missing Value",
+  "category": "/Manipulation/Column/Missing",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Replaces missing values in selected columns with a constant, the column mean, or the most frequent value.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Missing Value configuration",
+    "additionalProperties": false,
+    "properties": {
+      "rules": {
+        "type": "array",
+        "title": "Rules",
+        "description": "Per-column replacement rules for missing values.",
+        "items": {
+          "type": "object",
+          "title": "Rule",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column whose missing values are replaced."
+            },
+            "method": {
+              "type": "string",
+              "title": "Method",
+              "description": "Replacement source: a constant, the column mean, or the most frequent value.",
+              "enum": [
+                "constant",
+                "mean",
+                "mode"
+              ],
+              "default": "constant"
+            },
+            "value": {
+              "title": "Value",
+              "description": "Constant used when the method is constant."
+            }
+          },
+          "required": [
+            "column",
+            "method"
+          ]
+        }
+      }
+    },
+    "required": [
+      "rules"
+    ]
+  }
+}
