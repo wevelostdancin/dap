@@ -1,0 +1,85 @@
+{
+  "id": "dap.row_filter",
+  "name": "Row Filter",
+  "category": "/Manipulation/Row/Filter",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Keeps only the rows that match the configured conditions. Conditions are combined with AND or OR.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Row Filter configuration",
+    "additionalProperties": false,
+    "properties": {
+      "logic": {
+        "type": "string",
+        "title": "Logic",
+        "description": "How the conditions are combined.",
+        "enum": [
+          "and",
+          "or"
+        ],
+        "default": "and"
+      },
+      "where": {
+        "type": "array",
+        "title": "Conditions",
+        "description": "Row conditions applied to the input table.",
+        "items": {
+          "type": "object",
+          "title": "Condition",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column to test."
+            },
+            "op": {
+              "type": "string",
+              "title": "Operator",
+              "description": "Comparison operator; is_null and not_null ignore the value.",
+              "enum": [
+                "eq",
+                "ne",
+                "lt",
+                "le",
+                "gt",
+                "ge",
+                "is_null",
+                "not_null"
+              ]
+            },
+            "value": {
+              "title": "Value",
+              "description": "Comparison value for the operator; a number, string or boolean."
+            }
+          },
+          "required": [
+            "column",
+            "op"
+          ]
+        }
+      }
+    },
+    "required": [
+      "where"
+    ]
+  }
+}

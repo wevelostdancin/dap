@@ -1,0 +1,75 @@
+{
+  "id": "dap.sorter",
+  "name": "Sorter",
+  "category": "/Manipulation/Row/Sort",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Sorts rows by one or more columns. Sort keys are applied in order and ties fall through to the next key.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Sorter configuration",
+    "additionalProperties": false,
+    "properties": {
+      "keys": {
+        "type": "array",
+        "title": "Sort keys",
+        "description": "Columns to sort by, in priority order.",
+        "items": {
+          "type": "object",
+          "title": "Sort key",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column to sort by."
+            },
+            "direction": {
+              "type": "string",
+              "title": "Direction",
+              "description": "Sort direction.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            }
+          },
+          "required": [
+            "column"
+          ]
+        }
+      },
+      "collation": {
+        "type": "string",
+        "title": "Collation",
+        "description": "String comparison used when sorting text values.",
+        "enum": [
+          "binary",
+          "nocase"
+        ],
+        "default": "binary"
+      }
+    },
+    "required": [
+      "keys"
+    ]
+  }
+}

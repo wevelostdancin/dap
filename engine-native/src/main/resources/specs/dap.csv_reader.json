@@ -1,0 +1,86 @@
+{
+  "id": "dap.csv_reader",
+  "name": "CSV Reader",
+  "category": "/IO/Read",
+  "type": "Source",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Reads a delimited text file into a data table. Column names and types can be set explicitly or inferred from the header row.",
+  "inPorts": [],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "CSV Reader configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Input file",
+        "description": "Absolute path to the CSV file to read.",
+        "placeholder": "/data/input.csv"
+      },
+      "delimiter": {
+        "type": "string",
+        "title": "Delimiter",
+        "description": "Field separator used by the file; a comma by default.",
+        "default": ","
+      },
+      "header": {
+        "type": "boolean",
+        "title": "Header row",
+        "description": "Whether the first row contains column names.",
+        "default": true
+      },
+      "columns": {
+        "type": "array",
+        "title": "Column schema",
+        "description": "Optional explicit column names and Arrow types; when omitted the header and type inference define the schema.",
+        "items": {
+          "type": "object",
+          "title": "Column",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name",
+              "description": "Column name in the output table."
+            },
+            "type": {
+              "type": "string",
+              "title": "Type",
+              "description": "Arrow data type of the column.",
+              "enum": [
+                "Int64",
+                "Float64",
+                "Utf8",
+                "Boolean",
+                "Date32",
+                "Timestamp"
+              ]
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      "emptyStringIsNull": {
+        "type": "boolean",
+        "title": "Empty string is null",
+        "description": "Treat unquoted empty fields as NULL; quoted empty strings stay empty strings.",
+        "default": false
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}

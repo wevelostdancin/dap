@@ -1,0 +1,61 @@
+{
+  "id": "dap.math_formula",
+  "name": "Math Formula",
+  "category": "/Manipulation/Column/Math",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": false,
+  "description": "Computes new columns from SQL-style expressions over the input columns. Each output name becomes a new column.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Math Formula configuration",
+    "additionalProperties": false,
+    "properties": {
+      "outputs": {
+        "type": "array",
+        "title": "Outputs",
+        "description": "New columns computed from SQL expressions over the input columns.",
+        "items": {
+          "type": "object",
+          "title": "Output",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name",
+              "description": "Name of the new output column."
+            },
+            "expression": {
+              "type": "string",
+              "title": "Expression",
+              "description": "SQL expression evaluated against the input columns."
+            }
+          },
+          "required": [
+            "name",
+            "expression"
+          ]
+        }
+      }
+    },
+    "required": [
+      "outputs"
+    ]
+  }
+}
