@@ -6,6 +6,7 @@ Exit code 0 when all checks pass, 1 otherwise.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 import re
@@ -88,6 +89,23 @@ def check_openapi() -> None:
         warn("OpenAPI has no /v1/workflows/{workflow}/jobs path")
 
 
+def check_frozen_contract() -> None:
+    frozen = ROOT / "api" / "openapi-v1-frozen.yaml"
+    checksum = ROOT / "api" / "openapi-v1-frozen.sha256"
+    if not frozen.exists() or not checksum.exists():
+        fail("api/openapi-v1-frozen.yaml or its .sha256 is missing")
+        return
+    expected = checksum.read_text(encoding="utf-8").split()[0]
+    actual = hashlib.sha256(frozen.read_bytes()).hexdigest()
+    if actual != expected:
+        fail("api/openapi-v1-frozen.yaml checksum " + actual + " != " + expected
+             + " (frozen contract was edited)")
+    live = hashlib.sha256((ROOT / "api" / "openapi.yaml").read_bytes()).hexdigest()
+    if live != actual:
+        fail("api/openapi.yaml drifted from api/openapi-v1-frozen.yaml: update the frozen copy, "
+             "its .sha256 and record the change in CHANGELOG.md")
+
+
 def check_catalog() -> None:
     try:
         catalog = json.loads(read("catalog/catalog.json"))
@@ -136,6 +154,7 @@ def main() -> int:
     check_version()
     check_shell()
     check_openapi()
+    check_frozen_contract()
     check_catalog()
     check_stale()
     check_python_syntax()

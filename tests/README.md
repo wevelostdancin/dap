@@ -104,6 +104,18 @@ stdlib, без внешних зависимостей. Тесты не меня
   и падает с `Please define at least one joining column pair.`; рабочий join —
   `Joiner3` (с `mode=WILDCARD`).
 
+## Parity harness (Phase 0)
+
+Корпус tests/corpus/ и tests/parity.py фиксируют semantic parity с KNIME:
+
+    python3 tests/parity.py --validate
+    python3 tests/parity.py --engine oracle --write-baseline
+    python3 tests/parity.py --engine oracle --check-baseline
+
+tests/baseline.json хранит наблюдения oracle в native-словаре (имена и типы
+приведены к контракту native), правила сравнения — docs/PARITY.md.
+--engine native появится вместе с engine-native/.
+
 ## Фактический прогон
 
 `python3 tests/run_all.py`, exit code 0 (9 сценариев, 41 PASS, 0 FAIL, 1 SKIP):

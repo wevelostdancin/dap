@@ -1,0 +1,70 @@
+{
+  "id": "wf-08-air-quality-filter",
+  "title": "Air quality: warm sensor hours, ordered by humidity",
+  "rationale": "Wide numeric table with Date/Time columns; numeric filter plus three-key sort.",
+  "kind": "dual-run",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "table_source",
+      "config": {
+        "dataset": "AIR_QUALITY"
+      }
+    },
+    {
+      "id": "filter",
+      "type": "row_filter",
+      "config": {
+        "where": [
+          {
+            "column": "T",
+            "op": "ge",
+            "value": 25
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "RH",
+            "direction": "desc"
+          },
+          {
+            "column": "Date",
+            "direction": "asc"
+          },
+          {
+            "column": "Time",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "filter"
+    },
+    {
+      "from": "filter",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "filter",
+      "kind": "profile"
+    },
+    {
+      "node": "sort",
+      "kind": "table",
+      "limit": 20,
+      "order": "ordered"
+    }
+  ]
+}

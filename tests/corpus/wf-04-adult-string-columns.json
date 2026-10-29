@@ -1,0 +1,103 @@
+{
+  "id": "wf-04-adult-string-columns",
+  "title": "Adult census: uppercase occupation, prune columns, count by occupation",
+  "rationale": "String transform in place, column pruning, then aggregation with a 2-key order.",
+  "kind": "dual-run",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "table_source",
+      "config": {
+        "dataset": "ADULT"
+      }
+    },
+    {
+      "id": "str",
+      "type": "string_manipulation",
+      "config": {
+        "column": "occupation",
+        "op": "upper",
+        "mode": "replace"
+      }
+    },
+    {
+      "id": "cols",
+      "type": "column_filter",
+      "config": {
+        "exclude": [
+          "fnlwgt",
+          "capital-gain",
+          "capital-loss",
+          "native-country"
+        ]
+      }
+    },
+    {
+      "id": "g",
+      "type": "group_by",
+      "config": {
+        "keys": [
+          "occupation"
+        ],
+        "aggregations": [
+          {
+            "column": "age",
+            "fn": "count"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "Count(age)",
+            "direction": "desc"
+          },
+          {
+            "column": "occupation",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "str"
+    },
+    {
+      "from": "str",
+      "to": "cols"
+    },
+    {
+      "from": "cols",
+      "to": "g"
+    },
+    {
+      "from": "g",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "str",
+      "kind": "table",
+      "limit": 5,
+      "order": "unordered"
+    },
+    {
+      "node": "cols",
+      "kind": "profile"
+    },
+    {
+      "node": "sort",
+      "kind": "table",
+      "limit": 20,
+      "order": "ordered"
+    }
+  ]
+}

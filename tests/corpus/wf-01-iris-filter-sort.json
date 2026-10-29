@@ -1,0 +1,78 @@
+{
+  "id": "wf-01-iris-filter-sort",
+  "title": "Iris: keep setosa, sort by four numeric keys",
+  "rationale": "Restrict a class, then impose a total order for inspection or export.",
+  "kind": "dual-run",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "table_source",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "filter",
+      "type": "row_filter",
+      "config": {
+        "where": [
+          {
+            "column": "species",
+            "op": "eq",
+            "value": "setosa"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "sepal_length",
+            "direction": "desc"
+          },
+          {
+            "column": "sepal_width",
+            "direction": "asc"
+          },
+          {
+            "column": "petal_length",
+            "direction": "asc"
+          },
+          {
+            "column": "petal_width",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "filter"
+    },
+    {
+      "from": "filter",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "filter",
+      "kind": "profile"
+    },
+    {
+      "node": "sort",
+      "kind": "profile"
+    },
+    {
+      "node": "sort",
+      "kind": "table",
+      "limit": 50,
+      "order": "ordered"
+    }
+  ]
+}
