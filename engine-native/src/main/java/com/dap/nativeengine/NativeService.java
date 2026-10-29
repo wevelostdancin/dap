@@ -1,37 +1,140 @@
 package com.dap.nativeengine;
 
 import com.dap.nativeengine.api.ApiException;
+import com.dap.nativeengine.api.CatalogHandlers;
+import com.dap.nativeengine.api.DataHandlers;
 import com.dap.nativeengine.api.Http;
+import com.dap.nativeengine.api.JobHandlers;
+import com.dap.nativeengine.api.OpsHandlers;
+import com.dap.nativeengine.api.ServiceState;
+import com.dap.nativeengine.api.WorkflowHandlers;
+import com.dap.nativeengine.catalog.NodeRegistry;
+import com.dap.nativeengine.exec.Executors;
+import com.dap.nativeengine.nodes.ColumnFilterExecutor;
+import com.dap.nativeengine.nodes.CsvReaderExecutor;
+import com.dap.nativeengine.nodes.MissingValueExecutor;
+import com.dap.nativeengine.nodes.RowFilterExecutor;
+import com.dap.nativeengine.nodes.SorterExecutor;
 import io.javalin.Javalin;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * HTTP entry point. Phase 1 skeleton: /v1 and /v1/health are wired here; the
- * remaining routes live in the api package and are registered by the routes task.
+ * HTTP entry point of the native engine: the frozen /v1 surface over the in-memory
+ * workflow store, the DAG job manager and the per-session DuckDB databases.
  */
 public final class NativeService implements AutoCloseable {
     public static final String NAME = "DAP";
     public static final String VERSION = "1.0.0";
+    private static final String ERROR_BODY_ATTRIBUTE = "dap.errorBody";
 
+    /** Service configuration; production defaults come from the DAP_* environment. */
+    public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port) {
+        public static Settings fromEnv() {
+            return new Settings(
+                    intEnv("DAP_MAX_WORKFLOWS", 100),
+                    intEnv("DAP_JOB_TIMEOUT", 600),
+                    System.getenv().getOrDefault("DAP_BIND", "127.0.0.1"),
+                    intEnv("DAP_PORT", 7800));
+        }
+
+        private static int intEnv(String name, int fallback) {
+            String raw = System.getenv(name);
+            if (raw == null || raw.isBlank()) {
+                return fallback;
+            }
+            try {
+                return Integer.parseInt(raw.strip());
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+    }
+
+    private final Settings settings;
+    private final ServiceState state;
     private final Javalin app;
+    private final CountDownLatch stopped = new CountDownLatch(1);
+    private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean shuttingDown = new AtomicBoolean();
     private volatile int port;
-    private volatile boolean shuttingDown;
 
+    /** Production service: environment settings, classpath catalog, five Phase-1 executors. */
     public NativeService() {
+        this(Settings.fromEnv(), new NodeRegistry(), defaultExecutors());
+    }
+
+    /** Test seam: inject catalog and executors (for example a test-only node). */
+    public NativeService(Settings settings, NodeRegistry registry, Executors executors) {
+        this.settings = Objects.requireNonNull(settings, "settings");
+        this.state = new ServiceState(settings,
+                Objects.requireNonNull(registry, "registry"),
+                Objects.requireNonNull(executors, "executors"));
         this.app = Javalin.create(config -> {
             config.showJavalinBanner = false;
+            config.useVirtualThreads = true;
+            config.jetty.defaultHost = this.settings.bindHost();
             config.http.defaultContentType = "application/json; charset=utf-8";
         });
-        app.exception(ApiException.class, (exception, context) ->
-                Http.error(context, exception.status(), exception.getMessage()));
-        app.exception(Exception.class, (exception, context) ->
-                Http.error(context, 500, exception.getMessage() == null
-                        ? exception.getClass().getSimpleName() : exception.getMessage()));
+        app.exception(ApiException.class, (exception, context) -> {
+            context.attribute(ERROR_BODY_ATTRIBUTE, true);
+            Http.error(context, exception.status(), exception.getMessage());
+        });
+        app.exception(Exception.class, (exception, context) -> {
+            context.attribute(ERROR_BODY_ATTRIBUTE, true);
+            Http.error(context, 500, exception.getMessage() == null
+                    ? exception.getClass().getSimpleName()
+                    : exception.getMessage());
+        });
+        // Unmatched routes are answered by Javalin before any handler ran, so the attribute
+        // distinguishes them from a deliberate ApiException 404 with its own body.
+        app.error(404, context -> {
+            if (context.attribute(ERROR_BODY_ATTRIBUTE) != null) {
+                return;
+            }
+            Http.error(context, 404, "no route: " + context.method() + " " + context.path());
+        });
+        registerRoutes(registry);
+    }
+
+    private void registerRoutes(NodeRegistry registry) {
+        CatalogHandlers catalog = new CatalogHandlers(registry);
+        WorkflowHandlers workflows = new WorkflowHandlers(state);
+        JobHandlers jobs = new JobHandlers(state);
+        DataHandlers data = new DataHandlers(state);
+        OpsHandlers ops = new OpsHandlers(state, this::shutdownAsync);
+
         app.get("/v1", context -> Http.ok(context, meta()));
-        app.get("/v1/health", context -> Http.ok(context, health()));
-        app.error(404, context -> Http.error(context, 404, "no route: " + context.method() + " " + context.path()));
+        app.get("/v1/health", context -> Http.ok(context, health(Http.session(context))));
+
+        app.get("/v1/nodes", catalog::list);
+        app.get("/v1/nodes/{nodeTypeId}", catalog::get);
+        app.get("/v1/nodes/{nodeTypeId}/dialog", catalog::dialog);
+
+        app.get("/v1/workflows", workflows::list);
+        app.post("/v1/workflows", workflows::create);
+        app.delete("/v1/workflows/{workflowId}", workflows::delete);
+        app.get("/v1/workflows/{workflowId}/nodes", workflows::nodes);
+        app.post("/v1/workflows/{workflowId}/nodes", workflows::addNode);
+        app.patch("/v1/workflows/{workflowId}/nodes/{workflowNodeId}", workflows::configureNode);
+        app.delete("/v1/workflows/{workflowId}/nodes/{workflowNodeId}", workflows::removeNode);
+        app.post("/v1/workflows/{workflowId}/connect", workflows::connect);
+        app.post("/v1/workflows/{workflowId}/disconnect", workflows::disconnect);
+        app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/dialog", workflows::nodeDialog);
+        app.post("/v1/workflows/{workflowId}/run", jobs::run);
+        app.post("/v1/workflows/{workflowId}/jobs", jobs::submit);
+        app.get("/v1/jobs", jobs::list);
+        app.get("/v1/jobs/{jobId}", jobs::get);
+        app.delete("/v1/jobs/{jobId}", jobs::cancel);
+        app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/table", data::table);
+        app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/profile", data::profile);
+        app.post("/v1/workflows/{workflowId}/save", ops::save);
+        app.get("/v1/workflows/{workflowId}/debug", ops::debug);
+        app.post("/v1/shutdown", ops::shutdown);
     }
 
     private static Map<String, Object> meta() {
@@ -43,7 +146,7 @@ public final class NativeService implements AutoCloseable {
         return body;
     }
 
-    private Map<String, Object> health() {
+    private Map<String, Object> health(String session) {
         long usedMb = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / (1024 * 1024);
         long maxMb = Runtime.getRuntime().maxMemory() / (1024 * 1024);
         Map<String, Object> memory = new LinkedHashMap<>();
@@ -54,18 +157,17 @@ public final class NativeService implements AutoCloseable {
         body.put("name", NAME);
         body.put("version", VERSION);
         body.put("api", Http.API_VERSION);
-        body.put("nodes", 0);
-        body.put("coreNodes", 0);
-        body.put("workflows", 0);
-        body.put("sessions", 0);
-        body.put("jobs", 0);
+        body.put("nodes", state.registry().size());
+        body.put("coreNodes", state.registry().coreCount());
+        body.put("workflows", state.workflows().count());
+        body.put("sessions", state.sessionCount());
+        body.put("jobs", state.jobs().activeCount(session));
         body.put("memory", memory);
         return body;
     }
 
     public NativeService start(int requestedPort) {
-        this.port = requestedPort;
-        app.start(requestedPort);
+        app.start(settings.bindHost(), requestedPort);
         this.port = app.port();
         return this;
     }
@@ -74,29 +176,87 @@ public final class NativeService implements AutoCloseable {
         return port;
     }
 
-    public Javalin app() {
-        return app;
+    public boolean shuttingDown() {
+        return shuttingDown.get();
     }
 
-    public boolean shuttingDown() {
-        return shuttingDown;
+    /** Blocks the caller until {@link #close()} or {@link #shutdownAsync()} finished. */
+    public void awaitStop() {
+        try {
+            stopped.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Stop after the current response is written: a new daemon thread delays, then closes the
+     * job manager, the HTTP server and every session database.
+     */
+    public void shutdownAsync() {
+        if (!shuttingDown.compareAndSet(false, true)) {
+            return;
+        }
+        Thread thread = new Thread(() -> {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            close();
+        }, "dap-shutdown");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     @Override
     public void close() {
-        app.stop();
+        if (!closed.compareAndSet(false, true)) {
+            stopped.countDown();
+            return;
+        }
+        try {
+            state.jobs().close();
+        } finally {
+            try {
+                app.stop();
+            } finally {
+                try {
+                    state.closeSessions();
+                } finally {
+                    stopped.countDown();
+                }
+            }
+        }
+    }
+
+    /** All five Phase-1 node executors. */
+    public static Executors defaultExecutors() {
+        return new Executors()
+                .register(new CsvReaderExecutor())
+                .register(new RowFilterExecutor())
+                .register(new ColumnFilterExecutor())
+                .register(new SorterExecutor())
+                .register(new MissingValueExecutor());
     }
 
     public static void main(String[] args) {
-        int port = Integer.parseInt(System.getProperty("dap.port", System.getenv().getOrDefault("DAP_PORT", "7800")));
-        String bind = System.getenv().getOrDefault("DAP_BIND", "127.0.0.1");
+        Settings defaults = Settings.fromEnv();
+        int port = defaults.port();
+        String configuredPort = System.getProperty("dap.port");
+        if (configuredPort != null && !configuredPort.isBlank()) {
+            port = Integer.parseInt(configuredPort.strip());
+        }
+        String bind = defaults.bindHost();
         if (!"127.0.0.1".equals(bind) && !"localhost".equals(bind) && !"0.0.0.0".equals(bind)) {
             System.err.println("dap-native: unsupported DAP_BIND " + bind);
             System.exit(2);
         }
-        NativeService service = new NativeService();
-        Runtime.getRuntime().addShutdownHook(new Thread(service::close, "dap-shutdown"));
+        Settings settings = new Settings(defaults.maxWorkflows(), defaults.defaultJobTimeoutSec(), bind, port);
+        NativeService service = new NativeService(settings, new NodeRegistry(), defaultExecutors());
+        Runtime.getRuntime().addShutdownHook(new Thread(service::close, "dap-shutdown-hook"));
         service.start(port);
         System.out.println("dap-native listening on http://" + bind + ":" + service.port() + "/v1");
+        service.awaitStop();
     }
 }
