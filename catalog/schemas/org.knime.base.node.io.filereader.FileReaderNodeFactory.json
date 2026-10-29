@@ -1,0 +1,99 @@
+{
+  "id" : "org.knime.base.node.io.filereader.FileReaderNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.io.filereader.FileReaderNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "section" : "Enter ASCII data file location: (press 'Enter' to update preview)",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Enter ASCII data file location: (press 'Enter' to update preview)",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Enter ASCII data file location: (press 'Enter' to update preview)",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Preserve user settings for new location",
+      "section" : "Enter ASCII data file location: (press 'Enter' to update preview)",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "read row IDs",
+      "section" : "Basic Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Column delimiter",
+      "section" : "Basic Settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "<none>",
+        "label" : "<none>"
+      }, {
+        "value" : ",",
+        "label" : ","
+      }, {
+        "value" : "<space>",
+        "label" : "<space>"
+      }, {
+        "value" : "<tab>",
+        "label" : "<tab>"
+      }, {
+        "value" : ";",
+        "label" : ";"
+      } ],
+      "default" : "<none>"
+    }, {
+      "type" : "boolean",
+      "label" : "read column headers",
+      "section" : "Basic Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "ignore spaces and tabs",
+      "section" : "Basic Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Java-style comments",
+      "section" : "Basic Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Single line comment",
+      "section" : "Basic Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "text",
+      "label" : "Click column header to change column properties (* = name/type user settings)",
+      "section" : "Preview",
+      "source" : "dialog-ui",
+      "default" : ""
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 11,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

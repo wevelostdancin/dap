@@ -1,0 +1,138 @@
+{
+  "id" : "org.knime.exp.node.columnTrans.Many2OneColNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelFilterString",
+      "configKey" : "many2OneCols2Condense",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelFilterString",
+      "type" : "filter",
+      "default" : null,
+      "title" : "Many2OneCols2Condense",
+      "titleSource" : "field-name",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "many2OneCondenseColName",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Condensed Column",
+      "title" : "Appended column name",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "includeMethod",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Binary",
+      "title" : "Include method",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "Binary",
+        "label" : "Binary"
+      }, {
+        "value" : "Maximum",
+        "label" : "Maximum"
+      }, {
+        "value" : "Minimum",
+        "label" : "Minimum"
+      }, {
+        "value" : "RegExpPattern",
+        "label" : "RegExpPattern"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "many2OneRecoValBox",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "[^0]*",
+      "title" : "Include Pattern",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "many2OneRemoveCols",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : true,
+      "title" : "Many2OneRemoveCols",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.preproc.columnTrans.Many2OneColNodeDialog",
+    "ui" : [ {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Always include all columns",
+      "section" : "Column settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Appended column name",
+      "section" : "Column settings",
+      "source" : "dialog-ui",
+      "default" : "Condensed Column",
+      "editable" : true
+    }, {
+      "type" : "dropdown",
+      "label" : "Include method",
+      "configKey" : "includeMethod",
+      "keySource" : "label-match",
+      "section" : "Column settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Binary",
+        "label" : "Binary"
+      }, {
+        "value" : "Maximum",
+        "label" : "Maximum"
+      }, {
+        "value" : "Minimum",
+        "label" : "Minimum"
+      }, {
+        "value" : "RegExpPattern",
+        "label" : "RegExpPattern"
+      } ],
+      "default" : "Binary"
+    }, {
+      "type" : "string",
+      "label" : "Include Pattern",
+      "section" : "Column settings",
+      "source" : "dialog-ui",
+      "default" : "[^0]*",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Keep original columns",
+      "section" : "Column settings",
+      "source" : "dialog-ui",
+      "default" : true
+    } ],
+    "labelCoverage" : "3/5",
+    "uiElements" : 7
+  },
+  "tier" : "experimental"
+}

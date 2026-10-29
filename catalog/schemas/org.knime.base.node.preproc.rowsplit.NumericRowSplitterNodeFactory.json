@@ -1,0 +1,86 @@
+{
+  "id" : "org.knime.base.node.preproc.rowsplit.NumericRowSplitterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.rowsplit.NumericRowSplitterNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnSelection",
+      "configKey" : "column_selection",
+      "title" : "Column",
+      "description" : "Select one numeric column whose values will be tested against the specified bounds.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_lowerBoundDefined",
+      "configKey" : "lower_bound_defined",
+      "title" : "Use lower bound",
+      "description" : "If enabled, only rows whose column value satisfies the lower bound condition are directed to the first output port.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_lowerBoundValue",
+      "configKey" : "lower_bound_value",
+      "title" : "Lower bound value",
+      "description" : "The lower bound value. Only rows whose column value satisfies the lower bound condition are directed to the first output port.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.0
+    }, {
+      "field" : "m_lowerBoundOperator",
+      "configKey" : "lowerBoundOperator",
+      "title" : "Lower bound operator",
+      "description" : "Defines how the lower bound is applied to the column value.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "GREATER_THAN_OR_EQUAL",
+        "label" : "Greater than or equal"
+      }, {
+        "value" : "GREATER_THAN",
+        "label" : "Greater than"
+      } ],
+      "default" : "GREATER_THAN_OR_EQUAL"
+    }, {
+      "field" : "m_upperBoundDefined",
+      "configKey" : "upper_bound_defined",
+      "title" : "Use upper bound",
+      "description" : "If enabled, only rows whose column value satisfies the upper bound condition are directed to the first output port.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_upperBoundValue",
+      "configKey" : "upper_bound_value",
+      "title" : "Upper bound value",
+      "description" : "The upper bound value. Only rows whose column value satisfies the upper bound condition are directed to the first output port.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.0
+    }, {
+      "field" : "m_upperBoundOperator",
+      "configKey" : "upperBoundOperator",
+      "title" : "Upper bound operator",
+      "description" : "Defines how the upper bound is applied to the column value.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LESS_THAN_OR_EQUAL",
+        "label" : "Less than or equal"
+      }, {
+        "value" : "LESS_THAN",
+        "label" : "Less than"
+      } ],
+      "default" : "LESS_THAN_OR_EQUAL"
+    } ]
+  },
+  "tier" : "experimental"
+}

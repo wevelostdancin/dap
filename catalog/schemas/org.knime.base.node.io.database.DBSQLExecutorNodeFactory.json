@@ -1,0 +1,26 @@
+{
+  "id" : "org.knime.base.node.io.database.DBSQLExecutorNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.io.database.DBSQLExecutorNodeDialog",
+    "ui" : [ {
+      "type" : "text",
+      "label" : "SQL Statement",
+      "section" : "Config",
+      "source" : "dialog-ui",
+      "default" : ""
+    }, {
+      "type" : "list",
+      "section" : "Config",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 2,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

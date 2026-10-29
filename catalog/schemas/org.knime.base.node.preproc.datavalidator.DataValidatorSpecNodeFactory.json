@@ -1,0 +1,157 @@
+{
+  "id" : "org.knime.base.node.preproc.datavalidator.DataValidatorSpecNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.datavalidator.DataValidatorSpecNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnNameMatching",
+      "configKey" : "columnNameMatching",
+      "title" : "If column name casing differs",
+      "description" : "Controls what counts as a column name match between the input table and the reference table. If\n'Rename' is chosen, it still tries to treat the column name as a distinct value (find an exactly\ncase-sensitive matching column name) first, and then falls back to renaming the column\n(case-insensitive matching).\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "CASE_SENSITIVE",
+        "label" : "Treat as distinct"
+      }, {
+        "value" : "CASE_INSENSITIVE",
+        "label" : "Rename"
+      } ],
+      "default" : "CASE_SENSITIVE"
+    }, {
+      "field" : "m_missingColumnHandling",
+      "configKey" : "colum_missing_handling",
+      "title" : "If a column is missing in the table",
+      "description" : "Ensures that the reference columns exist in the input table.\nIf case insensitive name matching is selected, the first matching column will satisfy this condition.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "",
+        "label" : ""
+      }, {
+        "value" : "Reject if column is missing",
+        "label" : "Reject if column is missing"
+      }, {
+        "value" : "Insert column filled with missing values",
+        "label" : "Insert column filled with missing values"
+      } ],
+      "default" : "Reject if column is missing"
+    }, {
+      "field" : "m_additionalColumnsHandling",
+      "configKey" : "unkown_columns_handling",
+      "title" : "If there is an additional column in the table",
+      "description" : "Specifies how to handle columns which are not included in the reference table but in the table to validate.\nAdditional columns can cause the validation to fail, be removed, or moved to the end of the table.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Don't allow unknown columns",
+        "label" : "Don't allow unknown columns"
+      }, {
+        "value" : "Remove unknown columns",
+        "label" : "Remove unknown columns"
+      }, {
+        "value" : "Sort them to the end",
+        "label" : "Sort them to the end"
+      } ],
+      "default" : "Don't allow unknown columns"
+    }, {
+      "field" : "m_dataTypeHandling",
+      "configKey" : "datatype_handling",
+      "title" : "If data type does not match",
+      "description" : "Ensures a correct data type.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Reject if different",
+        "label" : "Reject if different"
+      }, {
+        "value" : "",
+        "label" : ""
+      }, {
+        "value" : "Try to convert (reject if not compatible)",
+        "label" : "Try to convert (reject if not compatible)"
+      } ],
+      "default" : "Reject if different"
+    }, {
+      "field" : "m_columnNames",
+      "configKey" : "column_names",
+      "title" : "ColumnNames",
+      "description" : "",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "string"
+      },
+      "addButtonText" : "",
+      "default" : [ ]
+    }, {
+      "field" : "m_missingValueHandling",
+      "configKey" : "missingValueHandling",
+      "title" : "If there are missing values",
+      "description" : "Validation fails if any of the columns contains missing values.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      }, {
+        "value" : "FAIL",
+        "label" : "Fail validation"
+      } ],
+      "default" : "IGNORE"
+    }, {
+      "field" : "m_categoricDomainHandling",
+      "configKey" : "categoricDomainHandling",
+      "title" : "If categoric value is not in the domain",
+      "description" : "Allows one to optionally validate categoric values in columns against a set of allowed values.\nThis option is only enabled if the reference column defines possible values.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      }, {
+        "value" : "FAIL",
+        "label" : "Fail validation"
+      }, {
+        "value" : "MISSING_VALUE",
+        "label" : "Replace with missing values"
+      } ],
+      "default" : "IGNORE"
+    }, {
+      "field" : "m_numericDomainHandling",
+      "configKey" : "numericDomainHandling",
+      "title" : "If numeric value is outside the domain",
+      "description" : "Checks if each data object is between min and max defined by the domain of the reference column.\nThis option is only enabled if the reference column defines a numeric domain (min/max).\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      }, {
+        "value" : "FAIL",
+        "label" : "Fail validation"
+      }, {
+        "value" : "MISSING_VALUE",
+        "label" : "Replace with missing values"
+      } ],
+      "default" : "IGNORE"
+    }, {
+      "field" : "m_validationFailureBehavior",
+      "configKey" : "rejecting_behavior",
+      "title" : "If validation fails",
+      "description" : "Controls the effect of a failed validation.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Fail node (no data scan if structure differs)",
+        "label" : "Fail node (no data scan if structure differs)"
+      }, {
+        "value" : "Deactivate first output port (always scans data)",
+        "label" : "Deactivate first output port (always scans data)"
+      } ],
+      "default" : "Fail node (no data scan if structure differs)"
+    } ]
+  },
+  "tier" : "experimental"
+}

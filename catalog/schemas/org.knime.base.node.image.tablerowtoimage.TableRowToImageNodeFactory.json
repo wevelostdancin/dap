@@ -1,0 +1,24 @@
+{
+  "id" : "org.knime.base.node.image.tablerowtoimage.TableRowToImageNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.image.tablerowtoimage.TableRowToImageNodeParameters",
+    "fields" : [ {
+      "field" : "m_imageColumn",
+      "configKey" : "Image Column",
+      "title" : "Image column",
+      "description" : "Specifies the column containing the image to convert.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.image.tablerowtoimage.TableRowToImageNodeParameters$ImageColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "experimental"
+}

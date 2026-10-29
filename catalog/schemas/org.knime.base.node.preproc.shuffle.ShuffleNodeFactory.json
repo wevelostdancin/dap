@@ -1,0 +1,42 @@
+{
+  "id" : "org.knime.base.node.preproc.shuffle.ShuffleNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.shuffle.ShuffleNodeParameters",
+    "fields" : [ {
+      "field" : "m_seedParameters",
+      "configKey" : "seedParameters",
+      "title" : "SeedParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_useSeed",
+        "configKey" : "useSeed",
+        "title" : "Use seed",
+        "description" : "When enabled, the shuffling will use a fixed seed value, making the randomization reproducible across\nmultiple executions. When disabled, each execution will produce different random shuffling results,\nproviding real randomness.\n",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_seed",
+        "configKey" : "seed",
+        "title" : "Random seed",
+        "description" : "The seed value used for random number generation. Use the same seed to get identical shuffling results\nacross multiple executions. You can enter a custom value or use the button below to generate a new\nrandom seed.\n",
+        "advanced" : false,
+        "type" : "string",
+        "default" : "0"
+      }, {
+        "field" : "m_drawSeed",
+        "configKey" : "drawSeed",
+        "title" : "Draw new seed",
+        "description" : "Generate a new random seed and set it in the Random seed input above for reproducible runs.\n",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "java.lang.Void"
+      } ]
+    } ]
+  },
+  "tier" : "core"
+}

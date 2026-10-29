@@ -1,0 +1,204 @@
+{
+  "id" : "org.knime.base.node.flowvariable.createfilename.CreateFilenameNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "BaseDir",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "/Users/vitalypesnev",
+      "title" : "BaseDir",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "FileName",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Base file name",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "FileExtension",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : ".txt",
+      "title" : "File extension",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : ".txt",
+        "label" : ".txt"
+      }, {
+        "value" : ".csv",
+        "label" : ".csv"
+      }, {
+        "value" : ".table",
+        "label" : ".table"
+      }, {
+        "value" : ".pmml",
+        "label" : ".pmml"
+      }, {
+        "value" : ".xml",
+        "label" : ".xml"
+      }, {
+        "value" : ".arff",
+        "label" : ".arff"
+      }, {
+        "value" : ".xls",
+        "label" : ".xls"
+      }, {
+        "value" : ".xlsx",
+        "label" : ".xlsx"
+      }, {
+        "value" : ".zip",
+        "label" : ".zip"
+      }, {
+        "value" : ".png",
+        "label" : ".png"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "OverwriteFlag",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "OverwriteFlag",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "OutputFlowVarName",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "filePath",
+      "title" : "Output flow variable name",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "EmptySettingsModel",
+      "configKey" : "1935524147",
+      "javaType" : "org.knime.core.node.defaultnodesettings.DialogComponent$EmptySettingsModel",
+      "type" : "unknown",
+      "default" : null,
+      "title" : "1935524147",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "previewArea",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "PreviewArea",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "EmptySettingsModel",
+      "configKey" : "1462961187",
+      "javaType" : "org.knime.core.node.defaultnodesettings.DialogComponent$EmptySettingsModel",
+      "type" : "unknown",
+      "default" : null,
+      "title" : "1462961187",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.flowvariable.createfilename.CreateFilenameNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "section" : "Selected Directory",
+      "source" : "dialog-ui",
+      "choices" : [ ],
+      "default" : "/Users/vitalypesnev"
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Selected Directory",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Selected Directory",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    }, {
+      "type" : "string",
+      "label" : "Base file name",
+      "section" : "Filename settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "dropdown",
+      "label" : "File extension",
+      "configKey" : "FileExtension",
+      "keySource" : "label-match",
+      "section" : "Filename settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : ".txt",
+        "label" : ".txt"
+      }, {
+        "value" : ".csv",
+        "label" : ".csv"
+      }, {
+        "value" : ".table",
+        "label" : ".table"
+      }, {
+        "value" : ".pmml",
+        "label" : ".pmml"
+      }, {
+        "value" : ".xml",
+        "label" : ".xml"
+      }, {
+        "value" : ".arff",
+        "label" : ".arff"
+      }, {
+        "value" : ".xls",
+        "label" : ".xls"
+      }, {
+        "value" : ".xlsx",
+        "label" : ".xlsx"
+      }, {
+        "value" : ".zip",
+        "label" : ".zip"
+      }, {
+        "value" : ".png",
+        "label" : ".png"
+      } ],
+      "default" : ".txt"
+    }, {
+      "type" : "boolean",
+      "label" : "Overwrite existing variable",
+      "section" : "Filename settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Output flow variable name",
+      "section" : "Filename settings",
+      "source" : "dialog-ui",
+      "default" : "filePath",
+      "editable" : true
+    }, {
+      "type" : "text",
+      "section" : "Output Preview",
+      "source" : "dialog-ui",
+      "default" : ""
+    } ],
+    "labelCoverage" : "3/8",
+    "uiElements" : 8
+  },
+  "tier" : "experimental"
+}

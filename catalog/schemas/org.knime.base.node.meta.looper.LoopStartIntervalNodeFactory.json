@@ -1,0 +1,61 @@
+{
+  "id" : "org.knime.base.node.meta.looper.LoopStartIntervalNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.meta.looper.LoopStartIntervalNodeDialog",
+    "ui" : [ {
+      "type" : "string",
+      "label" : "From",
+      "configKey" : "from",
+      "keySource" : "label-match",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "To",
+      "configKey" : "to",
+      "keySource" : "label-match",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Step",
+      "configKey" : "step",
+      "keySource" : "label-match",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "double",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "integer",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Variable prefix",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 6,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

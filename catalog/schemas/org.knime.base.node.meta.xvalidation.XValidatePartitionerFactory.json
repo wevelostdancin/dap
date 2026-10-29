@@ -1,0 +1,77 @@
+{
+  "id" : "org.knime.base.node.meta.xvalidation.XValidatePartitionerFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.meta.xvalidation.XValidatePartitionerParameters",
+    "fields" : [ {
+      "field" : "m_validations",
+      "configKey" : "validations",
+      "title" : "Number of validations",
+      "description" : "The number of cross validation iterations that should be performed.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 10
+    }, {
+      "field" : "m_samplingMethod",
+      "configKey" : "samplingMethod",
+      "title" : "Sampling method",
+      "description" : "Choose the sampling method for partitioning the data:",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LINEAR",
+        "label" : "Linear sampling"
+      }, {
+        "value" : "RANDOM",
+        "label" : "Random sampling"
+      }, {
+        "value" : "STRATIFIED",
+        "label" : "Stratified sampling"
+      }, {
+        "value" : "LEAVE_ONE_OUT",
+        "label" : "Leave-one-out"
+      } ],
+      "default" : "RANDOM"
+    }, {
+      "field" : "m_classColumn",
+      "configKey" : "classColumn",
+      "title" : "Class column",
+      "description" : "The name of the column with the class labels for stratified sampling.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_useRandomSeed",
+      "configKey" : "useRandomSeed",
+      "title" : "Use random seed",
+      "description" : "For random and stratified sampling you can choose a seed for the random number generator in order\nto get reproducible results. Otherwise you get different partitions every time.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_randomSeed",
+      "configKey" : "randomSeed",
+      "title" : "Random seed",
+      "description" : "The seed value for the random number generator.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "0"
+    }, {
+      "field" : "m_drawSeed",
+      "configKey" : "drawSeed",
+      "title" : "Draw seed",
+      "description" : "Generate a random seed and set it in the Random seed input above for reproducible runs.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    } ]
+  },
+  "tier" : "experimental"
+}

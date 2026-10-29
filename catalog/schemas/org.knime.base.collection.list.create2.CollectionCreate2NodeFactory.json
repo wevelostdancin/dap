@@ -1,0 +1,57 @@
+{
+  "id" : "org.knime.base.collection.list.create2.CollectionCreate2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.collection.list.create2.CollectionCreate2NodeParameters",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Collected columns",
+      "description" : "Select the columns to be collected into a new collection column.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter"
+    }, {
+      "field" : "m_collectionType",
+      "configKey" : "collectionType",
+      "title" : "Collection type",
+      "description" : "Sets the collection column type.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LIST",
+        "label" : "List"
+      }, {
+        "value" : "SET",
+        "label" : "Set (remove duplicates)"
+      } ],
+      "default" : "LIST"
+    }, {
+      "field" : "m_ignoreMissing",
+      "configKey" : "ignoreMissingValue",
+      "title" : "Skip missing values",
+      "description" : "If checked, missing values are skipped, i.e. not stored in collection cells.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_newColumnName",
+      "configKey" : "newColName",
+      "title" : "Output column name",
+      "description" : "Specifies the name of the output column containing the collection cells.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Collected Values"
+    }, {
+      "field" : "m_removeColumns",
+      "configKey" : "removeCols",
+      "title" : "Remove collected columns",
+      "description" : "If checked, collected columns are removed from output table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

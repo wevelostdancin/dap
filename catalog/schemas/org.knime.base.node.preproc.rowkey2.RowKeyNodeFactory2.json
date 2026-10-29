@@ -1,0 +1,117 @@
+{
+  "id" : "org.knime.base.node.preproc.rowkey2.RowKeyNodeFactory2",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.rowkey2.RowKeyNodeSettings",
+    "fields" : [ {
+      "field" : "m_replaceRowKey",
+      "configKey" : "replaceRowKey",
+      "title" : "Replace RowIDs",
+      "description" : "If selected the RowIDs will be replaced",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_replaceRowKeyMode",
+      "configKey" : "replaceRowKeyMode",
+      "title" : "Replacement mode",
+      "description" : "Replace the RowID by a newly generated one or the values of a column.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "GENERATE_NEW",
+        "label" : "Generate new"
+      }, {
+        "value" : "USE_COLUMN",
+        "label" : "Use column"
+      } ],
+      "default" : "GENERATE_NEW"
+    }, {
+      "field" : "m_newRowKeyColumnV2",
+      "configKey" : "newRowKeyColumnV2",
+      "title" : "ID column",
+      "description" : "The column to replace the current RowID.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeRowKeyColumn",
+      "configKey" : "removeRowKeyCol",
+      "title" : "Remove selected ID column",
+      "description" : "If selected, the column replacing the current RowID is removed from the table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_handleMissingsMode",
+      "configKey" : "handleMissingsMode",
+      "title" : "If ID column contains missing values",
+      "description" : "Fail if encountering missing values, or replace them.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "REPLACE",
+        "label" : "Replace by \"?\""
+      } ],
+      "default" : "FAIL"
+    }, {
+      "field" : "m_handleDuplicatesMode",
+      "configKey" : "handleDuplicatesMode",
+      "title" : "If ID column contains duplicates",
+      "description" : "Fail if encountering duplicate values, or make them unique.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "APPEND_COUNTER",
+        "label" : "Append counter"
+      } ],
+      "default" : "FAIL"
+    }, {
+      "field" : "m_enableHilite",
+      "configKey" : "enableHilite",
+      "title" : "Enable hiliting",
+      "description" : "If selected, a map is maintained joining the old with the new RowID. Depending on the number of rows,\nenabling this feature might consume a lot of memory.",
+      "advanced" : true,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_appendRowKey",
+      "configKey" : "appendRowKeyCol",
+      "title" : "Append column with RowID values",
+      "description" : "If selected, a new column with the values of the current RowID is appended to the table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_appendedColumnName",
+      "configKey" : "newColumnName4RowKeyValues",
+      "title" : "Column name",
+      "description" : "The name of the column to append to the table.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Old RowID"
+    }, {
+      "field" : "m_doNotAllowPaddedColumnName",
+      "configKey" : "doNotAllowPaddedColumnName",
+      "title" : "DoNotAllowPaddedColumnName",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "core"
+}

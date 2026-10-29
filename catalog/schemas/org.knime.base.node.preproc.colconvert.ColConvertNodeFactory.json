@@ -1,0 +1,39 @@
+{
+  "id" : "org.knime.base.node.preproc.colconvert.ColConvertNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.preproc.colconvert.ColConvertNodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "String -> Number",
+      "section" : "Select mode",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Number -> String",
+      "section" : "Select mode",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 4,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

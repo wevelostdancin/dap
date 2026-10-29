@@ -1,0 +1,545 @@
+{
+  "id" : "org.knime.base.node.io.filehandling.csv.reader.CSVTableReaderNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.io.filehandling.csv.reader.CSVTableReaderNodeParameters",
+    "fields" : [ {
+      "field" : "m_csvReaderParameters",
+      "configKey" : "csvReaderParameters",
+      "title" : "CsvReaderParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_multiFileSelectionParams",
+        "configKey" : "multiFileSelectionParams",
+        "title" : "MultiFileSelectionParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_fileSystemFromPortNotAvailableMessage",
+          "configKey" : "fileSystemFromPortNotAvailableMessage",
+          "title" : "FileSystemFromPortNotAvailableMessage",
+          "description" : "",
+          "advanced" : false,
+          "type" : "unknown",
+          "javaType" : "java.lang.Void"
+        }, {
+          "field" : "m_source",
+          "configKey" : "source",
+          "title" : "Source",
+          "description" : "",
+          "advanced" : false,
+          "type" : "unknown",
+          "javaType" : "org.knime.node.parameters.widget.file.MultiFileSelection"
+        } ]
+      }, {
+        "field" : "m_skipFirstDataRowsParams",
+        "configKey" : "skipFirstDataRowsParams",
+        "title" : "SkipFirstDataRowsParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_skipFirstDataRows",
+          "configKey" : "skipFirstDataRows",
+          "title" : "Skip first data rows",
+          "description" : "Use this option to skip the specified number of valid data rows. This has no effect on which row will be\nchosen as a column header. Skipping rows prevents parallel reading of individual files.\n",
+          "advanced" : false,
+          "type" : "integer",
+          "default" : 0
+        } ]
+      }, {
+        "field" : "m_maxNumberOfRowsParams",
+        "configKey" : "maxNumberOfRowsParams",
+        "title" : "MaxNumberOfRowsParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_maximumNumberOfRows",
+          "configKey" : "maximumNumberOfRows",
+          "title" : "Limit number of rows",
+          "description" : "If enabled, only the specified number of data rows are read. The column header row (if selected) is not\ntaken into account. Limiting rows prevents parallel reading of individual files.\n",
+          "advanced" : true,
+          "type" : "integer",
+          "nullable" : true,
+          "default" : null,
+          "optional" : true
+        } ]
+      }, {
+        "field" : "m_ifSchemaChangesParams",
+        "configKey" : "ifSchemaChangesParams",
+        "title" : "IfSchemaChangesParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_ignoreSchemaChange",
+          "configKey" : "ignoreSchemaChange",
+          "title" : "If schema changes, ignore schema change (deprecated)",
+          "description" : "If set, the node tries to ignore the changes and outputs a table with the old table specification.\nThis option is deprecated. Once unchecked, it will disappear and cannot be selected again, as it may lead\nto invalid data in the resulting table.\n",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        }, {
+          "field" : "m_ifSchemaChangesOption",
+          "configKey" : "ifSchemaChangesOption",
+          "title" : "If schema changes",
+          "description" : "Specifies the node behavior if the content of the configured file/folder changes between executions,\ni.e., columns are added/removed to/from the file(s) or their types change. The following options are\navailable:\n",
+          "advanced" : false,
+          "type" : "enum",
+          "choices" : [ {
+            "value" : "FAIL",
+            "label" : "Fail"
+          }, {
+            "value" : "USE_NEW_SCHEMA",
+            "label" : "Use new schema"
+          } ],
+          "default" : "FAIL"
+        }, {
+          "field" : "m_ignoreSchemaChangeWasSetInitially",
+          "configKey" : "ignoreSchemaChangeWasSetInitially",
+          "title" : "IgnoreSchemaChangeWasSetInitially",
+          "description" : "",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        } ]
+      }, {
+        "field" : "m_multiFileReaderParams",
+        "configKey" : "multiFileReaderParams",
+        "title" : "MultiFileReaderParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_howToCombineColumns",
+          "configKey" : "howToCombineColumns",
+          "title" : "How to combine columns",
+          "description" : "Specifies how to deal with reading multiple files in which not all column names are identical.",
+          "advanced" : false,
+          "type" : "enum",
+          "choices" : [ {
+            "value" : "FAIL",
+            "label" : "Fail if different"
+          }, {
+            "value" : "UNION",
+            "label" : "Union"
+          }, {
+            "value" : "INTERSECTION",
+            "label" : "Intersection"
+          } ],
+          "default" : "FAIL"
+        }, {
+          "field" : "m_appendPathColumn",
+          "configKey" : "appendPathColumn",
+          "title" : "Append file path column",
+          "description" : "Select this box if you want to add a column containing the path of the file from which the row is read.\nThe node will fail if adding the column with the provided name causes a name collision with any of the\ncolumns in the read table.\n",
+          "advanced" : false,
+          "type" : "string",
+          "nullable" : true,
+          "default" : null,
+          "optional" : true
+        } ]
+      }, {
+        "field" : "m_fileEncodingParams",
+        "configKey" : "fileEncodingParams",
+        "title" : "FileEncodingParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_fileEncoding",
+          "configKey" : "fileEncoding",
+          "title" : "File encoding",
+          "description" : "Defines the character set used to read or write a file that contains characters in a different encoding. You can choose from a list of character encodings (UTF-8, UTF-16, etc.), or specify any other encoding supported by your Java Virtual Machine (VM). The default value uses the default encoding of the Java VM, which may depend on the locale or the Java property &quot;file.encoding&quot;.\n",
+          "advanced" : true,
+          "type" : "enum",
+          "choices" : [ {
+            "value" : "DEFAULT",
+            "label" : "OS default (UTF-8)"
+          }, {
+            "value" : "ISO_8859_1",
+            "label" : "ISO-8859-1"
+          }, {
+            "value" : "US_ASCII",
+            "label" : "US-ASCII"
+          }, {
+            "value" : "UTF_8",
+            "label" : "UTF-8"
+          }, {
+            "value" : "UTF_16",
+            "label" : "UTF-16"
+          }, {
+            "value" : "UTF_16BE",
+            "label" : "UTF-16BE"
+          }, {
+            "value" : "UTF_16LE",
+            "label" : "UTF-16LE"
+          }, {
+            "value" : "OTHER",
+            "label" : "Other"
+          } ],
+          "default" : "UTF_8",
+          "choicesSource" : {
+            "provider" : "org.knime.base.node.io.filehandling.webui.FileEncodingParameters$EncodingChoicesProvider",
+            "kind" : "enum"
+          },
+          "choicesResolved" : true
+        }, {
+          "field" : "m_customEncoding",
+          "configKey" : "customEncoding",
+          "title" : "Custom encoding",
+          "description" : "A custom character set used to read a CSV file.",
+          "advanced" : true,
+          "type" : "string",
+          "default" : ""
+        } ]
+      }, {
+        "field" : "m_skipFirstLinesParams",
+        "configKey" : "skipFirstLinesParams",
+        "title" : "SkipFirstLinesParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_skipFirstLines",
+          "configKey" : "skipFirstLines",
+          "title" : "Skip first lines of file",
+          "description" : "Use this option to skip lines that do not fit in the table structure (e.g. multi-line comments).\n<br/>\nThe specified number of lines are skipped in the input file before the parsing starts. Skipping lines\nprevents parallel reading of individual files.\n",
+          "advanced" : false,
+          "type" : "integer",
+          "default" : 0
+        } ]
+      }, {
+        "field" : "m_csvFormatParams",
+        "configKey" : "csvFormatParams",
+        "title" : "CsvFormatParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_commentLineCharacter",
+          "configKey" : "commentLineCharacter",
+          "title" : "Comment line character",
+          "description" : "Defines the character indicating line comments.",
+          "advanced" : false,
+          "type" : "string",
+          "default" : "#"
+        }, {
+          "field" : "m_rowDelimiterOption",
+          "configKey" : "rowDelimiterOption",
+          "title" : "Row delimiter",
+          "description" : "Defines the character string delimiting rows. Can get detected automatically.",
+          "advanced" : false,
+          "type" : "enum",
+          "choices" : [ {
+            "value" : "LINE_BREAK",
+            "label" : "Line break"
+          }, {
+            "value" : "CUSTOM",
+            "label" : "Custom"
+          } ],
+          "default" : "LINE_BREAK"
+        }, {
+          "field" : "m_customRowDelimiter",
+          "configKey" : "customRowDelimiter",
+          "title" : "Custom row delimiter",
+          "description" : "Defines the character to be used as custom row delimiter.",
+          "advanced" : false,
+          "type" : "string",
+          "default" : "\n"
+        }, {
+          "field" : "m_columnDelimiter",
+          "configKey" : "columnDelimiter",
+          "title" : "Column delimiter",
+          "description" : "Defines the character string delimiting columns. Use '\\t' for tab characters. Can get detected\nautomatically.\n",
+          "advanced" : false,
+          "type" : "string",
+          "default" : ","
+        }, {
+          "field" : "m_quotedStringsContainNoRowDelimiters",
+          "configKey" : "quotedStringsContainNoRowDelimiters",
+          "title" : "Quoted strings contain no row delimiters",
+          "description" : "Check this box if there are no quotes that contain row delimiters inside the files. Row delimiters\nshould not be inside of quotes for parallel reading of individual files.\n",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        }, {
+          "field" : "m_quoteCharacter",
+          "configKey" : "quoteCharacter",
+          "title" : "Quote character",
+          "description" : "The character indicating quotes. Can get detected automatically.",
+          "advanced" : false,
+          "type" : "string",
+          "default" : "\""
+        }, {
+          "field" : "m_quoteEscapeCharacter",
+          "configKey" : "quoteEscapeCharacter",
+          "title" : "Quote escape character",
+          "description" : "The character used for escaping quotes inside an already quoted value. Can get detected\nautomatically.\n",
+          "advanced" : false,
+          "type" : "string",
+          "default" : "\""
+        }, {
+          "field" : "m_decimalSeparator",
+          "configKey" : "decimalSeparator",
+          "title" : "Decimal separator",
+          "description" : "Specifies the decimal separator character for parsing numbers. The decimal separator is only used for\nthe parsing of double values. Note that the decimal separator must differ from the thousands separator.\nYou must always provide a decimal separator.\n",
+          "advanced" : false,
+          "type" : "string",
+          "default" : "."
+        }, {
+          "field" : "m_thousandsSeparator",
+          "configKey" : "thousandsSeparator",
+          "title" : "Thousands separator",
+          "description" : "Specifies the thousands separator character for parsing numbers. The thousands separator is used for\ninteger, long and double parsing. Note that the thousands separator must differ from the decimal\nseparator. It is possible to leave the thousands separator unspecified.\n",
+          "advanced" : false,
+          "type" : "string",
+          "default" : ""
+        } ]
+      }, {
+        "field" : "m_autoDetectParams",
+        "configKey" : "autoDetectParams",
+        "title" : "AutoDetectParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_autoDetectButton",
+          "configKey" : "autoDetectButton",
+          "title" : "Autodetect format",
+          "description" : "By pressing this button, the format of the file will be guessed automatically. It is not guaranteed that\nthe correct values are being detected.\n",
+          "advanced" : false,
+          "type" : "unknown",
+          "javaType" : "java.lang.Void"
+        }, {
+          "field" : "m_numberOfCharactersForAutodetection",
+          "configKey" : "numberOfCharactersForAutodetection",
+          "title" : "Number of characters for autodetection",
+          "description" : "Specifies on how many characters of the selected file should be used for autodetection. The\nautodetection by default is based on the first 1024 * 1024 characters.\n",
+          "advanced" : true,
+          "type" : "integer",
+          "default" : 1048576
+        } ]
+      }, {
+        "field" : "m_firstRowContainsColumnNamesParams",
+        "configKey" : "firstRowContainsColumnNamesParams",
+        "title" : "FirstRowContainsColumnNamesParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_firstRowContainsColumnNames",
+          "configKey" : "firstRowContainsColumnNames",
+          "title" : "First row contains column names",
+          "description" : "Select this box if the first row contains column name headers.",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : true
+        } ]
+      }, {
+        "field" : "m_firstColumnContainsRowIdsParams",
+        "configKey" : "firstColumnContainsRowIdsParams",
+        "title" : "FirstColumnContainsRowIdsParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_firstColumnContainsRowIds",
+          "configKey" : "firstColumnContainsRowIds",
+          "title" : "First column contains RowIDs",
+          "description" : "Select this box if the first column contains RowIDs (no duplicates allowed).",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        } ]
+      }, {
+        "field" : "m_ifRowHasFewerColumnsParams",
+        "configKey" : "ifRowHasFewerColumnsParams",
+        "title" : "IfRowHasFewerColumnsParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_ifRowHasLessColumnsOption",
+          "configKey" : "ifRowHasLessColumnsOption",
+          "title" : "If row has fewer columns",
+          "description" : "Specifies the behavior in case some rows are shorter than others. ",
+          "advanced" : false,
+          "type" : "enum",
+          "choices" : [ {
+            "value" : "FAIL",
+            "label" : "Fail"
+          }, {
+            "value" : "INSERT_MISSING",
+            "label" : "Insert missing"
+          } ],
+          "default" : "FAIL"
+        } ]
+      }, {
+        "field" : "m_quotedStringsParams",
+        "configKey" : "quotedStringsParams",
+        "title" : "QuotedStringsParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_replaceEmptyQuotedStringsByMissingValues",
+          "configKey" : "replaceEmptyQuotedStringsByMissingValues",
+          "title" : "Replace empty quoted string by missing values",
+          "description" : "Select this box if you want <b>quoted</b> empty strings to be replaced by missing value cells.",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : true
+        }, {
+          "field" : "m_quotedStringsOption",
+          "configKey" : "quotedStringsOption",
+          "title" : "Quoted strings",
+          "description" : "Specifies the behavior in case there are quoted strings in the input table.",
+          "advanced" : true,
+          "type" : "enum",
+          "choices" : [ {
+            "value" : "REMOVE_QUOTES_AND_TRIM",
+            "label" : "Remove quotes and trim whitespace"
+          }, {
+            "value" : "KEEP_QUOTES",
+            "label" : "Keep quotes"
+          } ],
+          "default" : "REMOVE_QUOTES_AND_TRIM"
+        } ]
+      }, {
+        "field" : "m_limitScannedRowsParams",
+        "configKey" : "limitScannedRowsParams",
+        "title" : "LimitScannedRowsParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_maxDataRowsScanned",
+          "configKey" : "maxDataRowsScanned",
+          "title" : "Limit scanned rows",
+          "description" : "If enabled, only the specified number of input <i>rows</i> are used to analyze the file (i.e to\ndetermine the column types). This option is recommended for long files where the first <i>n</i> rows are\nrepresentative for the whole file. The \"Skip first data rows\" option has no effect on the scanning. Note\nalso, that this option and the \"Limit number of rows\" option are independent from each other, i.e., if\nthe value in \"Limit number of rows\" is smaller than the value specified here, we will still read as many\nrows as specified here.\n",
+          "advanced" : false,
+          "type" : "integer",
+          "nullable" : true,
+          "default" : null,
+          "optional" : true
+        } ]
+      }, {
+        "field" : "m_maxColumnsParams",
+        "configKey" : "maxColumnsParams",
+        "title" : "MaxColumnsParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_maximumNumberOfColumns",
+          "configKey" : "maximumNumberOfColumns",
+          "title" : "Maximum number of columns",
+          "description" : "Sets the number of allowed columns (default 8192 columns) to prevent memory exhaustion. The node will\n            fail if the number of columns exceeds the set limit.\n",
+          "advanced" : false,
+          "type" : "integer",
+          "default" : 8192
+        } ]
+      }, {
+        "field" : "m_limitMemoryParams",
+        "configKey" : "limitMemoryParams",
+        "title" : "LimitMemoryParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_limitMemoryPerColumn",
+          "configKey" : "limitMemoryPerColumn",
+          "title" : "Limit memory per column",
+          "description" : "If selected the memory per column is restricted to 1MB in order to prevent memory exhaustion. Uncheck\nthis option to disable these memory restrictions.\n",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : true
+        } ]
+      }, {
+        "field" : "m_prependFileIndexParams",
+        "configKey" : "prependFileIndexParams",
+        "title" : "PrependFileIndexParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_prependFileIndexToRowId",
+          "configKey" : "prependFileIndexToRowId",
+          "title" : "Prepend file index to RowID",
+          "description" : "Select this box if you want to prepend a prefix that depends on the index of the source file to the\nRowIDs. The prefix for the first file is \"File_0_\", for the second \"File_1_\" and so on. This option is\nuseful if the RowIDs within a single file are unique but the same RowIDs appear in multiple files.\nPrepending the file index prevents parallel reading of individual files.\n",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        } ]
+      } ]
+    }, {
+      "field" : "m_transformationParameters",
+      "configKey" : "transformationParameters",
+      "title" : "TransformationParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_specs",
+        "configKey" : "specs",
+        "title" : "Specs",
+        "description" : "",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "object"
+        },
+        "addButtonText" : "",
+        "default" : null
+      }, {
+        "field" : "m_enforceTypes",
+        "configKey" : "enforceTypes",
+        "title" : "Enforce types",
+        "description" : "Controls how columns whose type changes are dealt with.\nIf selected, the mapping to the KNIME type you configured is attempted.\nThe node will fail if that is not possible.\nIf unselected, the KNIME type corresponding to the new type is used.\n",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : true
+      }, {
+        "field" : "m_dirtyTracker",
+        "configKey" : "dirtyTracker",
+        "title" : "DirtyTracker",
+        "description" : "",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "java.lang.Void"
+      }, {
+        "field" : "m_columnTransformation",
+        "configKey" : "columnTransformation",
+        "title" : "Transformations",
+        "description" : "Use this option to modify the structure of the table. You can deselect each column to filter it out of the\noutput table, use the arrows to reorder the columns, or change the column name or column type of each\ncolumn. Note that the positions of columns are reset in the dialog if a new file or folder is selected.\nWhether and where to add unknown columns during execution is specified via the special row &lt;any unknown\nnew column&gt;. It is also possible to select the type new columns should be converted to. Note that the\nnode will fail if this conversion is not possible e.g. if the selected type is Integer but the new column is\nof type Double.\n",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "unknown"
+        },
+        "addButtonText" : "",
+        "default" : null,
+        "defaultNote" : "значение не сериализуется без UI"
+      }, {
+        "field" : "m_initialColumnTransformation",
+        "configKey" : "initialColumnTransformation",
+        "title" : "InitialColumnTransformation",
+        "description" : "",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "unknown"
+        },
+        "addButtonText" : "",
+        "default" : [ ]
+      } ]
+    } ]
+  },
+  "tier" : "core"
+}

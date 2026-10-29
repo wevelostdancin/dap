@@ -1,0 +1,70 @@
+{
+  "id" : "org.knime.base.node.mine.bfn.fuzzy.FuzzyBasisFunctionPredictor2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.bfn.BasisFunctionPredictor2NodeParameters",
+    "fields" : [ {
+      "field" : "m_dontKnowClass",
+      "configKey" : "dontKnowClass",
+      "title" : "DontKnowClass",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_mode",
+        "configKey" : "mode",
+        "title" : "Unkown class handling",
+        "description" : "Select how to handle cases where the activation degree for all classes is below a certain threshold.\n",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "DEFAULT",
+          "label" : "Default"
+        }, {
+          "value" : "IGNORE",
+          "label" : "Ignore"
+        }, {
+          "value" : "CUSTOM_THRESHOLD",
+          "label" : "Custom threshold"
+        } ],
+        "default" : "IGNORE"
+      }, {
+        "field" : "m_threshold",
+        "configKey" : "threshold",
+        "title" : "Threshold",
+        "description" : "The threshold value between 0 and 1. Instances where the activation lies below this threshold\nare classified as unknown.\n",
+        "advanced" : false,
+        "type" : "number",
+        "default" : 0.0
+      } ]
+    }, {
+      "field" : "m_predictionColumnName",
+      "configKey" : "predictionColumnName",
+      "title" : "Custom prediction column name",
+      "description" : "Allows you to specify a customized name for the prediction column that is appended to the input table.\nIf not checked, <tt>Prediction(target)</tt> (where target is the name of the target column of the provided\nregression model) is used as default.\n",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_appendProbabilityColumns",
+      "configKey" : "append_class_probabilities",
+      "title" : "Append columns with normalized class distribution",
+      "description" : "If selected, a column is appended for each class instance with the normalized probability\nof this row being a member of this class. The probability columns will have names like:\n<tt>P(targetColumn=value)</tt>.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_probabilitySuffix",
+      "configKey" : "class probability suffix",
+      "title" : "Probability column suffix",
+      "description" : "Suffix for the probability columns.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    } ]
+  },
+  "tier" : "experimental"
+}

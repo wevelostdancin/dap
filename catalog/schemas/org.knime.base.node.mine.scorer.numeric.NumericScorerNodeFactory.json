@@ -1,0 +1,116 @@
+{
+  "id" : "org.knime.base.node.mine.scorer.numeric.NumericScorerNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelColumnName",
+      "configKey" : "reference",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelColumnName",
+      "type" : "column",
+      "default" : "",
+      "title" : "Reference column",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelColumnName",
+      "configKey" : "predicted",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelColumnName",
+      "type" : "column",
+      "default" : "",
+      "title" : "Predicted column",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "override default output name",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "Override default output name",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "output column",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Output column name",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "name prefix for flowvars",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Prefix of flow variables",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "generate flow variables",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "Generate flow variables",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.mine.scorer.numeric.NumericScorerNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Reference column",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Predicted column",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Change column name",
+      "section" : "Output column",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Output column name",
+      "section" : "Output column",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Prefix of flow variables",
+      "section" : "Provide scores as flow variables",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Output scores as flow variables",
+      "section" : "Provide scores as flow variables",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "4/6",
+    "uiElements" : 6
+  },
+  "tier" : "experimental"
+}

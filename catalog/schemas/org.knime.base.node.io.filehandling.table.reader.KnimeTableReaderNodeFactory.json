@@ -1,0 +1,244 @@
+{
+  "id" : "org.knime.base.node.io.filehandling.table.reader.KnimeTableReaderNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.io.filehandling.table.reader.KnimeTableReaderNodeParameters",
+    "fields" : [ {
+      "field" : "m_knimeTableReaderParameters",
+      "configKey" : "knimeTableReaderParameters",
+      "title" : "KnimeTableReaderParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_multiFileSelectionParams",
+        "configKey" : "multiFileSelectionParams",
+        "title" : "MultiFileSelectionParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_fileSystemFromPortNotAvailableMessage",
+          "configKey" : "fileSystemFromPortNotAvailableMessage",
+          "title" : "FileSystemFromPortNotAvailableMessage",
+          "description" : "",
+          "advanced" : false,
+          "type" : "unknown",
+          "javaType" : "java.lang.Void"
+        }, {
+          "field" : "m_source",
+          "configKey" : "source",
+          "title" : "Source",
+          "description" : "",
+          "advanced" : false,
+          "type" : "unknown",
+          "javaType" : "org.knime.node.parameters.widget.file.MultiFileSelection"
+        } ]
+      }, {
+        "field" : "m_skipFirstDataRowsParams",
+        "configKey" : "skipFirstDataRowsParams",
+        "title" : "SkipFirstDataRowsParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_skipFirstDataRows",
+          "configKey" : "skipFirstDataRows",
+          "title" : "Skip first data rows",
+          "description" : "Use this option to skip the specified number of valid data rows. This has no effect on which row will be\nchosen as a column header. Skipping rows prevents parallel reading of individual files.\n",
+          "advanced" : false,
+          "type" : "integer",
+          "default" : 0
+        } ]
+      }, {
+        "field" : "m_maxNumberOfRowsParams",
+        "configKey" : "maxNumberOfRowsParams",
+        "title" : "MaxNumberOfRowsParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_maximumNumberOfRows",
+          "configKey" : "maximumNumberOfRows",
+          "title" : "Limit number of rows",
+          "description" : "If enabled, only the specified number of data rows are read. The column header row (if selected) is not\ntaken into account. Limiting rows prevents parallel reading of individual files.\n",
+          "advanced" : true,
+          "type" : "integer",
+          "nullable" : true,
+          "default" : null,
+          "optional" : true
+        } ]
+      }, {
+        "field" : "m_ifSchemaChangesParams",
+        "configKey" : "ifSchemaChangesParams",
+        "title" : "IfSchemaChangesParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_ignoreSchemaChange",
+          "configKey" : "ignoreSchemaChange",
+          "title" : "If schema changes, ignore schema change (deprecated)",
+          "description" : "If set, the node tries to ignore the changes and outputs a table with the old table specification.\nThis option is deprecated. Once unchecked, it will disappear and cannot be selected again, as it may lead\nto invalid data in the resulting table.\n",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        }, {
+          "field" : "m_ifSchemaChangesOption",
+          "configKey" : "ifSchemaChangesOption",
+          "title" : "If schema changes",
+          "description" : "Specifies the node behavior if the content of the configured file/folder changes between executions,\ni.e., columns are added/removed to/from the file(s) or their types change. The following options are\navailable:\n",
+          "advanced" : false,
+          "type" : "enum",
+          "choices" : [ {
+            "value" : "FAIL",
+            "label" : "Fail"
+          }, {
+            "value" : "USE_NEW_SCHEMA",
+            "label" : "Use new schema"
+          } ],
+          "default" : "FAIL"
+        }, {
+          "field" : "m_ignoreSchemaChangeWasSetInitially",
+          "configKey" : "ignoreSchemaChangeWasSetInitially",
+          "title" : "IgnoreSchemaChangeWasSetInitially",
+          "description" : "",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        } ]
+      }, {
+        "field" : "m_multiFileReaderParams",
+        "configKey" : "multiFileReaderParams",
+        "title" : "MultiFileReaderParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_howToCombineColumns",
+          "configKey" : "howToCombineColumns",
+          "title" : "How to combine columns",
+          "description" : "Specifies how to deal with reading multiple files in which not all column names are identical.",
+          "advanced" : false,
+          "type" : "enum",
+          "choices" : [ {
+            "value" : "FAIL",
+            "label" : "Fail if different"
+          }, {
+            "value" : "UNION",
+            "label" : "Union"
+          }, {
+            "value" : "INTERSECTION",
+            "label" : "Intersection"
+          } ],
+          "default" : "FAIL"
+        }, {
+          "field" : "m_appendPathColumn",
+          "configKey" : "appendPathColumn",
+          "title" : "Append file path column",
+          "description" : "Select this box if you want to add a column containing the path of the file from which the row is read.\nThe node will fail if adding the column with the provided name causes a name collision with any of the\ncolumns in the read table.\n",
+          "advanced" : false,
+          "type" : "string",
+          "nullable" : true,
+          "default" : null,
+          "optional" : true
+        } ]
+      }, {
+        "field" : "m_useExistingRowIdParams",
+        "configKey" : "useExistingRowIdParams",
+        "title" : "UseExistingRowIdParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_useExistingRowId",
+          "configKey" : "useExistingRowId",
+          "title" : "Use existing RowID",
+          "description" : "Check this box if the RowIDs from the input tables should be used for\nthe output tables. If unchecked, a new RowID is generated.\nThe generated RowID follows the schema \"Row0\", \"Row1\" and so on.\n",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        } ]
+      }, {
+        "field" : "m_prependTableIndexParams",
+        "configKey" : "prependTableIndexParams",
+        "title" : "PrependTableIndexParams",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_prependTableIndexToRowId",
+          "configKey" : "prependTableIndexToRowId",
+          "title" : "Prepend table index to RowID",
+          "description" : "Only enabled if the existing RowIDs are used. If checked, a prefix is\nprepended to the RowIDs that indicates which table the row came\nfrom.\nThe format of the prefix is \"File_0_\", \"File_1_\" and so on.\n",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        } ]
+      } ]
+    }, {
+      "field" : "m_transformationParameters",
+      "configKey" : "transformationParameters",
+      "title" : "TransformationParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_specs",
+        "configKey" : "specs",
+        "title" : "Specs",
+        "description" : "",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "object"
+        },
+        "addButtonText" : "",
+        "default" : null
+      }, {
+        "field" : "m_enforceTypes",
+        "configKey" : "enforceTypes",
+        "title" : "Enforce types",
+        "description" : "Controls how columns whose type changes are dealt with.\nIf selected, the mapping to the KNIME type you configured is attempted.\nThe node will fail if that is not possible.\nIf unselected, the KNIME type corresponding to the new type is used.\n",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : true
+      }, {
+        "field" : "m_dirtyTracker",
+        "configKey" : "dirtyTracker",
+        "title" : "DirtyTracker",
+        "description" : "",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "java.lang.Void"
+      }, {
+        "field" : "m_columnTransformation",
+        "configKey" : "columnTransformation",
+        "title" : "Transformations",
+        "description" : "Use this option to modify the structure of the table. You can deselect each column to filter it out of the\noutput table, use the arrows to reorder the columns, or change the column name or column type of each\ncolumn. Note that the positions of columns are reset in the dialog if a new file or folder is selected.\nWhether and where to add unknown columns during execution is specified via the special row &lt;any unknown\nnew column&gt;. It is also possible to select the type new columns should be converted to. Note that the\nnode will fail if this conversion is not possible e.g. if the selected type is Integer but the new column is\nof type Double.\n",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "unknown"
+        },
+        "addButtonText" : "",
+        "default" : null,
+        "defaultNote" : "значение не сериализуется без UI"
+      }, {
+        "field" : "m_initialColumnTransformation",
+        "configKey" : "initialColumnTransformation",
+        "title" : "InitialColumnTransformation",
+        "description" : "",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "unknown"
+        },
+        "addButtonText" : "",
+        "default" : [ ]
+      } ]
+    } ]
+  },
+  "tier" : "core"
+}

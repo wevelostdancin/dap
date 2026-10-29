@@ -1,0 +1,103 @@
+{
+  "id" : "org.knime.ensembles.pmml.loopend.PMMLEnsembleLoopEndNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "weightFlowVarName",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "Weight flow variable",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "multiModelMethod",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Majority vote",
+      "title" : "Multiple models method",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "Majority vote",
+        "label" : "Majority vote"
+      }, {
+        "value" : "Average",
+        "label" : "Average"
+      }, {
+        "value" : "Maximum",
+        "label" : "Maximum"
+      }, {
+        "value" : "Sum",
+        "label" : "Sum"
+      }, {
+        "value" : "Median",
+        "label" : "Median"
+      }, {
+        "value" : "Select all",
+        "label" : "Select all"
+      }, {
+        "value" : "Select first",
+        "label" : "Select first"
+      }, {
+        "value" : "Weighted Average",
+        "label" : "Weighted Average"
+      }, {
+        "value" : "Weighted Majority Vote",
+        "label" : "Weighted Majority Vote"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.ensembles.pmml.loopend.PMMLEnsembleLoopEndNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Weight flow variable",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Multiple models method",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Majority vote",
+        "label" : "Majority vote"
+      }, {
+        "value" : "Average",
+        "label" : "Average"
+      }, {
+        "value" : "Maximum",
+        "label" : "Maximum"
+      }, {
+        "value" : "Sum",
+        "label" : "Sum"
+      }, {
+        "value" : "Median",
+        "label" : "Median"
+      }, {
+        "value" : "Select all",
+        "label" : "Select all"
+      }, {
+        "value" : "Select first",
+        "label" : "Select first"
+      }, {
+        "value" : "Weighted Average",
+        "label" : "Weighted Average"
+      }, {
+        "value" : "Weighted Majority Vote",
+        "label" : "Weighted Majority Vote"
+      } ],
+      "default" : "Majority vote"
+    } ],
+    "labelCoverage" : "2/2",
+    "uiElements" : 2
+  },
+  "tier" : "experimental"
+}

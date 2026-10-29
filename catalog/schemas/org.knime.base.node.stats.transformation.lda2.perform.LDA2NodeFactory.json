@@ -1,0 +1,64 @@
+{
+  "id" : "org.knime.base.node.stats.transformation.lda2.perform.LDA2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.stats.transformation.lda2.perform.LDA2NodeParameters",
+    "fields" : [ {
+      "field" : "m_targetDimensions",
+      "configKey" : "number_of_dimensions",
+      "title" : "Target dimensions",
+      "description" : "Number of dimensions to reduce the input data to. This cannot exceed the number of classes minus\none or the number of selected columns, depending on which one is smaller.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    }, {
+      "field" : "m_classColumn",
+      "configKey" : "class_column",
+      "title" : "Class column",
+      "description" : "Column containing class information.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.stats.transformation.lda2.perform.LDA2NodeParameters$ClassColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_inputColumns",
+      "configKey" : "inputColumns",
+      "title" : "Column selection",
+      "description" : "Columns containing the input data.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter"
+    }, {
+      "field" : "m_targetDimensionError",
+      "configKey" : "targetDimensionError",
+      "title" : "TargetDimensionError",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_removeOriginalColumns",
+      "configKey" : "remove_used_columns",
+      "title" : "Remove original data columns",
+      "description" : "If checked, the columns containing the input data are removed from the output table.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_failOnMissingValues",
+      "configKey" : "fail_on_missings",
+      "title" : "Fail if missing values are encountered",
+      "description" : "If checked, execution fails when the selected columns contain missing values. Otherwise, rows\ncontaining missing values are ignored during computation.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

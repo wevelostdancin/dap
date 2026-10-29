@@ -1,0 +1,44 @@
+{
+  "id" : "org.knime.timeseries.node.timemissvaluehandler.TimeMissValueNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.timeseries.node.timemissvaluehandler.TimeMissingValueHandlingNodeDialogPane",
+    "ui" : [ {
+      "type" : "string",
+      "section" : "Column Search",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "dropdown",
+      "section" : "Filter Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "None",
+        "label" : "None"
+      }, {
+        "value" : "Modified",
+        "label" : "Modified"
+      }, {
+        "value" : "Unmodified",
+        "label" : "Unmodified"
+      }, {
+        "value" : "Unknown",
+        "label" : "Unknown"
+      } ],
+      "default" : "None"
+    }, {
+      "type" : "list",
+      "section" : "Individual",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 3,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

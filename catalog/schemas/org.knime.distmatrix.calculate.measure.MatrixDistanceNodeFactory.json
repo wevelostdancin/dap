@@ -1,0 +1,40 @@
+{
+  "id" : "org.knime.distmatrix.calculate.measure.MatrixDistanceNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.distmatrix.calculate.measure.MatrixDistanceNodeParameters",
+    "fields" : [ {
+      "field" : "m_distanceColumn",
+      "configKey" : "columns",
+      "title" : "Distance matrix column",
+      "description" : "Choose the column which contains the distance matrix.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.distance.parameters.DistanceNodeParametersUtil$DistanceMatrixColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_distanceFactoryId",
+      "configKey" : "distance-factory-id",
+      "title" : "DistanceFactoryId",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_matrixDistanceFactoryId",
+      "configKey" : "matrixDistanceFactoryId",
+      "title" : "MatrixDistanceFactoryId",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    } ]
+  },
+  "tier" : "experimental"
+}

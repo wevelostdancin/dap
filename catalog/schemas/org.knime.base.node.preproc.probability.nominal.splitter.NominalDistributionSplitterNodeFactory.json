@@ -1,0 +1,55 @@
+{
+  "id" : "org.knime.base.node.preproc.probability.nominal.splitter.NominalDistributionSplitterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.probability.nominal.splitter.NominalDistributionSplitterNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnSelection",
+      "configKey" : "column_selection",
+      "title" : "Probability distribution column",
+      "description" : "Select the column containing the nominal probability distribution.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.probability.nominal.splitter.NominalDistributionSplitterNodeParameters$NominalDistributionColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeSelectedColumn",
+      "configKey" : "remove_selected_columns",
+      "title" : "Remove selected column",
+      "description" : "If selected, the selected column will be removed from the output.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_suffix",
+      "configKey" : "suffix",
+      "title" : "Suffix for probability columns",
+      "description" : "Specify a suffix for the probability columns. By default, no suffix is defined and the columns are named\nby their class names.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_missingValueHandling",
+      "configKey" : "missing_value_handling",
+      "title" : "Missing value handling",
+      "description" : "Specify how to treat a missing value in the input column. If <i>Fail</i> is selected, the node will fail.\nOtherwise, the node just gives a warning and puts missing values in the output for the corresponding rows.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      } ],
+      "default" : "FAIL"
+    } ]
+  },
+  "tier" : "experimental"
+}

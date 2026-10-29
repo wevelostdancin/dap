@@ -1,0 +1,280 @@
+{
+  "id" : "org.knime.ext.poi3.node.io.filehandling.excel.writer.ExcelTableWriterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.ext.poi3.node.io.filehandling.excel.writer.ExcelTableWriterNodeParameters",
+    "fields" : [ {
+      "field" : "m_excelFormat",
+      "configKey" : "excel_format",
+      "title" : "Excel format",
+      "description" : "Select the Excel file format to write.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "XLSX",
+        "label" : "XLSX"
+      }, {
+        "value" : "XLS",
+        "label" : "XLS"
+      } ],
+      "default" : "XLSX"
+    }, {
+      "field" : "m_outputFile",
+      "configKey" : "file_selection",
+      "title" : "OutputFile",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_overwritePolicy",
+        "configKey" : "if_path_exists",
+        "title" : "If exists",
+        "description" : "Specify the behavior of the node in case the output file already exists.<ul><li><b>Fail</b>: Will issue an error during the node's execution (to prevent unintentional overwrite).</li><li><b>Overwrite</b>: Will replace any existing file.</li><li><b>Ignore</b>: Will ignore if a file already exists and continues the copying process.</li></ul>",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "fail",
+          "label" : "Fail"
+        }, {
+          "value" : "overwrite",
+          "label" : "Overwrite"
+        }, {
+          "value" : "ignore",
+          "label" : "Ignore"
+        }, {
+          "value" : "append",
+          "label" : "Append"
+        } ],
+        "default" : "overwrite"
+      }, {
+        "field" : "m_createMissingFolders",
+        "configKey" : "create_missing_folders",
+        "title" : "Create missing folders",
+        "description" : "If enabled, missing folders in the specified path will be created automatically.",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_file",
+        "configKey" : "file",
+        "title" : "File Selection",
+        "description" : "The file selection.",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "org.knime.node.parameters.widget.file.FileSelection"
+      } ]
+    }, {
+      "field" : "m_encryption",
+      "configKey" : "authentication_method",
+      "title" : "Password to protect files",
+      "description" : "If enabled, the output file will be password-protected. This supports XLS files (using weak encryption) and XLSX files (using AES encryption).",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_type",
+        "configKey" : "selectedType",
+        "title" : "Password to protect files",
+        "description" : "Allows you to specify a password to protect the output file with. In case the \"append\" option is selected and the file already exists, the password must be valid for the existing file.",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "NONE",
+          "label" : "None"
+        }, {
+          "value" : "CREDENTIALS",
+          "label" : "Credentials"
+        }, {
+          "value" : "PWD",
+          "label" : "Password"
+        } ],
+        "default" : "NONE"
+      }, {
+        "field" : "m_credentials",
+        "configKey" : "credentials",
+        "title" : "Workflow credentials",
+        "description" : "Select the workflow credentials to use.",
+        "advanced" : false,
+        "type" : "string",
+        "default" : "",
+        "choicesSource" : {
+          "provider" : "org.knime.ext.poi3.node.io.filehandling.excel.ExcelEncryptionSettings$CredentialFlowVariablesProvider",
+          "kind" : "dynamic"
+        },
+        "choices" : [ ],
+        "choicesResolved" : true
+      }, {
+        "field" : "m_password",
+        "configKey" : "password",
+        "title" : "Password",
+        "description" : "Enter the password to protect the file.",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "org.knime.node.parameters.widget.credentials.Credentials"
+      } ]
+    }, {
+      "field" : "m_encryptionValidationMessage",
+      "configKey" : "encryptionValidationMessage",
+      "title" : "EncryptionValidationMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_sheetNames",
+      "configKey" : "sheetNames",
+      "title" : "Sheets",
+      "description" : "",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "",
+      "default" : [ ]
+    }, {
+      "field" : "m_ifSheetExists",
+      "configKey" : "if_sheet_exists",
+      "title" : "If sheet exists",
+      "description" : "Specify the behavior of the node in case a sheet with the entered name already exists. (This option is only relevant if the file append option is selected.)",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "OVERWRITE",
+        "label" : "Overwrite"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append"
+      } ],
+      "default" : "FAIL"
+    }, {
+      "field" : "m_concatenateSheetsWithSameName",
+      "configKey" : "concatenateSheetsWithSameName",
+      "title" : "Merge data with identical sheet names into one sheet",
+      "description" : "If checked, it is possible to provide the same sheet name for multiple input tables. Data from those tables will be concatenated into the same sheet in the order the tables are connected.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_sheetNameValidationMessage",
+      "configKey" : "sheetNameValidationMessage",
+      "title" : "SheetNameValidationMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_writeRowKey",
+      "configKey" : "write_row_key",
+      "title" : "Write row key",
+      "description" : "If checked, the row IDs are added to the output, in the first column of the spreadsheet.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_writeColumnHeaders",
+      "configKey" : "write_column_header",
+      "title" : "Write column headers",
+      "description" : "If checked, the column names are written out in the first row of the spreadsheet.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_skipColumnHeaderOnAppend",
+      "configKey" : "skip_column_header_on_append",
+      "title" : "Don't write column headers if sheet exists",
+      "description" : "Only write the column headers if a sheet is newly created or replaced. This option is convenient if you have written data with the same specification to an existing sheet before and want to append new rows to it.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_missingValuePattern",
+      "configKey" : "missingValuePattern",
+      "title" : "Replace missing values",
+      "description" : "If selected, missing values will be replaced by the specified value, otherwise a blank cell is being created.",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null
+    }, {
+      "field" : "m_evaluateFormulas",
+      "configKey" : "evaluate_formulas",
+      "title" : "Evaluate formulas (leave unchecked if uncertain, see help for details)",
+      "description" : "If checked, all formulas in the file will be evaluated after the sheet has been written. This is useful if other sheets in the file refer to the data just written and their content needs updating. This option is only relevant if the append option is selected. This can cause errors when there are functions that are not implemented by the underlying Apache POI library. Note: For xlsx files, evaluation requires significantly more memory as the whole file needs to be kept in memory (xls files are anyway loaded completely into memory).",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_autosizeColumns",
+      "configKey" : "autosize_columns",
+      "title" : "Autosize columns",
+      "description" : "Fits each column's width to its content.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_orientation",
+      "configKey" : "layout",
+      "title" : "Page orientation",
+      "description" : "Sets the print format to portrait or landscape.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "PORTRAIT",
+        "label" : "Portrait"
+      }, {
+        "value" : "LANDSCAPE",
+        "label" : "Landscape"
+      } ],
+      "default" : "PORTRAIT"
+    }, {
+      "field" : "m_paperSize",
+      "configKey" : "paper_size",
+      "title" : "Paper size",
+      "description" : "Sets the paper size in the print setup.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "A4 - 210x297 mm",
+        "label" : "A4 - 210x297 mm"
+      }, {
+        "value" : "A5 - 148x210 mm",
+        "label" : "A5 - 148x210 mm"
+      }, {
+        "value" : "US Envelope #10 4 1/8 x 9 1/2",
+        "label" : "Us envelope #10 4 1/8 x 9 1/2"
+      }, {
+        "value" : "Envelope C5 162x229 mm",
+        "label" : "Envelope c5 162x229 mm"
+      }, {
+        "value" : "Envelope DL 110x220 mm",
+        "label" : "Envelope dl 110x220 mm"
+      }, {
+        "value" : "Envelope Monarch 98.4×190.5 mm",
+        "label" : "Envelope monarch 98.4×190.5 mm"
+      }, {
+        "value" : "US Executive 7 1/4 x 10 1/2 in",
+        "label" : "Us executive 7 1/4 x 10 1/2 in"
+      }, {
+        "value" : "US Legal 8 1/2 x 14 in",
+        "label" : "Us legal 8 1/2 x 14 in"
+      }, {
+        "value" : "US Letter 8 1/2 x 11 in",
+        "label" : "Us letter 8 1/2 x 11 in"
+      } ],
+      "default" : "A4 - 210x297 mm"
+    }, {
+      "field" : "m_openOutputFileAfterExecution",
+      "configKey" : "open_file_after_exec_Internals",
+      "title" : "Open file after execution",
+      "description" : "If enabled, the output file will be opened in the associated application after the node has successfully executed.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

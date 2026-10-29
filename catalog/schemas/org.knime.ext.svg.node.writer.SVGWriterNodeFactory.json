@@ -1,0 +1,39 @@
+{
+  "id" : "org.knime.ext.svg.node.writer.SVGWriterNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "svgColumn",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "SvgColumn",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "directory",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "Directory",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "overwrite",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "Overwrite",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    } ],
+    "labelCoverage" : "0/3",
+    "warnings" : [ "диалог не создан: IllegalArgumentException: Argument must not be null." ]
+  },
+  "tier" : "experimental"
+}

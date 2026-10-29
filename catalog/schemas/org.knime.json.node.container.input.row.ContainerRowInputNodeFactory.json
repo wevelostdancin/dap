@@ -1,0 +1,159 @@
+{
+  "id" : "org.knime.json.node.container.input.row.ContainerRowInputNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.json.node.container.input.row.ContainerRowInputNodeParameters",
+    "fields" : [ {
+      "field" : "m_parameterName",
+      "configKey" : "parameterName",
+      "title" : "Parameter name",
+      "description" : "A name for the input parameter (preferably unique). This name is exposed in the REST interface. It must start with a letter, followed by letters and digits and single minus signs or dashes and must end with a letter. Pattern: <tt>^[a-zA-Z](?:[-_]?[a-zA-Z0-9]+)*(?&lt;![0-9])$</tt>\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "row-input"
+    }, {
+      "field" : "m_useFullyQualifiedName",
+      "configKey" : "useFullyQualifiedName",
+      "title" : "Append unique ID to parameter name",
+      "description" : "If checked, the name set above will be amended by the node's ID \"{Parameter Name}-{Relative node ID}\" to\nguarantee unique parameter names. Usually it's a good idea to have this box <i>not</i> checked and instead\nmake sure to use meaningful and unique names in all container nodes present in a workflow.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_description",
+      "configKey" : "description",
+      "title" : "Description",
+      "description" : "The description for the input parameter. It is currently <i>not</i> shown in the API specification of the REST interface but it's used for example when using this workflow as a tool for an AI Agent or when\nextracting the workflow summary.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_inputValidationMode",
+      "configKey" : "inputValidationMode",
+      "title" : "Input validation mode",
+      "description" : "Controls whether the external input is validated against a configured template row specification.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ACCEPT_ANY_INPUT",
+        "label" : "Accept any"
+      }, {
+        "value" : "VALIDATE_AGAINST_TEMPLATE",
+        "label" : "Match template spec"
+      } ],
+      "default" : "ACCEPT_ANY_INPUT"
+    }, {
+      "field" : "m_setTemplateRowButtonSummary",
+      "configKey" : "setTemplateRowButtonSummary",
+      "title" : "SetTemplateRowButtonSummary",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_setTemplateRow",
+      "configKey" : "setTemplateRow",
+      "title" : "Set first row of input as template",
+      "description" : "By selecting this button, the first row of the input table, given one is provided, will be set as the\nnew template row.\n<br/>\nThe template row defines the expected column names and types of the external input and the order of the\noutput. It also populates the \"InputParameters\" field of the generated OpenAPI specification, which is\npresented to end users for documentation purposes.\n<br/>\nWhen the node is executed without receiving any external input and has no table connected to its optional\ninput port, the template row is used as the output.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_makeDialogDirty",
+      "configKey" : "makeDialogDirty",
+      "title" : "MakeDialogDirty",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_missingValuesHandling",
+      "configKey" : "missingValuesHandling",
+      "title" : "Missing values",
+      "description" : "Defines how missing values in the input row are handled when validating against the template:\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ACCEPT",
+        "label" : "Accept"
+      }, {
+        "value" : "FILL_WITH_DEFAULT",
+        "label" : "Fill with templates"
+      }, {
+        "value" : "FAIL",
+        "label" : "Fail"
+      } ],
+      "default" : "ACCEPT"
+    }, {
+      "field" : "m_missingColumnHandling",
+      "configKey" : "missingColumnHandling",
+      "title" : "Missing columns",
+      "description" : "Defines how missing columns, i.e. columns that the template requires but are not present in the input,\nare handled:\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FILL_WITH_MISSING_VALUE",
+        "label" : "Fill with missings"
+      }, {
+        "value" : "FILL_WITH_DEFAULT_VALUE",
+        "label" : "Fill with templates"
+      }, {
+        "value" : "REMOVE",
+        "label" : "Remove"
+      }, {
+        "value" : "FAIL",
+        "label" : "Fail"
+      } ],
+      "default" : "FILL_WITH_MISSING_VALUE"
+    }, {
+      "field" : "m_unknownColumnHandling",
+      "configKey" : "unknownColumnHandling",
+      "title" : "Unknown columns",
+      "description" : "Defines how unknown columns, i.e. columns that are present in the input but are not required by the\ntemplate, are handled:\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "APPEND_AT_END",
+        "label" : "Move to end"
+      }, {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      } ],
+      "default" : "APPEND_AT_END"
+    }, {
+      "field" : "m_templateRow",
+      "configKey" : "templateRow",
+      "title" : "TemplateRow",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "{\"table-spec\":[],\"table-data\":[]}"
+    }, {
+      "field" : "m_inputRow",
+      "configKey" : "inputRow",
+      "title" : "InputRow",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_templateMatchesInputRow",
+      "configKey" : "templateMatchesInputRow",
+      "title" : "TemplateMatchesInputRow",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_inputPathOrUrl",
+      "configKey" : "inputPathOrUrl",
+      "title" : "InputPathOrUrl",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    } ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,107 @@
+{
+  "id" : "org.knime.base.node.io.filehandling.imagewriter.table.ImageWriterTableNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.io.filehandling.imagewriter.table.ImageWriterTableNodeParameters",
+    "fields" : [ {
+      "field" : "m_fileChooser",
+      "configKey" : "output_location",
+      "title" : "FileChooser",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_overwritePolicy",
+        "configKey" : "if_path_exists",
+        "title" : "If exists",
+        "description" : "Specify the behavior of the node in case the output file already exists.<ul><li><b>Fail</b>: Will issue an error during the node's execution (to prevent unintentional overwrite).</li><li><b>Overwrite</b>: Will replace any existing file.</li><li><b>Ignore</b>: Will ignore if a file already exists and continues the copying process.</li></ul>",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "fail",
+          "label" : "Fail"
+        }, {
+          "value" : "overwrite",
+          "label" : "Overwrite"
+        }, {
+          "value" : "ignore",
+          "label" : "Ignore"
+        }, {
+          "value" : "append",
+          "label" : "Append"
+        } ],
+        "default" : "overwrite"
+      }, {
+        "field" : "m_createMissingFolders",
+        "configKey" : "create_missing_folders",
+        "title" : "Create missing folders",
+        "description" : "If enabled, missing folders in the specified path will be created automatically.",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_file",
+        "configKey" : "file",
+        "title" : "File Selection",
+        "description" : "The file selection.",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "org.knime.node.parameters.widget.file.FileSelection"
+      } ]
+    }, {
+      "field" : "m_imageColumn",
+      "configKey" : "image_column",
+      "title" : "Image column",
+      "description" : "Select the column containing the images to write to files.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.io.filehandling.imagewriter.table.ImageWriterTableNodeParameters$ImageColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeImageColumn",
+      "configKey" : "remove_image_column",
+      "title" : "Remove image column",
+      "description" : "If enabled, the image column will be excluded from the output table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_generateFileNames",
+      "configKey" : "generate_file_names",
+      "title" : "Generate file names",
+      "description" : "If enabled, file names will be generated using a pattern with an auto-incrementing counter. If disabled, file names will be taken from a column in the input table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_fileNamePattern",
+      "configKey" : "filename_pattern",
+      "title" : "File name pattern",
+      "description" : "The file names will be generated using the provided pattern. The pattern must contain a single \"?\" symbol. This symbol will, during execution, be replaced by an incrementing counter to make the file names unique. The file extension will be detected automatically and must not be specified.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "File_?"
+    }, {
+      "field" : "m_fileNameColumn",
+      "configKey" : "fileNameColumn",
+      "title" : "File name column",
+      "description" : "Select the column containing the file names for the output images, or select RowID to use row IDs as file names. The file extension will be determined automatically and should not be included in the column values.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.io.filehandling.imagewriter.table.ImageWriterTableNodeParameters$FileNameColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,281 @@
+{
+  "id" : "org.knime.base.node.io.filehandling.csv.writer.CSVWriter2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.io.filehandling.csv.writer.CSVWriter2NodeParameters",
+    "fields" : [ {
+      "field" : "m_outputFile",
+      "configKey" : "file_chooser_settings",
+      "title" : "OutputFile",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_overwritePolicy",
+        "configKey" : "if_path_exists",
+        "title" : "If exists",
+        "description" : "Specify the behavior of the node in case the output file already exists.<ul><li><b>Fail</b>: Will issue an error during the node's execution (to prevent unintentional overwrite).</li><li><b>Overwrite</b>: Will replace any existing file.</li><li><b>Ignore</b>: Will ignore if a file already exists and continues the copying process.</li></ul>",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "fail",
+          "label" : "Fail"
+        }, {
+          "value" : "overwrite",
+          "label" : "Overwrite"
+        }, {
+          "value" : "ignore",
+          "label" : "Ignore"
+        }, {
+          "value" : "append",
+          "label" : "Append"
+        } ],
+        "default" : "overwrite"
+      }, {
+        "field" : "m_createMissingFolders",
+        "configKey" : "create_missing_folders",
+        "title" : "Create missing folders",
+        "description" : "If enabled, missing folders in the specified path will be created automatically.",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_file",
+        "configKey" : "file",
+        "title" : "File Selection",
+        "description" : "The file selection.",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "org.knime.node.parameters.widget.file.FileSelection"
+      } ]
+    }, {
+      "field" : "m_fileEncoding",
+      "configKey" : "encoding",
+      "title" : "FileEncoding",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_fileEncoding",
+        "configKey" : "fileEncoding",
+        "title" : "File encoding",
+        "description" : "You can select a predefined character set (UTF-8, UTF-16, etc.), or specify any other encoding supported by\nyour Java VM. The OS default uses the default encoding of the Java VM, which may depend on the locale or the\nJava property \"file.encoding\".",
+        "advanced" : false,
+        "type" : "string",
+        "default" : "UTF-8"
+      }, {
+        "field" : "m_characterSetValidationMessage",
+        "configKey" : "characterSetValidationMessage",
+        "title" : "CharacterSetValidationMessage",
+        "description" : "",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "java.lang.Void"
+      } ]
+    }, {
+      "field" : "m_compressWithGzip",
+      "configKey" : "compress_with_gzip",
+      "title" : "Compress file (gzip)",
+      "description" : "Check this if you want to compress the output file using gzip compression.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_columnDelimiter",
+      "configKey" : "columnDelimiter",
+      "title" : "Column delimiter",
+      "description" : "The character string delimiting columns. A single tab character can be entered as '\\t'",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ","
+    }, {
+      "field" : "m_rowDelimiter",
+      "configKey" : "rowDelimiter",
+      "title" : "Row delimiter",
+      "description" : "Select the line break variation you want to use as row delimiter while writing the CSV file.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "System Default",
+        "label" : "System default"
+      }, {
+        "value" : "Linux/Unix Line break",
+        "label" : "Linux/unix line break"
+      }, {
+        "value" : "Windows Line break",
+        "label" : "Windows line break"
+      }, {
+        "value" : "Mac OS9 Line break",
+        "label" : "Mac os9 line break"
+      } ],
+      "default" : "System Default"
+    }, {
+      "field" : "m_quoteChar",
+      "configKey" : "quoteChar",
+      "title" : "Quote character",
+      "description" : "The quote character used to enclose values with. See the \"Quote values\" option to specify what kind of values should be enclosed within quotes.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "\""
+    }, {
+      "field" : "m_quoteEscapeChar",
+      "configKey" : "quoteEscapeChar",
+      "title" : "Quote escape character",
+      "description" : "The character is used for escaping quotes inside an already quoted value.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "\""
+    }, {
+      "field" : "m_writeColumnHeader",
+      "configKey" : "write_column_header",
+      "title" : "Write column headers",
+      "description" : "If checked, the column names will be written out in the first line of the output file.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_skipColumnHeaderOnAppend",
+      "configKey" : "skip_column_header_on_append",
+      "title" : "Don't write column headers if file exists",
+      "description" : "If checked, the column headers will not be written when the output is appended to the already\nexisting output file. This is particularly useful when the CSV Writer is used in a loop to report\nthe results of each iteration.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_writeRowHeader",
+      "configKey" : "write_row_header",
+      "title" : "Write RowIDs",
+      "description" : "If checked, the RowIDs will be added to the output, as first item in each line.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_quoteMode",
+      "configKey" : "quote_mode",
+      "title" : "Quote values",
+      "description" : "Specify when to enclose values with quotes:",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "STRINGS_ONLY",
+        "label" : "Strings only"
+      }, {
+        "value" : "IF_NEEDED",
+        "label" : "If needed"
+      }, {
+        "value" : "ALWAYS",
+        "label" : "Always"
+      }, {
+        "value" : "NEVER",
+        "label" : "Never"
+      } ],
+      "default" : "STRINGS_ONLY"
+    }, {
+      "field" : "m_separatorReplacement",
+      "configKey" : "separator_replacement",
+      "title" : "Replace column separator with",
+      "description" : "Specify a replacement for the value used as a column separator. Used only if the 'Never' option is selected for Quote values.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_missingValuePattern",
+      "configKey" : "missing_value_pattern",
+      "title" : "Replace missing values with",
+      "description" : "Set this option to replace missing values from the input table with specific text when writing.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_decimalSeparator",
+      "configKey" : "decimal_separator",
+      "title" : "Number decimal separator",
+      "description" : "Specify a character that is used as decimal separator for floating point numbers.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "char"
+    }, {
+      "field" : "m_useScientificFormat",
+      "configKey" : "use_scientific_format",
+      "title" : "Use scientific format for very large and very small numbers",
+      "description" : "Check this if you want very large and very small floating point numbers to be written in scientific notation (e.g., 1.0E9 instead of 1,000,000,000).",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_keepTrailingZero",
+      "configKey" : "keep_trailing_zero_in_decimals",
+      "title" : "Append .0 suffix for decimal numbers without fractions",
+      "description" : "Check this if you want to write every decimal value with .0 suffix even though the value doesn't contain\nany fractional part. (e.g., the value 12 will be written as 12.0 if it is coming from a decimal column).\nUse with caution as this could lead to unnecessary increase of the file size. This doesn't affect the way\nto write values from integer columns. The option is ignored if we are using a scientific format.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_addUserToComment",
+      "configKey" : "add_user_to_comment",
+      "title" : "Write name of file creator (KNIME username)",
+      "description" : "If checked, the login name of the user that created the file (probably you!) is inserted.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_addTimeToComment",
+      "configKey" : "add_time_to_comment",
+      "title" : "Write execution time",
+      "description" : "If checked, a comment line with the current execution time and date is added.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_addTableNameToComment",
+      "configKey" : "add_table_name_to_comment",
+      "title" : "Write input table name",
+      "description" : "If checked, a comment line is added showing the name of the table the data was read from.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_addCustomTextToComment",
+      "configKey" : "add_custom_text_to_comment",
+      "title" : "Write custom text",
+      "description" : "If you check this, you can enter any free text, that will be added then to the comment header.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_customCommentText",
+      "configKey" : "custom_comment_text",
+      "title" : "Custom text",
+      "description" : "Enter the custom text to be added to the comment header.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_commentLineMarker",
+      "configKey" : "comment_line_marker",
+      "title" : "Comment line marker",
+      "description" : "If you have checked at least one of the content options, you must provide a comment line marker that is used as a prefix for each comment line.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "#"
+    }, {
+      "field" : "m_commentIndent",
+      "configKey" : "commentIndent",
+      "title" : "Comment indentation",
+      "description" : "Specify an indentation string, i.e., a prefix for every comment line.A single tab character can be entered as '\\t'.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "\\t"
+    }, {
+      "field" : "m_performNewValidation",
+      "configKey" : "performNewValidation",
+      "title" : "PerformNewValidation",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "core"
+}

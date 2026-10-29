@@ -1,0 +1,197 @@
+{
+  "id" : "org.knime.json.node.toxml.JSONToXMLNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.json.node.toxml.JSONToXMLNodeParameters",
+    "fields" : [ {
+      "field" : "m_inputColumn",
+      "configKey" : "input.column",
+      "title" : "Input column",
+      "description" : "Column containing JSON values",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.toxml.JSONToXMLNodeParameters$JSONColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_appendOrReplace",
+      "configKey" : "appendOrReplace",
+      "title" : "Output column",
+      "description" : "",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "APPEND",
+        "label" : "Append new column"
+      }, {
+        "value" : "REPLACE",
+        "label" : "Replace input column"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_newColumnName",
+      "configKey" : "new.column.name",
+      "title" : "New column name",
+      "description" : "Name of the new (XML) column",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "XML"
+    }, {
+      "field" : "m_specifyNamespace",
+      "configKey" : "specify.namespace",
+      "title" : "Specify namespace",
+      "description" : "If unchecked, no base namespace will be set.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_namespace",
+      "configKey" : "namespace",
+      "title" : "Namespace",
+      "description" : "The base namespace",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_keepTypeInformation",
+      "configKey" : "keep.type.information",
+      "title" : "Keep type information by adding namespace",
+      "description" : "When checked, the JSON type information will be preserved, numbers, booleans, ... will be\nrepresented as text, but their node will have a prefix identifying its type. Otherwise all kind\nof values will be represented as text.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_arrayPrefix",
+      "configKey" : "array.prefix",
+      "title" : "Empty list (https://www.w3.org/2001/XMLSchema/list)",
+      "description" : "Only used for the <code>[]</code> JSON array when the Omit type information is unchecked. Otherwise it is\nnot possible to distinguish between <code>[]</code> and <code>{}</code>.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Array"
+    }, {
+      "field" : "m_booleanPrefix",
+      "configKey" : "boolean.prefix",
+      "title" : "Boolean (https://www.w3.org/2001/XMLSchema/boolean)",
+      "description" : "Prefix for the boolean values.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Boolean"
+    }, {
+      "field" : "m_decimalPrefix",
+      "configKey" : "decimal.prefix",
+      "title" : "Decimal (https://www.w3.org/2001/XMLSchema/decimal)",
+      "description" : "Prefix for the floating point/decimal values.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Decimal"
+    }, {
+      "field" : "m_integerPrefix",
+      "configKey" : "integer.prefix",
+      "title" : "Integer (https://www.w3.org/2001/XMLSchema/integer)",
+      "description" : "Prefix for the integer values.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Integer"
+    }, {
+      "field" : "m_nullPrefix",
+      "configKey" : "null.prefix",
+      "title" : "Null (https://www.w3.org/2001/XMLSchema)",
+      "description" : "Prefix for the null values.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "null"
+    }, {
+      "field" : "m_stringPrefix",
+      "configKey" : "string.prefix",
+      "title" : "String (https://www.w3.org/2001/XMLSchema/string)",
+      "description" : "Prefix for the String/text values.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "String"
+    }, {
+      "field" : "m_rootElementName",
+      "configKey" : "root.element",
+      "title" : "Root element name",
+      "description" : "There is always a root element, you can specify its name.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "root"
+    }, {
+      "field" : "m_arrayItemName",
+      "configKey" : "array.item.element",
+      "title" : "Array item name",
+      "description" : "Array items not always can be represented as trees (for example arrays within arrays, or\nprimitive types within arrays). In this case an XML element with the specified name will be\ncreated for each array entry.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "item"
+    }, {
+      "field" : "m_useParentKeyAsElementName",
+      "configKey" : "parent.key.as.element.name",
+      "title" : "Use parent keys as element name for arrays",
+      "description" : "When checked, JSON such as <pre><code>{\n    \"a\" : [\n        {\"b\" : 2},\n        {\"c\" : 3}\n    ]\n}</code></pre> gets translated to\n<pre><code>&lt;a&gt;\n &lt;b&gt;2&lt;/b&gt;\n&lt;/a&gt;\n&lt;a&gt;\n &lt;c&gt;3&lt;/c&gt;\n&lt;/a&gt;\n</code></pre> otherwise, it is translated to:\n<pre><code>&lt;a&gt;\n &lt;item&gt;\n  &lt;b&gt;2&lt;/b&gt;\n &lt;/item&gt;\n &lt;item&gt;\n  &lt;c&gt;3&lt;/c&gt;\n &lt;/item&gt;\n&lt;/a&gt;\n</code></pre>\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_createTextForSpecificKeys",
+      "configKey" : "create.text.for.specific.keys",
+      "title" : "Use a key to represent values as XML text",
+      "description" : "When checked, simple values with the specified key will not create attributes, but provide the\nsingle text of the surrounding element.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_keyForText",
+      "configKey" : "key.for.text",
+      "title" : "Key for text",
+      "description" : "The key name to represent as XML text",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "#text"
+    }, {
+      "field" : "m_hashCommentHandling",
+      "configKey" : "hashCommentHandling",
+      "title" : "Translate JSON keys starting with # to",
+      "description" : "JSON objects with keys starting with a hash sign such as\n<pre><code>{\"#comment\": \"content\"}</code></pre>\ncan either be translated to XML elements\n<pre><code>&lt;comment\n ns:originalKey=\"#comment\"&gt;\n  content\n&lt;/comment&gt;\n</code></pre>\nor to XML comments\n<pre><code>&lt;!--content--&gt;</code></pre>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ELEMENT",
+        "label" : "an element (<comment>content</comment>)"
+      }, {
+        "value" : "COMMENT",
+        "label" : "a comment (<!--content-->)"
+      } ],
+      "default" : "ELEMENT"
+    }, {
+      "field" : "m_questionPrefixHandling",
+      "configKey" : "questionPrefixHandling",
+      "title" : "Translate JSON keys starting with ? to",
+      "description" : "JSON objects with keys starting with a question mark such as\n<pre><code>{\"?pi\": \"content\"}</code></pre>\ncan either be translated to XML elements\n<pre><code>&lt;pi ns:originalKey=\"?pi\"&gt;\n content\n&lt;/pi&gt;\n</code></pre>\nor to XML processing instructions\n<pre><code>&lt;?pi content?&gt;</code></pre>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ELEMENT",
+        "label" : "an element (<pi>content</pi>)"
+      }, {
+        "value" : "PROCESSING_INSTRUCTION",
+        "label" : "a processing instruction (<?pi content?>)"
+      } ],
+      "default" : "ELEMENT"
+    }, {
+      "field" : "m_removeInvalidChars",
+      "configKey" : "value.remove.invalid.chars",
+      "title" : "Remove invalid XML characters from values",
+      "description" : "XML 1.0 supports only a limited set of characters (see\n<a href=\"https://www.w3.org/TR/xml/#charsets\">RFC</a>\n). When checked, invalid characters\nwill be removed from values.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "experimental"
+}

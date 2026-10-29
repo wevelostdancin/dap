@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension point="org.eclipse.core.runtime.applications" id="batch">
+      <application cardinality="singleton-global" thread="main" visible="false">
+         <run class="com.dap.engine.BatchRunner"/>
+      </application>
+   </extension>
+   <extension point="org.eclipse.core.runtime.applications" id="catalog">
+      <application cardinality="singleton-global" thread="main" visible="false">
+         <run class="com.dap.engine.CatalogBuilder"/>
+      </application>
+   </extension>
+   <extension point="org.eclipse.core.runtime.applications" id="service">
+      <application cardinality="singleton-global" thread="main" visible="false">
+         <run class="com.dap.engine.DapService"/>
+      </application>
+   </extension>
+   <extension point="org.eclipse.core.runtime.applications" id="audit">
+      <application cardinality="singleton-global" thread="main" visible="false">
+         <run class="com.dap.engine.SchemaAudit"/>
+      </application>
+   </extension>
+</plugin>

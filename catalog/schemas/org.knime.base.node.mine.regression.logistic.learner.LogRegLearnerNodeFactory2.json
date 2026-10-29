@@ -1,0 +1,57 @@
+{
+  "id" : "org.knime.base.node.mine.regression.logistic.learner.LogRegLearnerNodeFactory2",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.mine.regression.logistic.learner.LogRegLearnerNodeDialogPane",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Target Column",
+      "section" : "Target",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Reference Category",
+      "section" : "Target",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Use order from target column domain (only relevant for output representation)",
+      "section" : "Target",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Always include all columns",
+      "section" : "Values",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Use order from column domain (applies only to nominal columns). First value is chosen as reference for dummy variables.",
+      "section" : "Values",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 7,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

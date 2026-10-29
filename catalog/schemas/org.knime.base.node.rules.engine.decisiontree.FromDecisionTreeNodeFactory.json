@@ -1,0 +1,90 @@
+{
+  "id" : "org.knime.base.node.rules.engine.decisiontree.FromDecisionTreeNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.rules.engine.decisiontree.FromDecisionTreeNodeParameters",
+    "fields" : [ {
+      "field" : "m_splitRules",
+      "configKey" : "split.rules",
+      "title" : "Split rules to condition and outcome columns",
+      "description" : "When checked, two columns will be created for the rules, <b>Condition</b> and <b>Outcome</b>, otherwise the rules will reside in a single column, <b>Rule</b>.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_confidenceAndWeight",
+      "configKey" : "confidence.and.weight",
+      "title" : "Add confidence and weight columns",
+      "description" : "From PMML the <a href=\"http://www.dmg.org/v4-2-1/RuleSet.html#xsdGroup_Rule\">confidence and weight</a> attributes are extracted to columns. (It will create columns with missing values.)",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_provideStatistics",
+      "configKey" : "statistics",
+      "title" : "Add Record count and Number of correct statistics columns",
+      "description" : "In PMML, the <tt>recordCount</tt> and the <tt>nbCorrect</tt> attributes provide statistics about the input (training/test/validation) data, with this option, this information can be extracted to the columns: <b>Record count</b> and <b>Number of correct</b>",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_useAdditionalParentheses",
+      "configKey" : "additional.parentheses",
+      "title" : "Use additional parentheses to document precedence rules",
+      "description" : "If checked the output will contain additional parenthesis around rule parts to clearly document precedence. For instance, NOT is a stronger operator than AND than OR - using parenthesis improves readability. Checking this option does not change any of the rule logic.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_scorePmmlRecordCount",
+      "configKey" : "pmml.score.recordCount",
+      "title" : "Provide score distribution record count in PMML",
+      "description" : "PMML will store the information obtained from the rules on record counts of score distribution (how many times the different values were present in the training data, not necessarily integer)",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_scoreTableRecordCount",
+      "configKey" : "table.score.recordCount",
+      "title" : "Provide score distribution record count in table with column name prefix",
+      "description" : "Information about the record count of score distribution is saved to the table with the specified prefix.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_scoreTableRecordCountPrefix",
+      "configKey" : "table.score.recordCount.prefix",
+      "title" : "Record count column prefix",
+      "description" : "Prefix for the score distribution record count columns.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Record count "
+    }, {
+      "field" : "m_scorePmmlProbability",
+      "configKey" : "pmml.score.probability",
+      "title" : "Provide score distribution probability in PMML",
+      "description" : "PMML will store the information obtained from the rules on probabilities of score distribution (in the training data what the probability was of certain values for that decision tree leaf)",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_scoreTableProbability",
+      "configKey" : "table.score.probability",
+      "title" : "Provide score distribution probability in table with column name prefix",
+      "description" : "Information about the probabilities of score distribution is saved to the table with the specified prefix.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_scoreTableProbabilityPrefix",
+      "configKey" : "table.score.probability.prefix",
+      "title" : "Probability column prefix",
+      "description" : "Prefix for the score distribution probability columns.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Probability "
+    } ]
+  },
+  "tier" : "experimental"
+}

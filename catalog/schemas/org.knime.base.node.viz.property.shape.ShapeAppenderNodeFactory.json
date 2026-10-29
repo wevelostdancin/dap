@@ -1,0 +1,34 @@
+{
+  "id" : "org.knime.base.node.viz.property.shape.ShapeAppenderNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "selected_column",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "Append shapes to",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 1
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.viz.property.shape.ShapeAppenderNodeDialogPane",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Append shapes to",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "1/1",
+    "uiElements" : 1
+  },
+  "tier" : "experimental"
+}

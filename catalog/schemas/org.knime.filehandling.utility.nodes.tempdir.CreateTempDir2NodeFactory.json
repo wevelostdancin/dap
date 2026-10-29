@@ -1,0 +1,78 @@
+{
+  "id" : "org.knime.filehandling.utility.nodes.tempdir.CreateTempDir2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.filehandling.utility.nodes.tempdir.CreateTempDir2NodeParameters",
+    "fields" : [ {
+      "field" : "m_fileSystemManagedByPortMessage",
+      "configKey" : "fileSystemManagedByPortMessage",
+      "title" : "FileSystemManagedByPortMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_targetFolder",
+      "configKey" : "temp_dir_location",
+      "title" : "TargetFolder",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_createMissingFolders",
+        "configKey" : "create_missing_folders",
+        "title" : "Create missing folders",
+        "description" : "If enabled, missing folders in the specified path will be created automatically.",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_file",
+        "configKey" : "file",
+        "title" : "File Selection",
+        "description" : "The file selection.",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "org.knime.node.parameters.widget.file.FileSelection"
+      } ]
+    }, {
+      "field" : "m_deleteTempFolderOnReset",
+      "configKey" : "delete_on_reset",
+      "title" : "Delete temp folder on reset",
+      "description" : "Check this box to delete the folder and all its content when the node is reset.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_tempFolderPrefix",
+      "configKey" : "temp_dir_prefix",
+      "title" : "Temp folder prefix",
+      "description" : "Name prefix of the temporary folder. It will be amended by some random number to ensure uniqueness.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "knimetemp-"
+    }, {
+      "field" : "m_tempDirPathVariableName",
+      "configKey" : "temp_dir_path_variable_name",
+      "title" : "Export path as (variable name)",
+      "description" : "The name of the exported variable denoting the actual path of the created temporary folder.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "temp_dir_path"
+    }, {
+      "field" : "m_additionalPathVariables",
+      "configKey" : "additionalPathVariables",
+      "title" : "Additional path variables",
+      "description" : "A list of additional variables that will be created by the node. Each variable will denote a path to a file or folder.",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "unknown"
+      },
+      "addButtonText" : "Add path variable",
+      "default" : [ ]
+    } ]
+  },
+  "tier" : "experimental"
+}

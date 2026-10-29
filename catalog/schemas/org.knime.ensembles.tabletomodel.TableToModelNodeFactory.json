@@ -1,0 +1,24 @@
+{
+  "id" : "org.knime.ensembles.tabletomodel.TableToModelNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.ensembles.tabletomodel.TableToModelNodeParameters",
+    "fields" : [ {
+      "field" : "m_modelColumn",
+      "configKey" : "model-column",
+      "title" : "Model column",
+      "description" : "Select the column that contains the cell to be translated into a model output.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.ensembles.tabletomodel.TableToModelNodeParameters$ModelColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "experimental"
+}

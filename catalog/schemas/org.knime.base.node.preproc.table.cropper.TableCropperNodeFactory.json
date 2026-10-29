@@ -1,0 +1,125 @@
+{
+  "id" : "org.knime.base.node.preproc.table.cropper.TableCropperNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.table.cropper.TableCropperSettings",
+    "fields" : [ {
+      "field" : "m_columnRangeMode",
+      "configKey" : "columnRangeMode",
+      "title" : "Column range mode",
+      "description" : "Specify the range of columns included in the output by defining the start and end column. The options for specifiying the start and end columns are:<ul><li><b>By name</b>: Specify the name of the start and end columns to include.</li><li><b>By number</b>: Specify the start and end column by their number in the table. The first column has number 1.</li></ul>",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "BY_NAME",
+        "label" : "By name"
+      }, {
+        "value" : "BY_NUMBER",
+        "label" : "By number"
+      } ],
+      "default" : "BY_NAME"
+    }, {
+      "field" : "m_startColumnName",
+      "configKey" : "startColumnName",
+      "title" : "Start column",
+      "description" : "Select the first column to include.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_endColumnName",
+      "configKey" : "endColumnName",
+      "title" : "End column (inclusive)",
+      "description" : "Select the last column to include.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_startColumnNumber",
+      "configKey" : "startColumnNumber",
+      "title" : "Start column number",
+      "description" : "Select the first column to include (the first column of the table has number 1).",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    }, {
+      "field" : "m_startColumnCountFromEnd",
+      "configKey" : "startColumnCountFromEnd",
+      "title" : "Start counting columns from the end of the table",
+      "description" : "If selected, the start column will be counted from the end of the table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_endColumnNumber",
+      "configKey" : "endColumnNumber",
+      "title" : "End column number (inclusive)",
+      "description" : "Select the last column to include.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    }, {
+      "field" : "m_endColumnCountFromEnd",
+      "configKey" : "endColumnCountFromEnd",
+      "title" : "Start counting columns from the end of the table",
+      "description" : "If selected, the end column will be counted from the end of the table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_startRowNumber",
+      "configKey" : "startRowNumber",
+      "title" : "Start row number",
+      "description" : "Select the first row to include (the first row of the table has number 1).",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    }, {
+      "field" : "m_startRowCountFromEnd",
+      "configKey" : "startRowCountFromEnd",
+      "title" : "Start counting rows from the end of the table",
+      "description" : "If selected, the start row will be counted from the end of the table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_endRowNumber",
+      "configKey" : "endRowNumber",
+      "title" : "End row number (inclusive)",
+      "description" : "Select the last row to include.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    }, {
+      "field" : "m_endRowCountFromEnd",
+      "configKey" : "endRowCountFromEnd",
+      "title" : "Start counting rows from the end of the table",
+      "description" : "If selected, the end row will be counted from the end of the table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_updateDomains",
+      "configKey" : "updateDomains",
+      "title" : "Update domains of all columns",
+      "description" : "Advanced setting to enable recomputation of the domains of all columns in the output table such that the domains' bounds exactly match the bounds of the data in the output table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

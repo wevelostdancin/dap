@@ -1,0 +1,49 @@
+{
+  "id" : "org.knime.base.node.viz.property.color.ColorAppenderNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "apply_to_column_names",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "Apply to column names",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "selected_column",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "Column",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 1
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.viz.property.color.ColorAppender2NodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Column names",
+      "section" : "Apply colors to...",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Column",
+      "section" : "Apply colors to...",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "1/2",
+    "uiElements" : 2
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,44 @@
+{
+  "id" : "org.knime.json.node.jsonpath.multi.JSONPathNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.json.node.jsonpath.multi.JSONPathNodeParameters",
+    "fields" : [ {
+      "field" : "m_inputColumn",
+      "configKey" : "input.column",
+      "title" : "Source column",
+      "description" : "The JSON column to select the paths from.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.jsonpath.multi.JSONPathNodeParameters$JSONColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeSourceColumn",
+      "configKey" : "remove.input.column",
+      "title" : "Remove source column",
+      "description" : "When checked, the source column will be removed.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_outputSettings",
+      "configKey" : "outputSettings",
+      "title" : "Output columns",
+      "description" : "Configure the JSON paths to extract from the input column. Each element defines one output\ncolumn from one JSONPath expression.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add JSONPath",
+      "default" : [ ]
+    } ]
+  },
+  "tier" : "core"
+}

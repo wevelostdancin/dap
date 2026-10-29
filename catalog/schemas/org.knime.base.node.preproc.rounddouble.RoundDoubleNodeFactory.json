@@ -1,0 +1,105 @@
+{
+  "id" : "org.knime.base.node.preproc.rounddouble.RoundDoubleNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.rounddouble.RoundDoubleNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnsToFormat",
+      "configKey" : "columnsToFormat",
+      "title" : "Columns to round",
+      "description" : "Select the numeric input columns to round.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_numberModeV2",
+      "configKey" : "numberModeV2",
+      "title" : "Rounding mode",
+      "description" : "Select the rounding mode to apply.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "DECIMALS",
+        "label" : "Decimals"
+      }, {
+        "value" : "SIGNIFICANT_DIGITS",
+        "label" : "Significant digits"
+      }, {
+        "value" : "INTEGER",
+        "label" : "Integer"
+      } ],
+      "default" : "DECIMALS"
+    }, {
+      "field" : "m_precision",
+      "configKey" : "PrecisionNumer",
+      "title" : "Rounding to digits",
+      "description" : "When rounding to <b>Decimals</b>, this sets the number of decimal places to keep.<br/>\nWhen rounding to <b>Significant digits</b>, this sets the number of significant digits to keep.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 3
+    }, {
+      "field" : "m_roundingMethod",
+      "configKey" : "roundingMethod",
+      "title" : "RoundingMethod",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.base.node.preproc.rounddouble.RoundDoubleNodeSettings$RoundingMethod"
+    }, {
+      "field" : "m_outputColumn",
+      "configKey" : "outputColumn",
+      "title" : "Output columns",
+      "description" : "Configure output column behavior.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append with suffix"
+      } ],
+      "default" : "APPEND"
+    }, {
+      "field" : "m_suffix",
+      "configKey" : "ColumnSuffix",
+      "title" : "Output column suffix",
+      "description" : "Set the suffix to append to the new column names.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : " (Rounded)"
+    }, {
+      "field" : "m_outputMode",
+      "configKey" : "outputMode",
+      "title" : "Output mode (legacy)",
+      "description" : "Determines the formatting of the output columns.\n",
+      "advanced" : true,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "AUTO",
+        "label" : "Auto"
+      }, {
+        "value" : "DOUBLE",
+        "label" : "Double"
+      }, {
+        "value" : "STANDARD_STRING",
+        "label" : "Standard string"
+      }, {
+        "value" : "PLAIN_STRING",
+        "label" : "Plain string"
+      }, {
+        "value" : "ENGINEERING_STRING",
+        "label" : "Engineering string"
+      } ],
+      "default" : "AUTO"
+    } ]
+  },
+  "tier" : "experimental"
+}

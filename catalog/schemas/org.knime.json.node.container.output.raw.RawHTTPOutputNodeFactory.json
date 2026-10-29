@@ -1,0 +1,32 @@
+{
+  "id" : "org.knime.json.node.container.output.raw.RawHTTPOutputNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.json.node.container.output.raw.RawHTTPOutputNodeParameters",
+    "fields" : [ {
+      "field" : "m_statusCode",
+      "configKey" : "statusCode",
+      "title" : "Status code",
+      "description" : "The HTTP <a href=\"https://en.wikipedia.org/wiki/List_of_HTTP_status_codes\">status code</a> which is sent back to the client.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 200
+    }, {
+      "field" : "m_bodyColumn",
+      "configKey" : "bodyColumn",
+      "title" : "Body column",
+      "description" : "Selector for the column in the input table which is sent back as response body.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.container.output.raw.RawHTTPOutputNodeParameters$BodyColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "experimental"
+}

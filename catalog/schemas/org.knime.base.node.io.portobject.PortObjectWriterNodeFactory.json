@@ -1,0 +1,59 @@
+{
+  "id" : "org.knime.base.node.io.portobject.PortObjectWriterNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "filename",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Filename",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "overwriteOK",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "OverwriteOK",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.io.portobject.PortObjectWriterNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "section" : "Output location",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Output location",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Output location",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Overwrite OK",
+      "configKey" : "overwriteOK",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/2",
+    "uiElements" : 4
+  },
+  "tier" : "experimental"
+}

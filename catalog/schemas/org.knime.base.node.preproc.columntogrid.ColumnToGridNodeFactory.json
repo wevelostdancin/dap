@@ -1,0 +1,47 @@
+{
+  "id" : "org.knime.base.node.preproc.columntogrid.ColumnToGridNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.preproc.columntogrid.ColumnToGridNodeDialogPane",
+    "ui" : [ {
+      "type" : "number",
+      "label" : "Grid Column Count",
+      "section" : "Grid Settigs",
+      "source" : "dialog-ui",
+      "default" : 4.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enable Grouping",
+      "section" : "Grid Settigs",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "dropdown",
+      "section" : "Grid Settigs",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 5,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

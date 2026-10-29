@@ -1,0 +1,172 @@
+{
+  "id" : "org.knime.filehandling.utility.nodes.transfer.table.TransferFilesTableNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.filehandling.utility.nodes.transfer.table.TransferFilesTableNodeParameters",
+    "fields" : [ {
+      "field" : "m_sourceFileSystemManagedByPortMessage",
+      "configKey" : "sourceFileSystemManagedByPortMessage",
+      "title" : "SourceFileSystemManagedByPortMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_sourceColumn",
+      "configKey" : "source_column",
+      "title" : "Source column",
+      "description" : "    Select the column containing the paths to the files/folders that must be copied/moved.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.filehandling.utility.nodes.transfer.table.TransferFilesTableNodeParameters$PathColumnChoices",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_failIfSourceDoesNotExist",
+      "configKey" : "fail_if_source_does_not_exist",
+      "title" : "Fail if source does not exist",
+      "description" : "    If the source file/folder to copy/move does not exit the node will fail.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_deleteSourceFilesAndFolders",
+      "configKey" : "delete_source_files_folders",
+      "title" : "Delete source files / folders",
+      "description" : "Delete all files/folders that have been successfully copied from the source folder. The\noutput contains an additional column indicating if the file has been deleted (true) or\nnot (false).\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_failOnUnsuccessfulDeletion",
+      "configKey" : "fail_on_unsuccessful_deletion",
+      "title" : "Fail on unsuccessful deletion",
+      "description" : "If the 'Delete source files / folders' option is activated and something goes wrong during the\ndeletion process the node will fail.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_destinationFileSystemManagedByPortMessage",
+      "configKey" : "destinationFileSystemManagedByPortMessage",
+      "title" : "DestinationFileSystemManagedByPortMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_fromTable",
+      "configKey" : "fromTable",
+      "title" : "Choose destination",
+      "description" : "Select a method with which to set the destination.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FILE_CHOOSER",
+        "label" : "From file chooser"
+      }, {
+        "value" : "FROM_TABLE",
+        "label" : "From table"
+      } ],
+      "default" : "FROM_TABLE"
+    }, {
+      "field" : "m_destinationColumn",
+      "configKey" : "destination_column",
+      "title" : "Destination column",
+      "description" : "Select the column containing the destination, i.e., the new location and names of the\nfiles/folders to be copied/moved. <br /> <i>Note:</i> If the source references a file/folder the\ndestination also has to be a file/folder.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.filehandling.utility.nodes.transfer.table.TransferFilesTableNodeParameters$PathColumnChoices",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_targetFolder",
+      "configKey" : "destination_location",
+      "title" : "TargetFolder",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_createMissingFolders",
+        "configKey" : "create_missing_folders",
+        "title" : "Create missing folders",
+        "description" : "If enabled, missing folders in the specified path will be created automatically.",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_file",
+        "configKey" : "file",
+        "title" : "File Selection",
+        "description" : "The file selection.",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "org.knime.node.parameters.widget.file.FileSelection"
+      } ]
+    }, {
+      "field" : "m_transferPolicy",
+      "configKey" : "transfer_policy",
+      "title" : "Overwrite policy",
+      "description" : "    How to handle files to be copied already existing in destination folder\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      }, {
+        "value" : "OVERWRITE",
+        "label" : "Overwrite"
+      }, {
+        "value" : "OVERWRITE_IF_NEWER",
+        "label" : "Overwrite if newer"
+      } ],
+      "default" : null
+    }, {
+      "field" : "m_destinationPath",
+      "configKey" : "destination_file_path",
+      "title" : "Destination file path",
+      "description" : "Depending on the selected mode the location of the files/folders to be copied to the destination\nfolder will differ.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "RELATIVE",
+        "label" : "File/folder only"
+      }, {
+        "value" : "KEEP",
+        "label" : "Full path"
+      }, {
+        "value" : "REMOVE_FOLDER_PREFIX",
+        "label" : "Path after prefix"
+      } ],
+      "default" : null
+    }, {
+      "field" : "m_folderPrefix",
+      "configKey" : "folder_prefix",
+      "title" : "Folder prefix",
+      "description" : "The folder prefix (the beginning of the path) to be ignored when using 'Path after prefix' mode.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_detailedOutput",
+      "configKey" : "detailed_output",
+      "title" : "Detailed output",
+      "description" : "If selected the output will not only show the folder that has been copied/moved but also all the\nfiles/folders it contains.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

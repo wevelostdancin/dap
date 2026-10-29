@@ -1,0 +1,18 @@
+{
+  "id" : "org.knime.base.node.meta.looper.LoopStartCountDynamicNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.meta.looper.LoopStartCountDynamicSettings",
+    "fields" : [ {
+      "field" : "m_loops",
+      "configKey" : "loops",
+      "title" : "Number of loops",
+      "description" : "The number of times the inner workflow should be executed.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 10
+    } ]
+  },
+  "tier" : "core"
+}

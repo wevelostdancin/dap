@@ -1,0 +1,143 @@
+{
+  "id" : "org.knime.base.node.mine.cluster.kmeans.ClusterNodeFactory2",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "nrClusters",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 3,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "title" : "NrClusters",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "",
+      "configKey" : "centroid_initialization",
+      "javaType" : "org.knime.base.node.mine.cluster.kmeans.ClusterNodeModel$1",
+      "type" : "string",
+      "default" : "RANDOM_INITIALIZATION",
+      "title" : "Centroid initialization",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "maxNrIterations",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 99,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "title" : "MaxNrIterations",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelFilterString",
+      "configKey" : "cfgColmns",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelFilterString",
+      "type" : "filter",
+      "default" : null,
+      "title" : "CfgColmns",
+      "titleSource" : "field-name",
+      "source" : "node-model",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      }
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "enableHilite",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "EnableHilite",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "",
+      "configKey" : "centroid_seeds",
+      "javaType" : "org.knime.base.node.mine.cluster.kmeans.ClusterNodeModel$2",
+      "type" : "unknown",
+      "default" : null,
+      "title" : "Centroid seeds",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    } ],
+    "dialogClass" : "org.knime.base.node.mine.cluster.kmeans.ClusterNodeDialog",
+    "ui" : [ {
+      "type" : "number",
+      "label" : "Number of clusters",
+      "section" : "Clusters",
+      "source" : "dialog-ui",
+      "default" : 3.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "First k rows",
+      "section" : "Clusters",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Random initialization",
+      "section" : "Clusters",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Use static random seed",
+      "section" : "Clusters",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Clusters",
+      "source" : "dialog-ui",
+      "default" : "0",
+      "editable" : true
+    }, {
+      "type" : "number",
+      "label" : "Max. number of iterations",
+      "section" : "Number of Iterations",
+      "source" : "dialog-ui",
+      "default" : 99.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 10.0
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Always include all columns",
+      "section" : "Column Selection",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Enable Hilite Mapping",
+      "section" : "Hilite Mapping",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/6",
+    "uiElements" : 10,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

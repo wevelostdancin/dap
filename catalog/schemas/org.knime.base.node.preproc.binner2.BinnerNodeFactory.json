@@ -1,0 +1,192 @@
+{
+  "id" : "org.knime.base.node.preproc.binner2.BinnerNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.binner2.BinnerNodeSettings",
+    "fields" : [ {
+      "field" : "m_selectedColumns",
+      "configKey" : "selectedColumns",
+      "title" : "Columns to bin",
+      "description" : "Select the numeric columns to apply binning to. Only the selected columns will be transformed.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.binner2.BinnerNodeSettings$NumericColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_binningType",
+      "configKey" : "binningType",
+      "title" : "Binning type",
+      "description" : "Select the method used to define bin intervals.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "EQUAL_WIDTH",
+        "label" : "Equal width"
+      }, {
+        "value" : "EQUAL_FREQUENCY",
+        "label" : "Equal frequency"
+      }, {
+        "value" : "CUSTOM_CUTOFFS",
+        "label" : "Custom cutoffs"
+      }, {
+        "value" : "CUSTOM_QUANTILES",
+        "label" : "Custom quantiles"
+      } ],
+      "default" : "EQUAL_WIDTH"
+    }, {
+      "field" : "m_numberOfBins",
+      "configKey" : "numberOfBins",
+      "title" : "Number of bins",
+      "description" : "Specifies the number of bins to create. Used with Equal width and Equal frequency binning.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 20
+    }, {
+      "field" : "m_customCutoffs",
+      "configKey" : "customCutoffs",
+      "title" : "Custom cutoffs",
+      "description" : "Specifies the exact value at which the bin boundary should be placed.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "New cutoff",
+      "default" : null,
+      "defaultNote" : "значение не сериализуется без UI"
+    }, {
+      "field" : "m_customQuantiles",
+      "configKey" : "customQuantiles",
+      "title" : "Custom quantiles",
+      "description" : "The bin boundaries may be defined manually by entering the quantiles. The behaviour when a value is exactly equal to a quantile can be configured separately for each quantile.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "New quantile",
+      "default" : null,
+      "defaultNote" : "значение не сериализуется без UI"
+    }, {
+      "field" : "m_enforceIntegerCutoffs",
+      "configKey" : "enforceIntegerCutoffs",
+      "title" : "Enforce integer cutoffs",
+      "description" : "If enabled, bin boundaries will be rounded to the nearest integer. Not available when using custom cutoffs.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_fixLowerBound",
+      "configKey" : "fixedLowerBound_is_present",
+      "title" : "Fix lower bound",
+      "description" : "If enabled, values below the specified lower bound will be assigned to a dedicated outlier bin. The bin will have the name specified by the 'Lower outlier name/value' setting.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_fixedLowerBound",
+      "configKey" : "fixedLowerBound",
+      "title" : "Lower bound",
+      "description" : "Sets the minimum value for binning. Values below this will be assigned to the lower outlier bin.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.0
+    }, {
+      "field" : "m_fixUpperBound",
+      "configKey" : "fixedUpperBound_is_present",
+      "title" : "Fix upper bound",
+      "description" : "If enabled, values above the specified upper bound will be assigned to a dedicated outlier bin. The bin will have the name specified by the 'Upper outlier name/value' setting.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_fixedUpperBound",
+      "configKey" : "fixedUpperBound",
+      "title" : "Upper bound",
+      "description" : "Sets the maximum value for binning. Values above this will be assigned to the upper outlier bin.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.0
+    }, {
+      "field" : "m_binNames",
+      "configKey" : "binNames",
+      "title" : "Bin names/values",
+      "description" : "Selects how bins are labeled in the output. Use a 'Number Format Manager' node to customize number formatting.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NUMBERED",
+        "label" : "Numbered (e.g., Bin 1, Bin 2)"
+      }, {
+        "value" : "BORDERS",
+        "label" : "Borders (e.g., [0.0, 1.0))"
+      }, {
+        "value" : "MIDPOINTS",
+        "label" : "Midpoints"
+      } ],
+      "default" : "NUMBERED"
+    }, {
+      "field" : "m_usePrefix",
+      "configKey" : "usePrefix",
+      "title" : "UsePrefix",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_prefix",
+      "configKey" : "prefix",
+      "title" : "Prefix",
+      "description" : "Text to prepend to bin labels when using numbered naming (e.g., Bin 1, Bin 2).\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Bin "
+    }, {
+      "field" : "m_lowerOutlierValue",
+      "configKey" : "lowerOutlierValue",
+      "title" : "Lower outlier name/value",
+      "description" : "Label assigned to values below the first bin.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Lower outlier"
+    }, {
+      "field" : "m_upperOutlierValue",
+      "configKey" : "upperOutlierValue",
+      "title" : "Upper outlier name/value",
+      "description" : "Label assigned to values above the last bin.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Upper outlier"
+    }, {
+      "field" : "m_replaceOrAppend",
+      "configKey" : "replaceOrAppend",
+      "title" : "Output columns",
+      "description" : "Whether to replace the original columns with the binned columns, or to append the binned columns with new names created by appending the specified suffix to the original column names.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append with suffix"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_suffix",
+      "configKey" : "suffix",
+      "title" : "Suffix",
+      "description" : "Text appended to column names when new columns are created using the Append option.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : " (Binned)"
+    } ]
+  },
+  "tier" : "core"
+}

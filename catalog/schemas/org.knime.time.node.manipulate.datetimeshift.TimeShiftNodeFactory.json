@@ -1,0 +1,128 @@
+{
+  "id" : "org.knime.time.node.manipulate.datetimeshift.TimeShiftNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.time.node.manipulate.datetimeshift.TimeShiftNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Date&time columns",
+      "description" : "The date&amp;time columns whose values are shifted.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.time.node.manipulate.datetimeshift.TimeShiftNodeSettings$ColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_shiftMode",
+      "configKey" : "shiftMode",
+      "title" : "Shift mode",
+      "description" : "Select the shift mode to use.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "SHIFT_VALUE",
+        "label" : "Shift value"
+      }, {
+        "value" : "DURATION_COLUMN",
+        "label" : "Duration column"
+      }, {
+        "value" : "NUMERICAL_COLUMN",
+        "label" : "Number column"
+      } ],
+      "default" : "SHIFT_VALUE"
+    }, {
+      "field" : "m_shiftDurationValue",
+      "configKey" : "shiftDurationValue",
+      "title" : "Shift value",
+      "description" : "Select to insert a format string to use as constant shift value. The inserted string can be either in:\n<ul>\n  <li>\n    the ISO-8601 representation (see <a href=     \"https://docs.oracle.com/javase/8/docs/api/java/time/Duration.html#parse-java.lang.CharSequence-\">     time-based duration format</a> for details)\n  </li>\n  <li>\n    the short letter representation (e.g. '4H 5m 6s'). In this case, the letters H, m, and s     respectively indicate hours, minutes, and seconds.\n  </li>\n  <li>\n    the long word representation (e.g. '4 hours 5 minutes 6 seconds).\n  </li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.experimental.interval.TimeInterval"
+    }, {
+      "field" : "m_durationColumn",
+      "configKey" : "durationColumn",
+      "title" : "Column",
+      "description" : "Select to choose the shift value from a time-based duration column.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.time.util.DateTimeUtils$DurationColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_numericalColumn",
+      "configKey" : "numericalColumn",
+      "title" : "Column",
+      "description" : "Select to choose the shift value from a numerical column. The shift value will be scaled by the selected granularity.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.time.node.manipulate.datetimeshift.DateTimeShiftSettingsUtils$NumberColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_granularity",
+      "configKey" : "granularity",
+      "title" : "Granularity",
+      "description" : "The granularity (i.e. hours, seconds, etc) of the shift.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "HOURS",
+        "label" : "Hours"
+      }, {
+        "value" : "MINUTES",
+        "label" : "Minutes"
+      }, {
+        "value" : "SECONDS",
+        "label" : "Seconds"
+      }, {
+        "value" : "MILLISECONDS",
+        "label" : "Milliseconds"
+      }, {
+        "value" : "MICROSECONDS",
+        "label" : "Microseconds"
+      }, {
+        "value" : "NANOSECONDS",
+        "label" : "Nanoseconds"
+      } ],
+      "default" : "HOURS"
+    }, {
+      "field" : "m_replaceOrAppend",
+      "configKey" : "replaceOrAppend",
+      "title" : "Output columns",
+      "description" : "Depending on this setting, the output columns will either replace the modified columns, or be appended to the table with a suffix.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append with suffix"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_outputColumnSuffix",
+      "configKey" : "outputColumnSuffix",
+      "title" : "Output column suffix",
+      "description" : "The suffix to append to the column names of the new columns.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : " (Shifted)"
+    } ]
+  },
+  "tier" : "experimental"
+}

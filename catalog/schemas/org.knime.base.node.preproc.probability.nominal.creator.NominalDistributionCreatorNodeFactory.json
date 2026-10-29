@@ -1,0 +1,123 @@
+{
+  "id" : "org.knime.base.node.preproc.probability.nominal.creator.NominalDistributionCreatorNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.probability.nominal.creator.NominalDistributionCreatorNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnType",
+      "configKey" : "columnType",
+      "title" : "Column type",
+      "description" : "Choose whether to create probability distributions from numeric columns or a single string column.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NUMERIC_COLUMN",
+        "label" : "Numeric columns"
+      }, {
+        "value" : "STRING_COLUMN",
+        "label" : "String column"
+      } ],
+      "default" : "NUMERIC_COLUMN"
+    }, {
+      "field" : "m_stringColumn",
+      "configKey" : "single_string_column",
+      "title" : "String column",
+      "description" : "Select a single string column with a valid domain to create a one-hot encoding probability distribution. I.e., the number of distinct values in the string column will be the number of classes in the created distribution and the string value of a cell will have probability 1 whereby all other possible string values of a cell will have a probablity of 0. ",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.probability.nominal.creator.NominalDistributionCreatorNodeParameters$NominalChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Numeric columns",
+      "description" : "Move the columns that contain the probability values to the \"Include\" list.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_allowImpreciseProbabilities",
+      "configKey" : "enable_precision",
+      "title" : "Allow probabilities that sum up to 1 imprecisely",
+      "description" : "If enabled, the probabilities must not sum up to 1 precisely. This might be helpful if there are, e.g., some\nrounding errors in the probability values.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_precisionDigits",
+      "configKey" : "precision",
+      "title" : "Precision (number of decimal digits)",
+      "description" : "Defines the precision that the sum of the probabilities must have by restricting the number of decimal\ndigits that must be precise. The sum is accepted if <i>abs(sum - 1) &lt;= 10^(-precision)</i> , e.g., if the\n sum is 0.999, it is only accepted with a precision of &lt;=2. The lower the specified number, the higher\n is the tolerance.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 4
+    }, {
+      "field" : "m_invalidDistributionHandling",
+      "configKey" : "invalidDistributionHandling",
+      "title" : "Invalid probability distribution handling",
+      "description" : "Specify how to treat invalid probabilities. Invalid means, e.g., negative probabilities or probabilities\nthat do not sum up to 1 (with respect to the specified precision). If <i>Fail</i> is selected, the node will\n fail. Otherwise, the node just gives a warning and puts missing values in the output for the corresponding\nrows.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      } ],
+      "default" : "FAIL"
+    }, {
+      "field" : "m_outputColumnName",
+      "configKey" : "column_name",
+      "title" : "Output column name",
+      "description" : "Specify the name of the created column containing the probability distribution.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Probability Distribution"
+    }, {
+      "field" : "m_removeIncludedColumns",
+      "configKey" : "remove_included_columns",
+      "title" : "Remove included columns",
+      "description" : "If selected, the included numeric columns or the picked string column will be removed from the output.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_missingValueHandling",
+      "configKey" : "missingValueHandling",
+      "title" : "Missing value handling",
+      "description" : "Specify how to treat a missing value in one of the input columns. If 'Fail' is selected, the node will fail.\n If 'Ignore' is selected, the node just gives a warning and puts missing values in the output for the\n corresponding rows. If 'Treat as zero' is selected, the missing value will be treated as 0.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      }, {
+        "value" : "ZERO",
+        "label" : "Treat as zero"
+      } ],
+      "default" : "FAIL",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.probability.nominal.creator.NominalDistributionCreatorNodeParameters$MissingValueHandlingChoicesProvider",
+        "kind" : "enum"
+      },
+      "choicesResolved" : true
+    } ]
+  },
+  "tier" : "experimental"
+}

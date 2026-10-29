@@ -1,0 +1,91 @@
+{
+  "id" : "org.knime.base.node.rules.engine.twoports.RuleEngineVariable2PortsNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.rules.engine.twoports.RuleEngineVariable2PortsNodeParameters",
+    "fields" : [ {
+      "field" : "m_variableName",
+      "configKey" : "variable.name",
+      "title" : "Variable name",
+      "description" : "Name of the flow variable that will hold the result of the first matching rule.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "prediction"
+    }, {
+      "field" : "m_dictionaryMode",
+      "configKey" : "dictionaryMode",
+      "title" : "Dictionary mode",
+      "description" : "Choose how the rules table encodes the rules.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "RULE",
+        "label" : "Rule"
+      }, {
+        "value" : "CONDITION_AND_VALUE",
+        "label" : "Condition and value"
+      } ],
+      "default" : "RULE"
+    }, {
+      "field" : "m_ruleColumn",
+      "configKey" : "ruleColumn",
+      "title" : "Rule column",
+      "description" : "The column in the rules table that contains the full rule expressions (condition and outcome combined, e.g. \"$Col$ > 0 => TRUE\").",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.AbstractRuleEngine2PortsNodeParameters$RulesTableStringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_conditionColumn",
+      "configKey" : "conditionColumn",
+      "title" : "Condition column",
+      "description" : "The column in the rules table that contains the condition part of each rule (e.g. \"$Col$ > 0\").",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.AbstractRuleEngine2PortsNodeParameters$RulesTableStringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_valueColumn",
+      "configKey" : "valueColumn",
+      "title" : "Value column",
+      "description" : "The column in the rules table that contains the outcome value for each rule (e.g. \"TRUE\" or \"FALSE\").",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.AbstractRuleEngine2PortsNodeParameters$RulesTableOutcomeColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_treatOutcomesWithDollarAsReferences",
+      "configKey" : "treat.outcomes.with.dollar.as.references",
+      "title" : "Treat values starting with $ as references",
+      "description" : "When checked, values in the value column that start with $ will be treated as references (for example, column, flow variable, or table property references) rather than literal string values.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_disallowLongOutputForCompatibility",
+      "configKey" : "disallowLongOutputForCompatibility",
+      "title" : "DisallowLongOutputForCompatibility",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

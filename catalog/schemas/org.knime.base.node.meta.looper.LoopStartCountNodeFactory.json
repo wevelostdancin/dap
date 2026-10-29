@@ -1,0 +1,24 @@
+{
+  "id" : "org.knime.base.node.meta.looper.LoopStartCountNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.meta.looper.LoopStartCountNodeDialog",
+    "ui" : [ {
+      "type" : "number",
+      "label" : "Number of loops",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : 10.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 1,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

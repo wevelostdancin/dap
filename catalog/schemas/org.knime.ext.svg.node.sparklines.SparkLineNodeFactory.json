@@ -1,0 +1,72 @@
+{
+  "id" : "org.knime.ext.svg.node.sparklines.SparkLineNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.ext.svg.node.sparklines.SparkLineNodeParameters",
+    "fields" : [ {
+      "field" : "m_columns",
+      "configKey" : "columns",
+      "title" : "Columns",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_keepAllColumnsSelected",
+        "configKey" : "keep_all_columns_selected",
+        "title" : "KeepAllColumnsSelected",
+        "description" : "",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_twinList",
+        "configKey" : "twinList",
+        "title" : "TwinList",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_inclList",
+          "configKey" : "inclList",
+          "title" : "Column selection",
+          "description" : "Move the numeric columns of interest to the \"Include\" list.",
+          "advanced" : false,
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          },
+          "addButtonText" : "",
+          "default" : [ ],
+          "choicesSource" : {
+            "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+            "kind" : "columns",
+            "note" : "варианты зависят от входной таблицы"
+          },
+          "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+        }, {
+          "field" : "m_exclList",
+          "configKey" : "ExclList",
+          "title" : "ExclList",
+          "description" : "",
+          "advanced" : false,
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          },
+          "addButtonText" : "",
+          "default" : [ ]
+        } ]
+      } ]
+    }, {
+      "field" : "m_newColumnName",
+      "configKey" : "new_column_name",
+      "title" : "Name of new column",
+      "description" : "Specify the name for the newly created column that will contain the spark line visualizations.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Spark Lines"
+    } ]
+  },
+  "tier" : "experimental"
+}

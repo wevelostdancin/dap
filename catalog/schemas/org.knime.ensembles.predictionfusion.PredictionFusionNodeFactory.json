@@ -1,0 +1,77 @@
+{
+  "id" : "org.knime.ensembles.predictionfusion.PredictionFusionNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.ensembles.predictionfusion.PredictionFusionNodeParameters",
+    "fields" : [ {
+      "field" : "m_method",
+      "configKey" : "method",
+      "title" : "Method",
+      "description" : "The fusion method.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "MAXIMUM",
+        "label" : "Maximum"
+      }, {
+        "value" : "MEAN",
+        "label" : "Mean"
+      }, {
+        "value" : "MEDIAN",
+        "label" : "Median"
+      }, {
+        "value" : "MINIMUM",
+        "label" : "Minimum"
+      } ],
+      "default" : "MAXIMUM"
+    }, {
+      "field" : "m_classesColumn",
+      "configKey" : "classesColumn",
+      "title" : "Classes column",
+      "description" : "String column from which to extract the classes from it's domain.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$StringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_addClassesFromColumn",
+      "configKey" : "addClassesFromColumn",
+      "title" : "Add classes from column domain",
+      "description" : "Add classes from the domain of the selected string column.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_classes",
+      "configKey" : "classes",
+      "title" : "Classes",
+      "description" : "The classes that were predicted and for which confidences are available. In case of a tie the higher\nclass (in the list) wins.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add class",
+      "default" : [ ]
+    }, {
+      "field" : "m_predictions",
+      "configKey" : "predictions",
+      "title" : "Class confidences",
+      "description" : "Each row represents the predicted confidences from one classifier. The fusion method is applied to all\nconfidence values of the same class.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add prediction",
+      "default" : [ ]
+    } ]
+  },
+  "tier" : "experimental"
+}

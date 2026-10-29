@@ -1,0 +1,81 @@
+{
+  "id" : "org.knime.base.filehandling.copyfiles.CopyFilesNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.filehandling.copyfiles.CopyFilesNodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Copy",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Move",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Source",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Use path from target column",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Use source name and output directory",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Overwrite",
+      "section" : "If a file exists...",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Abort",
+      "section" : "If a file exists...",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 11,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

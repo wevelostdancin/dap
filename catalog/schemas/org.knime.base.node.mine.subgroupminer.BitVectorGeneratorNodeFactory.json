@@ -1,0 +1,114 @@
+{
+  "id" : "org.knime.base.node.mine.subgroupminer.BitVectorGeneratorNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "STRING_COLUMN",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "STRING COLUMN",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelFilterString",
+      "configKey" : "included.numeric.columns",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelFilterString",
+      "type" : "filter",
+      "default" : null,
+      "title" : "Included.numeric.columns",
+      "titleSource" : "field-name",
+      "source" : "node-model",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      }
+    } ],
+    "dialogClass" : "org.knime.base.node.mine.subgroupminer.BitVectorGeneratorNodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Numeric input (many columns)",
+      "section" : "Bits from numeric columns",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "Threshold",
+      "configKey" : "THRESHOLD",
+      "keySource" : "label-match",
+      "section" : "Bits from numeric columns",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 0.1
+    }, {
+      "type" : "boolean",
+      "section" : "Bits from numeric columns",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "Percentage",
+      "section" : "Bits from numeric columns",
+      "source" : "dialog-ui",
+      "default" : 100.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 10.0
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Parse bitvectors from strings (one column)",
+      "section" : "Bits from string column",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "String column to be parsed",
+      "section" : "Bits from string column",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Kind of string representation",
+      "section" : "Bits from string column",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "HEX",
+        "label" : "HEX"
+      }, {
+        "value" : "ID",
+        "label" : "ID"
+      }, {
+        "value" : "BIT",
+        "label" : "BIT"
+      } ],
+      "default" : "HEX"
+    }, {
+      "type" : "boolean",
+      "label" : "Remove column(s) used for bit vector creation",
+      "section" : "General",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/2",
+    "uiElements" : 10,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,243 @@
+{
+  "id" : "org.knime.base.node.rules.engine.twoports.RuleEngine2PortsNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.rules.engine.twoports.RuleEngine2PortsNodeParameters",
+    "fields" : [ {
+      "field" : "m_outputMode",
+      "configKey" : "outputMode",
+      "title" : "Output mode",
+      "description" : "Choose whether to append a new column with the outcome of the rules, or replace an existing column.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "APPEND",
+        "label" : "Append column"
+      }, {
+        "value" : "REPLACE",
+        "label" : "Replace column"
+      } ],
+      "default" : "APPEND"
+    }, {
+      "field" : "m_appendColumn",
+      "configKey" : "append.column",
+      "title" : "Append column",
+      "description" : "Name of the newly appended column, which contains the outcome of the rules.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Prediction",
+      "placeholder" : "Prediction"
+    }, {
+      "field" : "m_replaceColumn",
+      "configKey" : "replace.column",
+      "title" : "Replace column",
+      "description" : "The column to replace with the rule outcome.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.RuleEngine2PortsNodeParameters$DataTableAllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_isPmmlRuleSet",
+      "configKey" : "is.pmml.ruleset",
+      "title" : "Enable PMML RuleSet generation",
+      "description" : "When checked, PMML mode evaluation is used and fails if the input cannot be translated to PMML.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_ruleSelectionMethod",
+      "configKey" : "rule.selection.method",
+      "title" : "Hit selection",
+      "description" : "The method used to select the outcome when multiple rules match.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "First hit",
+        "label" : "First hit"
+      }, {
+        "value" : "Maximal matching weighted sum",
+        "label" : "Maximal matching weighted sum"
+      }, {
+        "value" : "Highest matching weight",
+        "label" : "Highest matching weight"
+      } ],
+      "default" : "First hit"
+    }, {
+      "field" : "m_defaultScore",
+      "configKey" : "defaultScore",
+      "title" : "Default value/score",
+      "description" : "The default score/value to use when no rules matched.",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null
+    }, {
+      "field" : "m_defaultConfidence",
+      "configKey" : "defaultConfidence",
+      "title" : "Default rule confidence",
+      "description" : "The default confidence value to use when it is not specified by the confidence column.",
+      "advanced" : false,
+      "type" : "number",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_ruleConfidenceColumn",
+      "configKey" : "ruleConfidenceColumn",
+      "title" : "Rule confidence column",
+      "description" : "Specifies confidence of the rules based on the values in the selected column.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.RuleEngine2PortsPmmlSettings$RulesTableDoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_defaultWeight",
+      "configKey" : "defaultWeight",
+      "title" : "Default rule weight",
+      "description" : "The default weight value to use when it is not specified by the weight column.",
+      "advanced" : false,
+      "type" : "number",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_ruleWeightColumn",
+      "configKey" : "ruleWeightColumn",
+      "title" : "Rule weight column",
+      "description" : "Specifies weight values for the rules based on the values in the selected column.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.RuleEngine2PortsPmmlSettings$RulesTableDoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_computeConfidence",
+      "configKey" : "compute.confidence",
+      "title" : "Append confidence values",
+      "description" : "When checked, confidence values are computed and written into a new column in the output table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_predictionConfidenceColumn",
+      "configKey" : "prediction.confidence.column",
+      "title" : "Confidence column name",
+      "description" : "The name of the column to write confidence values into.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Confidence",
+      "placeholder" : "Confidence"
+    }, {
+      "field" : "m_provideStatistics",
+      "configKey" : "provide.statistics",
+      "title" : "Provide statistics",
+      "description" : "When checked, <tt>recordCount</tt> (and if <b>Validation column</b> is selected, also <tt>nbCorrect</tt>) is computed for the PMML output.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_validateColumn",
+      "configKey" : "validateColumn",
+      "title" : "Validation column",
+      "description" : "The column which contains the correct prediction for the input (test/validation) table. When <b>&lt;none&gt;</b> selected, no <tt>nbCorrect</tt> value will be computed.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.RuleEngine2PortsPmmlSettings$DataTableAllColumnsForValidationProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_dictionaryMode",
+      "configKey" : "dictionaryMode",
+      "title" : "Dictionary mode",
+      "description" : "Choose how the rules table encodes the rules.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "RULE",
+        "label" : "Rule"
+      }, {
+        "value" : "CONDITION_AND_VALUE",
+        "label" : "Condition and value"
+      } ],
+      "default" : "RULE"
+    }, {
+      "field" : "m_ruleColumn",
+      "configKey" : "ruleColumn",
+      "title" : "Rule column",
+      "description" : "The column in the rules table that contains the full rule expressions (condition and outcome combined, e.g. \"$Col$ > 0 => TRUE\").",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.AbstractRuleEngine2PortsNodeParameters$RulesTableStringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_conditionColumn",
+      "configKey" : "conditionColumn",
+      "title" : "Condition column",
+      "description" : "The column in the rules table that contains the condition part of each rule (e.g. \"$Col$ > 0\").",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.AbstractRuleEngine2PortsNodeParameters$RulesTableStringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_valueColumn",
+      "configKey" : "valueColumn",
+      "title" : "Value column",
+      "description" : "The column in the rules table that contains the outcome value for each rule (e.g. \"TRUE\" or \"FALSE\").",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.twoports.AbstractRuleEngine2PortsNodeParameters$RulesTableOutcomeColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_treatOutcomesWithDollarAsReferences",
+      "configKey" : "treat.outcomes.with.dollar.as.references",
+      "title" : "Treat values starting with $ as references",
+      "description" : "When checked, values in the value column that start with $ will be treated as references (for example, column, flow variable, or table property references) rather than literal string values.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_disallowLongOutputForCompatibility",
+      "configKey" : "disallowLongOutputForCompatibility",
+      "title" : "DisallowLongOutputForCompatibility",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

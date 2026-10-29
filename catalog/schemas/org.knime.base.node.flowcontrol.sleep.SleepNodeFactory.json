@@ -1,0 +1,110 @@
+{
+  "id" : "org.knime.base.node.flowcontrol.sleep.SleepNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.flowcontrol.sleep.SleepNodeParameters",
+    "fields" : [ {
+      "field" : "m_waitMode",
+      "configKey" : "waitMode",
+      "title" : "Wait",
+      "description" : "Select how the node should wait: for a duration, until a specific time, or for a file event.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "WAIT_FOR_TIME",
+        "label" : "For duration"
+      }, {
+        "value" : "WAIT_UNTIL_TIME",
+        "label" : "To time of day"
+      }, {
+        "value" : "WAIT_FILE",
+        "label" : "For file change"
+      } ],
+      "default" : "WAIT_FOR_TIME"
+    }, {
+      "field" : "m_forHours",
+      "configKey" : "for_hours",
+      "title" : "Hours",
+      "description" : "The amount of hours to wait for.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 0
+    }, {
+      "field" : "m_forMinutes",
+      "configKey" : "for_minutes",
+      "title" : "Minutes",
+      "description" : "The amount of minutes to wait for.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 0
+    }, {
+      "field" : "m_forSeconds",
+      "configKey" : "for_seconds",
+      "title" : "Seconds",
+      "description" : "The amount of seconds to wait for.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    }, {
+      "field" : "m_forMilliseconds",
+      "configKey" : "for_milliseconds",
+      "title" : "Milliseconds",
+      "description" : "The amount of milliseconds to wait for.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 0
+    }, {
+      "field" : "m_toHours",
+      "configKey" : "to_hours",
+      "title" : "Hour",
+      "description" : "The hour of the time to wait until.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 0
+    }, {
+      "field" : "m_toMinutes",
+      "configKey" : "to_min",
+      "title" : "Minute",
+      "description" : "The minute of the time to wait until.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 0
+    }, {
+      "field" : "m_toSeconds",
+      "configKey" : "to_seconds",
+      "title" : "Second",
+      "description" : "The second of the time to wait until.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 0
+    }, {
+      "field" : "m_filePath",
+      "configKey" : "path_to_file",
+      "title" : "File",
+      "description" : "Path to the file to monitor for events. Can be a local file or URL pointing to a local file.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_fileEvent",
+      "configKey" : "fileEvent",
+      "title" : "File change",
+      "description" : "Type of file event to wait for.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "MODIFICATION",
+        "label" : "Modified"
+      }, {
+        "value" : "CREATION",
+        "label" : "Created"
+      }, {
+        "value" : "DELETION",
+        "label" : "Deleted"
+      } ],
+      "default" : "MODIFICATION"
+    } ]
+  },
+  "tier" : "core"
+}

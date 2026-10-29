@@ -1,0 +1,75 @@
+{
+  "id" : "org.knime.base.node.preproc.filter.constvalcol.ConstantValueColumnFilterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.filter.constvalcol.ConstantValueColumnFilterNodeParameters",
+    "fields" : [ {
+      "field" : "m_filterMode",
+      "configKey" : "filterMode",
+      "title" : "Remove from the selected columns",
+      "description" : "Choose whether to remove all constant value columns or only those containing a specific value.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ALL",
+        "label" : "all constant value columns"
+      }, {
+        "value" : "BY_VALUE",
+        "label" : "constant value columns that only contain"
+      } ],
+      "default" : "ALL"
+    }, {
+      "field" : "m_filterNumeric",
+      "configKey" : "filterNumeric",
+      "title" : "numeric values of",
+      "description" : "Remove only those constant value columns that only contain a certain specific numeric value.",
+      "advanced" : false,
+      "type" : "number",
+      "nullable" : true,
+      "default" : null
+    }, {
+      "field" : "m_filterString",
+      "configKey" : "filterString",
+      "title" : "string values of",
+      "description" : "Remove only those constant value columns that only contain a certain specific textual value.",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null
+    }, {
+      "field" : "m_filterMissing",
+      "configKey" : "filter-missing",
+      "title" : "missing values",
+      "description" : "Remove only those constant value columns that only contain empty cells / missing values.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_warningMessage",
+      "configKey" : "warningMessage",
+      "title" : "WarningMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_consideredColumns",
+      "configKey" : "consideredColumns",
+      "title" : "Considered columns",
+      "description" : "This list contains the column names of the input table that are to be considered for filtering.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter"
+    }, {
+      "field" : "m_minRows",
+      "configKey" : "row-threshold",
+      "title" : "Minimum number of rows",
+      "description" : "The minimum number of rows a table must have to be considered for filtering. If the table size is below the\nspecified value, the table will not be filtered / altered.\n",
+      "advanced" : true,
+      "type" : "integer",
+      "default" : 1
+    } ]
+  },
+  "tier" : "core"
+}

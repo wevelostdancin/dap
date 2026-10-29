@@ -1,0 +1,77 @@
+{
+  "id" : "org.knime.base.node.preproc.domain.DomainNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.preproc.domain.DomainNodeDialogPane",
+    "ui" : [ {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Retain Possible Value Domain",
+      "section" : "Columns in exclude list",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Drop Possible Value Domain",
+      "section" : "Columns in exclude list",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Restrict number of possible values",
+      "section" : "Possible Values",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Possible Values",
+      "source" : "dialog-ui",
+      "default" : 60.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 10.0
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Retain Min/Max Domain",
+      "section" : "Columns in exclude list",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Drop Min/Max Domain",
+      "section" : "Columns in exclude list",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 10,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

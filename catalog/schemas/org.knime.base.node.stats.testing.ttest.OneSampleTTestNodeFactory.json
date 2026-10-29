@@ -1,0 +1,40 @@
+{
+  "id" : "org.knime.base.node.stats.testing.ttest.OneSampleTTestNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.stats.testing.ttest.OneSampleTTestNodeParameters",
+    "fields" : [ {
+      "field" : "m_testValue",
+      "configKey" : "testValue",
+      "title" : "Test value",
+      "description" : "The hypothesized value to test against.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.0
+    }, {
+      "field" : "m_confidenceIntervalProb",
+      "configKey" : "confidenceIntervalProb",
+      "title" : "Confidence interval (in %)",
+      "description" : "The limits for the confidence interval are computed using this number. The default is 95 which means that\nyou can be 95% confident that the true value of the parameter is in the confidence interval.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 95.0
+    }, {
+      "field" : "m_testColumns",
+      "configKey" : "testColumns",
+      "title" : "Test columns",
+      "description" : "A single sample t-test is performed separately for each of these columns.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "core"
+}

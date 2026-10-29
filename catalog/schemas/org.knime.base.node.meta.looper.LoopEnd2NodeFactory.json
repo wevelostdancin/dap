@@ -1,0 +1,83 @@
+{
+  "id" : "org.knime.base.node.meta.looper.LoopEnd2NodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.meta.looper.LoopEnd2NodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Generate new RowIDs",
+      "section" : "Row key policy",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Unique RowIDs by appending a suffix",
+      "section" : "Row key policy",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Leave RowIDs unmodified",
+      "section" : "Row key policy",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Add iteration column",
+      "configKey" : "addIterationColumn",
+      "keySource" : "label-match",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Propagate modified loop variables",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Ignore empty input tables at port 1",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Ignore empty input tables at port 2",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Allow variable column types at port 1",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Allow variable column types at port 2",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Allow changing table specifications at port 1",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Allow changing table specifications at port 2",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 11,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

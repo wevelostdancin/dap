@@ -1,0 +1,146 @@
+{
+  "id" : "org.knime.base.node.preproc.rowkey.RowKeyNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "replaceRowKey",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : true,
+      "title" : "ReplaceRowKey",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "newRowKeyColumnName",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "New RowID column:",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "removeRowKeyCol",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "RemoveRowKeyCol",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "ensureUniqueness",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "EnsureUniqueness",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "replaceMissingValues",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "ReplaceMissingValues",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "enableHilite",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "EnableHilite",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "appendRowKeyCol",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "AppendRowKeyCol",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "newColumnName4RowKeyValues",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "New column name:",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.preproc.rowkey.RowKeyNodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Replace RowID with selected column values or create a new one",
+      "section" : "Replace RowID",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "dropdown",
+      "label" : "New RowID column",
+      "section" : "Replace RowID",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "<none> (MissingCell)",
+        "label" : "<none> (MissingCell)"
+      } ],
+      "default" : "<none> (MissingCell)"
+    }, {
+      "type" : "boolean",
+      "label" : "Remove selected column",
+      "section" : "Replace RowID",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Ensure uniqueness",
+      "configKey" : "ensureUniqueness",
+      "keySource" : "label-match",
+      "section" : "Replace RowID",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Handle missing values",
+      "section" : "Replace RowID",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Enable hiliting",
+      "section" : "Replace RowID",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Create new column with the RowID values",
+      "section" : "Append RowID column",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "New column name",
+      "section" : "Append RowID column",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    } ],
+    "labelCoverage" : "2/8",
+    "uiElements" : 8
+  },
+  "tier" : "experimental"
+}

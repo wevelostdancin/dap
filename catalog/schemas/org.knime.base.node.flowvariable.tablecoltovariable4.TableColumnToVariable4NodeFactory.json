@@ -1,0 +1,39 @@
+{
+  "id" : "org.knime.base.node.flowvariable.tablecoltovariable4.TableColumnToVariable4NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.flowvariable.tablecoltovariable4.TableColumnToVariable4NodeSettings",
+    "fields" : [ {
+      "field" : "m_column",
+      "configKey" : "column",
+      "title" : "Column name",
+      "description" : "Name of the column for the values.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_missingOperation",
+      "configKey" : "missingOperation",
+      "title" : "If value in cell is missing",
+      "description" : "Action to take if the value in cell is missing.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      }, {
+        "value" : "FAIL",
+        "label" : "Fail"
+      } ],
+      "default" : "IGNORE"
+    } ]
+  },
+  "tier" : "core"
+}

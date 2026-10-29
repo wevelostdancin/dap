@@ -1,0 +1,102 @@
+{
+  "id" : "org.knime.distance.measure.numerical.NumericalDistanceNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.distance.measure.numerical.NumericalDistanceNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Column selection",
+      "description" : "Choose the columns for which the numeric distance measure is defined.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter"
+    }, {
+      "field" : "m_distanceType",
+      "configKey" : "distance-factory-id",
+      "title" : "Distance Selection",
+      "description" : "Select and configure the distance to be used for measurement.\n<a href=\"http://en.wikipedia.org/wiki/Lp_space\"> Standard Distance (Euclidean/ Manhattan)</a>\nThe Minkowski or Lp-Norm distance generalizes the\nEuclidean or Manhattan distance\n<a href=\"http://en.wikipedia.org/wiki/Cosine_similarity\">Cosine distance</a>\nCosine similarity is a measure of similarity between two vectors\nof an inner product space that measures the cosine of the angle\nbetween them. This distance function is 1 - cosine-similarity and can take range [0,2].\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "org.knime.distance.measure.numerical.lnorm.LNormDistanceFactory",
+      "choicesSource" : {
+        "provider" : "org.knime.distance.measure.numerical.NumericalDistanceNodeParameters$DistanceTypeProvider",
+        "kind" : "strings",
+        "note" : "варианты вычисляются провайдером"
+      },
+      "choices" : [ {
+        "value" : "org.knime.distance.measure.numerical.cosine.CosineDistanceFactory",
+        "label" : "Cosine Distance"
+      }, {
+        "value" : "org.knime.distance.measure.numerical.lnorm.LNormDistanceFactory",
+        "label" : "Standard Distance (Euclidean/ Manhattan)"
+      } ],
+      "choicesResolved" : true
+    }, {
+      "field" : "m_lNormParameters",
+      "configKey" : "lNormParameters",
+      "title" : "LNormParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_distanceConfig",
+        "configKey" : "distanceConfig",
+        "title" : "Distance configuration",
+        "description" : "Choose the distance measure to use.",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "EUCLIDIEAN",
+          "label" : "Euclidean"
+        }, {
+          "value" : "MANHATTAN",
+          "label" : "Manhattan"
+        }, {
+          "value" : "MAXIMUM",
+          "label" : "Maximum"
+        }, {
+          "value" : "CUSTOM",
+          "label" : "Custom"
+        } ],
+        "default" : "EUCLIDIEAN"
+      }, {
+        "field" : "m_pValue",
+        "configKey" : "pValue",
+        "title" : "P value",
+        "description" : "The power parameter for the L-norm distance. A value of 1 results in Manhattan distance, while a value of 2 equals Euclidean distance.",
+        "advanced" : false,
+        "type" : "number",
+        "default" : 2.0
+      } ]
+    }, {
+      "field" : "m_normalize",
+      "configKey" : "normalize-distance",
+      "title" : "Normalize distance",
+      "description" : "If enabled, the distance will be normalized to the range [0, 1],\nwhere 1 refers to the greatest possible difference between the given input vectors.\nNote that this assumes that the input vectors are already normalized.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_missingValueHandling",
+      "configKey" : "missingValueHandling",
+      "title" : "Missing value handling",
+      "description" : "Determines how missing values are handled during distance computation.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "ASSUME_EQUAL",
+        "label" : "Assume equal"
+      }, {
+        "value" : "AVERAGE_DISTANCE",
+        "label" : "Average distance"
+      } ],
+      "default" : "FAIL"
+    } ]
+  },
+  "tier" : "experimental"
+}

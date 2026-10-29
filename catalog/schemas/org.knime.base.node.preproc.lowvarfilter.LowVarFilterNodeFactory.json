@@ -1,0 +1,36 @@
+{
+  "id" : "org.knime.base.node.preproc.lowvarfilter.LowVarFilterNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.preproc.lowvarfilter.LowVarFilterNodeDialogPane",
+    "ui" : [ {
+      "type" : "number",
+      "label" : "Variance Upper Bound",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 0.0,
+      "min" : 0.0,
+      "max" : "Infinity",
+      "step" : 0.1
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 3,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

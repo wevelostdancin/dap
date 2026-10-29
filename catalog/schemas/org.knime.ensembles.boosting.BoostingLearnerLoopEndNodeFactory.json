@@ -1,0 +1,62 @@
+{
+  "id" : "org.knime.ensembles.boosting.BoostingLearnerLoopEndNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.ensembles.boosting.BoostingLearnerLoopEndNodeParameters",
+    "fields" : [ {
+      "field" : "m_classColumn",
+      "configKey" : "classColumn",
+      "title" : "Real class column",
+      "description" : "The column from the second input table that contains the real class values for each row.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.ensembles.boosting.BoostingLearnerLoopEndNodeParameters$NominalColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_predictionColumn",
+      "configKey" : "predictionColumn",
+      "title" : "Predicted class column",
+      "description" : "The column from the second input table that contains the predicted class values for each row.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.ensembles.boosting.BoostingLearnerLoopEndNodeParameters$NominalColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_maxIterations",
+      "configKey" : "maxIterations",
+      "title" : "Number of iterations",
+      "description" : "The number of iterations the loop should be run, i.e., the number of models to be learned.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 100
+    }, {
+      "field" : "m_useSeed",
+      "configKey" : "useSeed",
+      "title" : "Use seed for random numbers",
+      "description" : "Check this option if you want to use a fixed seed for generating random numbers. This ensures\nthat for the same input data always the same result is produced in each iteration.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_randomSeed",
+      "configKey" : "randomSeed",
+      "title" : "Seed",
+      "description" : "Enter the seed for the random number generator here.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "0"
+    } ]
+  },
+  "tier" : "experimental"
+}

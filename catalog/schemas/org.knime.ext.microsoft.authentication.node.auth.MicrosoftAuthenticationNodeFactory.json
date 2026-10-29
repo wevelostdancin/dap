@@ -1,0 +1,482 @@
+{
+  "id" : "org.knime.ext.microsoft.authentication.node.auth.MicrosoftAuthenticationNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.ext.microsoft.authentication.node.auth.MicrosoftAuthenticationNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Authentication mode",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Interactive authentication",
+        "label" : "Interactive authentication"
+      }, {
+        "value" : "Username/password authentication",
+        "label" : "Username/password authentication"
+      }, {
+        "value" : "Client/Application secret authentication",
+        "label" : "Client/Application secret authentication"
+      }, {
+        "value" : "Shared key authentication (Azure Storage only)",
+        "label" : "Shared key authentication (Azure Storage only)"
+      }, {
+        "value" : "Shared access signature (SAS) authentication (Azure Storage only)",
+        "label" : "Shared access signature (SAS) authentication (Azure Storage only)"
+      } ],
+      "default" : "Interactive authentication"
+    }, {
+      "type" : "boolean",
+      "label" : "Memory (stores token in-memory)",
+      "section" : "Token storage",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "File (stores token in separate file)",
+      "section" : "Token storage",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Write to",
+      "section" : "Token file to read/write",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Local File System",
+        "label" : "Local File System"
+      }, {
+        "value" : "Mountpoint",
+        "label" : "Mountpoint"
+      }, {
+        "value" : "Relative to",
+        "label" : "Relative to"
+      }, {
+        "value" : "Custom/KNIME URL",
+        "label" : "Custom/KNIME URL"
+      }, {
+        "value" : "Hub Space",
+        "label" : "Hub Space"
+      } ],
+      "default" : "Local File System"
+    }, {
+      "type" : "dropdown",
+      "section" : "Token file to read/write",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Current Hub Space",
+        "label" : "Current Hub Space"
+      }, {
+        "value" : "Current mountpoint",
+        "label" : "Current mountpoint"
+      }, {
+        "value" : "Current workflow",
+        "label" : "Current workflow"
+      }, {
+        "value" : "Current workflow data area",
+        "label" : "Current workflow data area"
+      } ],
+      "default" : "Current workflow data area"
+    }, {
+      "type" : "dropdown",
+      "section" : "Token file to read/write",
+      "source" : "dialog-ui",
+      "choices" : [ ],
+      "default" : "knime-temp-space"
+    }, {
+      "type" : "dropdown",
+      "section" : "Token file to read/write",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "number",
+      "label" : "Timeout",
+      "section" : "Token file to read/write",
+      "source" : "dialog-ui",
+      "default" : 10000.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 1000.0
+    }, {
+      "type" : "dropdown",
+      "label" : "File",
+      "configKey" : "file",
+      "keySource" : "label-match",
+      "section" : "Token file to read/write",
+      "source" : "dialog-ui",
+      "choices" : [ ],
+      "default" : ""
+    }, {
+      "type" : "boolean",
+      "label" : "Create missing folders",
+      "configKey" : "create_missing_folders",
+      "keySource" : "label-match",
+      "section" : "Token file to read/write",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Node (stores token in node settings)",
+      "section" : "Token storage",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Sharepoint files and list items (read-only)",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Sharepoint files and list items",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Sharepoint files, lists and list items",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Azure Databricks",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "User Groups (Read)  Note: Only used to list groups in Sharepoint Connector dialog. This is a sensitive scope which requires admin consent.",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "User Groups (IDs only)  Note: Only used to list groups in Sharepoint Connector dialog. This scope only allows to see technical IDs of groups, not the human-readable name.",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Azure Blob Storage/Azure Data Lake Storage Gen2",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Storage account",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Azure SQL Database",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Power BI",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Others (one per line)",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "text",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : ""
+    }, {
+      "type" : "boolean",
+      "label" : "Username/Password",
+      "configKey" : "USERNAME_PASSWORD",
+      "keySource" : "label-match",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Password",
+      "configKey" : "password",
+      "keySource" : "label-match",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Credentials flow variable",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Sharepoint files and list items (read-only)",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Sharepoint files and list items",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Sharepoint files, lists and list items",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Azure Databricks",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "User Groups (Read)  Note: Only used to list groups in Sharepoint Connector dialog. This is a sensitive scope which requires admin consent.",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "User Groups (IDs only)  Note: Only used to list groups in Sharepoint Connector dialog. This scope only allows to see technical IDs of groups, not the human-readable name.",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Azure Blob Storage/Azure Data Lake Storage Gen2",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Storage account",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Azure SQL Database",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Power BI",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Others (one per line)",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "text",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : ""
+    }, {
+      "type" : "dropdown",
+      "label" : "Tenant ID/Domain",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "string",
+      "label" : "Client/Application ID",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Secret",
+      "configKey" : "secret",
+      "keySource" : "label-match",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Use credentials",
+      "configKey" : "useCredentials",
+      "keySource" : "label-match",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Azure Databricks",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Sharepoint",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Azure SQL Database",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Power BI",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Other",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "section" : "Request access to",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Account/Secret Key",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "label" : "Secret key",
+      "configKey" : "secretKey",
+      "keySource" : "label-match",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Credentials flow variable",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Service SAS URL",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Credential flow variable",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Default",
+      "section" : "OAuth 2.0 authorization endpoint",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Custom",
+      "section" : "OAuth 2.0 authorization endpoint",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "section" : "OAuth 2.0 authorization endpoint",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Default",
+      "section" : "Application ID",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Custom",
+      "section" : "Application ID",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Application ID",
+      "section" : "Application ID",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Redirect URL",
+      "configKey" : "redirectUrl",
+      "keySource" : "label-match",
+      "section" : "Application ID",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 67,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

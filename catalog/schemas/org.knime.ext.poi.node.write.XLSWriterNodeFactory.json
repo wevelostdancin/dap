@@ -1,0 +1,68 @@
+{
+  "id" : "org.knime.ext.poi.node.write.XLSWriterNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "FOO",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "FOO",
+      "titleSource" : "field-name",
+      "source" : "dialog-field"
+    } ],
+    "dialogClass" : "org.knime.ext.poi.node.write.XLSWriterNodeDialogPane",
+    "ui" : [ {
+      "type" : "dropdown",
+      "section" : "Selected File",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Selected File",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Selected File",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Overwrite existing file",
+      "section" : "writer options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "add column headers",
+      "section" : "Add names and IDs",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "add row ids",
+      "section" : "Add names and IDs",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "For missing values write",
+      "section" : "Missing value pattern",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/1",
+    "uiElements" : 7,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

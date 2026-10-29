@@ -1,0 +1,95 @@
+{
+  "id" : "org.knime.base.node.stats.viz.extended.ExtendedStatisticsNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.stats.viz.extended.ExtendedStatisticsNodeParameters",
+    "fields" : [ {
+      "field" : "m_computeMedian",
+      "configKey" : "compute_median",
+      "title" : "Calculate median values (computationally expensive)",
+      "description" : "Select this option if for all numeric columns the medians are computed. Note, this computation\nmight be expensive, since it requires to sort all column independently to find the values that\ndivides the distribution into two halves of the same number of values.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_nominalColumnFilter",
+      "configKey" : "nominalColumnFilter",
+      "title" : "Column filter",
+      "description" : "Filter columns for counting all possible values.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_nominalValues",
+      "configKey" : "num_nominal-values",
+      "title" : "Max no. of most frequent and infrequent values (in view)",
+      "description" : "Adjusts the number of counts for both, top number of frequent and infrequent occurrences of\ncategorical values per column (displayed in the node view!).\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 20
+    }, {
+      "field" : "m_nominalValuesOutput",
+      "configKey" : "num_nominal-values_output",
+      "title" : "Max no. of possible values per column (in output table)",
+      "description" : "Adjusts the maximum number of possible values per column in the nominal output table.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1000
+    }, {
+      "field" : "m_enableHiLite",
+      "configKey" : "enable HiLite",
+      "title" : "Enable HiLite",
+      "description" : "Enable HiLite functionality for interactive highlighting of data points.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_histogramFormat",
+      "configKey" : "image format",
+      "title" : "Histogram format",
+      "description" : "The image format of histogram cells.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "SVG",
+        "label" : "SVG"
+      }, {
+        "value" : "PNG",
+        "label" : "PNG"
+      } ],
+      "default" : "SVG"
+    }, {
+      "field" : "m_histogramWidth",
+      "configKey" : "histogram width",
+      "title" : "Width",
+      "description" : "The width of the histogram.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 200
+    }, {
+      "field" : "m_histogramHeight",
+      "configKey" : "histogram height",
+      "title" : "Height",
+      "description" : "The height of the histogram.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 100
+    }, {
+      "field" : "m_showMinMax",
+      "configKey" : "show min max",
+      "title" : "Show min/max values",
+      "description" : "Show or do not show the numeric min/max values on histograms.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "core"
+}

@@ -1,0 +1,18 @@
+{
+  "id" : "org.knime.base.node.flowvariable.appendvariabletotable4.AppendVariableToTable4NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.flowvariable.appendvariabletotable4.AppendVariableToTable4NodeSettings",
+    "fields" : [ {
+      "field" : "m_filter",
+      "configKey" : "filter",
+      "title" : "Output as rows",
+      "description" : "Include list contains all variables that are converted into new columns in the resulting table, excluded variables are not used. All variables remain on the variable stack. Enforce exclusion and inclusion options can be used to force all new variables to be included or excluded, resp.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.FlowVariableFilter"
+    } ]
+  },
+  "tier" : "core"
+}

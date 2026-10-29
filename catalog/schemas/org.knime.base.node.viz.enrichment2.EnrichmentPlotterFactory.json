@@ -1,0 +1,80 @@
+{
+  "id" : "org.knime.base.node.viz.enrichment2.EnrichmentPlotterFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.viz.enrichment2.EnrichmentPlotterDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Plot sum of hit values",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Plot hits",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Hit threshold",
+      "configKey" : "hitThreshold",
+      "keySource" : "label-match",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Plot discovered clusters",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "Minimum molecules per cluster",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 1000.0,
+      "step" : 1.0
+    }, {
+      "type" : "string",
+      "label" : "Fraction sizes (in %)",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "dropdown",
+      "label" : "Activity column",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Sort descending",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "list",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 10,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

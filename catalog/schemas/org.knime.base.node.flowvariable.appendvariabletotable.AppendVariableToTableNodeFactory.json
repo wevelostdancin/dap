@@ -1,0 +1,26 @@
+{
+  "id" : "org.knime.base.node.flowvariable.appendvariabletotable.AppendVariableToTableNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.flowvariable.appendvariabletotable.AppendToTableNodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Include all flow variables",
+      "section" : "Variable Selection",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "list",
+      "section" : "Variable Selection",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 2,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

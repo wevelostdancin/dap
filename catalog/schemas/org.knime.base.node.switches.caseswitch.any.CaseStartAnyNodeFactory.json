@@ -1,0 +1,32 @@
+{
+  "id" : "org.knime.base.node.switches.caseswitch.any.CaseStartAnyNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.switches.caseswitch.any.CaseStartAnyNodeParameters",
+    "fields" : [ {
+      "field" : "m_selectedPort",
+      "configKey" : "PortIndex",
+      "title" : "Select active port",
+      "description" : "Select the active output port. This can be controlled by an integer or string flow variable and used to create a string flow variable.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "0",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.switches.caseswitch.any.CaseStartAnyNodeParameters$OutputPortChoicesProvider",
+        "kind" : "strings",
+        "note" : "варианты вычисляются провайдером"
+      },
+      "choicesError" : "NullPointerException: Cannot read the array length because the return value of \"org.knime.node.parameters.NodeParametersInput.getOutPortTypes()\" is null"
+    }, {
+      "field" : "m_activateAllOutputsDuringConfigure",
+      "configKey" : "activate_all_outputs_during_configure",
+      "title" : "Activate all outputs during configuration step",
+      "description" : "When set the node will keep all outputs active during workflow configuration (that is, while the traffic light of the node is \"yellow\"). This allows the configuration of connected downstream nodes and simplifies the workflow design at the expense of additional configuration calls of nodes that are later on inactive. It's recommended to switch this flag off for production workflows as this avoids unnecessary configuration calls of the inactive branches.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "core"
+}

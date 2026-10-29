@@ -1,0 +1,64 @@
+{
+  "id" : "org.knime.base.node.switches.caseswitch.any.CaseEndAnyNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.switches.caseswitch.any.CaseEndAnyNodeParameters",
+    "fields" : [ {
+      "field" : "m_multipleActiveHandling",
+      "configKey" : "multipleActiveHandling",
+      "title" : "If multiple inputs are active",
+      "description" : "Choose the expected behavior of the node if two or more inputs are active. In the case all inputs are inactive the node itself will pass on an inactive object.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Merge",
+        "label" : "Concatenate tables"
+      }, {
+        "value" : "Fail",
+        "label" : "Fail"
+      }, {
+        "value" : "UseFirstActive",
+        "label" : "Use first non-inactive input"
+      } ],
+      "default" : "Fail",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.switches.caseswitch.any.CaseEndAnyNodeParameters$MultipleActiveHandlingChoiceProvider",
+        "kind" : "enum"
+      },
+      "choicesError" : "NullPointerException: Cannot read the array length because \"array\" is null"
+    }, {
+      "field" : "m_duplicateRowHandling",
+      "configKey" : "duplicateRowHandling",
+      "title" : "Duplicate RowID handling",
+      "description" : "How to handle duplicate row identifiers (RowID) when concatenating the two input tables.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "APPEND_SUFFIX",
+        "label" : "Append suffix"
+      }, {
+        "value" : "SKIP_ROWS",
+        "label" : "Skip rows"
+      } ],
+      "default" : "APPEND_SUFFIX"
+    }, {
+      "field" : "m_suffix",
+      "configKey" : "suffix",
+      "title" : "Suffix",
+      "description" : "The suffix to append to duplicate row identifiers (RowID) to make them unique.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "_dup"
+    }, {
+      "field" : "m_enableHiliting",
+      "configKey" : "enable_hiliting",
+      "title" : "Enable hiliting",
+      "description" : "Enables hiliting between both inputs and the concatenated output table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

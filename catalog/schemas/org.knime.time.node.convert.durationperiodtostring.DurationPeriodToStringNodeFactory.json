@@ -1,0 +1,122 @@
+{
+  "id" : "org.knime.time.node.convert.durationperiodtostring.DurationPeriodToStringNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelColumnFilter2",
+      "configKey" : "col_select",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelColumnFilter2",
+      "type" : "filter",
+      "default" : null,
+      "title" : "Col select",
+      "titleSource" : "field-name",
+      "source" : "node-model",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      }
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "replace_or_append",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Replace selected columns",
+      "title" : "Replace or append",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "suffix",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : " (String)",
+      "title" : "Suffix",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "format",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "ISO-8601 representation",
+      "title" : "Format",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    } ],
+    "dialogClass" : "org.knime.time.node.convert.durationperiodtostring.DurationPeriodToStringNodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Manual Selection",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce exclusion",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce inclusion",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Append selected columns",
+      "section" : "Replace/Append Selection",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Replace selected columns",
+      "section" : "Replace/Append Selection",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "label" : "Suffix of appended columns",
+      "section" : "Replace/Append Selection",
+      "source" : "dialog-ui",
+      "default" : " (String)",
+      "editable" : true
+    }, {
+      "type" : "dropdown",
+      "label" : "Format",
+      "configKey" : "format",
+      "keySource" : "label-match",
+      "section" : "Format Selection",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "ISO-8601 representation",
+        "label" : "ISO-8601 representation"
+      }, {
+        "value" : "Long representation",
+        "label" : "Long representation"
+      }, {
+        "value" : "Short representation",
+        "label" : "Short representation"
+      } ],
+      "default" : "ISO-8601 representation"
+    } ],
+    "labelCoverage" : "0/4",
+    "uiElements" : 9,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

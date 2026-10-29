@@ -1,0 +1,18 @@
+{
+  "id" : "org.knime.distance.measure.mahalanobis.MahalanobisDistanceNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.distance.measure.mahalanobis.MahalanobisDistanceNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Column selection",
+      "description" : "Choose the numeric columns for which the distance is defined.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter"
+    } ]
+  },
+  "tier" : "experimental"
+}

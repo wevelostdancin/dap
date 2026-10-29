@@ -1,0 +1,153 @@
+{
+  "id" : "org.knime.base.node.mine.treeensemble2.node.randomforest.learner.classification.RandomForestClassificationLearnerNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.mine.treeensemble2.node.randomforest.learner.classification.RandomForestClassificationLearnerNodeDialogPane",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Target Column",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Use fingerprint attribute",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "dropdown",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Use column attributes",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Manual Selection",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce exclusion",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce inclusion",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Enable Hilighting (#patterns to store)",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 2000.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 100.0
+    }, {
+      "type" : "boolean",
+      "label" : "Save target distribution in tree nodes (memory expensive - only important for tree view and PMML export)",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Split Criterion",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Information Gain",
+        "label" : "Information Gain"
+      }, {
+        "value" : "Information Gain Ratio",
+        "label" : "Information Gain Ratio"
+      }, {
+        "value" : "Gini Index",
+        "label" : "Gini Index"
+      } ],
+      "default" : "Information Gain"
+    }, {
+      "type" : "boolean",
+      "label" : "Limit number of levels (tree depth)",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "number",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 3.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Minimum node size",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "number",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "number",
+      "label" : "Number of models",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 20.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 2.0
+    }, {
+      "type" : "boolean",
+      "label" : "Use static random seed",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 20,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,89 @@
+{
+  "id" : "org.knime.base.node.io.linereader.LineReaderNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.io.linereader.LineReaderNodeDialogPane",
+    "ui" : [ {
+      "type" : "dropdown",
+      "section" : "Input location",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Input location",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Input location",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    }, {
+      "type" : "string",
+      "label" : "Row header prefix",
+      "section" : "Reader options",
+      "source" : "dialog-ui",
+      "default" : "Row",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "section" : "Reader options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "section" : "Reader options",
+      "source" : "dialog-ui",
+      "default" : "Column",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Use first line as column header",
+      "section" : "Reader options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Skip empty lines",
+      "section" : "Reader options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Limit number of rows",
+      "section" : "Reader options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Reader options",
+      "source" : "dialog-ui",
+      "default" : 1000.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 100.0
+    }, {
+      "type" : "boolean",
+      "label" : "Match input against regex",
+      "section" : "Reader options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Reader options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 12,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

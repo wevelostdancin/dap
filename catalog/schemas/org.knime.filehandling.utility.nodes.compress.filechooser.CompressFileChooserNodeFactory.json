@@ -1,0 +1,119 @@
+{
+  "id" : "org.knime.filehandling.utility.nodes.compress.filechooser.CompressFileChooserNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.filehandling.utility.nodes.compress.filechooser.CompressFileChooserNodeParameters",
+    "fields" : [ {
+      "field" : "m_sourceFileChooser",
+      "configKey" : "source_location",
+      "title" : "SourceFileChooser",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.legacy.widget.file.LegacyMultiFileSelection"
+    }, {
+      "field" : "m_outputLocation",
+      "configKey" : "destination_location",
+      "title" : "OutputLocation",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_createMissingFolders",
+        "configKey" : "create_missing_folders",
+        "title" : "Create missing folders",
+        "description" : "If enabled, missing folders in the specified path will be created automatically.",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_file",
+        "configKey" : "file",
+        "title" : "File Selection",
+        "description" : "The file selection.",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "org.knime.node.parameters.widget.file.FileSelection"
+      } ]
+    }, {
+      "field" : "m_overwritePolicy",
+      "configKey" : "if_path_exists",
+      "title" : "If exists",
+      "description" : "Specify the behavior of the node in case the output file already exists.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "OVERWRITE",
+        "label" : "Overwrite"
+      } ],
+      "default" : "FAIL"
+    }, {
+      "field" : "m_truncatePathOption",
+      "configKey" : "archive_entry_path",
+      "title" : "Archive entry path",
+      "description" : "Depending on the selected mode the location of the files/folders to be copied to the destination\nfolder will differ.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "RELATIVE",
+        "label" : "File/folder only"
+      }, {
+        "value" : "KEEP",
+        "label" : "Full path"
+      }, {
+        "value" : "REMOVE_FOLDER_PREFIX",
+        "label" : "Path after prefix"
+      } ],
+      "default" : "RELATIVE"
+    }, {
+      "field" : "m_folderPrefix",
+      "configKey" : "folder_prefix",
+      "title" : "Folder prefix",
+      "description" : "The folder prefix (the beginning of the path) to be ignored when using 'Path after prefix' mode.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "placeholder" : "<folder prefix>"
+    }, {
+      "field" : "m_compression",
+      "configKey" : "compression",
+      "title" : "Compression",
+      "description" : "Select the desired compression format.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ZIP",
+        "label" : "zip"
+      }, {
+        "value" : "JAR",
+        "label" : "jar"
+      }, {
+        "value" : "TAR",
+        "label" : "tar"
+      }, {
+        "value" : "TAR_GZ",
+        "label" : "tar.gz"
+      }, {
+        "value" : "TAR_BZ2",
+        "label" : "tar.bz2"
+      }, {
+        "value" : "CPIO",
+        "label" : "cpio"
+      } ],
+      "default" : "ZIP"
+    }, {
+      "field" : "m_includeEmptyFolders",
+      "configKey" : "include_empty_folders",
+      "title" : "Include empty folders",
+      "description" : "This option allows to specify whether or not empty folders should be included in the archive.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

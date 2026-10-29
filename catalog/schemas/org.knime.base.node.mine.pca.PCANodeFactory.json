@@ -1,0 +1,109 @@
+{
+  "id" : "org.knime.base.node.mine.pca.PCANodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "failMissing",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "FailMissing",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelPCADimensions",
+      "configKey" : "output_dimensions_selected",
+      "javaType" : "org.knime.base.node.mine.pca.SettingsModelPCADimensions",
+      "type" : "unknown",
+      "default" : null,
+      "title" : "Output dimensions selected",
+      "titleSource" : "field-name",
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0,
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "removeColumns",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "RemoveColumns",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelFilterString",
+      "configKey" : "input_columns",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelFilterString",
+      "type" : "filter",
+      "default" : null,
+      "title" : "Input columns",
+      "titleSource" : "field-name",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.mine.pca.PCANodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Fail if missing values are encountered (skipped per default)",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Dimensions to reduce to",
+      "section" : "Target dimensions",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Target dimensions",
+      "source" : "dialog-ui",
+      "default" : 2.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Minimum information fraction to preserve (%)",
+      "section" : "Target dimensions",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "number",
+      "section" : "Target dimensions",
+      "source" : "dialog-ui",
+      "default" : 100.0,
+      "min" : 1.0,
+      "max" : 100.0,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Replace original data columns",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/4",
+    "uiElements" : 8
+  },
+  "tier" : "experimental"
+}

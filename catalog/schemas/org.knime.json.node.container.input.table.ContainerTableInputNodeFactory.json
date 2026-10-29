@@ -1,0 +1,121 @@
+{
+  "id" : "org.knime.json.node.container.input.table.ContainerTableInputNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.json.node.container.input.table.ContainerTableInputNodeParameters",
+    "fields" : [ {
+      "field" : "m_parameterName",
+      "configKey" : "parameterName",
+      "title" : "Parameter name",
+      "description" : "A name for the input parameter (preferably unique). This name is exposed in the REST interface and\nin the Call Workflow (Table Based) node. It must start with a letter, followed by letters and digits and\nsingle minus signs or dashes and must end with a letter.\nPattern: <tt>^[a-zA-Z](?:[-_]?[a-zA-Z0-9]+)*(?&lt;![0-9])$</tt>\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "table-input"
+    }, {
+      "field" : "m_useFullyQualifiedName",
+      "configKey" : "useFullyQualifiedName",
+      "title" : "Append unique ID to parameter name",
+      "description" : "If checked, the name set above will be amended by the node's ID \"{Parameter Name}-{Relative node ID}\" to\nguarantee unique parameter names. Usually it's a good idea to have this box <i>not</i> checked and instead\nmake sure to use meaningful and unique names in all container nodes present in a workflow.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_description",
+      "configKey" : "description",
+      "title" : "Description",
+      "description" : "The description for the input parameter. It is currently <i>not</i> shown in the API specification of the REST interface but it's used for example when using this workflow as a tool for an AI Agent or when\nextracting the workflow summary.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_setInputTableButtonSummary",
+      "configKey" : "setInputTableButtonSummary",
+      "title" : "SetInputTableButtonSummary",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_setInputTable",
+      "configKey" : "setInputTable",
+      "title" : "Set input table as template",
+      "description" : "By selecting this button, the input table, given one is provided, will be set as the new template table.\n<br/><br/>\nA template table can be used to define a table structure which allows the workflow to execute properly.\nThe main purpose of the template table is to populate the \"InputParameters\" field of the generated OpenAPI\nspecification, which is presented to end users for documentation purposes. When a node is executed without\nreceiving any external input (over REST or from the <i>Call Workflow (Table Based)</i> node) and it has no\ntable connected to its optional input port, the template is output. This allows downstream nodes\nto be configured when no external input is present and simplifies making adjustments to the workflow.<br/>\n<br/>\nThe template table also serves as a table spec when a simplified external input without table spec is\nreceived over the REST API. When receiving an input without table spec, the input will\nbe parsed according to the spec defined by the template table, i.e. each input row must contain as many\ncells as columns in the template table and each cell must contain a type that is compatible to the column\nspec, throwing an error in case of any inconsistencies.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_makeDialogDirty",
+      "configKey" : "makeDialogDirty",
+      "title" : "MakeDialogDirty",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_templateTableRowsOption",
+      "configKey" : "templateTableRowsOption",
+      "title" : "Template table rows to use",
+      "description" : "Choose how many rows of the template table to use.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "USE_ENTIRE_TABLE",
+        "label" : "Use entire input table"
+      }, {
+        "value" : "USE_ONLY_FIRST_ROWS",
+        "label" : "Use only first rows"
+      } ],
+      "default" : "USE_ENTIRE_TABLE"
+    }, {
+      "field" : "m_numberOfRows",
+      "configKey" : "numberOfRows",
+      "title" : "Number of rows",
+      "description" : "When selected, only the first n rows are used as the template table. Can be especially useful\nwhen the input table serves as an example in the OpenAPI specification and you want to avoid over\nspecifying the example with too many rows.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 10
+    }, {
+      "field" : "m_omitTableSpec",
+      "configKey" : "omitTableSpec",
+      "title" : "Omit table spec in API definition",
+      "description" : "When selected, only the data part of the template table is exposed to the OpenAPI definition,\nshowing a well formed simplified example input. Select this if the workflow is expected to be\nconsumed over REST and the caller of the workflow prefers the simplified input format.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_templateTable",
+      "configKey" : "templateTable",
+      "title" : "TemplateTable",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "{\"table-spec\":[{\"column-string\":\"string\"},{\"column-int\":\"int\"},{\"column-double\":\"double\"},{\"column-long\":\"long\"},{\"column-boolean\":\"boolean\"},{\"column-localdate\":\"localdate\"},{\"column-localdatetime\":\"localdatetime\"},{\"column-zoneddatetime\":\"zoneddatetime\"}],\"table-data\":[[\"value1\",1,1.5,1000,true,\"2018-03-27\",\"2018-03-27T08:30:45.111\",\"2018-03-27T08:30:45.111+01:00[Europe/Paris]\"],[\"value2\",2,2.5,2000,false,\"2018-03-28\",\"2018-03-28T08:30:45.111\",\"2018-03-28T08:30:45.111+01:00[Europe/Paris]\"]]}"
+    }, {
+      "field" : "m_trimmedInputTable",
+      "configKey" : "trimmedInputTable",
+      "title" : "TrimmedInputTable",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_templateMatchesInputTable",
+      "configKey" : "templateMatchesInputTable",
+      "title" : "TemplateMatchesInputTable",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_inputPathOrUrl",
+      "configKey" : "inputPathOrUrl",
+      "title" : "InputPathOrUrl",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    } ]
+  },
+  "tier" : "experimental"
+}

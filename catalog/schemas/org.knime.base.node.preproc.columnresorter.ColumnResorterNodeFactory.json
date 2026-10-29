@@ -1,0 +1,28 @@
+{
+  "id" : "org.knime.base.node.preproc.columnresorter.ColumnResorterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.columnresorter.ColumnResorterNodeSettings",
+    "fields" : [ {
+      "field" : "m_order",
+      "configKey" : "ColumnOrder",
+      "title" : "Columns",
+      "description" : "The names of the columns from the input file to be resorted.<br/><br/>You can either select the columns and move their position up or down, using the up and down arrows, or sort them alphabetically from first to last (A-Z) or from last to first (Z-A). You can also reset all to the order of the input table. ",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "string"
+      },
+      "addButtonText" : "",
+      "default" : [ ],
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "core"
+}

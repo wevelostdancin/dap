@@ -1,0 +1,32 @@
+{
+  "id" : "org.knime.base.node.preproc.valcount.ValueCounterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.valcount.ValueCounterNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnName",
+      "configKey" : "columnName",
+      "title" : "Column",
+      "description" : "The column whose values should be counted.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_hiliting",
+      "configKey" : "hiliting",
+      "title" : "Enable hiliting",
+      "description" : "Enables hiliting between the distinct values in the output table and the corresponding rows in the\ninput table. Be aware that this may require a lot of memory if the table is large.\n",
+      "advanced" : true,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

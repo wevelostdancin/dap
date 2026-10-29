@@ -1,0 +1,119 @@
+{
+  "id" : "org.knime.base.node.io.database.groupby.DBGroupByNodeFactory2",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelFilterString",
+      "configKey" : "groupByColumns",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelFilterString",
+      "type" : "filter",
+      "default" : null,
+      "title" : "GroupByColumns",
+      "titleSource" : "field-name",
+      "source" : "dialog-field",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      }
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "columnNamePolicy",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Aggregation method (column name)",
+      "title" : "ColumnNamePolicy",
+      "titleSource" : "field-name",
+      "source" : "dialog-field"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "addCountStar",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "AddCountStar",
+      "titleSource" : "field-name",
+      "source" : "dialog-field"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "countStarColName",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "COUNT(*)",
+      "title" : "CountStarColName",
+      "titleSource" : "field-name",
+      "source" : "dialog-field"
+    } ],
+    "dialogClass" : "org.knime.base.node.io.database.groupby.DBGroupByNodeDialog2",
+    "ui" : [ {
+      "type" : "string",
+      "section" : "Available column(s)",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Group column(s)",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "list",
+      "section" : "Available columns",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "list",
+      "section" : "Available data type",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Type matching",
+      "section" : "Type Based Aggregation",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Strict",
+        "label" : "Strict"
+      }, {
+        "value" : "Include sub-types",
+        "label" : "Include sub-types"
+      } ],
+      "default" : "Strict"
+    }, {
+      "type" : "dropdown",
+      "label" : "Column naming",
+      "section" : "Advanced settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Keep original name(s)",
+        "label" : "Keep original name(s)"
+      }, {
+        "value" : "Aggregation method (column name)",
+        "label" : "Aggregation method (column name)"
+      }, {
+        "value" : "Column name (aggregation method)",
+        "label" : "Column name (aggregation method)"
+      } ],
+      "default" : "Aggregation method (column name)"
+    }, {
+      "type" : "boolean",
+      "label" : "Add COUNT(*)",
+      "section" : "Advanced settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "column name",
+      "section" : "Advanced settings",
+      "source" : "dialog-ui",
+      "default" : "COUNT(*)",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/4",
+    "uiElements" : 8,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

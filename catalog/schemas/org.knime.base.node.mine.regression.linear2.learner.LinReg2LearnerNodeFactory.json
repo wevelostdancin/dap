@@ -1,0 +1,94 @@
+{
+  "id" : "org.knime.base.node.mine.regression.linear2.learner.LinReg2LearnerNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.mine.regression.linear2.learner.LinReg2LearnerNodeDialogPane",
+    "ui" : [ {
+      "type" : "dropdown",
+      "section" : "Target",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Manual Selection",
+      "section" : "Values",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce exclusion",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce inclusion",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Predefined Offset Value",
+      "section" : "Regression Properties",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Regression Properties",
+      "source" : "dialog-ui",
+      "default" : 0.0,
+      "min" : "-Infinity",
+      "max" : "Infinity",
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Ignore rows with missing values.",
+      "section" : "Missing Values in Input Data",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Fail on observing missing values.",
+      "section" : "Missing Values in Input Data",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "First Row",
+      "section" : "Scatter Plot View",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "number",
+      "label" : "Row Count",
+      "section" : "Scatter Plot View",
+      "source" : "dialog-ui",
+      "default" : 20000.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 12,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

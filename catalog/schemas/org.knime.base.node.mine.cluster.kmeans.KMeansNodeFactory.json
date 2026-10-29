@@ -1,0 +1,87 @@
+{
+  "id" : "org.knime.base.node.mine.cluster.kmeans.KMeansNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.cluster.kmeans.KMeansNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Column selection",
+      "description" : "The numerical columns to be used for clustering.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_nrOfClusters",
+      "configKey" : "nrOfClusters",
+      "title" : "Number of clusters",
+      "description" : "The number of clusters (cluster centers) to be created.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 3
+    }, {
+      "field" : "m_centroidInitialization",
+      "configKey" : "centroidInitialization",
+      "title" : "Centroid initialization",
+      "description" : "Determine how the initial centroids (cluster centers) are chosen.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "RANDOM_INITIALIZATION",
+        "label" : "Random initialization"
+      }, {
+        "value" : "FIRST_ROWS",
+        "label" : "First k rows"
+      } ],
+      "default" : "RANDOM_INITIALIZATION"
+    }, {
+      "field" : "m_useStaticRandomSeed",
+      "configKey" : "useStaticRandomSeed",
+      "title" : "Use static random seed",
+      "description" : "When checked, uses the provided static seed for reproducible random centroid initialization.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_seedValue",
+      "configKey" : "seedValue",
+      "title" : "Seed value",
+      "description" : "The seed value for random centroid initialization.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "0"
+    }, {
+      "field" : "m_newRandomSeedValue",
+      "configKey" : "newRandomSeedValue",
+      "title" : "New",
+      "description" : "Generate a new random seed value.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_maxIterations",
+      "configKey" : "maxIterations",
+      "title" : "Max number of iterations",
+      "description" : "The maximum number of iterations after which the algorithm terminates if it hasn't found a stable solution before.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 99
+    }, {
+      "field" : "m_enableHilite",
+      "configKey" : "enableHilite",
+      "title" : "Enable Hilite Mapping",
+      "description" : "If enabled, the hiliting of a cluster row (2nd output) will hilite all rows of this cluster in the input table and the 1st output table. Depending on the number of rows, enabling this feature might consume a lot of memory.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

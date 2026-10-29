@@ -1,0 +1,117 @@
+{
+  "id" : "org.knime.base.node.flowcontrol.trycatch.genericcatch.DBPortCatchNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "CFG_ALWAYS_POPULATE",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "CFG ALWAYS POPULATE",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "CFG_DEFAULT_TEXT_VARIABLE",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "none",
+      "title" : "Default for \"FailingNode\" variable:",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "CFG_DEFAULT_TEXT_MESSAGE",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "none",
+      "title" : "Default for \"FailingNodeMessage\" variable:",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "CFG_DEFAULT_TEXT_DETAILS",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "none",
+      "title" : "Default for \"FailingNodeDetails\" variable:",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "CFG_DEFAULT_STACK_TRACE",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "none",
+      "title" : "Default for \"FailingNodeStackTrace\" variable:",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "CFG_PROPAGATE_VARIABLES",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : true,
+      "title" : "CFG PROPAGATE VARIABLES",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "CFG_EXPORT_DETAILS_AS_JSON",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "CFG EXPORT DETAILS AS JSON",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    } ],
+    "dialogClass" : "org.knime.base.node.flowcontrol.trycatch.genericcatch.GenericCatchNodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Always populate error variable",
+      "section" : "Error Variables",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Default for \"FailingNode\" variable",
+      "section" : "Error Variables",
+      "source" : "dialog-ui",
+      "default" : "none",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Default for \"FailingNodeMessage\" variable",
+      "section" : "Error Variables",
+      "source" : "dialog-ui",
+      "default" : "none",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Default for \"FailingNodeDetails\" variable",
+      "section" : "Error Variables",
+      "source" : "dialog-ui",
+      "default" : "none",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Default for \"FailingNodeStackTrace\" variable",
+      "section" : "Error Variables",
+      "source" : "dialog-ui",
+      "default" : "none",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Propagate variables",
+      "section" : "Scope Variables",
+      "source" : "dialog-ui",
+      "default" : true
+    } ],
+    "labelCoverage" : "4/7",
+    "uiElements" : 6
+  },
+  "tier" : "experimental"
+}

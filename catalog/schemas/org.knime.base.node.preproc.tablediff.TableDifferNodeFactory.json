@@ -1,0 +1,50 @@
+{
+  "id" : "org.knime.base.node.preproc.tablediff.TableDifferNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.tablediff.TableDifferNodeParameters",
+    "fields" : [ {
+      "field" : "m_compareTablesEntirely",
+      "configKey" : "compare_entirely",
+      "title" : "Compare entire tables",
+      "description" : "If this option is checked all columns from the first as well as the second input will be compared\nagainst each other. Otherwise, the tables will solely be compared respective the selected columns\nof the reference, i.e., the second input table.\n<b>Note</b>: RowIDs are not being compared.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_comparedColumns",
+      "configKey" : "comparedColumns",
+      "title" : "Select columns from reference table",
+      "description" : "The list contains the names of those columns in the reference table to be included for the\ncomparison. It allows you to select the columns manually (by moving them to the right panel),\nvia wildcard/regex (all columns whose names match the wildcard/regex are included) or via type\nselection (all columns with a certain type are included).\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.tablediff.TableDifferNodeParameters$ReferenceColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_failureMode",
+      "configKey" : "failure_mode",
+      "title" : "Fail option",
+      "description" : "Select what to do when differences are found.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NEVER",
+        "label" : "Never"
+      }, {
+        "value" : "DIFFERENT_SPECS",
+        "label" : "Different table specs"
+      }, {
+        "value" : "DIFFERENT_VALUES",
+        "label" : "Different values"
+      } ],
+      "default" : "NEVER"
+    } ]
+  },
+  "tier" : "experimental"
+}

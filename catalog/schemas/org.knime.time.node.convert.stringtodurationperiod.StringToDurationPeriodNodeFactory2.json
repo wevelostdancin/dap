@@ -1,0 +1,80 @@
+{
+  "id" : "org.knime.time.node.convert.stringtodurationperiod.StringToDurationPeriodNodeFactory2",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.time.node.convert.stringtodurationperiod.StringToDurationPeriodNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "String columns",
+      "description" : "The string columns to convert to duration columns.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$StringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_durationType",
+      "configKey" : "durationType",
+      "title" : "Duration type",
+      "description" : "The type of the duration to parse.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "AUTO_DETECT",
+        "label" : "Auto-detected"
+      }, {
+        "value" : "PERIOD",
+        "label" : "Date-based"
+      }, {
+        "value" : "DURATION",
+        "label" : "Time-based"
+      } ],
+      "default" : "AUTO_DETECT"
+    }, {
+      "field" : "m_actionIfExtractionFails",
+      "configKey" : "actionIfExtractionFails",
+      "title" : "If extraction fails",
+      "description" : "Action to take if the extraction fails.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "SET_MISSING",
+        "label" : "Insert missing"
+      }, {
+        "value" : "FAIL",
+        "label" : "Fail"
+      } ],
+      "default" : "SET_MISSING"
+    }, {
+      "field" : "m_replaceOrAppend",
+      "configKey" : "replaceOrAppend",
+      "title" : "Output columns",
+      "description" : "Depending on this setting, the output columns will either replace the modified columns, or be appended to the table with a suffix.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append with suffix"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_appendedSuffix",
+      "configKey" : "appendedSuffix",
+      "title" : "Output column suffix",
+      "description" : "The suffix to append to the column names of the new columns.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : " (Duration)"
+    } ]
+  },
+  "tier" : "experimental"
+}

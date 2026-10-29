@@ -1,0 +1,34 @@
+{
+  "id" : "org.knime.base.node.preproc.rowtocolumnheader.RowToColumnHeaderNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.rowtocolumnheader.RowToColumnHeaderSettings",
+    "fields" : [ {
+      "field" : "m_headerRowIndex",
+      "configKey" : "headerRowIndex",
+      "title" : "Number of rows before the header",
+      "description" : "Number of rows in the input table that precede the row that should be used as new column header",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 0
+    }, {
+      "field" : "m_discardBefore",
+      "configKey" : "discardBefore",
+      "title" : "Discard rows before header row",
+      "description" : "Whether rows before the row containing the new column header should be discarded. Otherwise they are treated as additional output rows.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_detectTypes",
+      "configKey" : "detectTypes",
+      "title" : "Detect types of resulting columns",
+      "description" : "Whether type analysis should be applied to the output table. For each column, the most specific of the four column types <i>double</i> (64-bit floating-point number), <i>long</i> (64-bit integral number), <i>int</i> (32-bit integral number) and <i>String</i> is determined and the column is converted to this type.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

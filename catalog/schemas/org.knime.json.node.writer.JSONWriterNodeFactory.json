@@ -1,0 +1,79 @@
+{
+  "id" : "org.knime.json.node.writer.JSONWriterNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.json.node.writer.JSONWriterNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "JSON column",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Export format",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "JSON",
+        "label" : "JSON"
+      } ],
+      "default" : "JSON"
+    }, {
+      "type" : "dropdown",
+      "label" : "Compress",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "NONE",
+        "label" : "NONE"
+      }, {
+        "value" : "GZIP",
+        "label" : "GZIP"
+      } ],
+      "default" : "NONE"
+    }, {
+      "type" : "string",
+      "label" : "File extension",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : ".json",
+      "editable" : true
+    }, {
+      "type" : "dropdown",
+      "label" : "Selected directory",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Overwrite existing files.",
+      "configKey" : "overwriteExistingFiles",
+      "keySource" : "label-match",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 8,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

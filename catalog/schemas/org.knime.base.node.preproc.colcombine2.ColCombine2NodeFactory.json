@@ -1,0 +1,110 @@
+{
+  "id" : "org.knime.base.node.preproc.colcombine2.ColCombine2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.colcombine2.ColCombine2NodeSettings",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Input columns",
+      "description" : "Select the columns to combine in the output table.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_failIfMissingColumns",
+      "configKey" : "failIfMissingColumns",
+      "title" : "Fail if there are missing columns",
+      "description" : "If true the node will fail when there are missing columns selected",
+      "advanced" : true,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_delimiter",
+      "configKey" : "delimiter",
+      "title" : "Delimiter",
+      "description" : "Enter a delimiter string here. This string is used to separate the different cell contents in the new, appended column.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ","
+    }, {
+      "field" : "m_delimiterInputs",
+      "configKey" : "delimiterInputs",
+      "title" : "Handle delimiter inputs",
+      "description" : "",
+      "advanced" : true,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "QUOTE",
+        "label" : "Quote inputs"
+      }, {
+        "value" : "REPLACE",
+        "label" : "Replace delimiters"
+      } ],
+      "default" : "QUOTE"
+    }, {
+      "field" : "m_quoteCharacter",
+      "configKey" : "quote_char",
+      "title" : "Quote character",
+      "description" : "The character entered here will be used to quote the cell content in case that it contains the delimiter string (for instance if the cell content is <i>some;value</i>, the delimiter string is ';' (a single semicolon), and the quote character is '\"' (single quote char) the quoted string will be <i>\"some;value\"</i> (including quotes)). You can force quotation by checking \"Quote Always\". Alternatively, the user can also replace the delimiter  string in the cell content string (see below).",
+      "advanced" : true,
+      "type" : "unknown",
+      "javaType" : "char"
+    }, {
+      "field" : "m_quoteInputs",
+      "configKey" : "quoteInputs",
+      "title" : "Quote inputs",
+      "description" : "",
+      "advanced" : true,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ALL",
+        "label" : "All"
+      }, {
+        "value" : "ONLY_NECESSARY",
+        "label" : "Only necessary"
+      } ],
+      "default" : "ONLY_NECESSARY"
+    }, {
+      "field" : "m_replacementDelimiter",
+      "configKey" : "replace_delimiter",
+      "title" : "Replacement",
+      "description" : "If the string representation of the cell content contains the delimiter string, it will be replaced by the string entered here (if you entered '-' here, the output of the above example would be <i>some-value</i>).",
+      "advanced" : true,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_outputColumnName",
+      "configKey" : "new_column_name",
+      "title" : "Output column name",
+      "description" : "The name of the new column.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Combined String"
+    }, {
+      "field" : "m_doNotAllowPaddedColumnName",
+      "configKey" : "doNotAllowPaddedColumnName",
+      "title" : "DoNotAllowPaddedColumnName",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_removeInputColumns",
+      "configKey" : "remove_included_columns",
+      "title" : "Remove input columns",
+      "description" : "If selected, removes the columns in the &quot;Include&quot; list from the output.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

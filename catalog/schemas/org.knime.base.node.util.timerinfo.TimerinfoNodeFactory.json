@@ -1,0 +1,52 @@
+{
+  "id" : "org.knime.base.node.util.timerinfo.TimerinfoNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.util.timerinfo.TimerinfoNodeSettings",
+    "fields" : [ {
+      "field" : "m_recursionPolicy",
+      "configKey" : "recursionPolicy",
+      "title" : "Recursion",
+      "description" : "Chooses a recursion option for metanodes and components <br/>\n<ul>\n    <li><b>No recursion</b> : Only lists the nodes on the top level of the workflow.</li>\n    <li><b>Only metanodes</b> : Recurses only the metanodes up to the specified depth.</li>\n    <li><b>Components and metanodes</b> : Recurses components and metanodes up to the specified depth.</li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NO_RECURSION",
+        "label" : "No recursion"
+      }, {
+        "value" : "ONLY_METANODES",
+        "label" : "Only metanodes"
+      }, {
+        "value" : "COMPONENTS_AND_METANODES",
+        "label" : "Components and metanodes"
+      } ],
+      "default" : "NO_RECURSION"
+    }, {
+      "field" : "m_maxDepth",
+      "configKey" : "MaxDepth",
+      "title" : "Max Depth",
+      "description" : "Controls depth of reporting of nodes in (nested) metanodes and components.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 2
+    }, {
+      "field" : "m_includeComponentIO",
+      "configKey" : "includeComponentIO",
+      "title" : "Include component input and output nodes",
+      "description" : "Includes the component input and output nodes in the output table.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_includeNodeComments",
+      "configKey" : "includeNodeComments",
+      "title" : "Include node comments",
+      "description" : "Include node comments for each node in the output table",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "experimental"
+}

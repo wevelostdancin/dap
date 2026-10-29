@@ -1,0 +1,281 @@
+{
+  "id" : "org.knime.base.node.preproc.stringcleaner.StringCleanerNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.stringcleaner.StringCleanerNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnsToClean",
+      "configKey" : "columnsToClean",
+      "title" : "Columns to clean",
+      "description" : "Select which columns should be cleaned. The strings in these columns will be modified according to the configuration of this node.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$StringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeAccents",
+      "configKey" : "removeAccents",
+      "title" : "Remove accents and diacritics",
+      "description" : "When enabled, all accents and diacritics are removed from letters, leaving only the underlying letter. For example, Å becomes A, ë becomes e and だ becomes た.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_removeNonASCII",
+      "configKey" : "removeNonASCII",
+      "title" : "Remove non-ASCII characters",
+      "description" : "When enabled, all non-<a href=\"https://en.wikipedia.org/wiki/ASCII\">ASCII</a> characters are removed from strings.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_removeNonPrintableChars",
+      "configKey" : "removeNonPrintableChars",
+      "title" : "Remove non-printable characters",
+      "description" : "When enabled, all non-printable characters like a tabulator or non-break space are removed from strings.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_removeLettersCategory",
+      "configKey" : "removeLettersCategory",
+      "title" : "Remove letters",
+      "description" : "Select whether and what category of letters should be removed from strings.\n<ul>\n    <li><b>None</b> removes no letters.</li>\n    <li><b>All</b> removes all letters from a string. This includes letters from any language / script.</li>\n    <li><b>Uppercase</b> removes all uppercase letters from a string.</li>\n    <li><b>Lowercase</b> removes all lowercase letters from a string.</li>\n</ul>\nNote that this step happens before potentially changing the casing of the string.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NONE",
+        "label" : "None"
+      }, {
+        "value" : "ALL",
+        "label" : "All"
+      }, {
+        "value" : "UPPERCASE",
+        "label" : "Uppercase"
+      }, {
+        "value" : "LOWERCASE",
+        "label" : "Lowercase"
+      } ],
+      "default" : "NONE"
+    }, {
+      "field" : "m_removeNumbers",
+      "configKey" : "removeNumbers",
+      "title" : "Remove numbers",
+      "description" : "When enabled, all numbers are removed from strings. This includes e.g. 3, Ⅴ or ₅.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_removePunctuation",
+      "configKey" : "removePunctuation",
+      "title" : "Remove punctuation",
+      "description" : "When enabled, all punctuation is removed from strings. This includes e.g. _, ( or !.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_removeSymbols",
+      "configKey" : "removeSymbols",
+      "title" : "Remove symbols",
+      "description" : "When enabled, all symbols are removed from strings. This includes e.g. €, = or ♮.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_removeCustomCharactersString",
+      "configKey" : "removeCustomCharactersString",
+      "title" : "Other characters to remove",
+      "description" : "Here, custom characters can be defined that should be removed from strings. The characters are all interpreted literally and case-sensitive. Note that this step happens before potentially changing the casing of the string.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_removeAllWhitespace",
+      "configKey" : "removeAllWhitespace",
+      "title" : "Remove all whitespace",
+      "description" : "If enabled, all whitespace is removed. This includes normal space ( ), line breaks (\\r\\n), tabulators (\\t) and all other whitespace.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_removeLeadingWhitespace",
+      "configKey" : "removeLeadingWhitespace",
+      "title" : "Remove leading whitespace",
+      "description" : "If enabled, leading whitespace is removed, that is, all whitespace from the start of the string to the first non-whitespace character.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_removeTrailingWhitespace",
+      "configKey" : "removeTrailingWhitespace",
+      "title" : "Remove trailing whitespace",
+      "description" : "If enabled, trailing whitespace is removed, that is, all whitespace from the last non-whitespace character to the end of the string.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_removeDuplicateWhitespace",
+      "configKey" : "removeDuplicateWhitespace",
+      "title" : "Remove duplicate whitespace",
+      "description" : "If selected, all occurrences of two or more whitespace characters in a row are replaced by a single standard space.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_replaceLinebreakStrategy",
+      "configKey" : "replaceLinebreakStrategy",
+      "title" : "Line breaks",
+      "description" : "Select whether to remove line breaks or replace them with a standard space. If <b>Replace by space</b> is selected, \\r\\n is replaced by only a single space, not two.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "KEEP",
+        "label" : "Keep"
+      }, {
+        "value" : "REPLACE_WITH_STANDARDSPACE",
+        "label" : "Replace by space"
+      }, {
+        "value" : "REMOVE",
+        "label" : "Remove"
+      } ],
+      "default" : "KEEP"
+    }, {
+      "field" : "m_replaceSpecialWhitespaceStrategy",
+      "configKey" : "replaceSpecialWhitespaceStrategy",
+      "title" : "Special whitespace",
+      "description" : "Select whether to remove special whitespace or replace it with a standard space. Special whitespace is all whitespace that is not a standard space, \\r or \\n.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE_WITH_STANDARDSPACE",
+        "label" : "Replace by space"
+      }, {
+        "value" : "KEEP",
+        "label" : "Keep"
+      }, {
+        "value" : "REMOVE",
+        "label" : "Remove"
+      } ],
+      "default" : "REPLACE_WITH_STANDARDSPACE"
+    }, {
+      "field" : "m_changeCasing",
+      "configKey" : "changeCasing",
+      "title" : "Change casing",
+      "description" : "Define the casing of letters in the output string.\n<ul>\n    <li><b>None</b> makes no changes to the string.</li>\n    <li><b>Uppercase</b> converts all letters to uppercase.</li>\n    <li><b>Capitalize</b> first converts all letters to lowercase, then capitalizes according to the     defined settings.</li>\n    <li><b>Lowercase</b> converts all letters to lowercase.</li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NO",
+        "label" : "None"
+      }, {
+        "value" : "UPPERCASE",
+        "label" : "Uppercase"
+      }, {
+        "value" : "CAPITALIZE",
+        "label" : "Capitalize"
+      }, {
+        "value" : "LOWERCASE",
+        "label" : "Lowercase"
+      } ],
+      "default" : "NO"
+    }, {
+      "field" : "m_changeCasingCapitalizeAfter",
+      "configKey" : "changeCasingCapitalizeAfter",
+      "title" : "Capitalize after",
+      "description" : "Define after which characters a character should be capitalized.\n<ul>\n    <li><b>Whitespace</b> capitalizes letters that follow immediately after a whitespace character</li>\n    <li><b>Non-Letters</b> capitalizes letters that follow any non-letter character.</li>\n    <li><b>Custom</b> lets the user decide on a set of characters after which letters should be     capitalized</li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "WHITESPACE",
+        "label" : "Whitespace"
+      }, {
+        "value" : "NON_LETTERS",
+        "label" : "Non-letters"
+      }, {
+        "value" : "CUSTOM",
+        "label" : "Custom"
+      } ],
+      "default" : "WHITESPACE"
+    }, {
+      "field" : "m_changeCasingCapitalizeAfterCharacters",
+      "configKey" : "changeCasingCapitalizeAfterCharacters",
+      "title" : "Capitalize after characters",
+      "description" : "Here, custom characters can be defined after which characters should be capitalized. The characters are all interpreted literally.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_changeCasingCapitalizeFirstCharacter",
+      "configKey" : "changeCasingCapitalizeFirstCharacter",
+      "title" : "Capitalize character at the start of the string",
+      "description" : "If enabled, a letter at the start of the string is always capitalized.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_pad",
+      "configKey" : "pad",
+      "title" : "Pad",
+      "description" : "Define whether to pad a string if it doesn't have a certain minimum length.\n<ul>\n    <li><b>None</b> makes no change to the string.</li>\n    <li><b>Start</b> adds a fill character to the start of the string.</li>\n    <li><b>End</b> adds a fill character to the end of the string.</li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NO",
+        "label" : "None"
+      }, {
+        "value" : "START",
+        "label" : "Start"
+      }, {
+        "value" : "END",
+        "label" : "End"
+      } ],
+      "default" : "NO"
+    }, {
+      "field" : "m_padMinimumStringLength",
+      "configKey" : "padMinimumStringLength",
+      "title" : "Minimum string length",
+      "description" : "Define the minimum string length. If a string is shorter than this value, a pad will be added to make the string length equal to it.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    }, {
+      "field" : "m_padFillCharacter",
+      "configKey" : "padFillCharacter",
+      "title" : "Fill character",
+      "description" : "Define the fill character that is used to pad the string.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "_"
+    }, {
+      "field" : "m_output",
+      "configKey" : "output",
+      "title" : "Output columns",
+      "description" : "Define whether to clean the strings in-place (i.e. replace the existing values) or append (a) new column(s).\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append with suffix"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_outputSuffix",
+      "configKey" : "outputSuffix",
+      "title" : "Output column suffix",
+      "description" : "Define a suffix that is appended to the column names of the input table.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : " (Cleaned)"
+    } ]
+  },
+  "tier" : "core"
+}

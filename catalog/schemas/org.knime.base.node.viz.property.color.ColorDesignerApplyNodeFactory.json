@@ -1,0 +1,40 @@
+{
+  "id" : "org.knime.base.node.viz.property.color.ColorDesignerApplyNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.viz.property.color.ColorDesignerApplyNodeParameters",
+    "fields" : [ {
+      "field" : "m_modelTypeMessage",
+      "configKey" : "modelTypeMessage",
+      "title" : "ModelTypeMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Columns",
+      "description" : "Specify one or more columns whose values will be colorized.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.viz.property.color.ColorDesignerApplyNodeParameters$DomainColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_applyToColumnNames",
+      "configKey" : "applyToColumnNames",
+      "title" : "Apply to Column Names",
+      "description" : "Whether the color palette should be applied to the column names.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

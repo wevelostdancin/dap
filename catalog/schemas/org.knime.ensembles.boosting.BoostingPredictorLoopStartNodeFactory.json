@@ -1,0 +1,38 @@
+{
+  "id" : "org.knime.ensembles.boosting.BoostingPredictorLoopStartNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.ensembles.boosting.BoostingPredictorLoopStartNodeParameters",
+    "fields" : [ {
+      "field" : "m_modelColumn",
+      "configKey" : "modelColumn",
+      "title" : "Model column",
+      "description" : "The column that contains the models.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.ensembles.boosting.BoostingPredictorLoopStartNodeParameters$ModelColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_weightColumn",
+      "configKey" : "weightColumn",
+      "title" : "Model weight column",
+      "description" : "The column that contains the weight for each model.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.ensembles.boosting.BoostingPredictorLoopStartNodeParameters$WeightColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "experimental"
+}

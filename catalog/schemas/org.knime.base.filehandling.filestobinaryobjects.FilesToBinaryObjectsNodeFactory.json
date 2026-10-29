@@ -1,0 +1,47 @@
+{
+  "id" : "org.knime.base.filehandling.filestobinaryobjects.FilesToBinaryObjectsNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.filehandling.filestobinaryobjects.FilesToBinaryObjectsNodeParameters",
+    "fields" : [ {
+      "field" : "m_uriColumn",
+      "configKey" : "uricolumn",
+      "title" : "URI column",
+      "description" : "The column containing the paths to the files that should be loaded as binary objects.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.filehandling.filestobinaryobjects.FilesToBinaryObjectsNodeParameters$URIColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_appendOrReplace",
+      "configKey" : "appendOrReplace",
+      "title" : "Append or replace",
+      "description" : "Determines whether the binary object column is appended to the table or replaces the URI column.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "APPEND",
+        "label" : "Append"
+      }, {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      } ],
+      "default" : "APPEND"
+    }, {
+      "field" : "m_binaryObjectColumnName",
+      "configKey" : "binaryobjectcolumnname",
+      "title" : "New column name",
+      "description" : "The name for the newly appended binary object column. Only relevant when \"Append\" is selected.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "BinaryObject"
+    } ]
+  },
+  "tier" : "experimental"
+}

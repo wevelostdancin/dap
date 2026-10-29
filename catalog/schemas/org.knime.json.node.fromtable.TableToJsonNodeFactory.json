@@ -1,0 +1,128 @@
+{
+  "id" : "org.knime.json.node.fromtable.TableToJsonNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.json.node.fromtable.TableToJsonNodeParameters",
+    "fields" : [ {
+      "field" : "m_selectedColumns",
+      "configKey" : "selectedColumns",
+      "title" : "Input columns",
+      "description" : "The selected columns will be transformed.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.fromtable.TableToJsonNodeParameters$JSONColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_rowKeyOption",
+      "configKey" : "row.key.option",
+      "title" : "Row keys",
+      "description" : "Configure how row keys should be handled in the JSON output.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "omit",
+        "label" : "Omit row key"
+      }, {
+        "value" : "asValue",
+        "label" : "Row key as JSON value with key"
+      }, {
+        "value" : "asKey",
+        "label" : "Row key as JSON key"
+      } ],
+      "default" : "omit",
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.fromtable.TableToJsonNodeParameters$RowKeyOptionChoicesProvider",
+        "kind" : "enum"
+      },
+      "choicesResolved" : true
+    }, {
+      "field" : "m_rowKeyKey",
+      "configKey" : "rowkey.key",
+      "title" : "Row key name",
+      "description" : "The key name to use when row keys are included as JSON values.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "key"
+    }, {
+      "field" : "m_columnNamesAsPath",
+      "configKey" : "column.names.as.path",
+      "title" : "Column names as paths",
+      "description" : "When enabled, column names are treated as hierarchical paths using the specified separator.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_columnNameSeparator",
+      "configKey" : "column.name.separator",
+      "title" : "Path separator",
+      "description" : "When column names as paths is enabled, this value will be used to find the keys for JSON columns based on the column names.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "."
+    }, {
+      "field" : "m_direction",
+      "configKey" : "direction",
+      "title" : "Aggregation direction",
+      "description" : "Configure how to aggregate the selected columns into JSON.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "RowsOutside",
+        "label" : "Row-oriented (n input rows → 1 output cell)"
+      }, {
+        "value" : "KeepRows",
+        "label" : "Keep rows (n input rows → n output cells)"
+      }, {
+        "value" : "ColumnsOutside",
+        "label" : "Column-oriented (n input rows → 1 output cell)"
+      } ],
+      "default" : "RowsOutside"
+    }, {
+      "field" : "m_removeSourceColumns",
+      "configKey" : "remove.source.columns",
+      "title" : "Remove source columns",
+      "description" : "When checked, the source columns are removed when the rows are kept. It has no effect for the other aggregation direction options, when all columns are removed.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_missingValueHandling",
+      "configKey" : "missingValueHandling",
+      "title" : "Missing values",
+      "description" : "Configure how missing values should be handled in the JSON output.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "OMITTED",
+        "label" : "are omitted"
+      }, {
+        "value" : "AS_NULL",
+        "label" : "are inserted as 'null'"
+      } ],
+      "default" : "OMITTED"
+    }, {
+      "field" : "m_outputColumnName",
+      "configKey" : "output.column.name",
+      "title" : "Output column name",
+      "description" : "Name of the resulting JSON column.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "JSON"
+    }, {
+      "field" : "m_booleansAsNumbers",
+      "configKey" : "output.boolean.asNumbers",
+      "title" : "BooleansAsNumbers",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

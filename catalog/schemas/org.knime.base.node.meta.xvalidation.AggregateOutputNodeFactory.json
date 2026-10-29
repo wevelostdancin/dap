@@ -1,0 +1,46 @@
+{
+  "id" : "org.knime.base.node.meta.xvalidation.AggregateOutputNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.meta.xvalidation.AggregateOutputNodeParameters",
+    "fields" : [ {
+      "field" : "m_targetColumn",
+      "configKey" : "targetColumn",
+      "title" : "Target column",
+      "description" : "Column containing the true class label",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.meta.xvalidation.AggregateOutputNodeParameters$NominalAndDoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_predictionColumn",
+      "configKey" : "predictionColumn",
+      "title" : "Prediction column",
+      "description" : "Column containing the prediction label",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.meta.xvalidation.AggregateOutputNodeParameters$NominalAndDoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_addFoldId",
+      "configKey" : "addFoldId",
+      "title" : "Add column with fold id",
+      "description" : "If selected an additional column is added to the first output table that contains the fold's id in which the row was produced.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

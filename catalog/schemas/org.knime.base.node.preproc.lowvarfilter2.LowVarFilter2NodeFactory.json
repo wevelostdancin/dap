@@ -1,0 +1,32 @@
+{
+  "id" : "org.knime.base.node.preproc.lowvarfilter2.LowVarFilter2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.lowvarfilter2.LowVarFilter2NodeParameters",
+    "fields" : [ {
+      "field" : "m_varianceThreshold",
+      "configKey" : "max_variance",
+      "title" : "Variance upper bound",
+      "description" : "Choose a variance value here. The higher the value, the more columns are likely to get filtered\nout. Choose 0 to filter for columns, which only contain one constant value.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.0
+    }, {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Columns to include",
+      "description" : "This list contains the names of the columns that are considered for filtering. Any other column\nwill be left untouched (i.e. will also be present in the output table independent of their\nvariance). Only double-compatible columns can be selected.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,123 @@
+{
+  "id" : "org.knime.base.node.viz.format.string.StringFormatManagerNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.viz.format.string.StringFormatManagerNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnsToFormat",
+      "configKey" : "columnsToFormat",
+      "title" : "Columns to format",
+      "description" : "Select the columns to attach the selected format to.\nThis does not change the data, but only the way the strings are being displayed in views.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.viz.format.string.StringFormatManagerNodeSettings$StringCellColumns",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_nFirstChars",
+      "configKey" : "nFirstChars",
+      "title" : "Show first characters",
+      "description" : "Select the number of characters that should be retained at the <b>start</b> of the string. If a string's length is longer than the permitted length, it will be truncated. This does not change the data, but only the way the strings are being displayed in views.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 500
+    }, {
+      "field" : "m_nLastChars",
+      "configKey" : "nLastChars",
+      "title" : "Show last characters",
+      "description" : "Select the number of characters that should be retained at the <b>end</b> of the string. If a string's length is longer than the permitted length, it will be truncated. This does not change the data, but only the way the strings are being displayed in views.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 5
+    }, {
+      "field" : "m_wrapLinesOnDemand",
+      "configKey" : "wrapLinesOnDemand",
+      "title" : "Wrap lines on demand",
+      "description" : "Determine how to wrap a string when it is too long to fit the width of the view:\n<ul>\n    <li><i>No</i>: The string isn't wrapped and long strings will overflow the view width.</li>\n    <li><i>Anywhere</i>: The string is wrapped anywhere on demand, also in the middle of a word.</li>\n    <li><i>Between words</i>: The string is wrapped only between words, e.g. at white space.</li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NO",
+        "label" : "No"
+      }, {
+        "value" : "ANYWHERE",
+        "label" : "Anywhere"
+      }, {
+        "value" : "BETWEEN_WORDS",
+        "label" : "Between words"
+      } ],
+      "default" : "NO"
+    }, {
+      "field" : "m_replaceNewlineAndCarriageReturn",
+      "configKey" : "replaceNewlineAndCarriageReturn",
+      "title" : "Show line break and carriage return as symbols",
+      "description" : "If checked, line break (\\n) and carriage return (\\r) are displayed as symbols. Enabling this will always show a single-line string unless <i>Wrap  lines on demand</i> is enabled.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_replaceNonPrintableCharacters",
+      "configKey" : "replaceNonPrintableCharacters",
+      "title" : "Show other non-printable characters as symbols",
+      "description" : "If checked, non-printable symbols like a tabulator or non-break space will be displayed with a placeholder symbol (�). Enable this to make any non-standard control characters in your strings visible.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_replaceEmptyString",
+      "configKey" : "replaceEmptyString",
+      "title" : "Show empty string as",
+      "description" : "Determine how to display empty strings. This does not change the underlying data, but just how an empty string is shown in views.\n<ul>\n    <li><i>Blank</i>: The empty string will be shown as blank, this is the default.</li>\n    <li><i>Custom string</i>: A custom string can be defined that will be shown instead of a blank cell.     This might be useful to show some placeholder text or default value.</li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "BLANK",
+        "label" : "Blank"
+      }, {
+        "value" : "CUSTOM",
+        "label" : "Custom string"
+      } ],
+      "default" : "BLANK"
+    }, {
+      "field" : "m_emptyStringReplacement",
+      "configKey" : "emptyStringReplacement",
+      "title" : "Substitute for empty string",
+      "description" : "This string will be shown instead of an empty string, if <i>Show empty string as custom string</i> is enabled.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "<empty>"
+    }, {
+      "field" : "m_linkLinksAndEmails",
+      "configKey" : "linkLinksAndEmails",
+      "title" : "Link hyperlinks and e-mail addresses",
+      "description" : "Enabling this will display URLs and e-mail addresses as links.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_alignmentSuggestion",
+      "configKey" : "alignmentSuggestion",
+      "title" : "Alignment suggestion",
+      "description" : "Specify how to align the string.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LEFT",
+        "label" : "Left"
+      }, {
+        "value" : "CENTER",
+        "label" : "Center"
+      }, {
+        "value" : "RIGHT",
+        "label" : "Right"
+      } ],
+      "default" : "LEFT"
+    } ]
+  },
+  "tier" : "experimental"
+}

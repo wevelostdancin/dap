@@ -1,0 +1,153 @@
+{
+  "id" : "org.knime.base.node.viz.liftchart.LiftChartNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "responseColumn",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Column containing true labels:",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "responseLabel",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "Positive label (hits):",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "No values given null",
+        "label" : "No values given null"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "probabilityColumn",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Column containing score (probabilities):",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "intervalWidth",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "10",
+      "title" : "Interval width in %:",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "0.5",
+        "label" : "0.5"
+      }, {
+        "value" : "1",
+        "label" : "1"
+      }, {
+        "value" : "2",
+        "label" : "2"
+      }, {
+        "value" : "2.5",
+        "label" : "2.5"
+      }, {
+        "value" : "5",
+        "label" : "5"
+      }, {
+        "value" : "10",
+        "label" : "10"
+      }, {
+        "value" : "12.5",
+        "label" : "12.5"
+      }, {
+        "value" : "20",
+        "label" : "20"
+      }, {
+        "value" : "25",
+        "label" : "25"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.viz.liftchart.LiftChartNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Column containing true labels",
+      "section" : "True Labels",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Positive label (hits)",
+      "section" : "True Labels",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "No values given null",
+        "label" : "No values given null"
+      } ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Column containing score (probabilities)",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Interval width in %",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "0.5",
+        "label" : "0.5"
+      }, {
+        "value" : "1",
+        "label" : "1"
+      }, {
+        "value" : "2",
+        "label" : "2"
+      }, {
+        "value" : "2.5",
+        "label" : "2.5"
+      }, {
+        "value" : "5",
+        "label" : "5"
+      }, {
+        "value" : "10",
+        "label" : "10"
+      }, {
+        "value" : "12.5",
+        "label" : "12.5"
+      }, {
+        "value" : "20",
+        "label" : "20"
+      }, {
+        "value" : "25",
+        "label" : "25"
+      } ],
+      "default" : "10"
+    } ],
+    "labelCoverage" : "4/4",
+    "uiElements" : 4
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,66 @@
+{
+  "id" : "org.knime.base.node.meta.looper.recursive.RecursiveLoopEndDynamicNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.meta.looper.recursive.RecursiveLoopEndDynamicNodeParameters",
+    "fields" : [ {
+      "field" : "m_recursionPortSettings",
+      "configKey" : "recursionPortSettings",
+      "title" : "Minimal number of rows",
+      "description" : "The minimal number of rows for each recursion input table required to continue iterating.\nIf <b>one</b> of the tables falls below its configured minimum, the loop stops.\nThe minimum can be set per recursion input table individually.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "",
+      "default" : [ ]
+    }, {
+      "field" : "m_maxNrIterations",
+      "configKey" : "maxNrIterations",
+      "title" : "Maximal number of iterations",
+      "description" : "The maximum number of iterations the loop will run. Prevents endless loops.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 100
+    }, {
+      "field" : "m_flowVariableName",
+      "configKey" : "flowVariableName",
+      "title" : "End loop with variable",
+      "description" : "Enables ending the loop based on a flow variable.\nWhen selected, choose the flow variable that terminates the loop when its value equals &#8220;true&#8221;.\n",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.meta.looper.recursive.RecursiveLoopEndDynamicNodeParameters$FlowVariableNameChoicesProvider",
+        "kind" : "dynamic"
+      },
+      "choices" : [ ],
+      "choicesResolved" : true
+    }, {
+      "field" : "m_dataCollectionPortSettings",
+      "configKey" : "dataCollectionPortSettings",
+      "title" : "Data collection",
+      "description" : "Configure how data from each collection port is collected across iterations.",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "",
+      "default" : [ ]
+    }, {
+      "field" : "m_propagateFlowVariables",
+      "configKey" : "propagateFlowVariables",
+      "title" : "Propagate modified loop variables",
+      "description" : "If checked, variables whose values are modified within the loop are exported by this node. These variables\nmust be declared outside the loop, i.e. injected into the loop from a side-branch or be available upstream\nof the corresponding loop start node. For the latter, any modification of a variable is passed back to the\nstart node in subsequent iterations (e.g. moving sum calculation). Note that variables defined by the loop\nstart node itself are excluded as these usually represent loop controls (e.g. <i>\"currentIteration\"</i>).\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

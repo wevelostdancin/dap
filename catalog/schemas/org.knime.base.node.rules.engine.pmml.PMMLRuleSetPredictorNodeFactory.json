@@ -1,0 +1,63 @@
+{
+  "id" : "org.knime.base.node.rules.engine.pmml.PMMLRuleSetPredictorNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.rules.engine.pmml.PMMLRuleSetPredictorNodeParameters",
+    "fields" : [ {
+      "field" : "m_replaceOrAppend",
+      "configKey" : "replaceOrAppend",
+      "title" : "Output columns",
+      "description" : "Choose whether to append a new prediction column using the specified Prediction column name, or replace the selected column with the predicted value.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "APPEND",
+        "label" : "Append"
+      }, {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_outputColumn",
+      "configKey" : "output column",
+      "title" : "Prediction column",
+      "description" : "Name of the new column appended to the table containing the predicted value.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "prediction"
+    }, {
+      "field" : "m_replaceColumn",
+      "configKey" : "column to replace",
+      "title" : "Column to replace",
+      "description" : "Name of an existing column to be replaced by the predicted value. Only columns of compatible data types (double, string, or boolean) are available for selection.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.rules.engine.pmml.PMMLRuleSetPredictorNodeParameters$CompatibleOutputColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_addConfidence",
+      "configKey" : "add confidence",
+      "title" : "Compute confidence",
+      "description" : "If checked, the confidence of the predicted result is computed and stored in a separate column specified by \"Confidence column\".",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_confidenceColumn",
+      "configKey" : "confidence column",
+      "title" : "Confidence column",
+      "description" : "Name of the column to store the confidence values of the prediction. Only active when \"Compute confidence\" is enabled.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "confidence"
+    } ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,119 @@
+{
+  "id" : "org.knime.base.node.mine.scorer.accuracy.AccuracyScorer2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.scorer.accuracy.AccuracyScorer2NodeParameters",
+    "fields" : [ {
+      "field" : "m_firstColumn",
+      "configKey" : "first",
+      "title" : "First column",
+      "description" : "The first column represents the real classes of the data.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.scorer.accuracy.AccuracyScorer2NodeParameters$ColumnSelectionChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_secondColumn",
+      "configKey" : "second",
+      "title" : "Second column",
+      "description" : "The second column represents the predicted classes of the data.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.scorer.accuracy.AccuracyScorer2NodeParameters$ColumnSelectionChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_sameColumnWarning",
+      "configKey" : "sameColumnWarning",
+      "title" : "SameColumnWarning",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_sortingStrategy",
+      "configKey" : "sortingStrategy",
+      "title" : "Sorting strategy",
+      "description" : "Whether to sort the labels according to their appearance, or use the lexical/numeric ordering.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Insertion order",
+        "label" : "Insertion order"
+      }, {
+        "value" : "Numeric",
+        "label" : "Numeric"
+      }, {
+        "value" : "Lexical",
+        "label" : "Lexical"
+      }, {
+        "value" : "Unsorted",
+        "label" : "Unsorted"
+      } ],
+      "default" : "Insertion order",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.scorer.accuracy.AccuracyScorer2NodeParameters$ScorerSortingStrategyChoicesProvider",
+        "kind" : "enum"
+      },
+      "choicesError" : "ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0"
+    }, {
+      "field" : "m_reverseOrder",
+      "configKey" : "sortingReversed",
+      "title" : "Reverse order",
+      "description" : "Reverse the order of the elements.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_usePrefixParameters",
+      "configKey" : "usePrefixParameters",
+      "title" : "UsePrefixParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_usePrefix",
+        "configKey" : "usePrefix",
+        "title" : "Use name prefix",
+        "description" : "The scores (i.e. accuracy, error rate, number of correct and wrong classification) are exported as flow variables with a hard coded name. This option allows you to define a prefix for these variable identifiers so that name conflicts are resolved.",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_flowVariablePrefix",
+        "configKey" : "flowVariablePrefix",
+        "title" : "Prefix for flow variables",
+        "description" : "The prefix to use for flow variable names.",
+        "advanced" : false,
+        "type" : "string",
+        "default" : ""
+      } ]
+    }, {
+      "field" : "m_missingValueHandling",
+      "configKey" : "missingValueHandling",
+      "title" : "Missing values",
+      "description" : "Choose how to treat missing values in either the reference or prediction column. Default is to ignore them (treat them as if the row did not exist). Alternatively, you can expect the table to not contain missing values in these two columns. If they do, the node will fail during execution.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      }, {
+        "value" : "FAIL",
+        "label" : "Fail"
+      } ],
+      "default" : "IGNORE"
+    } ]
+  },
+  "tier" : "core"
+}

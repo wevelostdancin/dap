@@ -1,0 +1,48 @@
+{
+  "id" : "org.knime.filehandling.utility.nodes.deletepaths.table.DeleteFilesAndFoldersTableNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.filehandling.utility.nodes.deletepaths.table.DeleteFilesAndFoldersTableNodeParameters",
+    "fields" : [ {
+      "field" : "m_fileSystemManagedByPortMessage",
+      "configKey" : "fileSystemManagedByPortMessage",
+      "title" : "FileSystemManagedByPortMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_columnSelection",
+      "configKey" : "column_selection",
+      "title" : "Path column",
+      "description" : "The Path column that contains the paths which should be deleted.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.filehandling.utility.nodes.deletepaths.table.DeleteFilesAndFoldersTableNodeParameters$FSLocationColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_failIfDeleteFails",
+      "configKey" : "fail_if_delete_fails",
+      "title" : "Fail if delete fails",
+      "description" : "If this option is checked, the node will fail if one of the files/folders could not be deleted, i.e., it could not be accessed. If it is unchecked, the output table will contain a column that indicates whether a file/folder was successfully deleted or not.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_failIfFileDoesNotExist",
+      "configKey" : "fail_if_file_does_not_exist",
+      "title" : "Fail if file does not exist",
+      "description" : "If this option is checked, the node will fail if one of the files/folders does not exist.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,22 @@
+# DAP: docker compose -f deploy/docker-compose.yaml up -d --build
+services:
+  dap:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: dap:1.0.0
+    ports:
+      - "7800:7800"
+    volumes:
+      - dap-workspace:/opt/dap/workspace
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7800/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      # KNIME-рантайм стартует ~10-30 c; не считать это ошибкой.
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  dap-workspace:

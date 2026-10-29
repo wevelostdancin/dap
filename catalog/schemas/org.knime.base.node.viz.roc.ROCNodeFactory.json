@@ -1,0 +1,51 @@
+{
+  "id" : "org.knime.base.node.viz.roc.ROCNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.viz.roc.ROCNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Class column",
+      "configKey" : "classColumn",
+      "keySource" : "label-match",
+      "section" : "Standard Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Positive class value",
+      "section" : "Standard Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "number",
+      "label" : "Limit data points for each curve to",
+      "section" : "Standard Settings",
+      "source" : "dialog-ui",
+      "default" : 2000.0,
+      "min" : -1.0,
+      "max" : 2.147483647E9,
+      "step" : 10.0
+    }, {
+      "type" : "string",
+      "label" : "Columns containing the positive class probabilities",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 5,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

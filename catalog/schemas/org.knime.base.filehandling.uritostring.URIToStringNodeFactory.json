@@ -1,0 +1,47 @@
+{
+  "id" : "org.knime.base.filehandling.uritostring.URIToStringNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.filehandling.uritostring.URIToStringNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnSelection",
+      "configKey" : "columnselection",
+      "title" : "Column selection",
+      "description" : "Column that will be converted.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "URI",
+      "choicesSource" : {
+        "provider" : "org.knime.base.filehandling.uritostring.URIToStringNodeParameters$OnlyURIColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_replacePolicy",
+      "configKey" : "replacePolicy",
+      "title" : "Append or replace",
+      "description" : "Choose whether to append a new column or replace the selected column.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "APPEND",
+        "label" : "Append"
+      }, {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      } ],
+      "default" : "APPEND"
+    }, {
+      "field" : "m_columnName",
+      "configKey" : "columnname",
+      "title" : "New column name",
+      "description" : "Name of the appended column.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "String"
+    } ]
+  },
+  "tier" : "experimental"
+}

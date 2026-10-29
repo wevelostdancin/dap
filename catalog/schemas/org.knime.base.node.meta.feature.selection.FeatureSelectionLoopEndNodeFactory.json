@@ -1,0 +1,32 @@
+{
+  "id" : "org.knime.base.node.meta.feature.selection.FeatureSelectionLoopEndNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.meta.feature.selection.FeatureSelectionLoopEndNodeParameters",
+    "fields" : [ {
+      "field" : "m_scoreVariableName",
+      "configKey" : "scoreVariable",
+      "title" : "Score",
+      "description" : "The flow variable that contains the score for the model.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.meta.feature.selection.FeatureSelectionLoopEndNodeParameters$DoubleFlowVariablesProvider",
+        "kind" : "dynamic"
+      },
+      "choices" : [ ],
+      "choicesResolved" : true
+    }, {
+      "field" : "m_isMinimize",
+      "configKey" : "isMinimize",
+      "title" : "Minimize score",
+      "description" : "Check this option if you want to minimize the score (if you use error as score, for example, and you want\nto minimize error). If the option is left unchecked, the score will be maximized.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

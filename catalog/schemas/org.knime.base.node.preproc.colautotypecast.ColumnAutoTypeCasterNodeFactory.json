@@ -1,0 +1,72 @@
+{
+  "id" : "org.knime.base.node.preproc.colautotypecast.ColumnAutoTypeCasterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.colautotypecast.ColumnAutoTypeCasterNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Column filter",
+      "description" : "Select the columns to consider for automatic type casting. Only string columns and columns with an unknown type are shown. The filter supports manual selection and wildcard/regex.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.colautotypecast.ColumnAutoTypeCasterNodeParameters$StringAndUnknownColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_dateFormat",
+      "configKey" : "dateFormat",
+      "title" : "Choose a date&time format",
+      "description" : "Choose or enter a date, time, or date&amp;time pattern used to detect dates in the selected columns. The\n used locale will be the system default. For further configurations use the <i>String to Date&amp;Time</i>\n node.<br />\n The used parser depends on the setting <i>Use legacy date&amp;time type</i>. When checked, the\n <a href=\"https://docs.oracle.com/javase/8/docs/api/java/text/DateFormat.html\">DateFormat</a> is used, else\n the <a href=\"\nhttps://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/time/format/DateTimeFormatter.html\">DateTimeFormatter</a>. The <i>DateFormat</i> might not support every placeholder specified below.\n<br />\n<b>Examples:</b>\n<ul>\n    <li>\"yyyy.MM.dd HH:mm:ss.SSS\" produces dates such as \"2001.07.04 12:08:56.000\"\n    </li>\n    <li>\"yyyy-MM-dd'T'HH:mm:ss.SSSZ\" produces dates such as \"2001-07-04T12:08:56.235-0700\"\n    </li>\n    <li>\"yyyy-MM-dd'T'HH:mm:ss.SSSXXX'['VV']'\" produces dates such as\n    \"2001-07-04T12:08:56.235+02:00[Europe/Berlin]\"\n    </li>\n</ul>\n<b>Supported placeholders in the pattern are:</b>\n<ul>\n    <li>G: era</li>\n    <li>u: year</li>\n    <li>y: year of era</li>\n    <li>D: day of year</li>\n    <li>M: month in year (context sensitive)</li>\n    <li>L: month in year (standalone form)</li>\n    <li>d: day of month</li>\n    <li>Q/q: quarter of year</li>\n    <li>Y: week based year (you probably want to use y instead)</li>\n    <li>w: week of week based year</li>\n    <li>W: week of month</li>\n    <li>E: day of week</li>\n    <li>e: localized day of week\n        <ul>\n            <li>e: 4</li>\n            <li>ee: 04</li>\n            <li>eee: Wed</li>\n            <li>eeee: Wednesday</li>\n            <li>eeeee: W</li>\n        </ul>\n    </li>\n    <li>c: day of week</li>\n    <li>F: day-of-week in month</li>\n    <li>a: am/pm of day</li>\n    <li>h: clock hour of am/pm (1-12)</li>\n    <li>K: hour of am/pm (0-11)</li>\n    <li>k: clock hour of am/pm (1-24)</li>\n    <li>H: hour of day (0-23)</li>\n    <li>m: minute of hour</li>\n    <li>s: second of minute</li>\n    <li>S: fraction of second</li>\n    <li>A: milli of day</li>\n    <li>n: nano of second</li>\n    <li>N: nano of day</li>\n    <li>V: time zone ID</li>\n    <li>z: time zone name</li>\n    <li>O: localized zone offset</li>\n    <li>x: zone offset (ISO8601)\n          <ul>\n              <li>X: +08 or +0830</li>\n              <li>XX: +0800 or +0830 (no colons)</li>\n              <li>XXX: +08:00 or +08:30 (with colons)</li>\n              <li>XXXX: +0800 or +083015 (i.e. including offset seconds, no colons)</li>\n              <li>XXXXX: +08:00 or +08:30:15 (i.e. including offset seconds, with colons)</li>\n          </ul>\n    </li>\n    <li>X: same as x, but outputs Z when offset is 0</li>\n    <li>Z: zone offset (RFC822)\n        <ul>\n            <li>Z, ZZ, ZZZ: +0800 or +0830</li>\n            <li>ZZZZ: GMT+08:00 or GMT+08:30</li>\n            <li>ZZZZZ: +08:00 or +08:30:15</li>\n        </ul>\n    </li>\n    <li>p: pad next</li>\n    <li>' : escape for text</li>\n    <li>'': single quote</li>\n    <li>[: optional section start</li>\n    <li>]: optional section end</li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "dd.MM.yy"
+    }, {
+      "field" : "m_missingValuePattern",
+      "configKey" : "missingValuePattern",
+      "title" : "Missing value pattern",
+      "description" : "Enter a missing value pattern applied to all included columns. Two special strings which will not be treated as pattern exist:<ul><li><i>&lt;none&gt;</i>: no pattern (default)</li><li><i>&lt;empty&gt;</i>: for the empty string</li></ul>",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "<none>"
+    }, {
+      "field" : "m_quickScan",
+      "configKey" : "doAQuickScan",
+      "title" : "Quickscan",
+      "description" : "Speed up by determining the most specific type based only on the first N rows. <br /> Note: With quickscan enabled this node may fail during execution if later rows contradict the inferred type.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_quickScanRows",
+      "configKey" : "numberOfRowsForQuickScan",
+      "title" : "Number of rows to consider",
+      "description" : "Number of initial rows used when quickscan is enabled.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1000
+    }, {
+      "field" : "m_useLegacyTypeNames",
+      "configKey" : "useLegacyTypeNames",
+      "title" : "Use legacy type names instead of identifiers",
+      "description" : "Output legacy type names like 'Number (double)' on the second port instead of identifiers like 'org.knime.core.data.def.DoubleCell'. This resembles the old behavior but is discouraged as type names may change in future versions.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_useLegacyDateTimeType",
+      "configKey" : "useLegacyDateTimeType",
+      "title" : "Use legacy date&time type",
+      "description" : "Output date with the legacy date and time type (org.knime.core.data.date.DateAndTimeCell) or the successor types (org.knime.core.data.time.*.LocalTimeCell/LocalDateCell/LocalDateTimeCell/ZonedDateTimeCell).",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

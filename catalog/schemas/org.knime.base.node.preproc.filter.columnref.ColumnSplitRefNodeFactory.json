@@ -1,0 +1,25 @@
+{
+  "id" : "org.knime.base.node.preproc.filter.columnref.ColumnSplitRefNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.filter.columnref.ColumnSplitRefNodeSettings",
+    "fields" : [ {
+      "field" : "m_typeCompatibility",
+      "configKey" : "typeCompatibility",
+      "title" : "If column names match, but types are incompatible",
+      "description" : "Ensures that the matching columns don't only have the same name but also the same type. Columns are only included or excluded if the column type of the first table is a super-type of the column type from the second table. If this option is not selected, only the column names need to match.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "MATCH",
+        "label" : "Match"
+      }, {
+        "value" : "NO_MATCH",
+        "label" : "Don't match"
+      } ],
+      "default" : "MATCH"
+    } ]
+  },
+  "tier" : "experimental"
+}

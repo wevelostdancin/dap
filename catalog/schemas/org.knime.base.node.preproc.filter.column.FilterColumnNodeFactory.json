@@ -1,0 +1,63 @@
+{
+  "id" : "org.knime.base.node.preproc.filter.column.FilterColumnNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.preproc.filter.column.FilterColumnNodeDialog",
+    "ui" : [ {
+      "type" : "string",
+      "label" : "Column(s)",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Select all search hits",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "list",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce exclusion",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "label" : "Column(s)",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Select all search hits",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "list",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce inclusion",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 8,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,27 @@
+{
+  "id" : "org.knime.base.node.preproc.colconvert.categorytonumber.CategoryToNumberApplyNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.colconvert.categorytonumber.CategoryToNumberApplyNodeParameters",
+    "fields" : [ {
+      "field" : "m_appendColumns",
+      "configKey" : "append_columns",
+      "title" : "Append columns",
+      "description" : "If checked, the computed columns will be appended to the input table. Otherwise the computed columns\nreplace their source columns.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_columnSuffix",
+      "configKey" : "column_suffix",
+      "title" : "Column suffix",
+      "description" : "The column name of the computed columns are the name of the column in the input appended by this suffix.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : " (to number)",
+      "placeholder" : " (to number)"
+    } ]
+  },
+  "tier" : "experimental"
+}

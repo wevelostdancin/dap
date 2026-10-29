@@ -1,0 +1,30 @@
+{
+  "id" : "org.knime.base.node.preproc.correlation.pmcc.PMCCFilterNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.preproc.correlation.pmcc.PMCCFilterNodeDialogPane",
+    "ui" : [ {
+      "type" : "list",
+      "label" : "Columns from Model",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "string",
+      "label" : "Correlation Threshold",
+      "configKey" : "correlation_threshold",
+      "keySource" : "label-match",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : "1",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 2,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

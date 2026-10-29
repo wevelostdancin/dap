@@ -1,0 +1,29 @@
+{
+  "id" : "org.knime.base.node.viz.hilite.AutoHiLiteNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "clearhilites",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "Clearhilites",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.viz.hilite.AutoHiLiteNodeFactory$2",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Clear HiLiting",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/1",
+    "uiElements" : 1
+  },
+  "tier" : "experimental"
+}

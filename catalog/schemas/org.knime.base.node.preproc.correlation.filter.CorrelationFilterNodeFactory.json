@@ -1,0 +1,46 @@
+{
+  "id" : "org.knime.base.node.preproc.correlation.filter.CorrelationFilterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.correlation.filter.CorrelationFilterNodeParameters",
+    "fields" : [ {
+      "field" : "m_correlationModelInfo",
+      "configKey" : "correlationModelInfo",
+      "title" : "CorrelationModelInfo",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_threshold",
+      "configKey" : "correlation_threshold",
+      "title" : "Correlation threshold",
+      "description" : "Choose the correlation threshold. The higher the value, the fewer columns get filtered out.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 1.0,
+      "step" : 0.01
+    }, {
+      "field" : "m_includedColumns",
+      "configKey" : "includedColumns",
+      "title" : "Included columns",
+      "description" : "Shows the columns which will be included or excluded in the output table. The list is updated based on the\ncorrelation model and the chosen correlation threshold. This list cannot be edited.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "string"
+      },
+      "addButtonText" : "",
+      "default" : [ ],
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.correlation.filter.CorrelationFilterNodeParameters$IncludedColumnsChoicesProvider",
+        "kind" : "strings",
+        "note" : "варианты вычисляются провайдером"
+      },
+      "choices" : [ ],
+      "choicesResolved" : true
+    } ]
+  },
+  "tier" : "experimental"
+}

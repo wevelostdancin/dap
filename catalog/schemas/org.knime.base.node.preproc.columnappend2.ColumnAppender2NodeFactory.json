@@ -1,0 +1,36 @@
+{
+  "id" : "org.knime.base.node.preproc.columnappend2.ColumnAppender2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.columnappend2.ColumnAppenderSettings",
+    "fields" : [ {
+      "field" : "m_rowIdMode",
+      "configKey" : "selected_rowid_mode",
+      "title" : "RowID mode",
+      "description" : "Determines the RowIDs of the output table:<ul><li><b>Identical RowIDs and table lengths</b>: If the RowIDs in both input tables exactly match (i.e. the RowID names, their order, and their number have to match) this option can be checked in order to allow a faster execution with less memory consumption. If the RowIDs (names, order, number) don't match exactly the node execution will fail. <br/><br/>If this option <i>is NOT checked</i> the result table is newly created. This might result in a longer processing time. However, in this case the number of rows in the input tables can differ and missing values are added accordingly. The RowIDs are either generated new or taken from one of the input tables (see options below).</li><li><b>Generate new RowIDs</b>: RowIDs are newly generated. If one of the input tables is longer than the other, missing values are inserted accordingly.</li> <li><b>Use RowIDs from the selected input table</b>: The RowIDs of the table at the selected input port number are used. Tables with fewer rows will be filled with missing values accordingly. And tables with more rows will be truncated.</li></ul>",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "IDENTICAL",
+        "label" : "Identical RowIDs and table lengths"
+      }, {
+        "value" : "GENERATE",
+        "label" : "Generate new RowIDs"
+      }, {
+        "value" : "KEY_TABLE",
+        "label" : "Use RowIDs from the selected input table"
+      } ],
+      "default" : "IDENTICAL"
+    }, {
+      "field" : "m_rowIdTableSelect",
+      "configKey" : "rowIdTableSelect",
+      "title" : "RowID table number",
+      "description" : "Select the table whose RowIDs should be used for the output table.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    } ]
+  },
+  "tier" : "core"
+}

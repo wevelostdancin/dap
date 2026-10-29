@@ -1,0 +1,134 @@
+{
+  "id" : "org.knime.base.node.meta.feature.selection.FeatureSelectionFilterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.meta.feature.selection.FeatureSelectionFilterNodeParameters",
+    "fields" : [ {
+      "field" : "m_optimizationInfo",
+      "configKey" : "optimizationInfo",
+      "title" : "OptimizationInfo",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_selectionMode",
+      "configKey" : "selectionMode",
+      "title" : "Feature set selection mode",
+      "description" : "Choose how the features are selected from the available feature sets computed during the feature selection\nloop.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NUMBER_OF_FEATURES",
+        "label" : "Manual"
+      }, {
+        "value" : "BEST_SCORE",
+        "label" : "Best score"
+      }, {
+        "value" : "THRESHOLD",
+        "label" : "Threshold"
+      } ],
+      "default" : "NUMBER_OF_FEATURES"
+    }, {
+      "field" : "m_manualSelection",
+      "configKey" : "manualSelection",
+      "title" : "Select a feature set",
+      "description" : "Select the feature set based on the score and number of features.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.meta.feature.selection.FeatureSelectionFilterNodeParameters$ManualSelectionChoicesProvider",
+        "kind" : "strings",
+        "note" : "варианты вычисляются провайдером"
+      },
+      "choices" : [ ],
+      "choicesResolved" : true
+    }, {
+      "field" : "m_errorThreshold",
+      "configKey" : "errorThreshold",
+      "title" : "Prediction score threshold",
+      "description" : "Enter a prediction score threshold here. The smallest feature set whose score meets the threshold\nrequirement is selected.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.5,
+      "step" : 0.01
+    }, {
+      "field" : "m_includeStaticColumns",
+      "configKey" : "includeTargetColumn",
+      "title" : "Include static columns",
+      "description" : "If checked, any static columns (columns that were not part of the feature selection, i.e. constant columns\nkept throughout the selection loop) are included in the output table. Otherwise, they are filtered out.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_featureSelectionParameters",
+      "configKey" : "featureSelectionParameters",
+      "title" : "FeatureSelectionParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_nrOfFeatures",
+        "configKey" : "nrOfFeatures",
+        "title" : "NrOfFeatures",
+        "description" : "",
+        "advanced" : false,
+        "type" : "integer",
+        "default" : 1
+      }, {
+        "field" : "m_selectedFeatures",
+        "configKey" : "selectedFeatures",
+        "title" : "SelectedFeatures",
+        "description" : "",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "string"
+        },
+        "addButtonText" : "",
+        "default" : [ ]
+      }, {
+        "field" : "m_staticColumns",
+        "configKey" : "staticColumns",
+        "title" : "StaticColumns",
+        "description" : "",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "string"
+        },
+        "addButtonText" : "",
+        "default" : [ ]
+      }, {
+        "field" : "m_displayedSelection",
+        "configKey" : "displayedSelection",
+        "title" : "Included features",
+        "description" : "This shows the columns that are included in the output table. The list is automatically updated based on\nthe selection configuration and whether static columns are included.\n",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "string"
+        },
+        "addButtonText" : "",
+        "default" : [ ],
+        "choicesSource" : {
+          "provider" : "org.knime.base.node.meta.feature.selection.FeatureSelectionFilterNodeParameters$FeatureSelectionParameters$IncludedColumnsChoicesProvider",
+          "kind" : "strings",
+          "note" : "варианты вычисляются провайдером"
+        },
+        "choicesError" : "ArrayIndexOutOfBoundsException: Index 1 out of bounds for length 0"
+      } ]
+    }, {
+      "field" : "m_featureSelectionFilterInfo",
+      "configKey" : "featureSelectionFilterInfo",
+      "title" : "FeatureSelectionFilterInfo",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    } ]
+  },
+  "tier" : "experimental"
+}

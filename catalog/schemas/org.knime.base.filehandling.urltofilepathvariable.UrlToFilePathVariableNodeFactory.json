@@ -1,0 +1,48 @@
+{
+  "id" : "org.knime.base.filehandling.urltofilepathvariable.UrlToFilePathVariableNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.filehandling.urltofilepathvariable.UrlToFilePathVariableNodeParameters",
+    "fields" : [ {
+      "field" : "m_flowVariableName",
+      "configKey" : "flowVariableName",
+      "title" : "Flow variable containing URLs",
+      "description" : "Select a string flow variable containing the URL string to convert. The node will convert this URL into\nfour string flow variables containing the file path, parent folder, file name, and file extension.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "URL",
+      "choicesSource" : {
+        "provider" : "org.knime.base.filehandling.urltofilepathvariable.UrlToFilePathVariableNodeParameters$StringFlowVariablesProvider",
+        "kind" : "dynamic"
+      },
+      "choices" : [ ],
+      "choicesResolved" : true
+    }, {
+      "field" : "m_addPrefixToVariable",
+      "configKey" : "AddPrefixToVariable",
+      "title" : "Add prefix to variable identifiers",
+      "description" : "If checked, the name of the specified input variable is used as prefix for the names of the output\nvariables.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_failOnInvalidSyntax",
+      "configKey" : "FailOnInvalidSyntax",
+      "title" : "Fail if URL has invalid syntax",
+      "description" : "If checked, node will fail if an invalid url string occurs, otherwise an empty string will be set as file\npath, parent folder, file name, and file extension variables.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_failOnInvalidLocation",
+      "configKey" : "FailOnInvalidLocation",
+      "title" : "Fail if file does not exist",
+      "description" : "If checked, node will fail if a file location does not exist, otherwise an empty string will set as file\npath parent folder, file name, and file extension variables.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

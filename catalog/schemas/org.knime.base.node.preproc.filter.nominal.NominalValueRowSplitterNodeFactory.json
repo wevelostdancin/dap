@@ -1,0 +1,53 @@
+{
+  "id" : "org.knime.base.node.preproc.filter.nominal.NominalValueRowSplitterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.filter.nominal.NominalValueRowCommonSettings$NominalValueRowSplitterNodeSettings",
+    "fields" : [ {
+      "field" : "m_missingValueHandling",
+      "configKey" : "missingValueHandling",
+      "title" : "If value is missing",
+      "description" : "Defines how missing values are handled.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LOWER",
+        "label" : "Second"
+      }, {
+        "value" : "UPPER",
+        "label" : "First"
+      } ],
+      "default" : "LOWER"
+    }, {
+      "field" : "m_selectedColumn",
+      "configKey" : "selected_column",
+      "title" : "Filter column",
+      "description" : "Select the column containing the nominal values to be filtered.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.filter.nominal.NominalValueRowCommonSettings$SettingsUtils$NominalColumnWithDomainChoicesProider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_nominalValueSelection",
+      "configKey" : "nominalValueSelection",
+      "title" : "Values",
+      "description" : "to be replaced by widget modification",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.StringFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.filter.nominal.NominalValueRowCommonSettings$SettingsUtils$SelectedColumnDomainChoicesStateProviderOnInitAndDepChange",
+        "kind" : "strings",
+        "note" : "варианты вычисляются провайдером"
+      },
+      "choicesError" : "NullPointerException: Cannot invoke \"java.util.List.stream()\" because the return value of \"org.knime.node.parameters.widget.choices.StringChoicesProvider.choices(org.knime.node.parameters.NodeParametersInput)\" is null"
+    } ]
+  },
+  "tier" : "core"
+}

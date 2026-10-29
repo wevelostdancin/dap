@@ -1,0 +1,77 @@
+{
+  "id" : "org.knime.base.node.preproc.pmml.stringtonumber.StringToNumberNodeFactory2",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelFilterString",
+      "configKey" : "include",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelFilterString",
+      "type" : "filter",
+      "default" : null,
+      "title" : "Include",
+      "titleSource" : "field-name",
+      "source" : "node-model",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      }
+    } ],
+    "dialogClass" : "org.knime.base.node.preproc.pmml.stringtonumber.StringToNumberNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Type",
+      "section" : "Parsing options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Number (Float)",
+        "label" : "Number (Float)"
+      }, {
+        "value" : "Number (Integer)",
+        "label" : "Number (Integer)"
+      } ],
+      "default" : "Number (Float)"
+    }, {
+      "type" : "string",
+      "label" : "Decimal separator",
+      "configKey" : "decimal_separator",
+      "keySource" : "label-match",
+      "section" : "Parsing options",
+      "source" : "dialog-ui",
+      "default" : ".",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Thousands separator",
+      "configKey" : "thousands_separator",
+      "keySource" : "label-match",
+      "section" : "Parsing options",
+      "source" : "dialog-ui",
+      "default" : ",",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Always include all columns",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/1",
+    "uiElements" : 6,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

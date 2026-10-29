@@ -1,0 +1,89 @@
+{
+  "id" : "org.knime.base.node.mine.subgroupminer.SubgroupMinerFactory2",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.subgroupminer.SubgroupMinerFactory2Parameters",
+    "fields" : [ {
+      "field" : "m_transactionColumn",
+      "configKey" : "TRANSACTION_COLUMN",
+      "title" : "Column containing transactions",
+      "description" : "Select the column containing the transactions (BitVector or Collection) to mine for frequent itemsets or\nassociation rules. There must be at least one, since this is the only valid input for the subgroup miner.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.subgroupminer.SubgroupMinerFactory2Parameters$TransactionColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_minSupport",
+      "configKey" : "MIN_SUPPORT",
+      "title" : "Minimum support",
+      "description" : "An itemset is considered to be frequent if there are at least \"minimum support\" transactions, where the\nitemset occurs. Make sure to have here a meaningful number in proportion of the number of rows of the input.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.9
+    }, {
+      "field" : "m_underlyingStruct",
+      "configKey" : "UNDERLYING_STRUCT",
+      "title" : "Underlying data structure",
+      "description" : "Choose the underlying data structure\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ARRAY",
+        "label" : "Array"
+      }, {
+        "value" : "TIDList",
+        "label" : "TID list"
+      } ],
+      "default" : "ARRAY"
+    }, {
+      "field" : "m_itemSetType",
+      "configKey" : "ITEMSET_TYPE",
+      "title" : "Itemset type",
+      "description" : "Choose the type of frequent itemsets to output.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "CLOSED",
+        "label" : "Closed"
+      }, {
+        "value" : "FREE",
+        "label" : "Free"
+      }, {
+        "value" : "MAXIMAL",
+        "label" : "Maximal"
+      } ],
+      "default" : "CLOSED"
+    }, {
+      "field" : "m_maxItemsetLength",
+      "configKey" : "MAX_ITEMSET_LENGTH",
+      "title" : "Maximal itemset length",
+      "description" : "The maximal length of the resulting itemsets. A lower value may reduce the runtime if there are very long\nfrequent itemsets.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 10
+    }, {
+      "field" : "m_associationRules",
+      "configKey" : "ASSOCIATION_RULES",
+      "title" : "Output association rules",
+      "description" : "Check if association rules should be generated out of the frequent itemsets. Note: association rules are\nalways generated from free frequent itemsets and are constrained to have only one item in the consequence.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_confidence",
+      "configKey" : "CONFIDENCE",
+      "title" : "Minimum confidence",
+      "description" : "The confidence is a measure for \"how often the rule is right\". Thus, how often, if the items in the\nantecedence appeared also the consequence occurred in the transactions.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.8
+    } ]
+  },
+  "tier" : "core"
+}

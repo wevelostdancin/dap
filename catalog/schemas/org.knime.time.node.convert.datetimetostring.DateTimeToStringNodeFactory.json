@@ -1,0 +1,3374 @@
+{
+  "id" : "org.knime.time.node.convert.datetimetostring.DateTimeToStringNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "date_format",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "yyyy-MM-dd;HH:mm:ss.S",
+      "title" : "Date format",
+      "titleSource" : "field-name",
+      "source" : "dialog-field"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "locale",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "en-GB",
+      "title" : "Locale",
+      "titleSource" : "field-name",
+      "source" : "dialog-field"
+    }, {
+      "field" : "SettingsModelColumnFilter2",
+      "configKey" : "col_select",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelColumnFilter2",
+      "type" : "filter",
+      "default" : null,
+      "title" : "Col select",
+      "titleSource" : "field-name",
+      "source" : "node-model",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      }
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "replace_or_append",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Replace selected columns",
+      "title" : "Replace or append",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "suffix",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "(String)",
+      "title" : "Suffix",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    } ],
+    "dialogClass" : "org.knime.time.node.convert.datetimetostring.DateTimeToStringNodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Manual Selection",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce exclusion",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce inclusion",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Append selected columns",
+      "section" : "Replace/Append Selection",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Replace selected columns",
+      "section" : "Replace/Append Selection",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "label" : "Suffix of appended columns",
+      "section" : "Replace/Append Selection",
+      "source" : "dialog-ui",
+      "default" : "(String)",
+      "editable" : true
+    }, {
+      "type" : "dropdown",
+      "label" : "Date format",
+      "configKey" : "date_format",
+      "keySource" : "label-match",
+      "section" : "Type and Format Selection",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "yyyy-MM-dd;HH:mm:ss.S",
+        "label" : "yyyy-MM-dd;HH:mm:ss.S"
+      }, {
+        "value" : "dd.MM.yyyy;HH:mm:ss.S",
+        "label" : "dd.MM.yyyy;HH:mm:ss.S"
+      }, {
+        "value" : "yyyy-MM-dd HH:mm:ss.S",
+        "label" : "yyyy-MM-dd HH:mm:ss.S"
+      }, {
+        "value" : "dd.MM.yyyy HH:mm:ss.S",
+        "label" : "dd.MM.yyyy HH:mm:ss.S"
+      }, {
+        "value" : "yyyy-MM-dd'T'HH:mm:ss.SSS",
+        "label" : "yyyy-MM-dd'T'HH:mm:ss.SSS"
+      }, {
+        "value" : "yyyy-MM-dd;HH:mm:ssVV",
+        "label" : "yyyy-MM-dd;HH:mm:ssVV"
+      }, {
+        "value" : "yyyy-MM-dd'T'HH:mm:ss.SSSVV",
+        "label" : "yyyy-MM-dd'T'HH:mm:ss.SSSVV"
+      }, {
+        "value" : "yyyy-MM-dd'T'HH:mm:ss.SSSVV'['zzzz']'",
+        "label" : "yyyy-MM-dd'T'HH:mm:ss.SSSVV'['zzzz']'"
+      }, {
+        "value" : "yyyy/dd/MM",
+        "label" : "yyyy/dd/MM"
+      }, {
+        "value" : "dd.MM.yyyy",
+        "label" : "dd.MM.yyyy"
+      }, {
+        "value" : "yyyy-MM-dd",
+        "label" : "yyyy-MM-dd"
+      }, {
+        "value" : "HH:mm:ss",
+        "label" : "HH:mm:ss"
+      } ],
+      "default" : "yyyy-MM-dd;HH:mm:ss.S"
+    }, {
+      "type" : "dropdown",
+      "label" : "Locale",
+      "configKey" : "locale",
+      "keySource" : "label-match",
+      "section" : "Type and Format Selection",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "af",
+        "label" : "af"
+      }, {
+        "value" : "af-Latn-ZA",
+        "label" : "af-Latn-ZA"
+      }, {
+        "value" : "af-NA",
+        "label" : "af-NA"
+      }, {
+        "value" : "af-ZA",
+        "label" : "af-ZA"
+      }, {
+        "value" : "agq",
+        "label" : "agq"
+      }, {
+        "value" : "agq-CM",
+        "label" : "agq-CM"
+      }, {
+        "value" : "agq-Latn-CM",
+        "label" : "agq-Latn-CM"
+      }, {
+        "value" : "ak",
+        "label" : "ak"
+      }, {
+        "value" : "ak-GH",
+        "label" : "ak-GH"
+      }, {
+        "value" : "ak-Latn-GH",
+        "label" : "ak-Latn-GH"
+      }, {
+        "value" : "am",
+        "label" : "am"
+      }, {
+        "value" : "am-ET",
+        "label" : "am-ET"
+      }, {
+        "value" : "am-Ethi-ET",
+        "label" : "am-Ethi-ET"
+      }, {
+        "value" : "ann",
+        "label" : "ann"
+      }, {
+        "value" : "ann-Latn-NG",
+        "label" : "ann-Latn-NG"
+      }, {
+        "value" : "ann-NG",
+        "label" : "ann-NG"
+      }, {
+        "value" : "ar",
+        "label" : "ar"
+      }, {
+        "value" : "ar-001",
+        "label" : "ar-001"
+      }, {
+        "value" : "ar-AE",
+        "label" : "ar-AE"
+      }, {
+        "value" : "ar-Arab-EG",
+        "label" : "ar-Arab-EG"
+      }, {
+        "value" : "ar-BH",
+        "label" : "ar-BH"
+      }, {
+        "value" : "ar-DJ",
+        "label" : "ar-DJ"
+      }, {
+        "value" : "ar-DZ",
+        "label" : "ar-DZ"
+      }, {
+        "value" : "ar-EG",
+        "label" : "ar-EG"
+      }, {
+        "value" : "ar-EH",
+        "label" : "ar-EH"
+      }, {
+        "value" : "ar-ER",
+        "label" : "ar-ER"
+      }, {
+        "value" : "ar-IL",
+        "label" : "ar-IL"
+      }, {
+        "value" : "ar-IQ",
+        "label" : "ar-IQ"
+      }, {
+        "value" : "ar-JO",
+        "label" : "ar-JO"
+      }, {
+        "value" : "ar-KM",
+        "label" : "ar-KM"
+      }, {
+        "value" : "ar-KW",
+        "label" : "ar-KW"
+      }, {
+        "value" : "ar-LB",
+        "label" : "ar-LB"
+      }, {
+        "value" : "ar-LY",
+        "label" : "ar-LY"
+      }, {
+        "value" : "ar-MA",
+        "label" : "ar-MA"
+      }, {
+        "value" : "ar-MR",
+        "label" : "ar-MR"
+      }, {
+        "value" : "ar-OM",
+        "label" : "ar-OM"
+      }, {
+        "value" : "ar-PS",
+        "label" : "ar-PS"
+      }, {
+        "value" : "ar-QA",
+        "label" : "ar-QA"
+      }, {
+        "value" : "ar-SA",
+        "label" : "ar-SA"
+      }, {
+        "value" : "ar-SD",
+        "label" : "ar-SD"
+      }, {
+        "value" : "ar-SO",
+        "label" : "ar-SO"
+      }, {
+        "value" : "ar-SS",
+        "label" : "ar-SS"
+      }, {
+        "value" : "ar-SY",
+        "label" : "ar-SY"
+      }, {
+        "value" : "ar-TD",
+        "label" : "ar-TD"
+      }, {
+        "value" : "ar-TN",
+        "label" : "ar-TN"
+      }, {
+        "value" : "ar-YE",
+        "label" : "ar-YE"
+      }, {
+        "value" : "as",
+        "label" : "as"
+      }, {
+        "value" : "as-Beng-IN",
+        "label" : "as-Beng-IN"
+      }, {
+        "value" : "as-IN",
+        "label" : "as-IN"
+      }, {
+        "value" : "asa",
+        "label" : "asa"
+      }, {
+        "value" : "asa-Latn-TZ",
+        "label" : "asa-Latn-TZ"
+      }, {
+        "value" : "asa-TZ",
+        "label" : "asa-TZ"
+      }, {
+        "value" : "ast",
+        "label" : "ast"
+      }, {
+        "value" : "ast-ES",
+        "label" : "ast-ES"
+      }, {
+        "value" : "ast-Latn-ES",
+        "label" : "ast-Latn-ES"
+      }, {
+        "value" : "az",
+        "label" : "az"
+      }, {
+        "value" : "az-AZ",
+        "label" : "az-AZ"
+      }, {
+        "value" : "az-Cyrl",
+        "label" : "az-Cyrl"
+      }, {
+        "value" : "az-Cyrl-AZ",
+        "label" : "az-Cyrl-AZ"
+      }, {
+        "value" : "az-Latn",
+        "label" : "az-Latn"
+      }, {
+        "value" : "az-Latn-AZ",
+        "label" : "az-Latn-AZ"
+      }, {
+        "value" : "bas",
+        "label" : "bas"
+      }, {
+        "value" : "bas-CM",
+        "label" : "bas-CM"
+      }, {
+        "value" : "bas-Latn-CM",
+        "label" : "bas-Latn-CM"
+      }, {
+        "value" : "be",
+        "label" : "be"
+      }, {
+        "value" : "be-BY",
+        "label" : "be-BY"
+      }, {
+        "value" : "be-Cyrl-BY",
+        "label" : "be-Cyrl-BY"
+      }, {
+        "value" : "be-TARASK",
+        "label" : "be-TARASK"
+      }, {
+        "value" : "bem",
+        "label" : "bem"
+      }, {
+        "value" : "bem-Latn-ZM",
+        "label" : "bem-Latn-ZM"
+      }, {
+        "value" : "bem-ZM",
+        "label" : "bem-ZM"
+      }, {
+        "value" : "bez",
+        "label" : "bez"
+      }, {
+        "value" : "bez-Latn-TZ",
+        "label" : "bez-Latn-TZ"
+      }, {
+        "value" : "bez-TZ",
+        "label" : "bez-TZ"
+      }, {
+        "value" : "bg",
+        "label" : "bg"
+      }, {
+        "value" : "bg-BG",
+        "label" : "bg-BG"
+      }, {
+        "value" : "bg-Cyrl-BG",
+        "label" : "bg-Cyrl-BG"
+      }, {
+        "value" : "bgc",
+        "label" : "bgc"
+      }, {
+        "value" : "bgc-Deva-IN",
+        "label" : "bgc-Deva-IN"
+      }, {
+        "value" : "bgc-IN",
+        "label" : "bgc-IN"
+      }, {
+        "value" : "bho",
+        "label" : "bho"
+      }, {
+        "value" : "bho-Deva-IN",
+        "label" : "bho-Deva-IN"
+      }, {
+        "value" : "bho-IN",
+        "label" : "bho-IN"
+      }, {
+        "value" : "bm",
+        "label" : "bm"
+      }, {
+        "value" : "bm-Latn-ML",
+        "label" : "bm-Latn-ML"
+      }, {
+        "value" : "bm-ML",
+        "label" : "bm-ML"
+      }, {
+        "value" : "bn",
+        "label" : "bn"
+      }, {
+        "value" : "bn-BD",
+        "label" : "bn-BD"
+      }, {
+        "value" : "bn-Beng-BD",
+        "label" : "bn-Beng-BD"
+      }, {
+        "value" : "bn-IN",
+        "label" : "bn-IN"
+      }, {
+        "value" : "bo",
+        "label" : "bo"
+      }, {
+        "value" : "bo-CN",
+        "label" : "bo-CN"
+      }, {
+        "value" : "bo-IN",
+        "label" : "bo-IN"
+      }, {
+        "value" : "bo-Tibt-CN",
+        "label" : "bo-Tibt-CN"
+      }, {
+        "value" : "br",
+        "label" : "br"
+      }, {
+        "value" : "br-FR",
+        "label" : "br-FR"
+      }, {
+        "value" : "br-Latn-FR",
+        "label" : "br-Latn-FR"
+      }, {
+        "value" : "brx",
+        "label" : "brx"
+      }, {
+        "value" : "brx-Deva-IN",
+        "label" : "brx-Deva-IN"
+      }, {
+        "value" : "brx-IN",
+        "label" : "brx-IN"
+      }, {
+        "value" : "bs",
+        "label" : "bs"
+      }, {
+        "value" : "bs-BA",
+        "label" : "bs-BA"
+      }, {
+        "value" : "bs-Cyrl",
+        "label" : "bs-Cyrl"
+      }, {
+        "value" : "bs-Cyrl-BA",
+        "label" : "bs-Cyrl-BA"
+      }, {
+        "value" : "bs-Latn",
+        "label" : "bs-Latn"
+      }, {
+        "value" : "bs-Latn-BA",
+        "label" : "bs-Latn-BA"
+      }, {
+        "value" : "ca",
+        "label" : "ca"
+      }, {
+        "value" : "ca-AD",
+        "label" : "ca-AD"
+      }, {
+        "value" : "ca-ES",
+        "label" : "ca-ES"
+      }, {
+        "value" : "ca-ES-VALENCIA",
+        "label" : "ca-ES-VALENCIA"
+      }, {
+        "value" : "ca-FR",
+        "label" : "ca-FR"
+      }, {
+        "value" : "ca-IT",
+        "label" : "ca-IT"
+      }, {
+        "value" : "ca-Latn-ES",
+        "label" : "ca-Latn-ES"
+      }, {
+        "value" : "ccp",
+        "label" : "ccp"
+      }, {
+        "value" : "ccp-BD",
+        "label" : "ccp-BD"
+      }, {
+        "value" : "ccp-Cakm-BD",
+        "label" : "ccp-Cakm-BD"
+      }, {
+        "value" : "ccp-IN",
+        "label" : "ccp-IN"
+      }, {
+        "value" : "ce",
+        "label" : "ce"
+      }, {
+        "value" : "ce-Cyrl-RU",
+        "label" : "ce-Cyrl-RU"
+      }, {
+        "value" : "ce-RU",
+        "label" : "ce-RU"
+      }, {
+        "value" : "ceb",
+        "label" : "ceb"
+      }, {
+        "value" : "ceb-Latn-PH",
+        "label" : "ceb-Latn-PH"
+      }, {
+        "value" : "ceb-PH",
+        "label" : "ceb-PH"
+      }, {
+        "value" : "cgg",
+        "label" : "cgg"
+      }, {
+        "value" : "cgg-Latn-UG",
+        "label" : "cgg-Latn-UG"
+      }, {
+        "value" : "cgg-UG",
+        "label" : "cgg-UG"
+      }, {
+        "value" : "chr",
+        "label" : "chr"
+      }, {
+        "value" : "chr-Cher-US",
+        "label" : "chr-Cher-US"
+      }, {
+        "value" : "chr-US",
+        "label" : "chr-US"
+      }, {
+        "value" : "ckb",
+        "label" : "ckb"
+      }, {
+        "value" : "ckb-Arab-IQ",
+        "label" : "ckb-Arab-IQ"
+      }, {
+        "value" : "ckb-IQ",
+        "label" : "ckb-IQ"
+      }, {
+        "value" : "ckb-IR",
+        "label" : "ckb-IR"
+      }, {
+        "value" : "cs",
+        "label" : "cs"
+      }, {
+        "value" : "cs-CZ",
+        "label" : "cs-CZ"
+      }, {
+        "value" : "cs-Latn-CZ",
+        "label" : "cs-Latn-CZ"
+      }, {
+        "value" : "cv",
+        "label" : "cv"
+      }, {
+        "value" : "cv-Cyrl-RU",
+        "label" : "cv-Cyrl-RU"
+      }, {
+        "value" : "cv-RU",
+        "label" : "cv-RU"
+      }, {
+        "value" : "cy",
+        "label" : "cy"
+      }, {
+        "value" : "cy-GB",
+        "label" : "cy-GB"
+      }, {
+        "value" : "cy-Latn-GB",
+        "label" : "cy-Latn-GB"
+      }, {
+        "value" : "da",
+        "label" : "da"
+      }, {
+        "value" : "da-DK",
+        "label" : "da-DK"
+      }, {
+        "value" : "da-GL",
+        "label" : "da-GL"
+      }, {
+        "value" : "da-Latn-DK",
+        "label" : "da-Latn-DK"
+      }, {
+        "value" : "dav",
+        "label" : "dav"
+      }, {
+        "value" : "dav-KE",
+        "label" : "dav-KE"
+      }, {
+        "value" : "dav-Latn-KE",
+        "label" : "dav-Latn-KE"
+      }, {
+        "value" : "de",
+        "label" : "de"
+      }, {
+        "value" : "de-AT",
+        "label" : "de-AT"
+      }, {
+        "value" : "de-BE",
+        "label" : "de-BE"
+      }, {
+        "value" : "de-CH",
+        "label" : "de-CH"
+      }, {
+        "value" : "de-DE",
+        "label" : "de-DE"
+      }, {
+        "value" : "de-IT",
+        "label" : "de-IT"
+      }, {
+        "value" : "de-LI",
+        "label" : "de-LI"
+      }, {
+        "value" : "de-LU",
+        "label" : "de-LU"
+      }, {
+        "value" : "de-Latn-DE",
+        "label" : "de-Latn-DE"
+      }, {
+        "value" : "dje",
+        "label" : "dje"
+      }, {
+        "value" : "dje-Latn-NE",
+        "label" : "dje-Latn-NE"
+      }, {
+        "value" : "dje-NE",
+        "label" : "dje-NE"
+      }, {
+        "value" : "doi",
+        "label" : "doi"
+      }, {
+        "value" : "doi-Deva-IN",
+        "label" : "doi-Deva-IN"
+      }, {
+        "value" : "doi-IN",
+        "label" : "doi-IN"
+      }, {
+        "value" : "dsb",
+        "label" : "dsb"
+      }, {
+        "value" : "dsb-DE",
+        "label" : "dsb-DE"
+      }, {
+        "value" : "dsb-Latn-DE",
+        "label" : "dsb-Latn-DE"
+      }, {
+        "value" : "dua",
+        "label" : "dua"
+      }, {
+        "value" : "dua-CM",
+        "label" : "dua-CM"
+      }, {
+        "value" : "dua-Latn-CM",
+        "label" : "dua-Latn-CM"
+      }, {
+        "value" : "dyo",
+        "label" : "dyo"
+      }, {
+        "value" : "dyo-Latn-SN",
+        "label" : "dyo-Latn-SN"
+      }, {
+        "value" : "dyo-SN",
+        "label" : "dyo-SN"
+      }, {
+        "value" : "dz",
+        "label" : "dz"
+      }, {
+        "value" : "dz-BT",
+        "label" : "dz-BT"
+      }, {
+        "value" : "dz-Tibt-BT",
+        "label" : "dz-Tibt-BT"
+      }, {
+        "value" : "ebu",
+        "label" : "ebu"
+      }, {
+        "value" : "ebu-KE",
+        "label" : "ebu-KE"
+      }, {
+        "value" : "ebu-Latn-KE",
+        "label" : "ebu-Latn-KE"
+      }, {
+        "value" : "ee",
+        "label" : "ee"
+      }, {
+        "value" : "ee-GH",
+        "label" : "ee-GH"
+      }, {
+        "value" : "ee-Latn-GH",
+        "label" : "ee-Latn-GH"
+      }, {
+        "value" : "ee-TG",
+        "label" : "ee-TG"
+      }, {
+        "value" : "el",
+        "label" : "el"
+      }, {
+        "value" : "el-CY",
+        "label" : "el-CY"
+      }, {
+        "value" : "el-GR",
+        "label" : "el-GR"
+      }, {
+        "value" : "el-Grek-GR",
+        "label" : "el-Grek-GR"
+      }, {
+        "value" : "el-POLYTON",
+        "label" : "el-POLYTON"
+      }, {
+        "value" : "en",
+        "label" : "en"
+      }, {
+        "value" : "en-001",
+        "label" : "en-001"
+      }, {
+        "value" : "en-150",
+        "label" : "en-150"
+      }, {
+        "value" : "en-AE",
+        "label" : "en-AE"
+      }, {
+        "value" : "en-AG",
+        "label" : "en-AG"
+      }, {
+        "value" : "en-AI",
+        "label" : "en-AI"
+      }, {
+        "value" : "en-AS",
+        "label" : "en-AS"
+      }, {
+        "value" : "en-AT",
+        "label" : "en-AT"
+      }, {
+        "value" : "en-AU",
+        "label" : "en-AU"
+      }, {
+        "value" : "en-BB",
+        "label" : "en-BB"
+      }, {
+        "value" : "en-BE",
+        "label" : "en-BE"
+      }, {
+        "value" : "en-BI",
+        "label" : "en-BI"
+      }, {
+        "value" : "en-BM",
+        "label" : "en-BM"
+      }, {
+        "value" : "en-BS",
+        "label" : "en-BS"
+      }, {
+        "value" : "en-BW",
+        "label" : "en-BW"
+      }, {
+        "value" : "en-BZ",
+        "label" : "en-BZ"
+      }, {
+        "value" : "en-CA",
+        "label" : "en-CA"
+      }, {
+        "value" : "en-CC",
+        "label" : "en-CC"
+      }, {
+        "value" : "en-CH",
+        "label" : "en-CH"
+      }, {
+        "value" : "en-CK",
+        "label" : "en-CK"
+      }, {
+        "value" : "en-CM",
+        "label" : "en-CM"
+      }, {
+        "value" : "en-CX",
+        "label" : "en-CX"
+      }, {
+        "value" : "en-CY",
+        "label" : "en-CY"
+      }, {
+        "value" : "en-DE",
+        "label" : "en-DE"
+      }, {
+        "value" : "en-DG",
+        "label" : "en-DG"
+      }, {
+        "value" : "en-DK",
+        "label" : "en-DK"
+      }, {
+        "value" : "en-DM",
+        "label" : "en-DM"
+      }, {
+        "value" : "en-ER",
+        "label" : "en-ER"
+      }, {
+        "value" : "en-FI",
+        "label" : "en-FI"
+      }, {
+        "value" : "en-FJ",
+        "label" : "en-FJ"
+      }, {
+        "value" : "en-FK",
+        "label" : "en-FK"
+      }, {
+        "value" : "en-FM",
+        "label" : "en-FM"
+      }, {
+        "value" : "en-GB",
+        "label" : "en-GB"
+      }, {
+        "value" : "en-GD",
+        "label" : "en-GD"
+      }, {
+        "value" : "en-GG",
+        "label" : "en-GG"
+      }, {
+        "value" : "en-GH",
+        "label" : "en-GH"
+      }, {
+        "value" : "en-GI",
+        "label" : "en-GI"
+      }, {
+        "value" : "en-GM",
+        "label" : "en-GM"
+      }, {
+        "value" : "en-GU",
+        "label" : "en-GU"
+      }, {
+        "value" : "en-GY",
+        "label" : "en-GY"
+      }, {
+        "value" : "en-HK",
+        "label" : "en-HK"
+      }, {
+        "value" : "en-IE",
+        "label" : "en-IE"
+      }, {
+        "value" : "en-IL",
+        "label" : "en-IL"
+      }, {
+        "value" : "en-IM",
+        "label" : "en-IM"
+      }, {
+        "value" : "en-IN",
+        "label" : "en-IN"
+      }, {
+        "value" : "en-IO",
+        "label" : "en-IO"
+      }, {
+        "value" : "en-JE",
+        "label" : "en-JE"
+      }, {
+        "value" : "en-JM",
+        "label" : "en-JM"
+      }, {
+        "value" : "en-KE",
+        "label" : "en-KE"
+      }, {
+        "value" : "en-KI",
+        "label" : "en-KI"
+      }, {
+        "value" : "en-KN",
+        "label" : "en-KN"
+      }, {
+        "value" : "en-KY",
+        "label" : "en-KY"
+      }, {
+        "value" : "en-LC",
+        "label" : "en-LC"
+      }, {
+        "value" : "en-LR",
+        "label" : "en-LR"
+      }, {
+        "value" : "en-LS",
+        "label" : "en-LS"
+      }, {
+        "value" : "en-Latn-US",
+        "label" : "en-Latn-US"
+      }, {
+        "value" : "en-MG",
+        "label" : "en-MG"
+      }, {
+        "value" : "en-MH",
+        "label" : "en-MH"
+      }, {
+        "value" : "en-MO",
+        "label" : "en-MO"
+      }, {
+        "value" : "en-MP",
+        "label" : "en-MP"
+      }, {
+        "value" : "en-MS",
+        "label" : "en-MS"
+      }, {
+        "value" : "en-MT",
+        "label" : "en-MT"
+      }, {
+        "value" : "en-MU",
+        "label" : "en-MU"
+      }, {
+        "value" : "en-MV",
+        "label" : "en-MV"
+      }, {
+        "value" : "en-MW",
+        "label" : "en-MW"
+      }, {
+        "value" : "en-MY",
+        "label" : "en-MY"
+      }, {
+        "value" : "en-NA",
+        "label" : "en-NA"
+      }, {
+        "value" : "en-NF",
+        "label" : "en-NF"
+      }, {
+        "value" : "en-NG",
+        "label" : "en-NG"
+      }, {
+        "value" : "en-NL",
+        "label" : "en-NL"
+      }, {
+        "value" : "en-NR",
+        "label" : "en-NR"
+      }, {
+        "value" : "en-NU",
+        "label" : "en-NU"
+      }, {
+        "value" : "en-NZ",
+        "label" : "en-NZ"
+      }, {
+        "value" : "en-PG",
+        "label" : "en-PG"
+      }, {
+        "value" : "en-PH",
+        "label" : "en-PH"
+      }, {
+        "value" : "en-PK",
+        "label" : "en-PK"
+      }, {
+        "value" : "en-PN",
+        "label" : "en-PN"
+      }, {
+        "value" : "en-PR",
+        "label" : "en-PR"
+      }, {
+        "value" : "en-PW",
+        "label" : "en-PW"
+      }, {
+        "value" : "en-RW",
+        "label" : "en-RW"
+      }, {
+        "value" : "en-SB",
+        "label" : "en-SB"
+      }, {
+        "value" : "en-SC",
+        "label" : "en-SC"
+      }, {
+        "value" : "en-SD",
+        "label" : "en-SD"
+      }, {
+        "value" : "en-SE",
+        "label" : "en-SE"
+      }, {
+        "value" : "en-SG",
+        "label" : "en-SG"
+      }, {
+        "value" : "en-SH",
+        "label" : "en-SH"
+      }, {
+        "value" : "en-SI",
+        "label" : "en-SI"
+      }, {
+        "value" : "en-SL",
+        "label" : "en-SL"
+      }, {
+        "value" : "en-SS",
+        "label" : "en-SS"
+      }, {
+        "value" : "en-SX",
+        "label" : "en-SX"
+      }, {
+        "value" : "en-SZ",
+        "label" : "en-SZ"
+      }, {
+        "value" : "en-TC",
+        "label" : "en-TC"
+      }, {
+        "value" : "en-TK",
+        "label" : "en-TK"
+      }, {
+        "value" : "en-TO",
+        "label" : "en-TO"
+      }, {
+        "value" : "en-TT",
+        "label" : "en-TT"
+      }, {
+        "value" : "en-TV",
+        "label" : "en-TV"
+      }, {
+        "value" : "en-TZ",
+        "label" : "en-TZ"
+      }, {
+        "value" : "en-UG",
+        "label" : "en-UG"
+      }, {
+        "value" : "en-UM",
+        "label" : "en-UM"
+      }, {
+        "value" : "en-US",
+        "label" : "en-US"
+      }, {
+        "value" : "en-US-POSIX",
+        "label" : "en-US-POSIX"
+      }, {
+        "value" : "en-VC",
+        "label" : "en-VC"
+      }, {
+        "value" : "en-VG",
+        "label" : "en-VG"
+      }, {
+        "value" : "en-VI",
+        "label" : "en-VI"
+      }, {
+        "value" : "en-VU",
+        "label" : "en-VU"
+      }, {
+        "value" : "en-WS",
+        "label" : "en-WS"
+      }, {
+        "value" : "en-ZA",
+        "label" : "en-ZA"
+      }, {
+        "value" : "en-ZM",
+        "label" : "en-ZM"
+      }, {
+        "value" : "en-ZW",
+        "label" : "en-ZW"
+      }, {
+        "value" : "eo",
+        "label" : "eo"
+      }, {
+        "value" : "eo-001",
+        "label" : "eo-001"
+      }, {
+        "value" : "eo-Latn-001",
+        "label" : "eo-Latn-001"
+      }, {
+        "value" : "es",
+        "label" : "es"
+      }, {
+        "value" : "es-419",
+        "label" : "es-419"
+      }, {
+        "value" : "es-AR",
+        "label" : "es-AR"
+      }, {
+        "value" : "es-BO",
+        "label" : "es-BO"
+      }, {
+        "value" : "es-BR",
+        "label" : "es-BR"
+      }, {
+        "value" : "es-BZ",
+        "label" : "es-BZ"
+      }, {
+        "value" : "es-CL",
+        "label" : "es-CL"
+      }, {
+        "value" : "es-CO",
+        "label" : "es-CO"
+      }, {
+        "value" : "es-CR",
+        "label" : "es-CR"
+      }, {
+        "value" : "es-CU",
+        "label" : "es-CU"
+      }, {
+        "value" : "es-DO",
+        "label" : "es-DO"
+      }, {
+        "value" : "es-EA",
+        "label" : "es-EA"
+      }, {
+        "value" : "es-EC",
+        "label" : "es-EC"
+      }, {
+        "value" : "es-ES",
+        "label" : "es-ES"
+      }, {
+        "value" : "es-GQ",
+        "label" : "es-GQ"
+      }, {
+        "value" : "es-GT",
+        "label" : "es-GT"
+      }, {
+        "value" : "es-HN",
+        "label" : "es-HN"
+      }, {
+        "value" : "es-IC",
+        "label" : "es-IC"
+      }, {
+        "value" : "es-Latn-ES",
+        "label" : "es-Latn-ES"
+      }, {
+        "value" : "es-MX",
+        "label" : "es-MX"
+      }, {
+        "value" : "es-NI",
+        "label" : "es-NI"
+      }, {
+        "value" : "es-PA",
+        "label" : "es-PA"
+      }, {
+        "value" : "es-PE",
+        "label" : "es-PE"
+      }, {
+        "value" : "es-PH",
+        "label" : "es-PH"
+      }, {
+        "value" : "es-PR",
+        "label" : "es-PR"
+      }, {
+        "value" : "es-PY",
+        "label" : "es-PY"
+      }, {
+        "value" : "es-SV",
+        "label" : "es-SV"
+      }, {
+        "value" : "es-US",
+        "label" : "es-US"
+      }, {
+        "value" : "es-UY",
+        "label" : "es-UY"
+      }, {
+        "value" : "es-VE",
+        "label" : "es-VE"
+      }, {
+        "value" : "et",
+        "label" : "et"
+      }, {
+        "value" : "et-EE",
+        "label" : "et-EE"
+      }, {
+        "value" : "et-Latn-EE",
+        "label" : "et-Latn-EE"
+      }, {
+        "value" : "eu",
+        "label" : "eu"
+      }, {
+        "value" : "eu-ES",
+        "label" : "eu-ES"
+      }, {
+        "value" : "eu-Latn-ES",
+        "label" : "eu-Latn-ES"
+      }, {
+        "value" : "ewo",
+        "label" : "ewo"
+      }, {
+        "value" : "ewo-CM",
+        "label" : "ewo-CM"
+      }, {
+        "value" : "ewo-Latn-CM",
+        "label" : "ewo-Latn-CM"
+      }, {
+        "value" : "fa",
+        "label" : "fa"
+      }, {
+        "value" : "fa-AF",
+        "label" : "fa-AF"
+      }, {
+        "value" : "fa-Arab-IR",
+        "label" : "fa-Arab-IR"
+      }, {
+        "value" : "fa-IR",
+        "label" : "fa-IR"
+      }, {
+        "value" : "ff",
+        "label" : "ff"
+      }, {
+        "value" : "ff-Adlm",
+        "label" : "ff-Adlm"
+      }, {
+        "value" : "ff-Adlm-BF",
+        "label" : "ff-Adlm-BF"
+      }, {
+        "value" : "ff-Adlm-CM",
+        "label" : "ff-Adlm-CM"
+      }, {
+        "value" : "ff-Adlm-GH",
+        "label" : "ff-Adlm-GH"
+      }, {
+        "value" : "ff-Adlm-GM",
+        "label" : "ff-Adlm-GM"
+      }, {
+        "value" : "ff-Adlm-GN",
+        "label" : "ff-Adlm-GN"
+      }, {
+        "value" : "ff-Adlm-GW",
+        "label" : "ff-Adlm-GW"
+      }, {
+        "value" : "ff-Adlm-LR",
+        "label" : "ff-Adlm-LR"
+      }, {
+        "value" : "ff-Adlm-MR",
+        "label" : "ff-Adlm-MR"
+      }, {
+        "value" : "ff-Adlm-NE",
+        "label" : "ff-Adlm-NE"
+      }, {
+        "value" : "ff-Adlm-NG",
+        "label" : "ff-Adlm-NG"
+      }, {
+        "value" : "ff-Adlm-SL",
+        "label" : "ff-Adlm-SL"
+      }, {
+        "value" : "ff-Adlm-SN",
+        "label" : "ff-Adlm-SN"
+      }, {
+        "value" : "ff-GN",
+        "label" : "ff-GN"
+      }, {
+        "value" : "ff-Latn",
+        "label" : "ff-Latn"
+      }, {
+        "value" : "ff-Latn-BF",
+        "label" : "ff-Latn-BF"
+      }, {
+        "value" : "ff-Latn-CM",
+        "label" : "ff-Latn-CM"
+      }, {
+        "value" : "ff-Latn-GH",
+        "label" : "ff-Latn-GH"
+      }, {
+        "value" : "ff-Latn-GM",
+        "label" : "ff-Latn-GM"
+      }, {
+        "value" : "ff-Latn-GN",
+        "label" : "ff-Latn-GN"
+      }, {
+        "value" : "ff-Latn-GW",
+        "label" : "ff-Latn-GW"
+      }, {
+        "value" : "ff-Latn-LR",
+        "label" : "ff-Latn-LR"
+      }, {
+        "value" : "ff-Latn-MR",
+        "label" : "ff-Latn-MR"
+      }, {
+        "value" : "ff-Latn-NE",
+        "label" : "ff-Latn-NE"
+      }, {
+        "value" : "ff-Latn-NG",
+        "label" : "ff-Latn-NG"
+      }, {
+        "value" : "ff-Latn-SL",
+        "label" : "ff-Latn-SL"
+      }, {
+        "value" : "ff-Latn-SN",
+        "label" : "ff-Latn-SN"
+      }, {
+        "value" : "ff-SN",
+        "label" : "ff-SN"
+      }, {
+        "value" : "fi",
+        "label" : "fi"
+      }, {
+        "value" : "fi-FI",
+        "label" : "fi-FI"
+      }, {
+        "value" : "fi-Latn-FI",
+        "label" : "fi-Latn-FI"
+      }, {
+        "value" : "fil",
+        "label" : "fil"
+      }, {
+        "value" : "fil-Latn-PH",
+        "label" : "fil-Latn-PH"
+      }, {
+        "value" : "fil-PH",
+        "label" : "fil-PH"
+      }, {
+        "value" : "fo",
+        "label" : "fo"
+      }, {
+        "value" : "fo-DK",
+        "label" : "fo-DK"
+      }, {
+        "value" : "fo-FO",
+        "label" : "fo-FO"
+      }, {
+        "value" : "fo-Latn-FO",
+        "label" : "fo-Latn-FO"
+      }, {
+        "value" : "fr",
+        "label" : "fr"
+      }, {
+        "value" : "fr-BE",
+        "label" : "fr-BE"
+      }, {
+        "value" : "fr-BF",
+        "label" : "fr-BF"
+      }, {
+        "value" : "fr-BI",
+        "label" : "fr-BI"
+      }, {
+        "value" : "fr-BJ",
+        "label" : "fr-BJ"
+      }, {
+        "value" : "fr-BL",
+        "label" : "fr-BL"
+      }, {
+        "value" : "fr-CA",
+        "label" : "fr-CA"
+      }, {
+        "value" : "fr-CD",
+        "label" : "fr-CD"
+      }, {
+        "value" : "fr-CF",
+        "label" : "fr-CF"
+      }, {
+        "value" : "fr-CG",
+        "label" : "fr-CG"
+      }, {
+        "value" : "fr-CH",
+        "label" : "fr-CH"
+      }, {
+        "value" : "fr-CI",
+        "label" : "fr-CI"
+      }, {
+        "value" : "fr-CM",
+        "label" : "fr-CM"
+      }, {
+        "value" : "fr-DJ",
+        "label" : "fr-DJ"
+      }, {
+        "value" : "fr-DZ",
+        "label" : "fr-DZ"
+      }, {
+        "value" : "fr-FR",
+        "label" : "fr-FR"
+      }, {
+        "value" : "fr-GA",
+        "label" : "fr-GA"
+      }, {
+        "value" : "fr-GF",
+        "label" : "fr-GF"
+      }, {
+        "value" : "fr-GN",
+        "label" : "fr-GN"
+      }, {
+        "value" : "fr-GP",
+        "label" : "fr-GP"
+      }, {
+        "value" : "fr-GQ",
+        "label" : "fr-GQ"
+      }, {
+        "value" : "fr-HT",
+        "label" : "fr-HT"
+      }, {
+        "value" : "fr-KM",
+        "label" : "fr-KM"
+      }, {
+        "value" : "fr-LU",
+        "label" : "fr-LU"
+      }, {
+        "value" : "fr-Latn-FR",
+        "label" : "fr-Latn-FR"
+      }, {
+        "value" : "fr-MA",
+        "label" : "fr-MA"
+      }, {
+        "value" : "fr-MC",
+        "label" : "fr-MC"
+      }, {
+        "value" : "fr-MF",
+        "label" : "fr-MF"
+      }, {
+        "value" : "fr-MG",
+        "label" : "fr-MG"
+      }, {
+        "value" : "fr-ML",
+        "label" : "fr-ML"
+      }, {
+        "value" : "fr-MQ",
+        "label" : "fr-MQ"
+      }, {
+        "value" : "fr-MR",
+        "label" : "fr-MR"
+      }, {
+        "value" : "fr-MU",
+        "label" : "fr-MU"
+      }, {
+        "value" : "fr-NC",
+        "label" : "fr-NC"
+      }, {
+        "value" : "fr-NE",
+        "label" : "fr-NE"
+      }, {
+        "value" : "fr-PF",
+        "label" : "fr-PF"
+      }, {
+        "value" : "fr-PM",
+        "label" : "fr-PM"
+      }, {
+        "value" : "fr-RE",
+        "label" : "fr-RE"
+      }, {
+        "value" : "fr-RW",
+        "label" : "fr-RW"
+      }, {
+        "value" : "fr-SC",
+        "label" : "fr-SC"
+      }, {
+        "value" : "fr-SN",
+        "label" : "fr-SN"
+      }, {
+        "value" : "fr-SY",
+        "label" : "fr-SY"
+      }, {
+        "value" : "fr-TD",
+        "label" : "fr-TD"
+      }, {
+        "value" : "fr-TG",
+        "label" : "fr-TG"
+      }, {
+        "value" : "fr-TN",
+        "label" : "fr-TN"
+      }, {
+        "value" : "fr-VU",
+        "label" : "fr-VU"
+      }, {
+        "value" : "fr-WF",
+        "label" : "fr-WF"
+      }, {
+        "value" : "fr-YT",
+        "label" : "fr-YT"
+      }, {
+        "value" : "frr",
+        "label" : "frr"
+      }, {
+        "value" : "frr-DE",
+        "label" : "frr-DE"
+      }, {
+        "value" : "frr-Latn-DE",
+        "label" : "frr-Latn-DE"
+      }, {
+        "value" : "fur",
+        "label" : "fur"
+      }, {
+        "value" : "fur-IT",
+        "label" : "fur-IT"
+      }, {
+        "value" : "fur-Latn-IT",
+        "label" : "fur-Latn-IT"
+      }, {
+        "value" : "fy",
+        "label" : "fy"
+      }, {
+        "value" : "fy-Latn-NL",
+        "label" : "fy-Latn-NL"
+      }, {
+        "value" : "fy-NL",
+        "label" : "fy-NL"
+      }, {
+        "value" : "ga",
+        "label" : "ga"
+      }, {
+        "value" : "ga-GB",
+        "label" : "ga-GB"
+      }, {
+        "value" : "ga-IE",
+        "label" : "ga-IE"
+      }, {
+        "value" : "ga-Latn-IE",
+        "label" : "ga-Latn-IE"
+      }, {
+        "value" : "gd",
+        "label" : "gd"
+      }, {
+        "value" : "gd-GB",
+        "label" : "gd-GB"
+      }, {
+        "value" : "gd-Latn-GB",
+        "label" : "gd-Latn-GB"
+      }, {
+        "value" : "gl",
+        "label" : "gl"
+      }, {
+        "value" : "gl-ES",
+        "label" : "gl-ES"
+      }, {
+        "value" : "gl-Latn-ES",
+        "label" : "gl-Latn-ES"
+      }, {
+        "value" : "gsw",
+        "label" : "gsw"
+      }, {
+        "value" : "gsw-CH",
+        "label" : "gsw-CH"
+      }, {
+        "value" : "gsw-FR",
+        "label" : "gsw-FR"
+      }, {
+        "value" : "gsw-LI",
+        "label" : "gsw-LI"
+      }, {
+        "value" : "gsw-Latn-CH",
+        "label" : "gsw-Latn-CH"
+      }, {
+        "value" : "gu",
+        "label" : "gu"
+      }, {
+        "value" : "gu-Gujr-IN",
+        "label" : "gu-Gujr-IN"
+      }, {
+        "value" : "gu-IN",
+        "label" : "gu-IN"
+      }, {
+        "value" : "guz",
+        "label" : "guz"
+      }, {
+        "value" : "guz-KE",
+        "label" : "guz-KE"
+      }, {
+        "value" : "guz-Latn-KE",
+        "label" : "guz-Latn-KE"
+      }, {
+        "value" : "gv",
+        "label" : "gv"
+      }, {
+        "value" : "gv-IM",
+        "label" : "gv-IM"
+      }, {
+        "value" : "gv-Latn-IM",
+        "label" : "gv-Latn-IM"
+      }, {
+        "value" : "ha",
+        "label" : "ha"
+      }, {
+        "value" : "ha-GH",
+        "label" : "ha-GH"
+      }, {
+        "value" : "ha-Latn-NG",
+        "label" : "ha-Latn-NG"
+      }, {
+        "value" : "ha-NE",
+        "label" : "ha-NE"
+      }, {
+        "value" : "ha-NG",
+        "label" : "ha-NG"
+      }, {
+        "value" : "haw",
+        "label" : "haw"
+      }, {
+        "value" : "haw-Latn-US",
+        "label" : "haw-Latn-US"
+      }, {
+        "value" : "haw-US",
+        "label" : "haw-US"
+      }, {
+        "value" : "he",
+        "label" : "he"
+      }, {
+        "value" : "he-Hebr-IL",
+        "label" : "he-Hebr-IL"
+      }, {
+        "value" : "he-IL",
+        "label" : "he-IL"
+      }, {
+        "value" : "hi",
+        "label" : "hi"
+      }, {
+        "value" : "hi-Deva-IN",
+        "label" : "hi-Deva-IN"
+      }, {
+        "value" : "hi-IN",
+        "label" : "hi-IN"
+      }, {
+        "value" : "hi-Latn",
+        "label" : "hi-Latn"
+      }, {
+        "value" : "hi-Latn-IN",
+        "label" : "hi-Latn-IN"
+      }, {
+        "value" : "hr",
+        "label" : "hr"
+      }, {
+        "value" : "hr-BA",
+        "label" : "hr-BA"
+      }, {
+        "value" : "hr-HR",
+        "label" : "hr-HR"
+      }, {
+        "value" : "hr-Latn-HR",
+        "label" : "hr-Latn-HR"
+      }, {
+        "value" : "hsb",
+        "label" : "hsb"
+      }, {
+        "value" : "hsb-DE",
+        "label" : "hsb-DE"
+      }, {
+        "value" : "hsb-Latn-DE",
+        "label" : "hsb-Latn-DE"
+      }, {
+        "value" : "hu",
+        "label" : "hu"
+      }, {
+        "value" : "hu-HU",
+        "label" : "hu-HU"
+      }, {
+        "value" : "hu-Latn-HU",
+        "label" : "hu-Latn-HU"
+      }, {
+        "value" : "hy",
+        "label" : "hy"
+      }, {
+        "value" : "hy-AM",
+        "label" : "hy-AM"
+      }, {
+        "value" : "hy-Armn-AM",
+        "label" : "hy-Armn-AM"
+      }, {
+        "value" : "ia",
+        "label" : "ia"
+      }, {
+        "value" : "ia-001",
+        "label" : "ia-001"
+      }, {
+        "value" : "ia-Latn-001",
+        "label" : "ia-Latn-001"
+      }, {
+        "value" : "id",
+        "label" : "id"
+      }, {
+        "value" : "id-ID",
+        "label" : "id-ID"
+      }, {
+        "value" : "id-Latn-ID",
+        "label" : "id-Latn-ID"
+      }, {
+        "value" : "ig",
+        "label" : "ig"
+      }, {
+        "value" : "ig-Latn-NG",
+        "label" : "ig-Latn-NG"
+      }, {
+        "value" : "ig-NG",
+        "label" : "ig-NG"
+      }, {
+        "value" : "ii",
+        "label" : "ii"
+      }, {
+        "value" : "ii-CN",
+        "label" : "ii-CN"
+      }, {
+        "value" : "ii-Yiii-CN",
+        "label" : "ii-Yiii-CN"
+      }, {
+        "value" : "is",
+        "label" : "is"
+      }, {
+        "value" : "is-IS",
+        "label" : "is-IS"
+      }, {
+        "value" : "is-Latn-IS",
+        "label" : "is-Latn-IS"
+      }, {
+        "value" : "it",
+        "label" : "it"
+      }, {
+        "value" : "it-CH",
+        "label" : "it-CH"
+      }, {
+        "value" : "it-IT",
+        "label" : "it-IT"
+      }, {
+        "value" : "it-Latn-IT",
+        "label" : "it-Latn-IT"
+      }, {
+        "value" : "it-SM",
+        "label" : "it-SM"
+      }, {
+        "value" : "it-VA",
+        "label" : "it-VA"
+      }, {
+        "value" : "ja",
+        "label" : "ja"
+      }, {
+        "value" : "ja-JP",
+        "label" : "ja-JP"
+      }, {
+        "value" : "ja-JP-u-ca-japanese-x-lvariant-JP",
+        "label" : "ja-JP-u-ca-japanese-x-lvariant-JP"
+      }, {
+        "value" : "ja-Jpan-JP",
+        "label" : "ja-Jpan-JP"
+      }, {
+        "value" : "jgo",
+        "label" : "jgo"
+      }, {
+        "value" : "jgo-CM",
+        "label" : "jgo-CM"
+      }, {
+        "value" : "jgo-Latn-CM",
+        "label" : "jgo-Latn-CM"
+      }, {
+        "value" : "jmc",
+        "label" : "jmc"
+      }, {
+        "value" : "jmc-Latn-TZ",
+        "label" : "jmc-Latn-TZ"
+      }, {
+        "value" : "jmc-TZ",
+        "label" : "jmc-TZ"
+      }, {
+        "value" : "jv",
+        "label" : "jv"
+      }, {
+        "value" : "jv-ID",
+        "label" : "jv-ID"
+      }, {
+        "value" : "jv-Latn-ID",
+        "label" : "jv-Latn-ID"
+      }, {
+        "value" : "ka",
+        "label" : "ka"
+      }, {
+        "value" : "ka-GE",
+        "label" : "ka-GE"
+      }, {
+        "value" : "ka-Geor-GE",
+        "label" : "ka-Geor-GE"
+      }, {
+        "value" : "kab",
+        "label" : "kab"
+      }, {
+        "value" : "kab-DZ",
+        "label" : "kab-DZ"
+      }, {
+        "value" : "kab-Latn-DZ",
+        "label" : "kab-Latn-DZ"
+      }, {
+        "value" : "kam",
+        "label" : "kam"
+      }, {
+        "value" : "kam-KE",
+        "label" : "kam-KE"
+      }, {
+        "value" : "kam-Latn-KE",
+        "label" : "kam-Latn-KE"
+      }, {
+        "value" : "kde",
+        "label" : "kde"
+      }, {
+        "value" : "kde-Latn-TZ",
+        "label" : "kde-Latn-TZ"
+      }, {
+        "value" : "kde-TZ",
+        "label" : "kde-TZ"
+      }, {
+        "value" : "kea",
+        "label" : "kea"
+      }, {
+        "value" : "kea-CV",
+        "label" : "kea-CV"
+      }, {
+        "value" : "kea-Latn-CV",
+        "label" : "kea-Latn-CV"
+      }, {
+        "value" : "kgp",
+        "label" : "kgp"
+      }, {
+        "value" : "kgp-BR",
+        "label" : "kgp-BR"
+      }, {
+        "value" : "kgp-Latn-BR",
+        "label" : "kgp-Latn-BR"
+      }, {
+        "value" : "khq",
+        "label" : "khq"
+      }, {
+        "value" : "khq-Latn-ML",
+        "label" : "khq-Latn-ML"
+      }, {
+        "value" : "khq-ML",
+        "label" : "khq-ML"
+      }, {
+        "value" : "ki",
+        "label" : "ki"
+      }, {
+        "value" : "ki-KE",
+        "label" : "ki-KE"
+      }, {
+        "value" : "ki-Latn-KE",
+        "label" : "ki-Latn-KE"
+      }, {
+        "value" : "kk",
+        "label" : "kk"
+      }, {
+        "value" : "kk-Cyrl-KZ",
+        "label" : "kk-Cyrl-KZ"
+      }, {
+        "value" : "kk-KZ",
+        "label" : "kk-KZ"
+      }, {
+        "value" : "kkj",
+        "label" : "kkj"
+      }, {
+        "value" : "kkj-CM",
+        "label" : "kkj-CM"
+      }, {
+        "value" : "kkj-Latn-CM",
+        "label" : "kkj-Latn-CM"
+      }, {
+        "value" : "kl",
+        "label" : "kl"
+      }, {
+        "value" : "kl-GL",
+        "label" : "kl-GL"
+      }, {
+        "value" : "kl-Latn-GL",
+        "label" : "kl-Latn-GL"
+      }, {
+        "value" : "kln",
+        "label" : "kln"
+      }, {
+        "value" : "kln-KE",
+        "label" : "kln-KE"
+      }, {
+        "value" : "kln-Latn-KE",
+        "label" : "kln-Latn-KE"
+      }, {
+        "value" : "km",
+        "label" : "km"
+      }, {
+        "value" : "km-KH",
+        "label" : "km-KH"
+      }, {
+        "value" : "km-Khmr-KH",
+        "label" : "km-Khmr-KH"
+      }, {
+        "value" : "kn",
+        "label" : "kn"
+      }, {
+        "value" : "kn-IN",
+        "label" : "kn-IN"
+      }, {
+        "value" : "kn-Knda-IN",
+        "label" : "kn-Knda-IN"
+      }, {
+        "value" : "ko",
+        "label" : "ko"
+      }, {
+        "value" : "ko-KP",
+        "label" : "ko-KP"
+      }, {
+        "value" : "ko-KR",
+        "label" : "ko-KR"
+      }, {
+        "value" : "ko-Kore-KR",
+        "label" : "ko-Kore-KR"
+      }, {
+        "value" : "kok",
+        "label" : "kok"
+      }, {
+        "value" : "kok-Deva-IN",
+        "label" : "kok-Deva-IN"
+      }, {
+        "value" : "kok-IN",
+        "label" : "kok-IN"
+      }, {
+        "value" : "ks",
+        "label" : "ks"
+      }, {
+        "value" : "ks-Arab",
+        "label" : "ks-Arab"
+      }, {
+        "value" : "ks-Arab-IN",
+        "label" : "ks-Arab-IN"
+      }, {
+        "value" : "ks-Deva",
+        "label" : "ks-Deva"
+      }, {
+        "value" : "ks-Deva-IN",
+        "label" : "ks-Deva-IN"
+      }, {
+        "value" : "ks-IN",
+        "label" : "ks-IN"
+      }, {
+        "value" : "ksb",
+        "label" : "ksb"
+      }, {
+        "value" : "ksb-Latn-TZ",
+        "label" : "ksb-Latn-TZ"
+      }, {
+        "value" : "ksb-TZ",
+        "label" : "ksb-TZ"
+      }, {
+        "value" : "ksf",
+        "label" : "ksf"
+      }, {
+        "value" : "ksf-CM",
+        "label" : "ksf-CM"
+      }, {
+        "value" : "ksf-Latn-CM",
+        "label" : "ksf-Latn-CM"
+      }, {
+        "value" : "ksh",
+        "label" : "ksh"
+      }, {
+        "value" : "ksh-DE",
+        "label" : "ksh-DE"
+      }, {
+        "value" : "ksh-Latn-DE",
+        "label" : "ksh-Latn-DE"
+      }, {
+        "value" : "ku",
+        "label" : "ku"
+      }, {
+        "value" : "ku-Latn-TR",
+        "label" : "ku-Latn-TR"
+      }, {
+        "value" : "ku-TR",
+        "label" : "ku-TR"
+      }, {
+        "value" : "kw",
+        "label" : "kw"
+      }, {
+        "value" : "kw-GB",
+        "label" : "kw-GB"
+      }, {
+        "value" : "kw-Latn-GB",
+        "label" : "kw-Latn-GB"
+      }, {
+        "value" : "ky",
+        "label" : "ky"
+      }, {
+        "value" : "ky-Cyrl-KG",
+        "label" : "ky-Cyrl-KG"
+      }, {
+        "value" : "ky-KG",
+        "label" : "ky-KG"
+      }, {
+        "value" : "lag",
+        "label" : "lag"
+      }, {
+        "value" : "lag-Latn-TZ",
+        "label" : "lag-Latn-TZ"
+      }, {
+        "value" : "lag-TZ",
+        "label" : "lag-TZ"
+      }, {
+        "value" : "lb",
+        "label" : "lb"
+      }, {
+        "value" : "lb-LU",
+        "label" : "lb-LU"
+      }, {
+        "value" : "lb-Latn-LU",
+        "label" : "lb-Latn-LU"
+      }, {
+        "value" : "lg",
+        "label" : "lg"
+      }, {
+        "value" : "lg-Latn-UG",
+        "label" : "lg-Latn-UG"
+      }, {
+        "value" : "lg-UG",
+        "label" : "lg-UG"
+      }, {
+        "value" : "lkt",
+        "label" : "lkt"
+      }, {
+        "value" : "lkt-Latn-US",
+        "label" : "lkt-Latn-US"
+      }, {
+        "value" : "lkt-US",
+        "label" : "lkt-US"
+      }, {
+        "value" : "ln",
+        "label" : "ln"
+      }, {
+        "value" : "ln-AO",
+        "label" : "ln-AO"
+      }, {
+        "value" : "ln-CD",
+        "label" : "ln-CD"
+      }, {
+        "value" : "ln-CF",
+        "label" : "ln-CF"
+      }, {
+        "value" : "ln-CG",
+        "label" : "ln-CG"
+      }, {
+        "value" : "ln-Latn-CD",
+        "label" : "ln-Latn-CD"
+      }, {
+        "value" : "lo",
+        "label" : "lo"
+      }, {
+        "value" : "lo-LA",
+        "label" : "lo-LA"
+      }, {
+        "value" : "lo-Laoo-LA",
+        "label" : "lo-Laoo-LA"
+      }, {
+        "value" : "lrc",
+        "label" : "lrc"
+      }, {
+        "value" : "lrc-Arab-IR",
+        "label" : "lrc-Arab-IR"
+      }, {
+        "value" : "lrc-IQ",
+        "label" : "lrc-IQ"
+      }, {
+        "value" : "lrc-IR",
+        "label" : "lrc-IR"
+      }, {
+        "value" : "lt",
+        "label" : "lt"
+      }, {
+        "value" : "lt-LT",
+        "label" : "lt-LT"
+      }, {
+        "value" : "lt-Latn-LT",
+        "label" : "lt-Latn-LT"
+      }, {
+        "value" : "lu",
+        "label" : "lu"
+      }, {
+        "value" : "lu-CD",
+        "label" : "lu-CD"
+      }, {
+        "value" : "lu-Latn-CD",
+        "label" : "lu-Latn-CD"
+      }, {
+        "value" : "luo",
+        "label" : "luo"
+      }, {
+        "value" : "luo-KE",
+        "label" : "luo-KE"
+      }, {
+        "value" : "luo-Latn-KE",
+        "label" : "luo-Latn-KE"
+      }, {
+        "value" : "luy",
+        "label" : "luy"
+      }, {
+        "value" : "luy-KE",
+        "label" : "luy-KE"
+      }, {
+        "value" : "luy-Latn-KE",
+        "label" : "luy-Latn-KE"
+      }, {
+        "value" : "lv",
+        "label" : "lv"
+      }, {
+        "value" : "lv-LV",
+        "label" : "lv-LV"
+      }, {
+        "value" : "lv-Latn-LV",
+        "label" : "lv-Latn-LV"
+      }, {
+        "value" : "mai",
+        "label" : "mai"
+      }, {
+        "value" : "mai-Deva-IN",
+        "label" : "mai-Deva-IN"
+      }, {
+        "value" : "mai-IN",
+        "label" : "mai-IN"
+      }, {
+        "value" : "mas",
+        "label" : "mas"
+      }, {
+        "value" : "mas-KE",
+        "label" : "mas-KE"
+      }, {
+        "value" : "mas-Latn-KE",
+        "label" : "mas-Latn-KE"
+      }, {
+        "value" : "mas-TZ",
+        "label" : "mas-TZ"
+      }, {
+        "value" : "mdf",
+        "label" : "mdf"
+      }, {
+        "value" : "mdf-Cyrl-RU",
+        "label" : "mdf-Cyrl-RU"
+      }, {
+        "value" : "mdf-RU",
+        "label" : "mdf-RU"
+      }, {
+        "value" : "mer",
+        "label" : "mer"
+      }, {
+        "value" : "mer-KE",
+        "label" : "mer-KE"
+      }, {
+        "value" : "mer-Latn-KE",
+        "label" : "mer-Latn-KE"
+      }, {
+        "value" : "mfe",
+        "label" : "mfe"
+      }, {
+        "value" : "mfe-Latn-MU",
+        "label" : "mfe-Latn-MU"
+      }, {
+        "value" : "mfe-MU",
+        "label" : "mfe-MU"
+      }, {
+        "value" : "mg",
+        "label" : "mg"
+      }, {
+        "value" : "mg-Latn-MG",
+        "label" : "mg-Latn-MG"
+      }, {
+        "value" : "mg-MG",
+        "label" : "mg-MG"
+      }, {
+        "value" : "mgh",
+        "label" : "mgh"
+      }, {
+        "value" : "mgh-Latn-MZ",
+        "label" : "mgh-Latn-MZ"
+      }, {
+        "value" : "mgh-MZ",
+        "label" : "mgh-MZ"
+      }, {
+        "value" : "mgo",
+        "label" : "mgo"
+      }, {
+        "value" : "mgo-CM",
+        "label" : "mgo-CM"
+      }, {
+        "value" : "mgo-Latn-CM",
+        "label" : "mgo-Latn-CM"
+      }, {
+        "value" : "mi",
+        "label" : "mi"
+      }, {
+        "value" : "mi-Latn-NZ",
+        "label" : "mi-Latn-NZ"
+      }, {
+        "value" : "mi-NZ",
+        "label" : "mi-NZ"
+      }, {
+        "value" : "mk",
+        "label" : "mk"
+      }, {
+        "value" : "mk-Cyrl-MK",
+        "label" : "mk-Cyrl-MK"
+      }, {
+        "value" : "mk-MK",
+        "label" : "mk-MK"
+      }, {
+        "value" : "ml",
+        "label" : "ml"
+      }, {
+        "value" : "ml-IN",
+        "label" : "ml-IN"
+      }, {
+        "value" : "ml-Mlym-IN",
+        "label" : "ml-Mlym-IN"
+      }, {
+        "value" : "mn",
+        "label" : "mn"
+      }, {
+        "value" : "mn-Cyrl-MN",
+        "label" : "mn-Cyrl-MN"
+      }, {
+        "value" : "mn-MN",
+        "label" : "mn-MN"
+      }, {
+        "value" : "mni",
+        "label" : "mni"
+      }, {
+        "value" : "mni-Beng",
+        "label" : "mni-Beng"
+      }, {
+        "value" : "mni-Beng-IN",
+        "label" : "mni-Beng-IN"
+      }, {
+        "value" : "mni-IN",
+        "label" : "mni-IN"
+      }, {
+        "value" : "mr",
+        "label" : "mr"
+      }, {
+        "value" : "mr-Deva-IN",
+        "label" : "mr-Deva-IN"
+      }, {
+        "value" : "mr-IN",
+        "label" : "mr-IN"
+      }, {
+        "value" : "ms",
+        "label" : "ms"
+      }, {
+        "value" : "ms-BN",
+        "label" : "ms-BN"
+      }, {
+        "value" : "ms-ID",
+        "label" : "ms-ID"
+      }, {
+        "value" : "ms-Latn-MY",
+        "label" : "ms-Latn-MY"
+      }, {
+        "value" : "ms-MY",
+        "label" : "ms-MY"
+      }, {
+        "value" : "ms-SG",
+        "label" : "ms-SG"
+      }, {
+        "value" : "mt",
+        "label" : "mt"
+      }, {
+        "value" : "mt-Latn-MT",
+        "label" : "mt-Latn-MT"
+      }, {
+        "value" : "mt-MT",
+        "label" : "mt-MT"
+      }, {
+        "value" : "mua",
+        "label" : "mua"
+      }, {
+        "value" : "mua-CM",
+        "label" : "mua-CM"
+      }, {
+        "value" : "mua-Latn-CM",
+        "label" : "mua-Latn-CM"
+      }, {
+        "value" : "my",
+        "label" : "my"
+      }, {
+        "value" : "my-MM",
+        "label" : "my-MM"
+      }, {
+        "value" : "my-Mymr-MM",
+        "label" : "my-Mymr-MM"
+      }, {
+        "value" : "mzn",
+        "label" : "mzn"
+      }, {
+        "value" : "mzn-Arab-IR",
+        "label" : "mzn-Arab-IR"
+      }, {
+        "value" : "mzn-IR",
+        "label" : "mzn-IR"
+      }, {
+        "value" : "naq",
+        "label" : "naq"
+      }, {
+        "value" : "naq-Latn-NA",
+        "label" : "naq-Latn-NA"
+      }, {
+        "value" : "naq-NA",
+        "label" : "naq-NA"
+      }, {
+        "value" : "nb",
+        "label" : "nb"
+      }, {
+        "value" : "nb-Latn-NO",
+        "label" : "nb-Latn-NO"
+      }, {
+        "value" : "nb-NO",
+        "label" : "nb-NO"
+      }, {
+        "value" : "nb-SJ",
+        "label" : "nb-SJ"
+      }, {
+        "value" : "nd",
+        "label" : "nd"
+      }, {
+        "value" : "nd-Latn-ZW",
+        "label" : "nd-Latn-ZW"
+      }, {
+        "value" : "nd-ZW",
+        "label" : "nd-ZW"
+      }, {
+        "value" : "nds",
+        "label" : "nds"
+      }, {
+        "value" : "nds-DE",
+        "label" : "nds-DE"
+      }, {
+        "value" : "nds-Latn-DE",
+        "label" : "nds-Latn-DE"
+      }, {
+        "value" : "nds-NL",
+        "label" : "nds-NL"
+      }, {
+        "value" : "ne",
+        "label" : "ne"
+      }, {
+        "value" : "ne-Deva-NP",
+        "label" : "ne-Deva-NP"
+      }, {
+        "value" : "ne-IN",
+        "label" : "ne-IN"
+      }, {
+        "value" : "ne-NP",
+        "label" : "ne-NP"
+      }, {
+        "value" : "nl",
+        "label" : "nl"
+      }, {
+        "value" : "nl-AW",
+        "label" : "nl-AW"
+      }, {
+        "value" : "nl-BE",
+        "label" : "nl-BE"
+      }, {
+        "value" : "nl-BQ",
+        "label" : "nl-BQ"
+      }, {
+        "value" : "nl-CW",
+        "label" : "nl-CW"
+      }, {
+        "value" : "nl-Latn-NL",
+        "label" : "nl-Latn-NL"
+      }, {
+        "value" : "nl-NL",
+        "label" : "nl-NL"
+      }, {
+        "value" : "nl-SR",
+        "label" : "nl-SR"
+      }, {
+        "value" : "nl-SX",
+        "label" : "nl-SX"
+      }, {
+        "value" : "nmg",
+        "label" : "nmg"
+      }, {
+        "value" : "nmg-CM",
+        "label" : "nmg-CM"
+      }, {
+        "value" : "nmg-Latn-CM",
+        "label" : "nmg-Latn-CM"
+      }, {
+        "value" : "nn",
+        "label" : "nn"
+      }, {
+        "value" : "nn-Latn-NO",
+        "label" : "nn-Latn-NO"
+      }, {
+        "value" : "nn-NO",
+        "label" : "nn-NO"
+      }, {
+        "value" : "nn-NO",
+        "label" : "nn-NO"
+      }, {
+        "value" : "nnh",
+        "label" : "nnh"
+      }, {
+        "value" : "nnh-CM",
+        "label" : "nnh-CM"
+      }, {
+        "value" : "nnh-Latn-CM",
+        "label" : "nnh-Latn-CM"
+      }, {
+        "value" : "no",
+        "label" : "no"
+      }, {
+        "value" : "no-Latn-NO",
+        "label" : "no-Latn-NO"
+      }, {
+        "value" : "no-NO",
+        "label" : "no-NO"
+      }, {
+        "value" : "nus",
+        "label" : "nus"
+      }, {
+        "value" : "nus-Latn-SS",
+        "label" : "nus-Latn-SS"
+      }, {
+        "value" : "nus-SS",
+        "label" : "nus-SS"
+      }, {
+        "value" : "nyn",
+        "label" : "nyn"
+      }, {
+        "value" : "nyn-Latn-UG",
+        "label" : "nyn-Latn-UG"
+      }, {
+        "value" : "nyn-UG",
+        "label" : "nyn-UG"
+      }, {
+        "value" : "oc",
+        "label" : "oc"
+      }, {
+        "value" : "oc-ES",
+        "label" : "oc-ES"
+      }, {
+        "value" : "oc-FR",
+        "label" : "oc-FR"
+      }, {
+        "value" : "oc-Latn-FR",
+        "label" : "oc-Latn-FR"
+      }, {
+        "value" : "om",
+        "label" : "om"
+      }, {
+        "value" : "om-ET",
+        "label" : "om-ET"
+      }, {
+        "value" : "om-KE",
+        "label" : "om-KE"
+      }, {
+        "value" : "om-Latn-ET",
+        "label" : "om-Latn-ET"
+      }, {
+        "value" : "or",
+        "label" : "or"
+      }, {
+        "value" : "or-IN",
+        "label" : "or-IN"
+      }, {
+        "value" : "or-Orya-IN",
+        "label" : "or-Orya-IN"
+      }, {
+        "value" : "os",
+        "label" : "os"
+      }, {
+        "value" : "os-Cyrl-GE",
+        "label" : "os-Cyrl-GE"
+      }, {
+        "value" : "os-GE",
+        "label" : "os-GE"
+      }, {
+        "value" : "os-RU",
+        "label" : "os-RU"
+      }, {
+        "value" : "pa",
+        "label" : "pa"
+      }, {
+        "value" : "pa-Arab",
+        "label" : "pa-Arab"
+      }, {
+        "value" : "pa-Arab-PK",
+        "label" : "pa-Arab-PK"
+      }, {
+        "value" : "pa-Guru",
+        "label" : "pa-Guru"
+      }, {
+        "value" : "pa-Guru-IN",
+        "label" : "pa-Guru-IN"
+      }, {
+        "value" : "pa-IN",
+        "label" : "pa-IN"
+      }, {
+        "value" : "pa-PK",
+        "label" : "pa-PK"
+      }, {
+        "value" : "pcm",
+        "label" : "pcm"
+      }, {
+        "value" : "pcm-Latn-NG",
+        "label" : "pcm-Latn-NG"
+      }, {
+        "value" : "pcm-NG",
+        "label" : "pcm-NG"
+      }, {
+        "value" : "pis",
+        "label" : "pis"
+      }, {
+        "value" : "pis-Latn-SB",
+        "label" : "pis-Latn-SB"
+      }, {
+        "value" : "pis-SB",
+        "label" : "pis-SB"
+      }, {
+        "value" : "pl",
+        "label" : "pl"
+      }, {
+        "value" : "pl-Latn-PL",
+        "label" : "pl-Latn-PL"
+      }, {
+        "value" : "pl-PL",
+        "label" : "pl-PL"
+      }, {
+        "value" : "ps",
+        "label" : "ps"
+      }, {
+        "value" : "ps-AF",
+        "label" : "ps-AF"
+      }, {
+        "value" : "ps-Arab-AF",
+        "label" : "ps-Arab-AF"
+      }, {
+        "value" : "ps-PK",
+        "label" : "ps-PK"
+      }, {
+        "value" : "pt",
+        "label" : "pt"
+      }, {
+        "value" : "pt-AO",
+        "label" : "pt-AO"
+      }, {
+        "value" : "pt-BR",
+        "label" : "pt-BR"
+      }, {
+        "value" : "pt-CH",
+        "label" : "pt-CH"
+      }, {
+        "value" : "pt-CV",
+        "label" : "pt-CV"
+      }, {
+        "value" : "pt-GQ",
+        "label" : "pt-GQ"
+      }, {
+        "value" : "pt-GW",
+        "label" : "pt-GW"
+      }, {
+        "value" : "pt-LU",
+        "label" : "pt-LU"
+      }, {
+        "value" : "pt-Latn-BR",
+        "label" : "pt-Latn-BR"
+      }, {
+        "value" : "pt-MO",
+        "label" : "pt-MO"
+      }, {
+        "value" : "pt-MZ",
+        "label" : "pt-MZ"
+      }, {
+        "value" : "pt-PT",
+        "label" : "pt-PT"
+      }, {
+        "value" : "pt-ST",
+        "label" : "pt-ST"
+      }, {
+        "value" : "pt-TL",
+        "label" : "pt-TL"
+      }, {
+        "value" : "qu",
+        "label" : "qu"
+      }, {
+        "value" : "qu-BO",
+        "label" : "qu-BO"
+      }, {
+        "value" : "qu-EC",
+        "label" : "qu-EC"
+      }, {
+        "value" : "qu-Latn-PE",
+        "label" : "qu-Latn-PE"
+      }, {
+        "value" : "qu-PE",
+        "label" : "qu-PE"
+      }, {
+        "value" : "raj",
+        "label" : "raj"
+      }, {
+        "value" : "raj-Deva-IN",
+        "label" : "raj-Deva-IN"
+      }, {
+        "value" : "raj-IN",
+        "label" : "raj-IN"
+      }, {
+        "value" : "rm",
+        "label" : "rm"
+      }, {
+        "value" : "rm-CH",
+        "label" : "rm-CH"
+      }, {
+        "value" : "rm-Latn-CH",
+        "label" : "rm-Latn-CH"
+      }, {
+        "value" : "rn",
+        "label" : "rn"
+      }, {
+        "value" : "rn-BI",
+        "label" : "rn-BI"
+      }, {
+        "value" : "rn-Latn-BI",
+        "label" : "rn-Latn-BI"
+      }, {
+        "value" : "ro",
+        "label" : "ro"
+      }, {
+        "value" : "ro-Latn-RO",
+        "label" : "ro-Latn-RO"
+      }, {
+        "value" : "ro-MD",
+        "label" : "ro-MD"
+      }, {
+        "value" : "ro-RO",
+        "label" : "ro-RO"
+      }, {
+        "value" : "rof",
+        "label" : "rof"
+      }, {
+        "value" : "rof-Latn-TZ",
+        "label" : "rof-Latn-TZ"
+      }, {
+        "value" : "rof-TZ",
+        "label" : "rof-TZ"
+      }, {
+        "value" : "ru",
+        "label" : "ru"
+      }, {
+        "value" : "ru-BY",
+        "label" : "ru-BY"
+      }, {
+        "value" : "ru-Cyrl-RU",
+        "label" : "ru-Cyrl-RU"
+      }, {
+        "value" : "ru-KG",
+        "label" : "ru-KG"
+      }, {
+        "value" : "ru-KZ",
+        "label" : "ru-KZ"
+      }, {
+        "value" : "ru-MD",
+        "label" : "ru-MD"
+      }, {
+        "value" : "ru-RU",
+        "label" : "ru-RU"
+      }, {
+        "value" : "ru-UA",
+        "label" : "ru-UA"
+      }, {
+        "value" : "rw",
+        "label" : "rw"
+      }, {
+        "value" : "rw-Latn-RW",
+        "label" : "rw-Latn-RW"
+      }, {
+        "value" : "rw-RW",
+        "label" : "rw-RW"
+      }, {
+        "value" : "rwk",
+        "label" : "rwk"
+      }, {
+        "value" : "rwk-Latn-TZ",
+        "label" : "rwk-Latn-TZ"
+      }, {
+        "value" : "rwk-TZ",
+        "label" : "rwk-TZ"
+      }, {
+        "value" : "sa",
+        "label" : "sa"
+      }, {
+        "value" : "sa-Deva-IN",
+        "label" : "sa-Deva-IN"
+      }, {
+        "value" : "sa-IN",
+        "label" : "sa-IN"
+      }, {
+        "value" : "sah",
+        "label" : "sah"
+      }, {
+        "value" : "sah-Cyrl-RU",
+        "label" : "sah-Cyrl-RU"
+      }, {
+        "value" : "sah-RU",
+        "label" : "sah-RU"
+      }, {
+        "value" : "saq",
+        "label" : "saq"
+      }, {
+        "value" : "saq-KE",
+        "label" : "saq-KE"
+      }, {
+        "value" : "saq-Latn-KE",
+        "label" : "saq-Latn-KE"
+      }, {
+        "value" : "sat",
+        "label" : "sat"
+      }, {
+        "value" : "sat-IN",
+        "label" : "sat-IN"
+      }, {
+        "value" : "sat-Olck",
+        "label" : "sat-Olck"
+      }, {
+        "value" : "sat-Olck-IN",
+        "label" : "sat-Olck-IN"
+      }, {
+        "value" : "sbp",
+        "label" : "sbp"
+      }, {
+        "value" : "sbp-Latn-TZ",
+        "label" : "sbp-Latn-TZ"
+      }, {
+        "value" : "sbp-TZ",
+        "label" : "sbp-TZ"
+      }, {
+        "value" : "sc",
+        "label" : "sc"
+      }, {
+        "value" : "sc-IT",
+        "label" : "sc-IT"
+      }, {
+        "value" : "sc-Latn-IT",
+        "label" : "sc-Latn-IT"
+      }, {
+        "value" : "sd",
+        "label" : "sd"
+      }, {
+        "value" : "sd-Arab",
+        "label" : "sd-Arab"
+      }, {
+        "value" : "sd-Arab-PK",
+        "label" : "sd-Arab-PK"
+      }, {
+        "value" : "sd-Deva",
+        "label" : "sd-Deva"
+      }, {
+        "value" : "sd-Deva-IN",
+        "label" : "sd-Deva-IN"
+      }, {
+        "value" : "sd-IN",
+        "label" : "sd-IN"
+      }, {
+        "value" : "sd-PK",
+        "label" : "sd-PK"
+      }, {
+        "value" : "se",
+        "label" : "se"
+      }, {
+        "value" : "se-FI",
+        "label" : "se-FI"
+      }, {
+        "value" : "se-Latn-NO",
+        "label" : "se-Latn-NO"
+      }, {
+        "value" : "se-NO",
+        "label" : "se-NO"
+      }, {
+        "value" : "se-SE",
+        "label" : "se-SE"
+      }, {
+        "value" : "seh",
+        "label" : "seh"
+      }, {
+        "value" : "seh-Latn-MZ",
+        "label" : "seh-Latn-MZ"
+      }, {
+        "value" : "seh-MZ",
+        "label" : "seh-MZ"
+      }, {
+        "value" : "ses",
+        "label" : "ses"
+      }, {
+        "value" : "ses-Latn-ML",
+        "label" : "ses-Latn-ML"
+      }, {
+        "value" : "ses-ML",
+        "label" : "ses-ML"
+      }, {
+        "value" : "sg",
+        "label" : "sg"
+      }, {
+        "value" : "sg-CF",
+        "label" : "sg-CF"
+      }, {
+        "value" : "sg-Latn-CF",
+        "label" : "sg-Latn-CF"
+      }, {
+        "value" : "shi",
+        "label" : "shi"
+      }, {
+        "value" : "shi-Latn",
+        "label" : "shi-Latn"
+      }, {
+        "value" : "shi-Latn-MA",
+        "label" : "shi-Latn-MA"
+      }, {
+        "value" : "shi-MA",
+        "label" : "shi-MA"
+      }, {
+        "value" : "shi-Tfng",
+        "label" : "shi-Tfng"
+      }, {
+        "value" : "shi-Tfng-MA",
+        "label" : "shi-Tfng-MA"
+      }, {
+        "value" : "si",
+        "label" : "si"
+      }, {
+        "value" : "si-LK",
+        "label" : "si-LK"
+      }, {
+        "value" : "si-Sinh-LK",
+        "label" : "si-Sinh-LK"
+      }, {
+        "value" : "sk",
+        "label" : "sk"
+      }, {
+        "value" : "sk-Latn-SK",
+        "label" : "sk-Latn-SK"
+      }, {
+        "value" : "sk-SK",
+        "label" : "sk-SK"
+      }, {
+        "value" : "sl",
+        "label" : "sl"
+      }, {
+        "value" : "sl-Latn-SI",
+        "label" : "sl-Latn-SI"
+      }, {
+        "value" : "sl-SI",
+        "label" : "sl-SI"
+      }, {
+        "value" : "smn",
+        "label" : "smn"
+      }, {
+        "value" : "smn-FI",
+        "label" : "smn-FI"
+      }, {
+        "value" : "smn-Latn-FI",
+        "label" : "smn-Latn-FI"
+      }, {
+        "value" : "sms",
+        "label" : "sms"
+      }, {
+        "value" : "sms-FI",
+        "label" : "sms-FI"
+      }, {
+        "value" : "sms-Latn-FI",
+        "label" : "sms-Latn-FI"
+      }, {
+        "value" : "sn",
+        "label" : "sn"
+      }, {
+        "value" : "sn-Latn-ZW",
+        "label" : "sn-Latn-ZW"
+      }, {
+        "value" : "sn-ZW",
+        "label" : "sn-ZW"
+      }, {
+        "value" : "so",
+        "label" : "so"
+      }, {
+        "value" : "so-DJ",
+        "label" : "so-DJ"
+      }, {
+        "value" : "so-ET",
+        "label" : "so-ET"
+      }, {
+        "value" : "so-KE",
+        "label" : "so-KE"
+      }, {
+        "value" : "so-Latn-SO",
+        "label" : "so-Latn-SO"
+      }, {
+        "value" : "so-SO",
+        "label" : "so-SO"
+      }, {
+        "value" : "sq",
+        "label" : "sq"
+      }, {
+        "value" : "sq-AL",
+        "label" : "sq-AL"
+      }, {
+        "value" : "sq-Latn-AL",
+        "label" : "sq-Latn-AL"
+      }, {
+        "value" : "sq-MK",
+        "label" : "sq-MK"
+      }, {
+        "value" : "sq-XK",
+        "label" : "sq-XK"
+      }, {
+        "value" : "sr",
+        "label" : "sr"
+      }, {
+        "value" : "sr-BA",
+        "label" : "sr-BA"
+      }, {
+        "value" : "sr-CS",
+        "label" : "sr-CS"
+      }, {
+        "value" : "sr-Cyrl",
+        "label" : "sr-Cyrl"
+      }, {
+        "value" : "sr-Cyrl-BA",
+        "label" : "sr-Cyrl-BA"
+      }, {
+        "value" : "sr-Cyrl-ME",
+        "label" : "sr-Cyrl-ME"
+      }, {
+        "value" : "sr-Cyrl-RS",
+        "label" : "sr-Cyrl-RS"
+      }, {
+        "value" : "sr-Cyrl-XK",
+        "label" : "sr-Cyrl-XK"
+      }, {
+        "value" : "sr-Latn",
+        "label" : "sr-Latn"
+      }, {
+        "value" : "sr-Latn-BA",
+        "label" : "sr-Latn-BA"
+      }, {
+        "value" : "sr-Latn-ME",
+        "label" : "sr-Latn-ME"
+      }, {
+        "value" : "sr-Latn-RS",
+        "label" : "sr-Latn-RS"
+      }, {
+        "value" : "sr-Latn-XK",
+        "label" : "sr-Latn-XK"
+      }, {
+        "value" : "sr-ME",
+        "label" : "sr-ME"
+      }, {
+        "value" : "sr-RS",
+        "label" : "sr-RS"
+      }, {
+        "value" : "su",
+        "label" : "su"
+      }, {
+        "value" : "su-ID",
+        "label" : "su-ID"
+      }, {
+        "value" : "su-Latn",
+        "label" : "su-Latn"
+      }, {
+        "value" : "su-Latn-ID",
+        "label" : "su-Latn-ID"
+      }, {
+        "value" : "sv",
+        "label" : "sv"
+      }, {
+        "value" : "sv-AX",
+        "label" : "sv-AX"
+      }, {
+        "value" : "sv-FI",
+        "label" : "sv-FI"
+      }, {
+        "value" : "sv-Latn-SE",
+        "label" : "sv-Latn-SE"
+      }, {
+        "value" : "sv-SE",
+        "label" : "sv-SE"
+      }, {
+        "value" : "sw",
+        "label" : "sw"
+      }, {
+        "value" : "sw-CD",
+        "label" : "sw-CD"
+      }, {
+        "value" : "sw-KE",
+        "label" : "sw-KE"
+      }, {
+        "value" : "sw-Latn-TZ",
+        "label" : "sw-Latn-TZ"
+      }, {
+        "value" : "sw-TZ",
+        "label" : "sw-TZ"
+      }, {
+        "value" : "sw-UG",
+        "label" : "sw-UG"
+      }, {
+        "value" : "ta",
+        "label" : "ta"
+      }, {
+        "value" : "ta-IN",
+        "label" : "ta-IN"
+      }, {
+        "value" : "ta-LK",
+        "label" : "ta-LK"
+      }, {
+        "value" : "ta-MY",
+        "label" : "ta-MY"
+      }, {
+        "value" : "ta-SG",
+        "label" : "ta-SG"
+      }, {
+        "value" : "ta-Taml-IN",
+        "label" : "ta-Taml-IN"
+      }, {
+        "value" : "te",
+        "label" : "te"
+      }, {
+        "value" : "te-IN",
+        "label" : "te-IN"
+      }, {
+        "value" : "te-Telu-IN",
+        "label" : "te-Telu-IN"
+      }, {
+        "value" : "teo",
+        "label" : "teo"
+      }, {
+        "value" : "teo-KE",
+        "label" : "teo-KE"
+      }, {
+        "value" : "teo-Latn-UG",
+        "label" : "teo-Latn-UG"
+      }, {
+        "value" : "teo-UG",
+        "label" : "teo-UG"
+      }, {
+        "value" : "tg",
+        "label" : "tg"
+      }, {
+        "value" : "tg-Cyrl-TJ",
+        "label" : "tg-Cyrl-TJ"
+      }, {
+        "value" : "tg-TJ",
+        "label" : "tg-TJ"
+      }, {
+        "value" : "th",
+        "label" : "th"
+      }, {
+        "value" : "th-TH",
+        "label" : "th-TH"
+      }, {
+        "value" : "th-TH-u-nu-thai-x-lvariant-TH",
+        "label" : "th-TH-u-nu-thai-x-lvariant-TH"
+      }, {
+        "value" : "th-Thai-TH",
+        "label" : "th-Thai-TH"
+      }, {
+        "value" : "ti",
+        "label" : "ti"
+      }, {
+        "value" : "ti-ER",
+        "label" : "ti-ER"
+      }, {
+        "value" : "ti-ET",
+        "label" : "ti-ET"
+      }, {
+        "value" : "ti-Ethi-ET",
+        "label" : "ti-Ethi-ET"
+      }, {
+        "value" : "tk",
+        "label" : "tk"
+      }, {
+        "value" : "tk-Latn-TM",
+        "label" : "tk-Latn-TM"
+      }, {
+        "value" : "tk-TM",
+        "label" : "tk-TM"
+      }, {
+        "value" : "to",
+        "label" : "to"
+      }, {
+        "value" : "to-Latn-TO",
+        "label" : "to-Latn-TO"
+      }, {
+        "value" : "to-TO",
+        "label" : "to-TO"
+      }, {
+        "value" : "tok",
+        "label" : "tok"
+      }, {
+        "value" : "tok-001",
+        "label" : "tok-001"
+      }, {
+        "value" : "tok-Latn-001",
+        "label" : "tok-Latn-001"
+      }, {
+        "value" : "tr",
+        "label" : "tr"
+      }, {
+        "value" : "tr-CY",
+        "label" : "tr-CY"
+      }, {
+        "value" : "tr-Latn-TR",
+        "label" : "tr-Latn-TR"
+      }, {
+        "value" : "tr-TR",
+        "label" : "tr-TR"
+      }, {
+        "value" : "tt",
+        "label" : "tt"
+      }, {
+        "value" : "tt-Cyrl-RU",
+        "label" : "tt-Cyrl-RU"
+      }, {
+        "value" : "tt-RU",
+        "label" : "tt-RU"
+      }, {
+        "value" : "twq",
+        "label" : "twq"
+      }, {
+        "value" : "twq-Latn-NE",
+        "label" : "twq-Latn-NE"
+      }, {
+        "value" : "twq-NE",
+        "label" : "twq-NE"
+      }, {
+        "value" : "tzm",
+        "label" : "tzm"
+      }, {
+        "value" : "tzm-Latn-MA",
+        "label" : "tzm-Latn-MA"
+      }, {
+        "value" : "tzm-MA",
+        "label" : "tzm-MA"
+      }, {
+        "value" : "ug",
+        "label" : "ug"
+      }, {
+        "value" : "ug-Arab-CN",
+        "label" : "ug-Arab-CN"
+      }, {
+        "value" : "ug-CN",
+        "label" : "ug-CN"
+      }, {
+        "value" : "uk",
+        "label" : "uk"
+      }, {
+        "value" : "uk-Cyrl-UA",
+        "label" : "uk-Cyrl-UA"
+      }, {
+        "value" : "uk-UA",
+        "label" : "uk-UA"
+      }, {
+        "value" : "und",
+        "label" : "und"
+      }, {
+        "value" : "ur",
+        "label" : "ur"
+      }, {
+        "value" : "ur-Arab-PK",
+        "label" : "ur-Arab-PK"
+      }, {
+        "value" : "ur-IN",
+        "label" : "ur-IN"
+      }, {
+        "value" : "ur-PK",
+        "label" : "ur-PK"
+      }, {
+        "value" : "uz",
+        "label" : "uz"
+      }, {
+        "value" : "uz-AF",
+        "label" : "uz-AF"
+      }, {
+        "value" : "uz-Arab",
+        "label" : "uz-Arab"
+      }, {
+        "value" : "uz-Arab-AF",
+        "label" : "uz-Arab-AF"
+      }, {
+        "value" : "uz-Cyrl",
+        "label" : "uz-Cyrl"
+      }, {
+        "value" : "uz-Cyrl-UZ",
+        "label" : "uz-Cyrl-UZ"
+      }, {
+        "value" : "uz-Latn",
+        "label" : "uz-Latn"
+      }, {
+        "value" : "uz-Latn-UZ",
+        "label" : "uz-Latn-UZ"
+      }, {
+        "value" : "uz-UZ",
+        "label" : "uz-UZ"
+      }, {
+        "value" : "vai",
+        "label" : "vai"
+      }, {
+        "value" : "vai-LR",
+        "label" : "vai-LR"
+      }, {
+        "value" : "vai-Latn",
+        "label" : "vai-Latn"
+      }, {
+        "value" : "vai-Latn-LR",
+        "label" : "vai-Latn-LR"
+      }, {
+        "value" : "vai-Vaii",
+        "label" : "vai-Vaii"
+      }, {
+        "value" : "vai-Vaii-LR",
+        "label" : "vai-Vaii-LR"
+      }, {
+        "value" : "vi",
+        "label" : "vi"
+      }, {
+        "value" : "vi-Latn-VN",
+        "label" : "vi-Latn-VN"
+      }, {
+        "value" : "vi-VN",
+        "label" : "vi-VN"
+      }, {
+        "value" : "vun",
+        "label" : "vun"
+      }, {
+        "value" : "vun-Latn-TZ",
+        "label" : "vun-Latn-TZ"
+      }, {
+        "value" : "vun-TZ",
+        "label" : "vun-TZ"
+      }, {
+        "value" : "wae",
+        "label" : "wae"
+      }, {
+        "value" : "wae-CH",
+        "label" : "wae-CH"
+      }, {
+        "value" : "wae-Latn-CH",
+        "label" : "wae-Latn-CH"
+      }, {
+        "value" : "wo",
+        "label" : "wo"
+      }, {
+        "value" : "wo-Latn-SN",
+        "label" : "wo-Latn-SN"
+      }, {
+        "value" : "wo-SN",
+        "label" : "wo-SN"
+      }, {
+        "value" : "xh",
+        "label" : "xh"
+      }, {
+        "value" : "xh-Latn-ZA",
+        "label" : "xh-Latn-ZA"
+      }, {
+        "value" : "xh-ZA",
+        "label" : "xh-ZA"
+      }, {
+        "value" : "xog",
+        "label" : "xog"
+      }, {
+        "value" : "xog-Latn-UG",
+        "label" : "xog-Latn-UG"
+      }, {
+        "value" : "xog-UG",
+        "label" : "xog-UG"
+      }, {
+        "value" : "yav",
+        "label" : "yav"
+      }, {
+        "value" : "yav-CM",
+        "label" : "yav-CM"
+      }, {
+        "value" : "yav-Latn-CM",
+        "label" : "yav-Latn-CM"
+      }, {
+        "value" : "yi",
+        "label" : "yi"
+      }, {
+        "value" : "yi-001",
+        "label" : "yi-001"
+      }, {
+        "value" : "yi-Hebr-001",
+        "label" : "yi-Hebr-001"
+      }, {
+        "value" : "yo",
+        "label" : "yo"
+      }, {
+        "value" : "yo-BJ",
+        "label" : "yo-BJ"
+      }, {
+        "value" : "yo-Latn-NG",
+        "label" : "yo-Latn-NG"
+      }, {
+        "value" : "yo-NG",
+        "label" : "yo-NG"
+      }, {
+        "value" : "yrl",
+        "label" : "yrl"
+      }, {
+        "value" : "yrl-BR",
+        "label" : "yrl-BR"
+      }, {
+        "value" : "yrl-CO",
+        "label" : "yrl-CO"
+      }, {
+        "value" : "yrl-Latn-BR",
+        "label" : "yrl-Latn-BR"
+      }, {
+        "value" : "yrl-VE",
+        "label" : "yrl-VE"
+      }, {
+        "value" : "yue",
+        "label" : "yue"
+      }, {
+        "value" : "yue-CN",
+        "label" : "yue-CN"
+      }, {
+        "value" : "yue-HK",
+        "label" : "yue-HK"
+      }, {
+        "value" : "yue-Hans",
+        "label" : "yue-Hans"
+      }, {
+        "value" : "yue-Hans-CN",
+        "label" : "yue-Hans-CN"
+      }, {
+        "value" : "yue-Hant",
+        "label" : "yue-Hant"
+      }, {
+        "value" : "yue-Hant-HK",
+        "label" : "yue-Hant-HK"
+      }, {
+        "value" : "zgh",
+        "label" : "zgh"
+      }, {
+        "value" : "zgh-MA",
+        "label" : "zgh-MA"
+      }, {
+        "value" : "zgh-Tfng-MA",
+        "label" : "zgh-Tfng-MA"
+      }, {
+        "value" : "zh",
+        "label" : "zh"
+      }, {
+        "value" : "zh-CN",
+        "label" : "zh-CN"
+      }, {
+        "value" : "zh-HK",
+        "label" : "zh-HK"
+      }, {
+        "value" : "zh-Hans",
+        "label" : "zh-Hans"
+      }, {
+        "value" : "zh-Hans-CN",
+        "label" : "zh-Hans-CN"
+      }, {
+        "value" : "zh-Hans-HK",
+        "label" : "zh-Hans-HK"
+      }, {
+        "value" : "zh-Hans-MO",
+        "label" : "zh-Hans-MO"
+      }, {
+        "value" : "zh-Hans-SG",
+        "label" : "zh-Hans-SG"
+      }, {
+        "value" : "zh-Hant",
+        "label" : "zh-Hant"
+      }, {
+        "value" : "zh-Hant-HK",
+        "label" : "zh-Hant-HK"
+      }, {
+        "value" : "zh-Hant-MO",
+        "label" : "zh-Hant-MO"
+      }, {
+        "value" : "zh-Hant-TW",
+        "label" : "zh-Hant-TW"
+      }, {
+        "value" : "zh-MO",
+        "label" : "zh-MO"
+      }, {
+        "value" : "zh-SG",
+        "label" : "zh-SG"
+      }, {
+        "value" : "zh-TW",
+        "label" : "zh-TW"
+      }, {
+        "value" : "zu",
+        "label" : "zu"
+      }, {
+        "value" : "zu-Latn-ZA",
+        "label" : "zu-Latn-ZA"
+      }, {
+        "value" : "zu-ZA",
+        "label" : "zu-ZA"
+      } ],
+      "default" : "en-GB"
+    } ],
+    "labelCoverage" : "0/5",
+    "uiElements" : 10,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,226 @@
+{
+  "id" : "org.knime.ext.microsoft.authentication.node.MicrosoftAuthenticatorNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.ext.microsoft.authentication.node.MicrosoftAuthenticatorSettings",
+    "fields" : [ {
+      "field" : "m_authenticationType",
+      "configKey" : "authenticationType",
+      "title" : "Authentication type",
+      "description" : "Authentication type to use. The following types are supported:\n    <ul>\n    <li>\n        <b>Interactive (OAuth 2)</b>: Interactive <i>user login</i> in your web browser, when you\n        click on <i>Login</i>. In the browser window that pops up, you may be asked to consent to\n        the scopes of access. The acquired access token typically will only be valid for a short\n        amount of time, then you need to login again. Technically, this uses the\n        <a href=\"https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow\">\n        OAuth 2.0 authorization code flow</a>.\n    </li>\n    <li>\n        <b>Username/Password (OAuth 2</b>: Non-interactive <i>user login</i>. This is well-suited for\n        workflows on KNIME\n        Hub, however you cannot to consent to the scopes of access, hence consent must be given\n        beforehand, e.g. during a previous interactive login, or by an Azure AD directory admin.\n        Second, accounts that require multi-factor authentication (MFA) will not work.\n        Technically, this uses the\n        <a href=\"https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth-ropc\">\n        OAuth 2.0 Resource Owner Password Credentials flow</a>.\n    </li>\n    <li>\n        <b>Client/Application secret (OAuth 2)</b>: Non-interactive login as the\n        service principal of the configured client/app. This is well-suited for workflows on KNIME\n        Hub.\n        Technically, this uses the\n        <a href=\"https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow\">\n        OAuth 2.0 client credentials flow</a>. MicrosoftAzure cloud services are accessed on\n        behalf of the application's service principal, not on behalf of a user\n        <a href=\"https://learn.microsoft.com/en-us/azure/active-directory/develop/scenario-daemon-overview\">\n        (see here)</a>.\n    </li>\n    <li>\n        <b>Azure storage shared key</b>: Authenticates using an Azure storage account and\n        its secret key. Can only be used to access Azure Blob Storage and Azure Data Lake Storage\n        Gen2.\n    </li>\n    <li>\n        <b>Azure Storage shared access signature (SAS)</b>: Authenticates using a shared access\n        signature (SAS). Can only be used to access Azure Blob Storage and Azure Data Lake Storage\n        Gen2. For more details on shared access signatures see\n        <a href=\"https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview\">\n        here.</a>\n    </li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "INTERACTIVE",
+        "label" : "Interactive"
+      }, {
+        "value" : "USERNAME_PASSWORD",
+        "label" : "Username/Password"
+      }, {
+        "value" : "CLIENT_SECRET",
+        "label" : "Application/Service principal"
+      }, {
+        "value" : "AZURE_STORAGE_SHARED_KEY",
+        "label" : "Azure Storage shared key"
+      }, {
+        "value" : "AZURE_STORAGE_SAS_URL",
+        "label" : "Azure Storage shared access signature (SAS)"
+      } ],
+      "default" : "INTERACTIVE"
+    }, {
+      "field" : "m_tenantId",
+      "configKey" : "tenantId",
+      "title" : "Tenant ID/Domain",
+      "description" : "The directory tenant the application plans to operate against, in ID or domain-name format,\nfor example <i>cf47ff49-7da6-4603-b339-f4475176432b,</i> or <i>mycompany.onmicrosoft.com.</i>\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_usernamePassword",
+      "configKey" : "usernamePassword",
+      "title" : "Username and password",
+      "description" : "The username and password to use.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.credentials.Credentials"
+    }, {
+      "field" : "m_confidentialApp",
+      "configKey" : "confidentialApp",
+      "title" : "Client/App ID and secret",
+      "description" : "The client/app ID and secret to use.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.credentials.Credentials"
+    }, {
+      "field" : "m_scopesSettings",
+      "configKey" : "scopesSettings",
+      "title" : "ScopesSettings",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_scopesSelectionType",
+        "configKey" : "scopesSelectionType",
+        "title" : "Scope type",
+        "description" : "Scopes are\n<a href=\"https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview#types-of-permissions\">\npermissions</a> that need to be requested during login. They specify what the resulting\naccess token can be used for. This setting defines whether to select scopes from a list of predefined\n<b>standard</b> scopes or to enter <b>custom</b> scopes manually.\n",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "STANDARD",
+          "label" : "Standard"
+        }, {
+          "value" : "CUSTOM",
+          "label" : "Custom"
+        } ],
+        "default" : "STANDARD"
+      }, {
+        "field" : "m_delegatedScopes",
+        "configKey" : "delegatedScopes",
+        "title" : "Standard scopes (delegated permissions)",
+        "description" : "Choose scopes from a predefined list of standard scopes. These scopes are\n<a href=\"https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview#types-of-permissions\">\ndelegated permissions</a> and define what the resulting access token can be used for.\nYou can leave the list empty. In this case, the scopes required by downstream nodes need to\nbe <a href=\"https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview#consent\">\nconsented</a> to beforehand, otherwise downstream nodes might fail.\n",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "object"
+        },
+        "addButtonText" : "Add scope",
+        "default" : [ ]
+      }, {
+        "field" : "m_appScopes",
+        "configKey" : "appScopes",
+        "title" : "Standard scopes (application permissions)",
+        "description" : "Choose scopes from a predefined list of standard scopes. These scopes are\n<a href=\"https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview#types-of-permissions\">\napplication permissions</a> and define what the resulting access token can be used for.\nYou can leave the list empty. In this case, the scopes required by downstream nodes need to\nbe <a href=\"https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview#consent\">\nconsented</a> to beforehand, otherwise downstream nodes might fail.\n",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "object"
+        },
+        "addButtonText" : "Add scope",
+        "default" : [ ]
+      }, {
+        "field" : "m_customScopes",
+        "configKey" : "customScopes",
+        "title" : "Custom scopes",
+        "description" : "Enter a list of custom scopes to request during login.\nThese scopes are\n<a href=\"https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview#types-of-permissions\">\npermissions</a> and define what the resulting access token can be used for.\nYou can leave the list empty. In this case, the scopes required by downstream nodes need to\nbe <a href=\"https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview#consent\">\nconsented</a> to beforehand, otherwise downstream nodes might fail.\n",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "object"
+        },
+        "addButtonText" : "Add scope",
+        "default" : [ ]
+      }, {
+        "field" : "m_azureStorageAccount",
+        "configKey" : "azureStorageAccount",
+        "title" : "Azure Storage account",
+        "description" : "If the Azure Blob Storage/Azure Data Lake Storage Gen2 scope is chosen, then this field\nspecifies the specific Azure storage account to request access to.\n",
+        "advanced" : false,
+        "type" : "string",
+        "default" : ""
+      } ]
+    }, {
+      "field" : "m_authorizationEndpointSelection",
+      "configKey" : "authorizationEndpointSelection",
+      "title" : "Which authorization endpoint to use",
+      "description" : "Whether to use the Microsoft default authorization endpoint, or a custom one.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "DEFAULT",
+        "label" : "Default"
+      }, {
+        "value" : "CUSTOM",
+        "label" : "Custom"
+      } ],
+      "default" : "DEFAULT"
+    }, {
+      "field" : "m_authorizationEndpointUrl",
+      "configKey" : "authorizationEndpointUrl",
+      "title" : "Custom endpoint URL",
+      "description" : "Custom authorization endpoint URL to use.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_userAgentSelection",
+      "configKey" : "userAgentSelection",
+      "title" : "HTTP User-Agent",
+      "description" : "Whether to use the default HTTP User-Agent or a custom one, when fetching the OAuth2 access token.\nThe default User-Agent is OS-specific, for example \"KNIME (Windows 11)\". A custom User-Agent\nonly needs to be set in rare cases, for example if the default User-Agent is rejected by a\nconditional access rule in Azure Entra ID.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "DEFAULT",
+        "label" : "Default"
+      }, {
+        "value" : "CUSTOM",
+        "label" : "Custom"
+      } ],
+      "default" : "DEFAULT"
+    }, {
+      "field" : "m_customUserAgent",
+      "configKey" : "customUserAgent",
+      "title" : "Custom HTTP User-Agent",
+      "description" : "Sets a custom HTTP User-Agent when fetching the OAuth2 access token. This only needs\nto be set in rare cases, where the default KNIME User-Agent is rejected.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_clientSelection",
+      "configKey" : "clientSelection",
+      "title" : "Which client/app to use",
+      "description" : "Whether to use the KNIME default app, or enter a custom one. The\nKNIME default app is called \"KNIME Analytics Platform\" and its\nID is cf47ff49-7da6-4603-b339-f4475176432b.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "DEFAULT",
+        "label" : "Default"
+      }, {
+        "value" : "CUSTOM",
+        "label" : "Custom"
+      } ],
+      "default" : "DEFAULT"
+    }, {
+      "field" : "m_clientId",
+      "configKey" : "clientId",
+      "title" : "ID",
+      "description" : "The custom client/app ID to use.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_sharedKey",
+      "configKey" : "sharedKey",
+      "title" : "Storage account and shared key",
+      "description" : "The storage account name and shared key (also called access key) to use.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.credentials.Credentials"
+    }, {
+      "field" : "m_sasUrl",
+      "configKey" : "sasUrl",
+      "title" : "Service SAS URL",
+      "description" : "The Azure Service SAS URL. Note that only\n<a href=\"https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview#service-sas\">\nService SAS</a> is supported. The SAS URL must delegate access to the Blob storage\nservice, or an object within.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.credentials.Credentials"
+    }, {
+      "field" : "m_redirectUrl",
+      "configKey" : "redirectUrl",
+      "title" : "Redirect URL (should be http://localhost:XXXXX)",
+      "description" : "Redirect URL to use during interactive login. Technical note: Only\nURLs such as http://localhost:37489 are allowed (localhost,\nno https, random non-privileged port number). Any URL entered here\nmust be part of the configuration of your custom app.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_loginCredentialRef",
+      "configKey" : "loginCredentialRef",
+      "title" : "Login",
+      "description" : "Clicking on login opens a new browser window/tab which allows to interactively log into the service.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.util.UUID"
+    } ]
+  },
+  "tier" : "experimental"
+}

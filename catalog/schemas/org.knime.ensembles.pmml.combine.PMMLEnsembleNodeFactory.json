@@ -1,0 +1,149 @@
+{
+  "id" : "org.knime.ensembles.pmml.combine.PMMLEnsembleNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelColumnName",
+      "configKey" : "pmmlCol",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelColumnName",
+      "type" : "column",
+      "default" : "PMML",
+      "title" : "PMML Column",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "weightAvailable",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "WeightAvailable",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelColumnName",
+      "configKey" : "weightCol",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelColumnName",
+      "type" : "column",
+      "default" : null,
+      "title" : "Weight Column",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "multiModelMethod",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Majority vote",
+      "title" : "Multiple models method",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "Majority vote",
+        "label" : "Majority vote"
+      }, {
+        "value" : "Average",
+        "label" : "Average"
+      }, {
+        "value" : "Maximum",
+        "label" : "Maximum"
+      }, {
+        "value" : "Sum",
+        "label" : "Sum"
+      }, {
+        "value" : "Median",
+        "label" : "Median"
+      }, {
+        "value" : "Select all",
+        "label" : "Select all"
+      }, {
+        "value" : "Select first",
+        "label" : "Select first"
+      }, {
+        "value" : "Weighted Average",
+        "label" : "Weighted Average"
+      }, {
+        "value" : "Weighted Majority Vote",
+        "label" : "Weighted Majority Vote"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.ensembles.pmml.combine.PMMLEnsembleNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "PMML Column",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Weight available",
+      "configKey" : "weightAvailable",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Weight Column",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "<RowID> (MissingCell)",
+        "label" : "<RowID> (MissingCell)"
+      } ],
+      "default" : "<RowID> (MissingCell)"
+    }, {
+      "type" : "dropdown",
+      "label" : "Multiple models method",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Majority vote",
+        "label" : "Majority vote"
+      }, {
+        "value" : "Average",
+        "label" : "Average"
+      }, {
+        "value" : "Maximum",
+        "label" : "Maximum"
+      }, {
+        "value" : "Sum",
+        "label" : "Sum"
+      }, {
+        "value" : "Median",
+        "label" : "Median"
+      }, {
+        "value" : "Select all",
+        "label" : "Select all"
+      }, {
+        "value" : "Select first",
+        "label" : "Select first"
+      }, {
+        "value" : "Weighted Average",
+        "label" : "Weighted Average"
+      }, {
+        "value" : "Weighted Majority Vote",
+        "label" : "Weighted Majority Vote"
+      } ],
+      "default" : "Majority vote"
+    } ],
+    "labelCoverage" : "3/4",
+    "uiElements" : 4
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,246 @@
+{
+  "id" : "org.knime.base.node.mine.decisiontree2.learner.DecisionTreeLearnerNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "classifyColumn",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "Class column",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "splitQualityMeasure",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Gini index",
+      "title" : "Quality measure",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "Gain ratio",
+        "label" : "Gain ratio"
+      }, {
+        "value" : "Gini index",
+        "label" : "Gini index"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "pruningMethod",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "No pruning",
+      "title" : "Pruning method",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "No pruning",
+        "label" : "No pruning"
+      }, {
+        "value" : "MDL",
+        "label" : "MDL"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "minNumberRecordsPerNode",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 2,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "title" : "Min number records per node",
+      "titleSource" : "dialog",
+      "step" : 1.0,
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "numverRecordsToView",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 10000,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "title" : "Number records to store for view",
+      "titleSource" : "dialog",
+      "step" : 100.0,
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "splitAverage",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "SplitAverage",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "numProcessors",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 8,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "title" : "Number threads",
+      "titleSource" : "dialog",
+      "step" : 1.0,
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "skipColumnsWithoutDomain",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : true,
+      "title" : "SkipColumnsWithoutDomain",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "binaryNominalSplit",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "BinaryNominalSplit",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "maxNumNominalValues",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 10,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "title" : "Max #nominal",
+      "titleSource" : "dialog",
+      "step" : 1.0,
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "FilterNominalValuesFromParent",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "FilterNominalValuesFromParent",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.mine.decisiontree2.learner.DecisionTreeLearnerNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Class column",
+      "section" : "General",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Quality measure",
+      "section" : "General",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Gain ratio",
+        "label" : "Gain ratio"
+      }, {
+        "value" : "Gini index",
+        "label" : "Gini index"
+      } ],
+      "default" : "Gini index"
+    }, {
+      "type" : "dropdown",
+      "label" : "Pruning method",
+      "configKey" : "pruningMethod",
+      "keySource" : "label-match",
+      "section" : "General",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "No pruning",
+        "label" : "No pruning"
+      }, {
+        "value" : "MDL",
+        "label" : "MDL"
+      } ],
+      "default" : "No pruning"
+    }, {
+      "type" : "number",
+      "label" : "Min number records per node",
+      "configKey" : "minNumberRecordsPerNode",
+      "keySource" : "label-match",
+      "section" : "General",
+      "source" : "dialog-ui",
+      "default" : 2.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "number",
+      "label" : "Number records to store for view",
+      "section" : "General",
+      "source" : "dialog-ui",
+      "default" : 10000.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 100.0
+    }, {
+      "type" : "boolean",
+      "label" : "Average split point",
+      "section" : "General",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "Number threads",
+      "section" : "General",
+      "source" : "dialog-ui",
+      "default" : 8.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Skip nominal columns without domain information",
+      "section" : "General",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Binary nominal splits",
+      "section" : "Binary nominal splits",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "Max #nominal",
+      "section" : "Binary nominal splits",
+      "source" : "dialog-ui",
+      "default" : 10.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Filter invalid attribute values in child nodes",
+      "section" : "Binary nominal splits",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "7/11",
+    "uiElements" : 11
+  },
+  "tier" : "experimental"
+}

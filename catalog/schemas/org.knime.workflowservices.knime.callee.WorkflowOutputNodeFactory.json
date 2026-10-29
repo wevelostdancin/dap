@@ -1,0 +1,26 @@
+{
+  "id" : "org.knime.workflowservices.knime.callee.WorkflowOutputNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.workflowservices.knime.callee.WorkflowOutputSettings",
+    "fields" : [ {
+      "field" : "m_parameterName",
+      "configKey" : "parameterName",
+      "title" : "Parameter name",
+      "description" : "The parameter name is supposed to be unique, but this is not enforced.\nIn case multiple <i>Workflow Output</i> nodes define the same\nparameter name, KNIME will make them unique by appending the node's node ID,\ne.g., \"output-table\" becomes \"output-table-7\".\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "output-parameter"
+    }, {
+      "field" : "m_parameterDescription",
+      "configKey" : "parameterDescription",
+      "title" : "Description",
+      "description" : "The description for the workflow output parameter describing the purpose of the parameter.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    } ]
+  },
+  "tier" : "experimental"
+}

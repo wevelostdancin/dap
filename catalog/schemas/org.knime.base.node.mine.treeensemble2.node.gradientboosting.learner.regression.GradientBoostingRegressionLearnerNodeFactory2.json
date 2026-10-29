@@ -1,0 +1,383 @@
+{
+  "id" : "org.knime.base.node.mine.treeensemble2.node.gradientboosting.learner.regression.GradientBoostingRegressionLearnerNodeFactory2",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.treeensemble2.node.gradientboosting.learner.regression.GradientBoostingRegressionLearnerNodeFactory2Parameters",
+    "fields" : [ {
+      "field" : "m_maxTreeDepth",
+      "configKey" : "maxTreeDepth",
+      "title" : "Limit number of levels (tree depth)",
+      "description" : "Limit the maximal number of tree levels. When disabled the tree depth is unbounded.\nFor instance, a value of 1 would only split the (single) root node resulting in a decision stump\n",
+      "advanced" : false,
+      "type" : "integer",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_columnSamplingMode",
+      "configKey" : "columnSamplingMode",
+      "title" : "Attribute sampling (columns)",
+      "description" : "Defines the sampling of attributes to learn an individual tree. This can either be a function based on the\nnumber of attributes (linear fraction or square root) or some absolute value. The latter can be used in\nconjunction with flow variables to inject some other value derived from the number of attributes (e.g.\nBreiman suggests starting with the square root of the number of attributes but also to try to double or\nhalf that number).\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NONE",
+        "label" : "All columns"
+      }, {
+        "value" : "SQUARE_ROOT",
+        "label" : "Square root"
+      }, {
+        "value" : "LINEAR",
+        "label" : "Linear fraction"
+      }, {
+        "value" : "ABSOLUTE",
+        "label" : "Absolute number"
+      } ],
+      "default" : "NONE"
+    }, {
+      "field" : "m_gradientBoostingParams",
+      "configKey" : "gradientBoostingParams",
+      "title" : "GradientBoostingParams",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_learningRate",
+        "configKey" : "learningRate",
+        "title" : "Learning rate",
+        "description" : "The learning rate influences how much influence a single model has on the ensemble result.\nUsually a value of 0.1 is a good starting point but the best learning rate also depends on the\nnumber of models. The more models the ensemble contains the lower the learning rate has to be.\n",
+        "advanced" : false,
+        "type" : "number",
+        "default" : 0.1,
+        "step" : 0.05
+      }, {
+        "field" : "m_alpha",
+        "configKey" : "alphaFraction",
+        "title" : "Alpha",
+        "description" : "",
+        "advanced" : false,
+        "type" : "number",
+        "default" : 0.95,
+        "step" : 0.05
+      } ]
+    }, {
+      "field" : "m_attributeReuse",
+      "configKey" : "attributeReuse",
+      "title" : "Attribute selection",
+      "description" : "<p>\n  <i>Use the same set of attributes for each tree</i>\n  means that the attributes are sampled once for each tree\n  and this sample is then used to construct the tree.\n</p>\n<p>\n  <i>Use a different set of attributes for each tree node</i>\n  samples a different set of candidate attributes in each of the tree nodes\n  from which the optimal one is chosen to perform the split.\n  This is the option used in random forests.\n</p>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "SAME_FOR_TREE",
+        "label" : "Use same set of attributes for entire tree"
+      }, {
+        "value" : "DIFFERENT_FOR_EACH_NODE",
+        "label" : "Use different set of attributes for each tree node"
+      } ],
+      "default" : "SAME_FOR_TREE"
+    }, {
+      "field" : "m_targetColumn",
+      "configKey" : "targetColumn",
+      "title" : "Target column",
+      "description" : "Select the column containing the value to be learned. Rows with missing values in this column are ignored during the learning process.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_trainingAttributes",
+      "configKey" : "trainingAttributes",
+      "title" : "TrainingAttributes",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_trainingAttributesMode",
+        "configKey" : "trainingAttributesMode",
+        "title" : "Training attributes",
+        "description" : "Choose whether to derive attributes from a fingerprint vector column or from ordinary table columns.\n",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "COLUMNS",
+          "label" : "Use column"
+        }, {
+          "value" : "FINGERPRINT",
+          "label" : "Use fingerprint"
+        } ],
+        "default" : "COLUMNS"
+      }, {
+        "field" : "m_fingerprintColumn",
+        "configKey" : "fingerprintColumn",
+        "title" : "Fingerprint attribute",
+        "description" : "Use a fingerprint (bit, byte, or double vector) column to learn the model. Each entry of the vector is treated as a separate attribute. All vectors must share the same length.\n",
+        "advanced" : false,
+        "type" : "string",
+        "default" : null,
+        "choicesSource" : {
+          "provider" : "org.knime.base.node.mine.treeensemble2.node.learner.parameters.TrainingAttributesParameters$FingerprintColumnsProvider",
+          "kind" : "columns",
+          "note" : "варианты зависят от входной таблицы"
+        },
+        "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+      } ]
+    }, {
+      "field" : "m_attributeColumns",
+      "configKey" : "attributeColumns",
+      "title" : "Attribute selection",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter"
+    }, {
+      "field" : "m_ignoreColumnsWithoutDomain",
+      "configKey" : "ignoreColumnsWithoutDomain",
+      "title" : "IgnoreColumnsWithoutDomain",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_missingValueHandling",
+      "configKey" : "missingValueHandling",
+      "title" : "MissingValueHandling",
+      "description" : "",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "XGBOOST",
+        "label" : "XGBoost"
+      }, {
+        "value" : "SURROGATE",
+        "label" : "Surrogate"
+      } ],
+      "default" : "XGBOOST"
+    }, {
+      "field" : "m_splitCriterion",
+      "configKey" : "splitCriterion",
+      "title" : "SplitCriterion",
+      "description" : "",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "INFORMATION_GAIN",
+        "label" : "Information Gain"
+      }, {
+        "value" : "INFORMATION_GAIN_RATIO",
+        "label" : "Information Gain Ratio"
+      }, {
+        "value" : "GINI",
+        "label" : "Gini"
+      } ],
+      "default" : "INFORMATION_GAIN_RATIO"
+    }, {
+      "field" : "m_useAverageSplitPoints",
+      "configKey" : "useAverageSplitPoints",
+      "title" : "UseAverageSplitPoints",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_useBinaryNominalSplits",
+      "configKey" : "useBinaryNominalSplits",
+      "title" : "UseBinaryNominalSplits",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_maxTreeDepth",
+      "configKey" : "maxTreeDepth",
+      "title" : "MaxTreeDepth",
+      "description" : "",
+      "advanced" : false,
+      "type" : "integer",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_minNodeSizes",
+      "configKey" : "minNodeSizes",
+      "title" : "MinNodeSizes",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_minNodeSize",
+        "configKey" : "minNodeSize",
+        "title" : "MinNodeSize",
+        "description" : "",
+        "advanced" : false,
+        "type" : "integer",
+        "nullable" : true,
+        "default" : null
+      }, {
+        "field" : "m_minChildNodeSize",
+        "configKey" : "minChildNodeSize",
+        "title" : "MinChildNodeSize",
+        "description" : "",
+        "advanced" : false,
+        "type" : "integer",
+        "nullable" : true,
+        "default" : null
+      } ]
+    }, {
+      "field" : "m_hardCodedRootColumn",
+      "configKey" : "hardCodedRootColumn",
+      "title" : "HardCodedRootColumn",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null
+    }, {
+      "field" : "m_rowSamplingFraction",
+      "configKey" : "rowSamplingFraction",
+      "title" : "RowSamplingFraction",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_enabled",
+        "configKey" : "enabled",
+        "title" : "Enabled",
+        "description" : "",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_fraction",
+        "configKey" : "fraction",
+        "title" : "Fraction",
+        "description" : "",
+        "advanced" : false,
+        "type" : "number",
+        "default" : 1.0
+      } ]
+    }, {
+      "field" : "m_rowSamplingWithReplacement",
+      "configKey" : "isDataSelectionWithReplacement",
+      "title" : "RowSamplingWithReplacement",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_rowSamplingMode",
+      "configKey" : "rowSamplingMode",
+      "title" : "RowSamplingMode",
+      "description" : "",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "RANDOM",
+        "label" : "Random"
+      }, {
+        "value" : "STRATIFIED",
+        "label" : "Stratified"
+      }, {
+        "value" : "EQUAL_SIZE",
+        "label" : "Equal size"
+      } ],
+      "default" : "RANDOM"
+    }, {
+      "field" : "m_numberOfModels",
+      "configKey" : "nrModels",
+      "title" : "NumberOfModels",
+      "description" : "",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 100
+    }, {
+      "field" : "m_columnSamplingMode",
+      "configKey" : "columnSamplingMode",
+      "title" : "ColumnSamplingMode",
+      "description" : "",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NONE",
+        "label" : "All columns"
+      }, {
+        "value" : "SQUARE_ROOT",
+        "label" : "Square root"
+      }, {
+        "value" : "LINEAR",
+        "label" : "Linear fraction"
+      }, {
+        "value" : "ABSOLUTE",
+        "label" : "Absolute number"
+      } ],
+      "default" : "SQUARE_ROOT"
+    }, {
+      "field" : "m_columnFractionLinear",
+      "configKey" : "columnFractionPerTree",
+      "title" : "ColumnFractionLinear",
+      "description" : "",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 1.0
+    }, {
+      "field" : "m_columnAbsolute",
+      "configKey" : "columnAbsolutePerTree",
+      "title" : "ColumnAbsolute",
+      "description" : "",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 10
+    }, {
+      "field" : "m_attributeReuse",
+      "configKey" : "attributeReuse",
+      "title" : "AttributeReuse",
+      "description" : "",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "SAME_FOR_TREE",
+        "label" : "Use same set of attributes for entire tree"
+      }, {
+        "value" : "DIFFERENT_FOR_EACH_NODE",
+        "label" : "Use different set of attributes for each tree node"
+      } ],
+      "default" : "DIFFERENT_FOR_EACH_NODE"
+    }, {
+      "field" : "m_seed",
+      "configKey" : "seed",
+      "title" : "Seed",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_newSeed",
+      "configKey" : "newSeed",
+      "title" : "NewSeed",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_hiliteCount",
+      "configKey" : "hiliteCount",
+      "title" : "HiliteCount",
+      "description" : "",
+      "advanced" : false,
+      "type" : "integer",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_saveTargetDistributionInNodes",
+      "configKey" : "saveTargetDistributionInNodes",
+      "title" : "SaveTargetDistributionInNodes",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

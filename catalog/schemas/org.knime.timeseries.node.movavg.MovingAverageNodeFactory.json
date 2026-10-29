@@ -1,0 +1,125 @@
+{
+  "id" : "org.knime.timeseries.node.movavg.MovingAverageNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.timeseries.node.movavg.MovingAverageNodeParameters",
+    "fields" : [ {
+      "field" : "m_method",
+      "configKey" : "method",
+      "title" : "Type of Moving Average",
+      "description" : "<p>\n    Select the moving average method defining how values in the window are weighted\n    (backward, centered, forward, Gaussian, cumulative, exponential variants, harmonic mean, etc.).\n</p>\n<p>\n    For the <i>Gaussian weighted</i> moving average the individual values are\n    weighted based on the position in the window:\n    <code>std_dev = (k - 1) / 4</code>\n    and\n    <code>gauss(i,mean,std_dev) = Math.exp((-0.5) * (i - mean) * (i - mean) / std_dev^2)</code>\n</p>\n<p>\n    For the <i>exponential</i> moving average the individual values are weighted as\n    <code>alpha = 2/(k+1)</code>.\n</p>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Simple",
+        "label" : "Backward simple"
+      }, {
+        "value" : "Center",
+        "label" : "Center simple"
+      }, {
+        "value" : "Forward",
+        "label" : "Forward simple"
+      }, {
+        "value" : "SimpleG",
+        "label" : "Backward Gaussian"
+      }, {
+        "value" : "CenterG",
+        "label" : "Center Gaussian"
+      }, {
+        "value" : "ForwardG",
+        "label" : "Forward Gaussian"
+      }, {
+        "value" : "HarmonicC",
+        "label" : "Harmonic Mean Center"
+      }, {
+        "value" : "Cumulative",
+        "label" : "Cumulative simple"
+      }, {
+        "value" : "Exponential",
+        "label" : "Simple exponential"
+      }, {
+        "value" : "DoubleExponential",
+        "label" : "Double exponential"
+      }, {
+        "value" : "TripleExponential",
+        "label" : "Triple exponential"
+      }, {
+        "value" : "OldExponential",
+        "label" : "Old exponential"
+      } ],
+      "default" : "Simple"
+    }, {
+      "field" : "m_windowLength",
+      "configKey" : "win_length",
+      "title" : "Window length",
+      "description" : "Number of consecutive rows used to compute each moving average. Must be an odd number for centered methods.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 21
+    }, {
+      "field" : "m_replaceOriginalColumns",
+      "configKey" : "replace_column",
+      "title" : "Remove original columns",
+      "description" : "If checked, the selected input columns are replaced by their moving average. If unchecked, new columns named MA(&lt;column&gt;) are appended.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_columnNames",
+      "configKey" : "column_names",
+      "title" : "ColumnNames",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_keepAllColumnsSelected",
+        "configKey" : "keep_all_columns_selected",
+        "title" : "KeepAllColumnsSelected",
+        "description" : "",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : false
+      }, {
+        "field" : "m_twinList",
+        "configKey" : "twinList",
+        "title" : "TwinList",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_inclList",
+          "configKey" : "inclList",
+          "title" : "Column selection",
+          "description" : "Move the numeric columns of interest to the \"Include\" list.",
+          "advanced" : false,
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          },
+          "addButtonText" : "",
+          "default" : [ ],
+          "choicesSource" : {
+            "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+            "kind" : "columns",
+            "note" : "варианты зависят от входной таблицы"
+          },
+          "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+        }, {
+          "field" : "m_exclList",
+          "configKey" : "ExclList",
+          "title" : "ExclList",
+          "description" : "",
+          "advanced" : false,
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          },
+          "addButtonText" : "",
+          "default" : [ ]
+        } ]
+      } ]
+    } ]
+  },
+  "tier" : "experimental"
+}

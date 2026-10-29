@@ -1,0 +1,55 @@
+{
+  "id" : "org.knime.base.node.preproc.pmml.xml2pmml.XML2PMMLNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.pmml.xml2pmml.XML2PMMLNodeParameters",
+    "fields" : [ {
+      "field" : "m_xmlColumnName",
+      "configKey" : "xmlColumnName",
+      "title" : "XML column",
+      "description" : "The column containing the XML.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.pmml.xml2pmml.XML2PMMLNodeParameters$XMLColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_replaceOrAppendColumn",
+      "configKey" : "replaceOrAppendColumn",
+      "title" : "Replace existing column",
+      "description" : "If checked, the existing XML column is replaced by the one with PMML.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "APPEND",
+        "label" : "Append"
+      }, {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      } ],
+      "default" : "APPEND"
+    }, {
+      "field" : "m_newColumnName",
+      "configKey" : "newColumnName",
+      "title" : "New PMML column",
+      "description" : "The name of the appended PMML column.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "pmml"
+    }, {
+      "field" : "m_failOnInvalid",
+      "configKey" : "failOnInvalid",
+      "title" : "Fail on invalid PMML",
+      "description" : "Fail if a cell in the XML column is not valid PMML. Else a missing value is inserted.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

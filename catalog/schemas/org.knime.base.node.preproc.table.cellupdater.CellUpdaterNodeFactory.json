@@ -1,0 +1,77 @@
+{
+  "id" : "org.knime.base.node.preproc.table.cellupdater.CellUpdaterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.table.cellupdater.CellUpdaterSettings",
+    "fields" : [ {
+      "field" : "m_columnMode",
+      "configKey" : "columnMode",
+      "title" : "Column specification",
+      "description" : "Select whether to specify the column by name or by number.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "BY_NAME",
+        "label" : "Name"
+      }, {
+        "value" : "BY_NUMBER",
+        "label" : "Number"
+      } ],
+      "default" : "BY_NAME"
+    }, {
+      "field" : "m_columnName",
+      "configKey" : "columnName",
+      "title" : "Column name",
+      "description" : "Select the column that contains the target cell.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.table.cellupdater.CellUpdaterSettings$AllColumns",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_columnNumber",
+      "configKey" : "columnNumber",
+      "title" : "Column number",
+      "description" : "Provide the number of the column that contains the target cell. Numbering starts at 1.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    }, {
+      "field" : "m_rowNumber",
+      "configKey" : "rowNumber",
+      "title" : "Row number",
+      "description" : "Provide the number of the row that contains the target cell. Numbering starts at 1.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    }, {
+      "field" : "m_countFromEnd",
+      "configKey" : "countFromEnd",
+      "title" : "Count rows from the end of the table",
+      "description" : "If selected, the rows will be counted from the end of the table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_flowVariableName",
+      "configKey" : "flowVariableName",
+      "title" : "New cell value",
+      "description" : "Select the flow variable containing the new cell value.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllFlowVariablesProvider",
+        "kind" : "enum"
+      },
+      "choices" : [ ],
+      "choicesResolved" : true
+    } ]
+  },
+  "tier" : "experimental"
+}

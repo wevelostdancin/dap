@@ -1,0 +1,61 @@
+{
+  "id" : "org.knime.base.node.preproc.filter.missingvaluecolfilter.MissingValueColumnFilterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.filter.missingvaluecolfilter.MissingValueColumnFilterNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Input columns",
+      "description" : "Select the columns to test for missing values.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeColumnsBy",
+      "configKey" : "removeColumnsBy",
+      "title" : "Remove columns",
+      "description" : "Specify the threshold for the removal of selected columns.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "SOME",
+        "label" : "With at least one missing value"
+      }, {
+        "value" : "ONLY",
+        "label" : "With only missing values"
+      }, {
+        "value" : "PERCENTAGE",
+        "label" : "By percentage of missing values"
+      }, {
+        "value" : "NUMBER",
+        "label" : "By number of missing values"
+      } ],
+      "default" : "ONLY"
+    }, {
+      "field" : "m_percentage",
+      "configKey" : "missing_value_percentage",
+      "title" : "Threshold percentage (equal or more than %)",
+      "description" : "Selected columns with at least this percentage of missing values are filtered out.",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 100.0
+    }, {
+      "field" : "m_number",
+      "configKey" : "number",
+      "title" : "Threshold number (equal or more than)",
+      "description" : "Selected columns with at least this number of missing values are filtered out.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    } ]
+  },
+  "tier" : "core"
+}

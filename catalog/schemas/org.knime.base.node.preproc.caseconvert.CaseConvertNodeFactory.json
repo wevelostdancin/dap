@@ -1,0 +1,43 @@
+{
+  "id" : "org.knime.base.node.preproc.caseconvert.CaseConvertNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.caseconvert.CaseConvertNodeParameters",
+    "fields" : [ {
+      "field" : "m_columns",
+      "configKey" : "include",
+      "title" : "Input columns to convert",
+      "description" : "Choose the string-compatible input columns whose textual values should be case-converted.\nOnly columns compatible with the String data type are shown.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "string"
+      },
+      "addButtonText" : "",
+      "default" : [ ],
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$StringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_mode",
+      "configKey" : "mode",
+      "title" : "Casing",
+      "description" : "Choose if you want to convert to uppercase or lowercase.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "UPPERCASE",
+        "label" : "Uppercase"
+      }, {
+        "value" : "LOWERCASE",
+        "label" : "Lowercase"
+      } ],
+      "default" : "UPPERCASE"
+    } ]
+  },
+  "tier" : "experimental"
+}

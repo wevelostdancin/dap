@@ -1,0 +1,41 @@
+{
+  "id" : "org.knime.base.node.preproc.append.row.AppendedRowsNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.append.row.AppendedRowsNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnSetOperation",
+      "configKey" : "columnSetOperation",
+      "title" : "How to combine input columns",
+      "description" : "Choose the output column selection process:<ul>\n<li><b>Union</b>: Use all columns from all input tables. Fill rows with missing values if they miss cells\n    for some columns.</li>\n<li><b>Intersection</b>: Use only the columns that appear in every input table. Any other column is ignored\n    and won't appear in the output table.</li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "UNION",
+        "label" : "Union"
+      }, {
+        "value" : "INTERSECTION",
+        "label" : "Intersection"
+      } ],
+      "default" : "UNION"
+    }, {
+      "field" : "m_rowIdStrategy",
+      "configKey" : "rowIdStrategy",
+      "title" : "RowIdStrategy",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.base.node.preproc.append.row.AppendedRowsNodeSettings$RowIdStrategySelection"
+    }, {
+      "field" : "m_enableHiliting",
+      "configKey" : "enable_hiliting",
+      "title" : "Enable hiliting",
+      "description" : "Enable hiliting between both inputs and the concatenated output table.",
+      "advanced" : true,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

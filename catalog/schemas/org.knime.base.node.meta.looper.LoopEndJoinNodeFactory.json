@@ -1,0 +1,27 @@
+{
+  "id" : "org.knime.base.node.meta.looper.LoopEndJoinNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.meta.looper.LoopEndJoinNodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Loop has same RowIDs in each iteration",
+      "section" : "Loop End Configuration",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Propagate modified loop variables",
+      "section" : "Loop End Configuration",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 2,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

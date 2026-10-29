@@ -1,0 +1,34 @@
+{
+  "id" : "org.knime.filehandling.utility.nodes.deletepaths.filechooser.DeleteFilesAndFoldersNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.filehandling.utility.nodes.deletepaths.filechooser.DeleteFilesAndFoldersNodeParameters",
+    "fields" : [ {
+      "field" : "m_fileSystemManagedByPortMessage",
+      "configKey" : "fileSystemManagedByPortMessage",
+      "title" : "FileSystemManagedByPortMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_fileChooser",
+      "configKey" : "file_chooser",
+      "title" : "FileChooser",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.legacy.widget.file.LegacyMultiFileSelection"
+    }, {
+      "field" : "m_failIfDeleteFails",
+      "configKey" : "fail_if_delete_fails",
+      "title" : "Fail if delete fails",
+      "description" : "If this option is checked, the node will fail if one of the files could not be deleted. If it is\nunchecked the output table will contain a column that indicates if a file/folder got successfully\ndeleted or not.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "experimental"
+}

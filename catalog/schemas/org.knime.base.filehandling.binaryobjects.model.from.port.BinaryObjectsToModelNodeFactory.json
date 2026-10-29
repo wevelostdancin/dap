@@ -1,0 +1,36 @@
+{
+  "id" : "org.knime.base.filehandling.binaryobjects.model.from.port.BinaryObjectsToModelNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "columnselection",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Column selection",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.filehandling.binaryobjects.model.from.port.BinaryObjectsToModelNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Column selection",
+      "configKey" : "columnselection",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "1/1",
+    "uiElements" : 1
+  },
+  "tier" : "experimental"
+}

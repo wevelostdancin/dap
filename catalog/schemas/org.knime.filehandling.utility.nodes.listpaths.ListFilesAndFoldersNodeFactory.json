@@ -1,0 +1,34 @@
+{
+  "id" : "org.knime.filehandling.utility.nodes.listpaths.ListFilesAndFoldersNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.filehandling.utility.nodes.listpaths.ListFilesAndFoldersNodeParameters",
+    "fields" : [ {
+      "field" : "m_fileChooser",
+      "configKey" : "file_chooser",
+      "title" : "FileChooser",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.legacy.widget.file.LegacyMultiFileSelection"
+    }, {
+      "field" : "m_includeRootDir",
+      "configKey" : "include_root_folder",
+      "title" : "Include parent folder",
+      "description" : "If selected the output contains the (selected) folder for which the files/folders are being listed.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_addDirIndicatorColumn",
+      "configKey" : "add_folder_identifier_column",
+      "title" : "Add folder identifier column",
+      "description" : "If selected the output contains an additional column indicating if the path points to a folder\n(<tt>true</tt>) or a file (<tt>false</tt>).\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

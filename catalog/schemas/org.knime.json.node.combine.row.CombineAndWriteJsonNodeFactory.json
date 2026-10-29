@@ -1,0 +1,134 @@
+{
+  "id" : "org.knime.json.node.combine.row.CombineAndWriteJsonNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.json.node.combine.row.CombineAndWriteJsonNodeParameters",
+    "fields" : [ {
+      "field" : "m_inputColumn",
+      "configKey" : "inputColumn",
+      "title" : "JSON column",
+      "description" : "The JSON column providing the values for the resulting JSON.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.combine.row.CombineAndWriteJsonNodeParameters$JSONColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_outputFile",
+      "configKey" : "file",
+      "title" : "Output file location",
+      "description" : "Location to save the file (can also be a URL).",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_invalidSchemeMessage",
+      "configKey" : "invalidSchemeMessage",
+      "title" : "InvalidSchemeMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_overwriteExistingFile",
+      "configKey" : "overwriteExistingFile",
+      "title" : "If output file already exists",
+      "description" : "How to handle output file already existing.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "PREVENT",
+        "label" : "Fail"
+      }, {
+        "value" : "OVERWRITE",
+        "label" : "Overwrite file"
+      } ],
+      "default" : "PREVENT"
+    }, {
+      "field" : "m_jsonFormat",
+      "configKey" : "jsonFormat",
+      "title" : "Format",
+      "description" : "Format for the resulting JSON.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "DENSE",
+        "label" : "Dense"
+      }, {
+        "value" : "PRETTY",
+        "label" : "Pretty print"
+      } ],
+      "default" : "PRETTY"
+    }, {
+      "field" : "m_objectOrArray",
+      "configKey" : "objectOrArray",
+      "title" : "Combine rows as",
+      "description" : "Configure how to collect the JSON values.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Array",
+        "label" : "Array"
+      }, {
+        "value" : "Object",
+        "label" : "Object with key"
+      } ],
+      "default" : "Array"
+    }, {
+      "field" : "m_objectKeyColumn",
+      "configKey" : "objectKeyColumn",
+      "title" : "Object key column",
+      "description" : "Column which provides keys when collecting rows into JSON object.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.combine.row.CombineAndWriteJsonNodeParameters$NominalColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_jsonStructure",
+      "configKey" : "jsonStructure",
+      "title" : "Place resulting JSON",
+      "description" : "How to structure the resulting JSON output.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NESTED",
+        "label" : "Under root key"
+      }, {
+        "value" : "TOP_LEVEL",
+        "label" : "At top level"
+      } ],
+      "default" : "NESTED"
+    }, {
+      "field" : "m_rootKey",
+      "configKey" : "rootKey",
+      "title" : "Root object key",
+      "description" : "Key under which to place the resulting JSON.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_keyValuePairs",
+      "configKey" : "keyValuePairs",
+      "title" : "Additional properties",
+      "description" : "Additional key/value pairs to add to the root object.",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add property",
+      "default" : [ ]
+    } ]
+  },
+  "tier" : "experimental"
+}

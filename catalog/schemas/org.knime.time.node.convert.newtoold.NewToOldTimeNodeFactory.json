@@ -1,0 +1,62 @@
+{
+  "id" : "org.knime.time.node.convert.newtoold.NewToOldTimeNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.time.node.convert.newtoold.NewToOldTimeNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnSelection",
+      "configKey" : "columnSelection",
+      "title" : "Column selection",
+      "description" : "Only the included columns will be converted.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.time.util.DateTimeUtils$DateTimeColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_addOffsetOfTimeZone",
+      "configKey" : "addOffsetOfTimeZone",
+      "title" : "Time zone handling",
+      "description" : "The legacy <b>Date&amp;Time</b> type does not support time zones. When converting values,\nyou can choose how the time zone information should be handled:\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ADD_AS_OFFSET",
+        "label" : "Add as offset"
+      }, {
+        "value" : "DROP",
+        "label" : "Drop"
+      } ],
+      "default" : "DROP"
+    }, {
+      "field" : "m_replaceOrAppend",
+      "configKey" : "replaceOrAppend",
+      "title" : "Output columns",
+      "description" : "Whether to replace the original columns with the converted columns, or to append the\nconverted columns with new names created by appending the specified suffix to the\noriginal column names.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append with suffix"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_suffix",
+      "configKey" : "suffix",
+      "title" : "Suffix",
+      "description" : "Text appended to column names when new columns are created using the Append option.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "(old Date&Time)"
+    } ]
+  },
+  "tier" : "experimental"
+}

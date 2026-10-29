@@ -1,0 +1,222 @@
+{
+  "id" : "org.knime.base.node.mine.subgroupminer.SubgroupMinerFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "BITVECTOR_COLUMN",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Column containing the bit vectors",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelDoubleBounded",
+      "configKey" : "MIN_SUPPORT",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelDoubleBounded",
+      "type" : "number",
+      "default" : 0.9,
+      "min" : 0.0,
+      "max" : 1.0,
+      "title" : "Minimum support (0-1)",
+      "titleSource" : "dialog",
+      "step" : 0.1,
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "UNDERLYING_STRUCT",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "ARRAY",
+      "title" : "Underlying data structure:",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "ARRAY",
+        "label" : "ARRAY"
+      }, {
+        "value" : "TIDList",
+        "label" : "TIDList"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "ITEMSET_TYPE",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "CLOSED",
+      "title" : "Item Set Type",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "CLOSED",
+        "label" : "CLOSED"
+      }, {
+        "value" : "FREE",
+        "label" : "FREE"
+      }, {
+        "value" : "MAXIMAL",
+        "label" : "MAXIMAL"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "MAX_ITEMSET_LENGTH",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 10,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "title" : "Maximal Itemset Length:",
+      "titleSource" : "dialog",
+      "step" : 1.0,
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "SORT_BY",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "NONE",
+      "title" : "Sort output table by:",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "NONE",
+        "label" : "NONE"
+      }, {
+        "value" : "ITEM_SET_LENGTH",
+        "label" : "ITEM_SET_LENGTH"
+      }, {
+        "value" : "SUPPORT",
+        "label" : "SUPPORT"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "ASSOCIATION_RULES",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "ASSOCIATION RULES",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelDoubleBounded",
+      "configKey" : "CONFIDENCE",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelDoubleBounded",
+      "type" : "number",
+      "default" : 0.8,
+      "min" : 0.0,
+      "max" : 1.0,
+      "title" : "Minimum Confidence:",
+      "titleSource" : "dialog",
+      "step" : 0.1,
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.mine.subgroupminer.SubgroupMinerDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Column containing the bit vectors",
+      "section" : "Itemset Mining",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "number",
+      "label" : "Minimum support (0-1)",
+      "section" : "Itemset Mining",
+      "source" : "dialog-ui",
+      "default" : 0.9,
+      "min" : 0.0,
+      "max" : 1.0,
+      "step" : 0.1
+    }, {
+      "type" : "dropdown",
+      "label" : "Underlying data structure",
+      "section" : "Itemset Mining",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "ARRAY",
+        "label" : "ARRAY"
+      }, {
+        "value" : "TIDList",
+        "label" : "TIDList"
+      } ],
+      "default" : "ARRAY"
+    }, {
+      "type" : "dropdown",
+      "label" : "Item Set Type",
+      "configKey" : "ITEMSET_TYPE",
+      "keySource" : "label-match",
+      "section" : "Output",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "CLOSED",
+        "label" : "CLOSED"
+      }, {
+        "value" : "FREE",
+        "label" : "FREE"
+      }, {
+        "value" : "MAXIMAL",
+        "label" : "MAXIMAL"
+      } ],
+      "default" : "CLOSED"
+    }, {
+      "type" : "number",
+      "label" : "Maximal Itemset Length",
+      "section" : "Output",
+      "source" : "dialog-ui",
+      "default" : 10.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "dropdown",
+      "label" : "Sort output table by",
+      "section" : "Output",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "NONE",
+        "label" : "NONE"
+      }, {
+        "value" : "ITEM_SET_LENGTH",
+        "label" : "ITEM_SET_LENGTH"
+      }, {
+        "value" : "SUPPORT",
+        "label" : "SUPPORT"
+      } ],
+      "default" : "NONE"
+    }, {
+      "type" : "boolean",
+      "label" : "Output association rules",
+      "section" : "Association Rules",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "Minimum Confidence",
+      "section" : "Association Rules",
+      "source" : "dialog-ui",
+      "default" : 0.8,
+      "min" : 0.0,
+      "max" : 1.0,
+      "step" : 0.1
+    } ],
+    "labelCoverage" : "7/8",
+    "uiElements" : 8
+  },
+  "tier" : "experimental"
+}

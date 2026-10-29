@@ -1,0 +1,68 @@
+{
+  "id" : "org.knime.base.node.viz.crosstable.CrosstabNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.viz.crosstable.CrosstabNodeParameters",
+    "fields" : [ {
+      "field" : "m_rowVarColumn",
+      "configKey" : "rowVariableColumn",
+      "title" : "Row variable",
+      "description" : "The input column used as the row variable in the cross-tabulation.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.viz.crosstable.CrosstabNodeParameters$StringOrDoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_colVarColumn",
+      "configKey" : "columnVariableColumn",
+      "title" : "Column variable",
+      "description" : "The input column used as the column variable in the cross-tabulation.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.viz.crosstable.CrosstabNodeParameters$StringOrDoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_weightColumn",
+      "configKey" : "weightColumn",
+      "title" : "Weight column",
+      "description" : "Applies a numeric weight for each record in the input causing the Crosstab node to treat each record as if\nit were repeated WEIGHT number of times.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_enableHiliting",
+      "configKey" : "enableHiliting",
+      "title" : "Enable hiliting",
+      "description" : "If enabled, the hiliting of a cell in the crosstab will hilite all cells with same categories in attached\nviews. Depending on the number of rows, enabling this feature might consume a lot of memory.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_namingVersion",
+      "configKey" : "namingVersion",
+      "title" : "NamingVersion",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    } ]
+  },
+  "tier" : "core"
+}

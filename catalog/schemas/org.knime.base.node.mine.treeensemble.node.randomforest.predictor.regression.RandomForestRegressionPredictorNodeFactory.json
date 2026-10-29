@@ -1,0 +1,28 @@
+{
+  "id" : "org.knime.base.node.mine.treeensemble.node.randomforest.predictor.regression.RandomForestRegressionPredictorNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.mine.treeensemble.node.randomforest.predictor.regression.RandomForestRegressionPredictorNodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Change prediction column name",
+      "section" : "Prediction Settings",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "label" : "Prediction Column Name",
+      "section" : "Prediction Settings",
+      "source" : "dialog-ui",
+      "default" : "Prediction ()",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 2,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

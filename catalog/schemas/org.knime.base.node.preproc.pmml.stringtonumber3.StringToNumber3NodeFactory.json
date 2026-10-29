@@ -1,0 +1,55 @@
+{
+  "id" : "org.knime.base.node.preproc.pmml.stringtonumber3.StringToNumber3NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.pmml.stringtonumber3.StringToNumber3NodeParameters",
+    "fields" : [ {
+      "field" : "m_inclCols",
+      "configKey" : "inclCols",
+      "title" : "Column selection",
+      "description" : "Move the columns of interest into the \"Include\" list.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$StringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_parseType",
+      "configKey" : "parseType",
+      "title" : "Type",
+      "description" : "Choose the DataType that your string should be converted to.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "DOUBLE",
+        "label" : "Number (Float)"
+      }, {
+        "value" : "INT",
+        "label" : "Number (Integer)"
+      } ],
+      "default" : "DOUBLE"
+    }, {
+      "field" : "m_decimalSep",
+      "configKey" : "decimal_separator",
+      "title" : "Decimal separator",
+      "description" : "Choose a decimal separator, which is used to mark the boundary between the integral and the fractional parts of the decimal string.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "."
+    }, {
+      "field" : "m_thousandsSep",
+      "configKey" : "thousands_separator",
+      "title" : "Thousands separator",
+      "description" : "Choose a thousands separator used in the decimal string to group together three digits.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    } ]
+  },
+  "tier" : "experimental"
+}

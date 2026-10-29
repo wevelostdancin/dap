@@ -1,0 +1,146 @@
+{
+  "id" : "org.knime.base.node.preproc.cellsplit2.CellSplitter2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.cellsplit2.CellSplitter2NodeParameters",
+    "fields" : [ {
+      "field" : "m_columnName",
+      "configKey" : "colName",
+      "title" : "Select a column",
+      "description" : "Select the column whose values are split.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$StringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeInputColumn",
+      "configKey" : "removeInputColumn",
+      "title" : "Remove input column",
+      "description" : "When checked, the selected input column will not be part of the output table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_delimiter",
+      "configKey" : "delimiter",
+      "title" : "Enter a delimiter",
+      "description" : "Specify the delimiter in the value, that splits each part.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ","
+    }, {
+      "field" : "m_useEscapeCharacter",
+      "configKey" : "useEscapeCharacter",
+      "title" : "Use \\ as escape character",
+      "description" : "If enabled, the backslash (\\) can be used to escape characters, such as \\t for tabs. You can use the full escape capabilities of Java.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_quotePattern",
+      "configKey" : "quotePattern",
+      "title" : "Enter a quotation character",
+      "description" : "Specify the quotation character if the different parts in the value are quoted. (The character to escape quotes is always the backslash.) If no quotation character is needed leave it empty.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "\"",
+      "placeholder" : "(leave empty for none)"
+    }, {
+      "field" : "m_removeQuotes",
+      "configKey" : "removeQuotes",
+      "title" : "RemoveQuotes",
+      "description" : "",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_trim",
+      "configKey" : "removeWhitespaces",
+      "title" : "Remove leading and trailing white space chars (trim)",
+      "description" : "If checked, leading and trailing white spaces of each part (token) will be deleted.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_outputMode",
+      "configKey" : "outputMode",
+      "title" : "Output format",
+      "description" : "Select how the split results should be output: as a list collection, as a set collection (duplicates removed), or as separate columns.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "AS_COLUMNS",
+        "label" : "As new columns"
+      }, {
+        "value" : "AS_LIST",
+        "label" : "As list"
+      }, {
+        "value" : "AS_SET",
+        "label" : "As set (remove duplicates)"
+      } ],
+      "default" : "AS_COLUMNS"
+    }, {
+      "field" : "m_splitColumnNames",
+      "configKey" : "splitColumnNames",
+      "title" : "Split input column name for output column names",
+      "description" : "When outputting as new columns, check this option when the input column name can be split in the same manner as the column's content to obtain the names for the output columns.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_sizeMode",
+      "configKey" : "sizeMode",
+      "title" : "Size determination",
+      "description" : "Choose whether to specify a fixed number of output columns or to automatically determine the size.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "GUESS_SIZE",
+        "label" : "Guess size and column types (requires additional data table scan)"
+      }, {
+        "value" : "FIXED_SIZE",
+        "label" : "Set array size"
+      } ],
+      "default" : "GUESS_SIZE"
+    }, {
+      "field" : "m_numberOfColumns",
+      "configKey" : "numberOfCols",
+      "title" : "Number of columns",
+      "description" : "Specify the number of columns to append. All created columns will be of type String.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 6
+    }, {
+      "field" : "m_hasScanLimit",
+      "configKey" : "hasScanLimit",
+      "title" : "Scan limit (number of lines to guess on)",
+      "description" : "Maximum number of rows to scan for guessing the number of output columns.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_scanLimit",
+      "configKey" : "scanLimit",
+      "title" : "Maximum rows to scan",
+      "description" : "Maximum number of rows to scan for guessing the number of output columns and their types.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 50
+    }, {
+      "field" : "m_useEmptyString",
+      "configKey" : "useEmptyString",
+      "title" : "Create empty string cells",
+      "description" : "If checked, empty string cells are created for missing or short input cells instead of missing value cells.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "core"
+}

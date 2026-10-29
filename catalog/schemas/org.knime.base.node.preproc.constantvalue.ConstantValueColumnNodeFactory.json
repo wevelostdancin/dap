@@ -1,0 +1,71 @@
+{
+  "id" : "org.knime.base.node.preproc.constantvalue.ConstantValueColumnNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.preproc.constantvalue.ConstantValueColumnNodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Replace",
+      "section" : "Column settings",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Append",
+      "section" : "Column settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Column settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "string",
+      "section" : "Column settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "dropdown",
+      "section" : "Value settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Number (Long Integer)",
+        "label" : "Number (Long Integer)"
+      }, {
+        "value" : "Number (Integer)",
+        "label" : "Number (Integer)"
+      }, {
+        "value" : "Number (Float)",
+        "label" : "Number (Float)"
+      }, {
+        "value" : "XML",
+        "label" : "XML"
+      }, {
+        "value" : "String",
+        "label" : "String"
+      }, {
+        "value" : "Date and Time",
+        "label" : "Date and Time"
+      }, {
+        "value" : "Boolean",
+        "label" : "Boolean"
+      } ],
+      "default" : "Number (Long Integer)"
+    }, {
+      "type" : "string",
+      "section" : "Value settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 6,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

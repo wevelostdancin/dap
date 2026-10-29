@@ -1,0 +1,56 @@
+{
+  "id" : "org.knime.base.node.preproc.ungroup.UngroupNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.ungroup.UngroupNodeParameters",
+    "fields" : [ {
+      "field" : "m_collectionColumns",
+      "configKey" : "collectionColumns",
+      "title" : "Collection columns to ungroup",
+      "description" : "Select the collection columns that should be ungrouped.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.ungroup.UngroupNodeParameters$CollectionColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeCollectionColumn",
+      "configKey" : "removeCollectionCol",
+      "title" : "Remove selected collection column",
+      "description" : "If enabled, the selected collection column will be removed from the result table. If disabled, the original collection column will be kept in the output alongside the ungrouped values.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_skipMissingValues",
+      "configKey" : "skipMissingValues",
+      "title" : "Skip missing values",
+      "description" : "If enabled, rows with a missing value in all selected collection columns are skipped, as well as missing values in a collection cell if they occur in all selected collection columns.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_skipEmptyCollections",
+      "configKey" : "skipEmptyCollections",
+      "title" : "Skip empty collections",
+      "description" : "If enabled, rows in which all selected collection columns are empty will be skipped.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_enableHiliting",
+      "configKey" : "enableHilite",
+      "title" : "Enable hiliting",
+      "description" : "If enabled, the hiliting of an input row results in hiliting all rows (given in the collection cell) of the ungrouped output table. Conversely, if all output rows (represented in one or more collection cells) are highlighted, the input row(s) are highlighted as well. Depending on the number of rows, enabling this feature might consume a lot of memory.",
+      "advanced" : true,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

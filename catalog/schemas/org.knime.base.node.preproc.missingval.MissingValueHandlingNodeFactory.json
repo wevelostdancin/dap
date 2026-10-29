@@ -1,0 +1,20 @@
+{
+  "id" : "org.knime.base.node.preproc.missingval.MissingValueHandlingNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.preproc.missingval.MissingValueHandlingNodeDialog",
+    "ui" : [ {
+      "type" : "list",
+      "section" : "Individual",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 1,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

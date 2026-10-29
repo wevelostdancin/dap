@@ -1,0 +1,40 @@
+{
+  "id" : "org.knime.base.node.preproc.cellsplitbypos.CellSplitterByPosNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.cellsplitbypos.CellSplitterByPosNodeParameters",
+    "fields" : [ {
+      "field" : "m_splitPoints",
+      "configKey" : "SplitPoints",
+      "title" : "Split indices",
+      "description" : "Enter the position(s) of the splits, separated by a comma. For example, the string \"ABCDEFG\" with the split points \"2,4\" creates three new columns carrying the results \"AB\", \"CD\", and \"EFG\". The specified split points must be strictly increasing numbers larger than zero.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_newColNames",
+      "configKey" : "NewColNames",
+      "title" : "New column names",
+      "description" : "Enter the name(s) for the appended columns separated by a comma. Names must be unique and not existing in the input table. Specify as many as you defined split points plus one. All newly created columns are of type String.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_selColumn",
+      "configKey" : "SelColumn",
+      "title" : "Column to split",
+      "description" : "Select the column whose content should be split. Only String columns can be selected.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$StringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "core"
+}

@@ -1,0 +1,30 @@
+{
+  "id" : "org.knime.base.node.mine.bayes.naivebayes.predictor4.NaiveBayesPredictorNodeFactory3",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.bayes.naivebayes.predictor4.NaiveBayesPredictorNodeParameters",
+    "fields" : [ {
+      "field" : "m_predictionColumnName",
+      "configKey" : "predictionColumnName",
+      "title" : "Change prediction column name",
+      "description" : "When set, you can change the name of the prediction column.\nThe default prediction column name is: <tt>Prediction (trainingColumn)</tt>.\n",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_probabilitySuffix",
+      "configKey" : "probabilitySuffix",
+      "title" : "Append columns with normalized class distribution",
+      "description" : "If selected, a column is appended for each class instance with the normalized probability\nof this row being a member of this class. The probability columns will have names like:\n<tt>P (trainingColumn=value)</tt> with an optional suffix that can be specified.)\n",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    } ]
+  },
+  "tier" : "core"
+}

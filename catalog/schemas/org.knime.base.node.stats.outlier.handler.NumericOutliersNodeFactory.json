@@ -1,0 +1,163 @@
+{
+  "id" : "org.knime.base.node.stats.outlier.handler.NumericOutliersNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.stats.outlier.handler.NumericOutliersNodeParameters",
+    "fields" : [ {
+      "field" : "m_outlierColumns",
+      "configKey" : "outlierColumns",
+      "title" : "Outlier selection",
+      "description" : "Allows the selection of columns for which outliers have to be detected and treated. If \"Compute\noutlier statistics on groups\" is selected, the outliers for each of the columns are computed solely\nwith respect to the different groups.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter"
+    }, {
+      "field" : "m_iqrScalar",
+      "configKey" : "iqr-scalar",
+      "title" : "Interquartile range multiplier (k)",
+      "description" : "Allows scaling the interquartile range (IQR). The default is k = 1.5. Larger values will cause\nless values to be considered outliers.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 1.5
+    }, {
+      "field" : "m_quartileCalculation",
+      "configKey" : "quartileCalculation",
+      "title" : "Quartile calculation",
+      "description" : "Allows to specify how the quartiles are computed.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FULL_DATA",
+        "label" : "Full data estimate"
+      }, {
+        "value" : "HEURISTIC",
+        "label" : "Use heuristic"
+      } ],
+      "default" : "HEURISTIC"
+    }, {
+      "field" : "m_estimationType",
+      "configKey" : "estimationType",
+      "title" : "Estimation type",
+      "description" : "Specifies how the actual quartile value is computed when using full data estimate. A detailed explanation of the different types can be found <a href=\"https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample\">here</a>.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LEGACY",
+        "label" : "Legacy"
+      }, {
+        "value" : "R_1",
+        "label" : "R 1"
+      }, {
+        "value" : "R_2",
+        "label" : "R 2"
+      }, {
+        "value" : "R_3",
+        "label" : "R 3"
+      }, {
+        "value" : "R_4",
+        "label" : "R 4"
+      }, {
+        "value" : "R_5",
+        "label" : "R 5"
+      }, {
+        "value" : "R_6",
+        "label" : "R 6"
+      }, {
+        "value" : "R_7",
+        "label" : "R 7"
+      }, {
+        "value" : "R_8",
+        "label" : "R 8"
+      }, {
+        "value" : "R_9",
+        "label" : "R 9"
+      } ],
+      "default" : "R_6"
+    }, {
+      "field" : "m_updateDomain",
+      "configKey" : "update-domain",
+      "title" : "Update domain",
+      "description" : "If checked the domain of the selected outlier columns is updated.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_detectionOption",
+      "configKey" : "detectionOption",
+      "title" : "Apply to",
+      "description" : "Allows to apply the selected treatment strategy to",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "All outliers",
+        "label" : "All outliers"
+      }, {
+        "value" : "Outliers below lower bound",
+        "label" : "Outliers below lower bound"
+      }, {
+        "value" : "Outliers above upper bound",
+        "label" : "Outliers above upper bound"
+      } ],
+      "default" : "All outliers"
+    }, {
+      "field" : "m_treatmentOption",
+      "configKey" : "treatmentOption",
+      "title" : "Treatment option",
+      "description" : "Defines three different strategies to treat outliers:",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Replace outlier values",
+        "label" : "Replace outlier values"
+      }, {
+        "value" : "Remove outlier rows",
+        "label" : "Remove outlier rows"
+      }, {
+        "value" : "Remove non-outlier rows",
+        "label" : "Remove non-outlier rows"
+      } ],
+      "default" : "Replace outlier values"
+    }, {
+      "field" : "m_replacementStrategy",
+      "configKey" : "replacementStrategy",
+      "title" : "Replacement strategy",
+      "description" : "Defines two different strategies to replace outliers:",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Missing values",
+        "label" : "Missing values"
+      }, {
+        "value" : "Closest permitted value",
+        "label" : "Closest permitted value"
+      } ],
+      "default" : "Missing values"
+    }, {
+      "field" : "m_useGroups",
+      "configKey" : "use-groups",
+      "title" : "Compute outlier statistics on groups",
+      "description" : "If selected, allows the selection of columns to identify groups. A group comprises all rows of\nthe input exhibiting the same values in every single column. The outliers will finally be computed\nwith respect to each of the individual groups.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_groupColumns",
+      "configKey" : "groupColumns",
+      "title" : "Group columns",
+      "description" : "Move the columns defining the groups into the Include list. The group definition will take\npriority, i.e. if a column is selected for both group definition and outlier handling, it will be\nused to define groups (no outlier handling done for that column).\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter"
+    }, {
+      "field" : "m_processInMemory",
+      "configKey" : "memory-policy",
+      "title" : "Process groups in memory",
+      "description" : "Processes the groups in the memory. This option comes with higher memory requirements, but is\nfaster since the table does not need any additional treatment.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

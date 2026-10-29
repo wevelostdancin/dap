@@ -1,0 +1,63 @@
+{
+  "id" : "org.knime.base.node.io.database.drop.DBDropTableNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "tableName",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "TableName",
+      "titleSource" : "field-name",
+      "source" : "dialog-field"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "cascade",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "Cascade",
+      "titleSource" : "field-name",
+      "source" : "dialog-field"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "failIfNotExists",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "FailIfNotExists",
+      "titleSource" : "field-name",
+      "source" : "dialog-field"
+    } ],
+    "dialogClass" : "org.knime.base.node.io.database.drop.DBDropTableNodeDialog",
+    "ui" : [ {
+      "type" : "string",
+      "label" : "Table name",
+      "configKey" : "tableName",
+      "keySource" : "label-match",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "cascade  (WARNING: This might drop dependent objects!)",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Fail if table does not exist",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/3",
+    "uiElements" : 3,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

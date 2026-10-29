@@ -1,0 +1,89 @@
+{
+  "id" : "org.knime.base.node.preproc.table.splitter.TableSplitterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.table.splitter.TableSplitterNodeSettings",
+    "fields" : [ {
+      "field" : "m_findSplittingRowMode",
+      "configKey" : "findSplittingRowMode",
+      "title" : "Find splitting row by",
+      "description" : "Select if the table should be split at the first matching row or at the last matching row.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FIRST_MATCH",
+        "label" : "First match"
+      }, {
+        "value" : "LAST_MATCH",
+        "label" : "Last match"
+      } ],
+      "default" : "FIRST_MATCH"
+    }, {
+      "field" : "m_lookupColumn",
+      "configKey" : "lookupColumnV2",
+      "title" : "Lookup column",
+      "description" : "Select the column that should be used to evaluate the matching criteria. Only columns of type String, Number (integer), or Number (long) can be selected.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.table.splitter.TableSplitterNodeSettings$ColumnChoices",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_matchingCriteria",
+      "configKey" : "matchingCriteria",
+      "title" : "Matching criteria",
+      "description" : "Select criteria for matching the row:<ul><li><b>Equals:</b> compares the value of the cell to a given search pattern.</li><li><b>Missing:</b> only matches rows that have a missing value at the selected column.</li><li><b>Empty:</b> matches rows that have an empty or missing value at the selected column. Strings and RowIDs containing only whitespace characters will also match.</li></ul>",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "EQUALS",
+        "label" : "Equals"
+      }, {
+        "value" : "MISSING",
+        "label" : "Missing"
+      }, {
+        "value" : "EMPTY",
+        "label" : "Empty"
+      } ],
+      "default" : "EQUALS"
+    }, {
+      "field" : "m_searchPattern",
+      "configKey" : "searchPattern",
+      "title" : "Search pattern",
+      "description" : "Select a search pattern to compare the value of the selected column. If a number column is selected the search pattern must be a parsable number.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_includeMatchingRowInTopTable",
+      "configKey" : "includeMatchingRowInTopTable",
+      "title" : "Include matching row in top output table",
+      "description" : "Select this option to include the row that split the table in the top output table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_includeMatchingRowInBottomTable",
+      "configKey" : "includeMatchingRowInBottomTable",
+      "title" : "Include matching row in bottom output table",
+      "description" : "Select this option to include the row that split the table in the bottom output table.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_updateDomains",
+      "configKey" : "updateDomains",
+      "title" : "Update domains of all columns",
+      "description" : "Advanced setting to enable recomputation of the domains of all columns in the output table such that the domains' bounds exactly match the bounds of the data in the output table.",
+      "advanced" : true,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

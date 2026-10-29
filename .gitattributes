@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.jar binary
+*.tar binary
+*.tar.gz binary
+*.tar.zst binary
+catalog/schemas/*.json linguist-generated=true
+catalog/catalog.json linguist-generated=true

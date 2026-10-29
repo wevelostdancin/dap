@@ -1,0 +1,24 @@
+{
+  "id" : "org.knime.ensembles.bagging.ModelLoopStartNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.ensembles.bagging.ModelLoopStartNodeParameters",
+    "fields" : [ {
+      "field" : "m_modelColumn",
+      "configKey" : "model-column",
+      "title" : "Model column",
+      "description" : "The column from the input table that contains the port objects (models) to iterate over.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.ensembles.bagging.ModelLoopStartNodeParameters$ModelColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "experimental"
+}

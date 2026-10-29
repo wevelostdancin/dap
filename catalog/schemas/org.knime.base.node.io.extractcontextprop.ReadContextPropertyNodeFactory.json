@@ -1,0 +1,33 @@
+{
+  "id" : "org.knime.base.node.io.extractcontextprop.ReadContextPropertyNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.io.extractcontextprop.ReadContextPropertyNodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Extract all available properties",
+      "section" : "Properties",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 3,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

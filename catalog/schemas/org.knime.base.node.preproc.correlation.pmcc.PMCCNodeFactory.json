@@ -1,0 +1,59 @@
+{
+  "id" : "org.knime.base.node.preproc.correlation.pmcc.PMCCNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelFilterString",
+      "configKey" : "includeList",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelFilterString",
+      "type" : "filter",
+      "default" : null,
+      "title" : "IncludeList",
+      "titleSource" : "field-name",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "possibleValuesCount",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 50,
+      "min" : 2.0,
+      "max" : 2.147483647E9,
+      "title" : "Possible Values Count",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.preproc.correlation.pmcc.PMCCNodeDialogPane",
+    "ui" : [ {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Possible Values Count",
+      "configKey" : "possibleValuesCount",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : "50",
+      "editable" : true
+    } ],
+    "labelCoverage" : "1/2",
+    "uiElements" : 3
+  },
+  "tier" : "experimental"
+}

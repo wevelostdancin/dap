@@ -1,0 +1,44 @@
+{
+  "id" : "org.knime.ext.sun.nodes.script.node.rowfilter.JavaRowFilterNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.ext.sun.nodes.script.JavaScriptingNodeDialog",
+    "ui" : [ {
+      "type" : "list",
+      "section" : "Column List",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "list",
+      "section" : "Flow Variable List",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Insert Missing As Null",
+      "configKey" : "insert_missing_as_null",
+      "keySource" : "label-match",
+      "section" : "Java Snippet",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Compile on close",
+      "section" : "Java Snippet",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "list",
+      "section" : "Additional Libraries",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 5,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

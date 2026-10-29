@@ -1,0 +1,35 @@
+{
+  "id" : "org.knime.base.node.viz.parcoord.ParallelCoordinatesNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.viz.parcoord.ParallelCoordinatesNodeDialog",
+    "ui" : [ {
+      "type" : "number",
+      "label" : "maximum number of rows displayed",
+      "section" : "Default Options",
+      "source" : "dialog-ui",
+      "default" : 1000.0,
+      "min" : 1.0,
+      "max" : 1000000.0,
+      "step" : 1.0
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 3
+  },
+  "tier" : "experimental"
+}

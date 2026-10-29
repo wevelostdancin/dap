@@ -1,0 +1,21 @@
+{
+  "id" : "org.knime.base.node.mine.regression.logistic.predict.GeneralRegressionPredictorNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.mine.regression.logistic.predict.GeneralRegressionPredictorNodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Append columns with predicted probabilities",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 1,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

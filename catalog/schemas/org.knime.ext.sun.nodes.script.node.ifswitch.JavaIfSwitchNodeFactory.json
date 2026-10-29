@@ -1,0 +1,26 @@
+{
+  "id" : "org.knime.ext.sun.nodes.script.node.ifswitch.JavaIfSwitchNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.ext.sun.nodes.script.node.ifswitch.JavaIfSwitchNodeDialogPane",
+    "ui" : [ {
+      "type" : "list",
+      "section" : "Flow Variable List",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Compile on close",
+      "section" : "Expression",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 2,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

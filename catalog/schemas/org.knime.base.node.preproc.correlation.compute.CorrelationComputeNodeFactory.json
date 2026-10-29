@@ -1,0 +1,75 @@
+{
+  "id" : "org.knime.base.node.preproc.correlation.compute.CorrelationComputeNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelColumnFilter2",
+      "configKey" : "include-list",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelColumnFilter2",
+      "type" : "filter",
+      "default" : null,
+      "title" : "Include-list",
+      "titleSource" : "field-name",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "possibleValuesCount",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 50,
+      "min" : 2.0,
+      "max" : 2.147483647E9,
+      "title" : "Possible Values Count",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.preproc.correlation.compute.CorrelationComputeNodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Manual Selection",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce exclusion",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce inclusion",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Possible Values Count",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : "50",
+      "editable" : true
+    } ],
+    "labelCoverage" : "1/2",
+    "uiElements" : 6
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,13 @@
+{
+  "id" : "org.knime.base.node.mine.treeensemble.node.modelextractor.TreeEnsembleModelExtractorNodeFactory",
+  "swing" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "labelCoverage" : "0/0",
+    "warnings" : [ "createNodeDialogPane() вернул null" ],
+    "empty" : true
+  },
+  "available" : false,
+  "reason" : "узел не отдал ни аннотированную, ни Swing-схему; используйте settingsXml из /nodes/{id}",
+  "tier" : "experimental"
+}

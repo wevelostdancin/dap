@@ -1,0 +1,184 @@
+{
+  "id" : "org.knime.base.node.mine.decisiontree2.learner2.DecisionTreeLearnerNodeFactory3",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.decisiontree2.learner2.DecisionTreeLearnerNodeFactory3Parameters",
+    "fields" : [ {
+      "field" : "m_classifyColumn",
+      "configKey" : "classifyColumn",
+      "title" : "Class column",
+      "description" : "Select the target attribute. Only nominal attributes are allowed.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.decisiontree2.learner2.DecisionTreeLearnerNodeFactory3Parameters$NominalColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_qualityMeasure",
+      "configKey" : "qualityMeasure",
+      "title" : "Quality measure",
+      "description" : "Select the quality measure according to which the split is calculated.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "GINI_INDEX",
+        "label" : "Gini index"
+      }, {
+        "value" : "GAIN_RATIO",
+        "label" : "Gain ratio"
+      } ],
+      "default" : "GINI_INDEX"
+    }, {
+      "field" : "m_pruningMethod",
+      "configKey" : "pruningMethod",
+      "title" : "Pruning method",
+      "description" : "Pruning reduces tree size and avoids overfitting which increases the generalization performance, and thus,\nthe prediction quality (for predictions, use the \"Decision Tree Predictor\" node).\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NO_PRUNING",
+        "label" : "No pruning"
+      }, {
+        "value" : "MDL",
+        "label" : "MDL"
+      } ],
+      "default" : "NO_PRUNING"
+    }, {
+      "field" : "m_reducedErrorPruning",
+      "configKey" : "enableReducedErrorPruning",
+      "title" : "Reduced error pruning",
+      "description" : "If checked (default), a simple pruning method is used to cut the tree in a post-processing step: Starting\nat the leaves, each node is replaced with its most popular class, but only if the prediction accuracy\ndoesn't decrease. Reduced error pruning has the advantage of simplicity and speed.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_minNumberRecordsPerNode",
+      "configKey" : "minNumberRecordsPerNode",
+      "title" : "Minimum number of records per node",
+      "description" : "Select the minimum number of records at least required in each node. If the number of records is smaller or\nequal to this number the tree is not grown any further. This corresponds to a stopping criteria (pre\npruning).\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 2
+    }, {
+      "field" : "m_numberRecordsStoredForView",
+      "configKey" : "numverRecordsToView",
+      "title" : "Number of records to store for view",
+      "description" : "Select the number of records stored in the tree for the view. The records are necessary to enable\nhighlighting.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 10000,
+      "step" : 100.0
+    }, {
+      "field" : "m_averageSplitPoint",
+      "configKey" : "splitAverage",
+      "title" : "Average split point",
+      "description" : "If checked (default), the split value for numeric attributes is determined according to the mean value of\nthe two attribute values that separate the two partitions. If unchecked, the split value is set to the\nlargest value of the lower partition (like C4.5).\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_numProcessors",
+      "configKey" : "numProcessors",
+      "title" : "Number threads",
+      "description" : "This node can exploit multiple threads and thus multiple processors or cores. This can improve performance.\nThe default value is set to the number of processors or cores that are available to KNIME. If set to 1, the\nalgorithm is performed sequentially.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 8
+    }, {
+      "field" : "m_skipColumnsWithoutDomain",
+      "configKey" : "skipColumnsWithoutDomain",
+      "title" : "Skip nominal columns without domain information",
+      "description" : "If checked, nominal columns containing no domain value information are skipped. This is generally the case\nfor nominal columns that have too many different values.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_useFirstSplitColumn",
+      "configKey" : "useFirstSplitColumn",
+      "title" : "Force root split column",
+      "description" : "If checked, the first split is calculated on the chosen column without evaluating any other column for\npossible splits. This is sometimes useful if the user has additional information as to which column is best\nto split on even if it does not have the numeric best split quality. In case the selected column does not\ncontain valid splits (e.g. because it has a constant value in all rows) a warning message will be displayed.\nIf uncertain, leave unselected.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_firstSplitColumn",
+      "configKey" : "firstSplitColumn",
+      "title" : "Root split column",
+      "description" : "The column to perform the root split on.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.decisiontree2.learner2.DecisionTreeLearnerNodeFactory3Parameters$NominalOrNumericColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_binaryNominalSplitMode",
+      "configKey" : "binaryNominalSplit",
+      "title" : "Binary nominal splits",
+      "description" : "If checked, nominal attributes are split in a binary fashion. Binary splits are more difficult to calculate\nbut result also in more accurate trees. The nominal values are divided in two subsets (one for each child).\nIf unchecked, for each nominal value one child is created.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_maxNumNominalValues",
+      "configKey" : "maxNumNominalValues",
+      "title" : "Maximum number of nominal values",
+      "description" : "The subsets for the binary nominal splits are difficult to calculate. To find the best subsets for n\nnominal values there must be performed 2^n calculations. In case of many different nominal values this can\nbe prohibitive expensive. Thus the maximum number of nominal values can be defined for which all possible\nsubsets are calculated. Above this threshold, a heuristic is applied that first calculates the best nominal\nvalue for the second partition, then the second best value, and so on; until no improvement can be\nachieved.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 10
+    }, {
+      "field" : "m_filterNominalValuesFromParent",
+      "configKey" : "FilterNominalValuesFromParent",
+      "title" : "Filter invalid attribute values in child nodes",
+      "description" : "Binary splits on nominal values may lead to tests for attribute values, which have been filtered out by a\nparent tree node. This is due to the fact that the learning algorithm is consistently using the table's\ndomain information instead of the data in a tree node to define the split sets. These duplicate checks do\nnot harm (the tree is the same and and will classify unknown data the exact same way), though they are\nconfusing when the tree is inspected in the tree viewer. Enabling this option will post-process the tree\nand filter invalid checks.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_noTrueChildStrategy",
+      "configKey" : "noTrueChildStrategy",
+      "title" : "No true child strategy",
+      "description" : "If the scoring reaches a node, at which its attributes value is unknown, one of the two following strategies\ncan be used.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "returnNullPrediction",
+        "label" : "Returnnullprediction"
+      }, {
+        "value" : "returnLastPrediction",
+        "label" : "Returnlastprediction"
+      } ],
+      "default" : "returnNullPrediction"
+    }, {
+      "field" : "m_missingValueStrategy",
+      "configKey" : "missingValueStrategy",
+      "title" : "Missing value strategy",
+      "description" : "If there are missing values in the data to be predicted, a strategy can be chosen how to handle them. <br/>\n<ul>\n    <li>\n        <b>Last Prediction</b>\n        If a Node's predicate evaluates to UNKNOWN while traversing the tree, evaluation is stopped and the\n        current winner is returned as the final prediction.\n    </li>\n    <li>\n        <b>None</b>\n        Comparisons with missing values other than checks for missing values always evaluate to FALSE. If\n        no rule fires, then use the noTrueChildStrategy to decide on a result. This option requires that\n        missing values be handled after all rules at the Node have been evaluated. Note: In contrast to\n        lastPrediction, evaluation is carried on instead of stopping immediately upon first discovery of a\n        Node who's predicate value cannot be determined due to missing values.\n    </li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "lastPrediction",
+        "label" : "Last prediction"
+      }, {
+        "value" : "none",
+        "label" : "None"
+      } ],
+      "default" : "lastPrediction",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.decisiontree2.learner2.DecisionTreeLearnerNodeFactory3Parameters$MissingValueStrategyProvider",
+        "kind" : "enum"
+      },
+      "choicesResolved" : true
+    } ]
+  },
+  "tier" : "core"
+}

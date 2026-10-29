@@ -1,0 +1,42 @@
+{
+  "id" : "org.knime.base.node.preproc.refcolumnresorter.ReferenceColumnResorterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.refcolumnresorter.ReferenceColumnResorterNodeParameters",
+    "fields" : [ {
+      "field" : "m_orderColumn",
+      "configKey" : "OrderCol",
+      "title" : "Order column",
+      "description" : "The column in the second input storing the ordered list of column names in the first input.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.refcolumnresorter.ReferenceColumnResorterNodeParameters$StringColumnSecondPortProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_strategy",
+      "configKey" : "strategy",
+      "title" : "Strategy for unspecified columns",
+      "description" : "Strategy for handling columns whose positions are not specified by the second input:",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LAST",
+        "label" : "Last"
+      }, {
+        "value" : "FIRST",
+        "label" : "First"
+      }, {
+        "value" : "DROP",
+        "label" : "Drop"
+      } ],
+      "default" : "LAST"
+    } ]
+  },
+  "tier" : "experimental"
+}

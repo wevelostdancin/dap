@@ -1,0 +1,205 @@
+{
+  "id" : "org.knime.base.node.mine.regression.logistic.learner4.LogRegLearnerNodeFactory4",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.regression.logistic.learner4.LogRegLearnerNodeParameters",
+    "fields" : [ {
+      "field" : "m_targetColumn",
+      "configKey" : "target",
+      "title" : "Target column",
+      "description" : "Select the target column. Only columns with nominal data are allowed. The reference category is\nempty if the domain of the target column is not available. In this case the node determines the\ndomain values right before computing the logistic regression model and chooses the last domain\nvalue as the targets reference category.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.regression.logistic.learner4.LogRegLearnerNodeParameters$NominalColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_targetReferenceCategory",
+      "configKey" : "targetReferenceCategory",
+      "title" : "Reference category",
+      "description" : "The reference category is the category for which the probability is obtained as 1 minus the sum\nof all other probabilities. In a two class scenario this is usually the class for which you don't\nexplicitly want to model the probability.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.regression.logistic.learner4.LogRegLearnerNodeParameters$TargetReferenceCategoryChoicesProvider",
+        "kind" : "strings",
+        "note" : "варианты вычисляются провайдером"
+      },
+      "choices" : [ ],
+      "choicesResolved" : true
+    }, {
+      "field" : "m_useTargetDomainOrder",
+      "configKey" : "useOrderFromTargetDomain",
+      "title" : "Use order from target column domain",
+      "description" : "By default the target domain values are sorted lexicographically in the output, but you can\nenforce the order of the target column domain to be preserved by checking the box. Note, if a\ntarget reference column is selected in the dropdown, the checkbox will have no influence on the\ncoefficients of the model except that the output representation (e.g. order of rows in the\ncoefficient table) may vary.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_solver",
+      "configKey" : "solver",
+      "title" : "Solver",
+      "description" : "Select the solver to use. Either Iteratively reweighted least squares or Stochastic average\ngradient.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Iteratively reweighted least squares",
+        "label" : "Iteratively reweighted least squares"
+      }, {
+        "value" : "Stochastic average gradient",
+        "label" : "Stochastic average gradient"
+      } ],
+      "default" : "Stochastic average gradient"
+    }, {
+      "field" : "m_includedColumns",
+      "configKey" : "includedColumns",
+      "title" : "Feature selection",
+      "description" : "Specify the independent columns that should be included in the regression model. Numeric and\nnominal data can be included.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.regression.logistic.learner4.LogRegLearnerNodeParameters$LogRegCompatibleColumnFilterProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_useFeatureDomainOrder",
+      "configKey" : "useOrderFromFeatureDomain",
+      "title" : "Use order from column domain",
+      "description" : "By default the domain values (categories) of nominal valued columns are sorted lexicographically,\nbut you can check that the order from the column domain is used. Please note that the first\ncategory is used as a reference when creating the dummy variables.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_performLazy",
+      "configKey" : "performLazy",
+      "title" : "Perform calculations lazily",
+      "description" : "If selected, the optimization is performed lazily i.e. the coefficients are only updated if their\ncorresponding feature is actually present in the current sample. Usually faster than the normal\nversion especially for sparse data (that is data where for the most rows the most values are\nzero). Currently only supported by the SAG solver.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_calcCovMatrix",
+      "configKey" : "calcCoefficientStatistics",
+      "title" : "Calculate statistics for coefficients",
+      "description" : "If selected, the node calculates the standard errors, z-score and P>|z| values for the\ncoefficients. Note that those are affected by regularization in case of the Gauss prior.\nCalculating those statistics is expensive if the model is learned on many features and can be\nresponsible for a significant part of the node runtime.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_maxEpoch",
+      "configKey" : "maxEpoch",
+      "title" : "Maximal number of epochs",
+      "description" : "Here you can specify the maximal number of learning epochs you want to perform. That is the\nnumber of times you want to iterate over the full table. This value determines to a large extend\nhow long learning will take. The solver will stop early if it reaches convergence therefore it is\nrecommended to set a relatively high value for this parameter in order to give the solver enough\ntime to find a good solution.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 100
+    }, {
+      "field" : "m_epsilon",
+      "configKey" : "epsilon",
+      "title" : "Epsilon",
+      "description" : "This value is used to determine whether the model converged. If the relative change of all\ncoefficients is smaller than epsilon, the training is stopped.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 1.0E-5
+    }, {
+      "field" : "m_learningRateStrategy",
+      "configKey" : "learningRateStrategy",
+      "title" : "Learning rate strategy",
+      "description" : "The strategy provides the learning rates for the optimization process. Only important for the SAG\nsolver. For more information see the paragraph on learning rate strategies above.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Fixed",
+        "label" : "Fixed"
+      }, {
+        "value" : "LineSearch",
+        "label" : "Linesearch"
+      } ],
+      "default" : "Fixed"
+    }, {
+      "field" : "m_initialLearningRate",
+      "configKey" : "stepSize",
+      "title" : "Step size",
+      "description" : "The step size (learning rate) to use in case of the fixed learning rate strategy.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.1
+    }, {
+      "field" : "m_prior",
+      "configKey" : "prior",
+      "title" : "Prior",
+      "description" : "The prior distribution for the coefficients. See the paragraph on regularization above for more details.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Uniform",
+        "label" : "Uniform"
+      }, {
+        "value" : "Gauss",
+        "label" : "Gauss"
+      }, {
+        "value" : "Laplace",
+        "label" : "Laplace"
+      } ],
+      "default" : "Uniform"
+    }, {
+      "field" : "m_priorVariance",
+      "configKey" : "priorVariance",
+      "title" : "Variance",
+      "description" : "The variance of the prior distribution. A larger variance corresponds to less regularization.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.1
+    }, {
+      "field" : "m_inMemory",
+      "configKey" : "inMemory",
+      "title" : "Hold data in memory",
+      "description" : "If selected, the data is read into an internal data structure which results into a tremendous\nspeed up. It is highly recommended to use this option if you have enough main memory available\nespecially if you use the SAG solver as their convergence rate highly depends on random access to\nindividual samples.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_chunkSize",
+      "configKey" : "chunkSize",
+      "title" : "Chunk size",
+      "description" : "If the data is not held completely in memory, the node reads chunks of data into memory to\nemulate random access for the SAG solver. This parameter specifies how large those chunks should\nbe. The chunk size directly affects the convergence rate of the SAG solver, as those work best\nwith complete random access and a larger chunk size will better approximate that. This especially\nmeans that the solver may need many epochs to converge if the chunk size is chosen too small.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 10000
+    }, {
+      "field" : "m_seedParameters",
+      "configKey" : "seedParameters",
+      "title" : "SeedParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_randomSeed",
+        "configKey" : "randomSeed",
+        "title" : "Random seed",
+        "description" : "The seed value for the random number generator.\n",
+        "advanced" : false,
+        "type" : "string",
+        "default" : null
+      }, {
+        "field" : "m_newSeed",
+        "configKey" : "newSeed",
+        "title" : "New",
+        "description" : "Generate a random seed and set it in the Random seed input above for reproducible runs.",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "java.lang.Void"
+      } ]
+    } ]
+  },
+  "tier" : "core"
+}

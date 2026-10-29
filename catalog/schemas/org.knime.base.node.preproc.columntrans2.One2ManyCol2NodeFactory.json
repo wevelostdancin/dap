@@ -1,0 +1,32 @@
+{
+  "id" : "org.knime.base.node.preproc.columntrans2.One2ManyCol2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.columntrans2.One2ManyCol2NodeParameters",
+    "fields" : [ {
+      "field" : "m_columnsToTransform",
+      "configKey" : "columnsToTransform",
+      "title" : "Columns to transform",
+      "description" : "Select the nominal columns that should be included in the transformation.\nFor each included column extra columns are appended, one for each possible value.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.columntrans2.One2ManyCol2NodeParameters$NominalColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeSources",
+      "configKey" : "removeSources",
+      "title" : "Remove included columns from output",
+      "description" : "When enabled, the original columns selected for transformation are removed from the output. The included columns are replaced by the new generated columns.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

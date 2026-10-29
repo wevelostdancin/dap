@@ -1,0 +1,56 @@
+{
+  "id" : "org.knime.base.node.viz.plotter.line.LinePlotterNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "end",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 2500,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "title" : "No. of rows to display:",
+      "titleSource" : "dialog",
+      "step" : 10.0,
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "max_nominal_values",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 60,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "title" : "Ignore columns with more nominal values than:",
+      "titleSource" : "dialog",
+      "step" : 10.0,
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.viz.plotter.node.DefaultVisualizationNodeDialog",
+    "ui" : [ {
+      "type" : "number",
+      "label" : "No. of rows to display",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 2500.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 10.0
+    }, {
+      "type" : "number",
+      "label" : "Ignore columns with more nominal values than",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 60.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 10.0
+    } ],
+    "labelCoverage" : "2/2",
+    "uiElements" : 2
+  },
+  "tier" : "experimental"
+}

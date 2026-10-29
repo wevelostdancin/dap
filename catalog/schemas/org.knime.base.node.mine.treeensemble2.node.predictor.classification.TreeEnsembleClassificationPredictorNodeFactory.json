@@ -1,0 +1,53 @@
+{
+  "id" : "org.knime.base.node.mine.treeensemble2.node.predictor.classification.TreeEnsembleClassificationPredictorNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.mine.treeensemble2.node.predictor.classification.TreeEnsembleClassificationPredictorNodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Change prediction column name",
+      "section" : "Prediction Settings",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "label" : "Prediction column name",
+      "section" : "Prediction Settings",
+      "source" : "dialog-ui",
+      "default" : "Prediction ()",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Append overall prediction confidence",
+      "section" : "Prediction Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Append individual class probabilities",
+      "section" : "Prediction Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Suffix for probability columns",
+      "section" : "Prediction Settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Use soft voting",
+      "section" : "Prediction Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 6,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

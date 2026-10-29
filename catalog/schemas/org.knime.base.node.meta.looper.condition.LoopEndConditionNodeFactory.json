@@ -1,0 +1,78 @@
+{
+  "id" : "org.knime.base.node.meta.looper.condition.LoopEndConditionNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.meta.looper.condition.LoopEndConditionNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Available flow variables",
+      "section" : "Default settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "Finish loop if selected variable is",
+      "section" : "Default settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "=",
+        "label" : "="
+      }, {
+        "value" : "<=",
+        "label" : "<="
+      }, {
+        "value" : "<",
+        "label" : "<"
+      }, {
+        "value" : ">=",
+        "label" : ">="
+      }, {
+        "value" : ">",
+        "label" : ">"
+      }, {
+        "value" : "!=",
+        "label" : "!="
+      } ],
+      "default" : "="
+    }, {
+      "type" : "string",
+      "section" : "Default settings",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Collect rows from last iteration",
+      "section" : "Default settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Collect rows from last iteration only",
+      "section" : "Default settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Add iteration column",
+      "configKey" : "addIterationColumn",
+      "keySource" : "label-match",
+      "section" : "Default settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Propagate modified loop variables",
+      "section" : "Default settings",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 7,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

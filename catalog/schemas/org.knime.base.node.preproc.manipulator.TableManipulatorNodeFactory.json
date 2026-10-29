@@ -1,0 +1,126 @@
+{
+  "id" : "org.knime.base.node.preproc.manipulator.TableManipulatorNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.manipulator.TableManipulatorNodeParameters",
+    "fields" : [ {
+      "field" : "m_parameters",
+      "configKey" : "parameters",
+      "title" : "Parameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_settings",
+        "configKey" : "settings",
+        "title" : "Settings",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_useExistingRowID",
+          "configKey" : "has_row_id",
+          "title" : "Use existing RowID",
+          "description" : "Check this box if the RowIDs from the input tables should be used for the output tables.If unchecked, a new RowID is generated. The generated RowID follows the schema \"Row0\", \"Row1\" and so on.",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        }, {
+          "field" : "m_prependTableIndexToRowID",
+          "configKey" : "prepend_table_index_to_row_id",
+          "title" : "Prepend table index to RowID",
+          "description" : "Only enabled if the existing RowIDs are used. If checked, a prefix is prepended to the RowIDs that indicates which table the row came from. The format of the prefix is \"Table_0_\", \"Table_1_\", and so on.",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        }, {
+          "field" : "m_initialPrependTableIndexToRowID",
+          "configKey" : "initialPrependTableIndexToRowID",
+          "title" : "InitialPrependTableIndexToRowID",
+          "description" : "",
+          "advanced" : false,
+          "type" : "boolean",
+          "default" : false
+        } ]
+      }, {
+        "field" : "m_columnFilterMode",
+        "configKey" : "column_filter_mode",
+        "title" : "Take columns from",
+        "description" : "Only relevant when several input tables are available. Specifies which set of columns is considered for the output table. <br /><b>Note:</b><br/>This setting has special implications if you are changing the input table without reconfiguring the node. If <i>Intersection</i> is selected, any column that moves into the intersection during execution will be considered to be new, even if it was previously part of the union of columns.",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "UNION",
+          "label" : "Union"
+        }, {
+          "value" : "INTERSECTION",
+          "label" : "Intersection"
+        } ],
+        "default" : "UNION"
+      } ]
+    }, {
+      "field" : "m_transformationParameters",
+      "configKey" : "transformationParameters",
+      "title" : "TransformationParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_specs",
+        "configKey" : "specs",
+        "title" : "Specs",
+        "description" : "",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "object"
+        },
+        "addButtonText" : "",
+        "default" : null
+      }, {
+        "field" : "m_enforceTypes",
+        "configKey" : "enforceTypes",
+        "title" : "Enforce types",
+        "description" : "Controls how columns whose type changes are dealt with.\nIf selected, the mapping to the KNIME type you configured is attempted.\nThe node will fail if that is not possible.\nIf unselected, the KNIME type corresponding to the new type is used.\n",
+        "advanced" : false,
+        "type" : "boolean",
+        "default" : true
+      }, {
+        "field" : "m_dirtyTracker",
+        "configKey" : "dirtyTracker",
+        "title" : "DirtyTracker",
+        "description" : "",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "java.lang.Void"
+      }, {
+        "field" : "m_columnTransformation",
+        "configKey" : "columnTransformation",
+        "title" : "Transformations",
+        "description" : "This option allows modifying the structure of the output table. It supports reordering, filtering and\nrenaming columns. It is also possible to change the type of the columns.\nWhether and where to add unknown columns during execution is specified via the special entry\n<i>Any unknown column</i>.\n<br />\n<b>Note:</b><br />\nThe transformation matching during execution is based on name. That means if there was a column\n[A, Integer] during configuration in the dialog and this column becomes [A, String] during execution, then\nthe stored transformation is applied to it. For filtering, ordering and renaming, this is straight forward.\nFor type mapping the following is done: If there is an alternative converter to the specified KNIME type,\nthen this converter is used, otherwise we default to the default KNIME type for the new type. In our example\nwe might have specified that [A, Integer] should be mapped to Long. For the changed column [A, String] there\nis no converter to Long, so we default back to String and A becomes a String column in the output table.\n",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "unknown"
+        },
+        "addButtonText" : "",
+        "default" : null,
+        "defaultNote" : "значение не сериализуется без UI"
+      }, {
+        "field" : "m_initialColumnTransformation",
+        "configKey" : "initialColumnTransformation",
+        "title" : "InitialColumnTransformation",
+        "description" : "",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "unknown"
+        },
+        "addButtonText" : "",
+        "default" : [ ]
+      } ]
+    } ]
+  },
+  "tier" : "core"
+}

@@ -1,0 +1,119 @@
+{
+  "id" : "org.knime.base.node.mine.treeensemble.node.randomforest.learner.regression.RandomForestRegressionLearnerNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.mine.treeensemble.node.randomforest.learner.regression.RandomForestRegressionLearnerNodeDialogPane",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Target Column",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Use fingerprint attribute",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "dropdown",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Use column attributes",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Always include all columns",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Enable Hilighting (#patterns to store)",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : 2000.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 100.0
+    }, {
+      "type" : "boolean",
+      "label" : "Limit number of levels (tree depth)",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "number",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : 3.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Minimum node size",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "number",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : 5.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "number",
+      "label" : "Number of models",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : 20.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 2.0
+    }, {
+      "type" : "boolean",
+      "label" : "Use static random seed",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Attribute Selection",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 16,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

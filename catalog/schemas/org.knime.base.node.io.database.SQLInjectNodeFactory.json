@@ -1,0 +1,29 @@
+{
+  "id" : "org.knime.base.node.io.database.SQLInjectNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "flowVarName",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "Flow Variable with SQL Query",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.io.database.SQLInjectNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Flow Variable with SQL Query",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "1/1",
+    "uiElements" : 1
+  },
+  "tier" : "experimental"
+}

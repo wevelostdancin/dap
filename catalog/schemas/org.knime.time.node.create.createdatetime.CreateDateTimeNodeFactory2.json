@@ -1,0 +1,153 @@
+{
+  "id" : "org.knime.time.node.create.createdatetime.CreateDateTimeNodeFactory2",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.time.node.create.createdatetime.CreateDateTimeNodeSettings",
+    "fields" : [ {
+      "field" : "m_outputType",
+      "configKey" : "outputType",
+      "title" : "Output type",
+      "description" : "The type to create can be selected. It can be either a Date, Time, Date&amp;time (Local), or Date&amp;time (Zoned).\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Date",
+        "label" : "Date"
+      }, {
+        "value" : "Time",
+        "label" : "Time"
+      }, {
+        "value" : "Date&time",
+        "label" : "Date&time"
+      }, {
+        "value" : "Date&time with zone",
+        "label" : "Date&time with zone"
+      } ],
+      "default" : "Date"
+    }, {
+      "field" : "m_localDateStart",
+      "configKey" : "localDateStart",
+      "title" : "Start date",
+      "description" : "The date at which the date&amp;time creation should start, inclusive.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.time.LocalDate"
+    }, {
+      "field" : "m_localTimeStart",
+      "configKey" : "localTimeStart",
+      "title" : "Start time",
+      "description" : "The time at which the date&amp;time creation should start, inclusive.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.time.LocalTime"
+    }, {
+      "field" : "m_localDateTimeStart",
+      "configKey" : "localDateTimeStart",
+      "title" : "Start local date&time",
+      "description" : "The local date&amp;time at which the date&amp;time creation should start, inclusive.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.time.LocalDateTime"
+    }, {
+      "field" : "m_zonedDateTimeStart",
+      "configKey" : "zonedDateTimeStart",
+      "title" : "Start zoned date&time",
+      "description" : "The zoned date&amp;time at which the date&amp;time creation should start, inclusive.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.time.ZonedDateTime"
+    }, {
+      "field" : "m_useExecutionTimeStart",
+      "configKey" : "useExecutionTimeStart",
+      "title" : "Use execution date & time",
+      "description" : "If checked, the execution date &amp; time will be used as starting point.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_fixedSteps",
+      "configKey" : "fixedSteps",
+      "title" : "Fixed steps",
+      "description" : "How the rows are created.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "NUMBER_AND_END",
+        "label" : "Count to end"
+      }, {
+        "value" : "NUMBER_AND_INTERVAL",
+        "label" : "Count with interval"
+      }, {
+        "value" : "INTERVAL_AND_END",
+        "label" : "Interval to end"
+      } ],
+      "default" : "NUMBER_AND_END"
+    }, {
+      "field" : "m_numberOfRows",
+      "configKey" : "numberOfRows",
+      "title" : "Number of rows",
+      "description" : "The number of rows to create.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1000
+    }, {
+      "field" : "m_interval",
+      "configKey" : "interval",
+      "title" : "Interval between rows",
+      "description" : "The interval between the created rows.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.experimental.interval.Interval"
+    }, {
+      "field" : "m_localDateEnd",
+      "configKey" : "localDateEnd",
+      "title" : "End date",
+      "description" : "The date at which the date&amp;time creation should stop. The end date is inclusive, except if the output mode is 'Number and Duration' and the provided interval does not divide evenly between the start and end date.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.time.LocalDate"
+    }, {
+      "field" : "m_localTimeEnd",
+      "configKey" : "localTimeEnd",
+      "title" : "End time",
+      "description" : "The time at which the date&amp;time creation should stop. The end time is inclusive, except if the output mode is 'Number and Duration' and the provided interval does not divide evenly between the start and end time.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.time.LocalTime"
+    }, {
+      "field" : "m_localDateTimeEnd",
+      "configKey" : "localDateTimeEnd",
+      "title" : "End local date&time",
+      "description" : "The local date&amp;time at which the date&amp;time creation should stop. The end date&amp;time is inclusive, except if the output mode is 'Number and Duration' and the provided interval does not divide evenly between the start and end date&amp;time.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.time.LocalDateTime"
+    }, {
+      "field" : "m_zonedDateTimeEnd",
+      "configKey" : "zonedDateTimeEnd",
+      "title" : "End zoned date&time",
+      "description" : "The zoned date&amp;time at which the date&amp;time creation should stop. The end date&amp;time is inclusive, except if the output mode is 'Number and Duration' and the provided interval does not divide evenly between the start and end date&amp;time.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.time.ZonedDateTime"
+    }, {
+      "field" : "m_useExecutionTimeEnd",
+      "configKey" : "useExecutionTimeEnd",
+      "title" : "Use execution date & time",
+      "description" : "If checked, the execution date &amp; time will be used as ending point.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_outputColumnName",
+      "configKey" : "outputColumnName",
+      "title" : "Output column name",
+      "description" : "The name of the output column.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Date"
+    } ]
+  },
+  "tier" : "experimental"
+}

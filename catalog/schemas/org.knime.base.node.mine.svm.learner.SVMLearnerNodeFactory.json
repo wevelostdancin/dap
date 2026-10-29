@@ -1,0 +1,106 @@
+{
+  "id" : "org.knime.base.node.mine.svm.learner.SVMLearnerNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelDouble",
+      "configKey" : "c_parameter",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelDouble",
+      "type" : "number",
+      "default" : 1.0,
+      "title" : "C parameter",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "classcol",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Classcol",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    } ],
+    "dialogClass" : "org.knime.base.node.mine.svm.learner.SVMLearnerNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Class column",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "number",
+      "label" : "Overlapping penalty",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "step" : 0.1
+    }, {
+      "type" : "boolean",
+      "label" : "Polynomial",
+      "section" : "Choose your kernel and parameters",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "Bias",
+      "section" : "Choose your kernel and parameters",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "step" : 0.1
+    }, {
+      "type" : "number",
+      "label" : "Power",
+      "section" : "Choose your kernel and parameters",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "step" : 0.1
+    }, {
+      "type" : "number",
+      "label" : "Gamma",
+      "section" : "Choose your kernel and parameters",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "step" : 0.1
+    }, {
+      "type" : "boolean",
+      "label" : "HyperTangent",
+      "section" : "Choose your kernel and parameters",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "kappa",
+      "section" : "Choose your kernel and parameters",
+      "source" : "dialog-ui",
+      "default" : 0.1,
+      "step" : 0.1
+    }, {
+      "type" : "number",
+      "label" : "delta",
+      "section" : "Choose your kernel and parameters",
+      "source" : "dialog-ui",
+      "default" : 0.5,
+      "step" : 0.1
+    }, {
+      "type" : "boolean",
+      "label" : "RBF",
+      "section" : "Choose your kernel and parameters",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "sigma",
+      "section" : "Choose your kernel and parameters",
+      "source" : "dialog-ui",
+      "default" : 0.1,
+      "step" : 0.1
+    } ],
+    "labelCoverage" : "0/2",
+    "uiElements" : 11,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,36 @@
+{
+  "id" : "org.knime.base.node.switches.manualif.ManualIfNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.switches.manualif.ManualIfNodeParameters",
+    "fields" : [ {
+      "field" : "m_portChoice",
+      "configKey" : "portChoice",
+      "title" : "Active port",
+      "description" : "Select the active output port",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "BOTH",
+        "label" : "Both"
+      }, {
+        "value" : "TOP",
+        "label" : "Top"
+      }, {
+        "value" : "BOTTOM",
+        "label" : "Bottom"
+      } ],
+      "default" : "BOTH"
+    }, {
+      "field" : "m_activateAllOutputsDuringConfigure",
+      "configKey" : "activate_all_outputs_during_configure",
+      "title" : "Activate all outputs during configuration step",
+      "description" : "When set the node will keep all outputs active during workflow configuration (that is, while the traffic light of the node is 'yellow'). This allows the configuration of connected downstream nodes and simplifies the workflow design at the expense of additional configuration calls of nodes that are later on inactive. It's recommended to switch this flag off for production workflows as this avoids unnecessary configuration calls of the inactive branches.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "core"
+}

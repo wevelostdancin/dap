@@ -1,0 +1,129 @@
+{
+  "id" : "org.knime.base.node.mine.sota.SotaNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "CallColumn",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "CallColumn",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "UseClassColumn",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : true,
+      "title" : "UseClassColumn",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    } ],
+    "dialogClass" : "org.knime.base.node.mine.sota.SotaNodeDialog",
+    "ui" : [ {
+      "type" : "number",
+      "label" : "Winner learningrate",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : 0.1,
+      "min" : 4.9E-324,
+      "max" : 1.0,
+      "step" : 0.01
+    }, {
+      "type" : "number",
+      "label" : "Sister learningrate",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : 0.01,
+      "min" : 4.9E-324,
+      "max" : 1.0,
+      "step" : 0.01
+    }, {
+      "type" : "number",
+      "label" : "Ancestor learningrate",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : 0.05,
+      "min" : 4.9E-324,
+      "max" : 1.0,
+      "step" : 0.01
+    }, {
+      "type" : "number",
+      "label" : "Minimal variability",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : 0.0,
+      "min" : 0.0,
+      "max" : 1.7976931348623157E308,
+      "step" : 0.01
+    }, {
+      "type" : "number",
+      "label" : "Minimal resource",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : 0.01,
+      "min" : 1.0E-4,
+      "max" : 1.7976931348623157E308,
+      "step" : 0.01
+    }, {
+      "type" : "number",
+      "label" : "Minimal error",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : 0.1,
+      "min" : 0.0,
+      "max" : 1.0,
+      "step" : 0.01
+    }, {
+      "type" : "boolean",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Dictance metric",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Euclidean",
+        "label" : "Euclidean"
+      }, {
+        "value" : "Cosinus",
+        "label" : "Cosinus"
+      } ],
+      "default" : "Euclidean"
+    }, {
+      "type" : "boolean",
+      "label" : "Use hierarchical fuzzy data",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Hierarchical level",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Use class column",
+      "configKey" : "UseClassColumn",
+      "keySource" : "label-match",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "dropdown",
+      "section" : "Class column",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "0/2",
+    "uiElements" : 12,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

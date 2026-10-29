@@ -1,0 +1,30 @@
+{
+  "id" : "org.knime.base.node.stats.testing.ttest.PairedTTestNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.stats.testing.ttest.PairedTTestNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnPairs",
+      "configKey" : "columnPairs",
+      "title" : "Test column pairs",
+      "description" : "Define the test column pairs here. Every pair is used to perform a paired t-test separately.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add test column pair",
+      "default" : [ ]
+    }, {
+      "field" : "m_confidenceIntervalProb",
+      "configKey" : "confidenceIntervalProb",
+      "title" : "Confidence interval (%)",
+      "description" : "The limits for the confidence interval are computed using this number. The default is 95 which means that\nyou can be 95% confident that the true value of the parameter is in the confidence interval.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 95.0
+    } ]
+  },
+  "tier" : "core"
+}

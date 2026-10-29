@@ -1,0 +1,70 @@
+{
+  "id" : "org.knime.base.node.mine.bayes.naivebayes.learner.NaiveBayesLearnerNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "classifyColumn",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : null,
+      "title" : "Classification Column:",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "skipMissingVals",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "SkipMissingVals",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelIntegerBounded",
+      "configKey" : "maxNoOfNomVals",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelIntegerBounded",
+      "type" : "integer",
+      "default" : 20,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "title" : "Maximum number of unique nominal values per attribute:",
+      "titleSource" : "dialog",
+      "step" : 1.0,
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.mine.bayes.naivebayes.learner.NaiveBayesLearnerNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Classification Column",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Skip missing values (incl. class column)",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "Maximum number of unique nominal values per attribute",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 20.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    } ],
+    "labelCoverage" : "2/3",
+    "uiElements" : 3
+  },
+  "tier" : "experimental"
+}

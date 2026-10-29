@@ -1,0 +1,177 @@
+{
+  "id" : "org.knime.base.node.preproc.valuelookup.ValueLookupNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.valuelookup.ValueLookupNodeSettings",
+    "fields" : [ {
+      "field" : "m_lookupCol",
+      "configKey" : "lookupCol",
+      "title" : "Lookup column (data table)",
+      "description" : "The column in the data table that will be used to look up cells in the dictionary.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.valuelookup.ValueLookupNodeSettings$DataTableChoices",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_dictKeyCol",
+      "configKey" : "dictKeyCol",
+      "title" : "Key column (dictionary table)",
+      "description" : "The column in the dictionary table that contains the search key / criterion.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.valuelookup.ValueLookupNodeSettings$DictionaryTableChoices",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_searchDirection",
+      "configKey" : "searchDirection",
+      "title" : "If multiple rows match",
+      "description" : "Defines the behavior in case there are multiple matching keys in the dictionary table.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FORWARD",
+        "label" : "Use first"
+      }, {
+        "value" : "BACKWARD",
+        "label" : "Use last"
+      } ],
+      "default" : "FORWARD"
+    }, {
+      "field" : "m_matchBehaviour",
+      "configKey" : "matchBehaviour",
+      "title" : "If no row matches",
+      "description" : "Defines what happens when a lookup key is not present in the dictionary: If \"Insert missing values\" is selected, missing values are inserted. If \"Match next smaller\" (\"- larger\") is selected, the next smaller (larger) value from the dictionary is matched, based on the value of the lookup key. If no such element can be found, a missing value is inserted.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "EQUAL",
+        "label" : "Insert missing values"
+      }, {
+        "value" : "EQUALORSMALLER",
+        "label" : "Match next smaller"
+      }, {
+        "value" : "EQUALORLARGER",
+        "label" : "Match next larger"
+      } ],
+      "default" : "EQUAL"
+    }, {
+      "field" : "m_stringMatchBehaviour",
+      "configKey" : "stringMatchBehaviour",
+      "title" : "String matching",
+      "description" : "The matching behavior when matching strings: Full string matching matches a lookup string only if it exactly matches a search string. Substring matching matches a lookup string if the key in the dictionary is a substring of it. Wildcard and Regex matching match a lookup string if a pattern in the dictionary matches it.",
+      "advanced" : true,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FULLSTRING",
+        "label" : "Full string"
+      }, {
+        "value" : "SUBSTRING",
+        "label" : "Substring"
+      }, {
+        "value" : "WILDCARD",
+        "label" : "Wildcard"
+      }, {
+        "value" : "REGEX",
+        "label" : "Regex"
+      } ],
+      "default" : "FULLSTRING"
+    }, {
+      "field" : "m_caseSensitive",
+      "configKey" : "caseSensitive",
+      "title" : "Match strings case-sensitive",
+      "description" : "When enabled, the string matching will be case-sensitive, otherwise case-insensitive.",
+      "advanced" : true,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_lookupColumnOutput",
+      "configKey" : "lookupColumnOutput",
+      "title" : "Lookup column output",
+      "description" : "Defines the content of the column that is selected as lookup column (data table).\nIf \"Retain\" the content of the lookup column is left unchanged.\nIf \"Replace\" is selected, the cell contents are replaced with values from the dictionary table.\nIf a match is found, the selected column's value is inserted, otherwise the original value can be kept\nor a missing value can be inserted. The name of the column does not change.\nIf \"Delete\" is selected, the lookup column is removed entirely from the output table.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "RETAIN",
+        "label" : "Retain"
+      }, {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "REMOVE",
+        "label" : "Remove"
+      } ],
+      "default" : "RETAIN"
+    }, {
+      "field" : "m_lookupReplacementCol",
+      "configKey" : "lookupReplacementCol",
+      "title" : "Replacement column",
+      "description" : "The column from the dictionary table that provides\nthe new values for the lookup column in the data table.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.valuelookup.ValueLookupNodeSettings$DictionaryTableChoices",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_columnNoMatchReplacement",
+      "configKey" : "columnNoMatchReplacement",
+      "title" : "If no match found",
+      "description" : "Defines the content of the lookup column if no match is found in the dictionary table.\n    If \"Retain\" is selected, the cell is left as is.\n    If \"Insert missing\" is selected, a missing value is used as content for the cell in the lookup column.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "RETAIN",
+        "label" : "Retain"
+      }, {
+        "value" : "INSERT_MISSING",
+        "label" : "Insert missing"
+      } ],
+      "default" : "RETAIN"
+    }, {
+      "field" : "m_dictValueCols",
+      "configKey" : "dictValueCols",
+      "title" : "Append columns (from dictionary table)",
+      "description" : "The columns in the dictionary table that contain the values added to the data table.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.valuelookup.ValueLookupNodeSettings$DictionaryTableChoices",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_createFoundCol",
+      "configKey" : "createFoundCol",
+      "title" : "Append a column indicating whether a match was found",
+      "description" : "When checked, a new column \"Match Found\" is appended to the output that contains a boolean indicating whether a match was found.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_enableHiliting",
+      "configKey" : "enableHiliting",
+      "title" : "Enable hiliting",
+      "description" : "Enable hiliting between the dictionary table and the output table.",
+      "advanced" : true,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

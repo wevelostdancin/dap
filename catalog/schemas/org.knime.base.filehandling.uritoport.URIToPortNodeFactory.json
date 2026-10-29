@@ -1,0 +1,36 @@
+{
+  "id" : "org.knime.base.filehandling.uritoport.URIToPortNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "uricolumn",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "URI column",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.filehandling.uritoport.URIToPortNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "URI column",
+      "configKey" : "uricolumn",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    } ],
+    "labelCoverage" : "1/1",
+    "uiElements" : 1
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,60 @@
+{
+  "id" : "org.knime.xml.node.combinewriter.XMLCombineWriterNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.xml.node.combinewriter.XMLCombineWriterNodeParameters",
+    "fields" : [ {
+      "field" : "m_inputColumn",
+      "configKey" : "inputColumn",
+      "title" : "XML column",
+      "description" : "Select the column containing the XML cells to be combined and written to the output file.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.xml.node.combinewriter.XMLCombineWriterNodeParameters$XMLColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_outputFile",
+      "configKey" : "file",
+      "title" : "Output file",
+      "description" : "Enter the path to the output file where the combined XML document will be written.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_overwriteExistingFiles",
+      "configKey" : "overwriteExistingFiles",
+      "title" : "Overwrite existing files",
+      "description" : "If checked, an existing output file will be overwritten. If unchecked, the node will fail if the output file already exists.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_rootElement",
+      "configKey" : "rootElement",
+      "title" : "Root element",
+      "description" : "Enter the qualified name of the root element that will wrap all XML cells in the output file. You may use a namespace prefix if the corresponding namespace is declared in the root element attributes below (e.g. <tt>ns:root</tt>).",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_customAttributes",
+      "configKey" : "customAttributes",
+      "title" : "Attributes of the root element",
+      "description" : "Define the attributes to be added to the root element. Use <tt>xmlns</tt> or <tt>xmlns:prefix</tt> as the name to declare XML namespaces.",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add attribute",
+      "default" : [ ]
+    } ]
+  },
+  "tier" : "experimental"
+}

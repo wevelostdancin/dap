@@ -1,0 +1,47 @@
+{
+  "id" : "org.knime.base.filehandling.pngstobinaryobjects.PNGsToBinaryObjectsNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.filehandling.pngstobinaryobjects.PNGsToBinaryObjectsNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnSelection",
+      "configKey" : "columnselection",
+      "title" : "Column selection",
+      "description" : "Select the PNG image column that will be converted to binary objects.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.base.filehandling.pngstobinaryobjects.PNGsToBinaryObjectsNodeSettings$PNGImageColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_replacePolicy",
+      "configKey" : "replacePolicy",
+      "title" : "Output handling",
+      "description" : "Select how the output column with the binary objects should be handled.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_columnName",
+      "configKey" : "columnname",
+      "title" : "New column name",
+      "description" : "Name for the new column containing the binary objects. Only used when 'Append' is selected.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "BinaryObject"
+    } ]
+  },
+  "tier" : "experimental"
+}

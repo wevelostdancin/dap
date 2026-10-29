@@ -1,0 +1,172 @@
+{
+  "id" : "org.knime.base.node.io.database.binning.auto.DBAutoBinnerNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.io.database.binning.auto.DBAutoBinnerNodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Manual Selection",
+      "section" : "Auto Binner Settings",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce exclusion",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce inclusion",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "label" : "Number of bins",
+      "section" : "Auto Binner Settings",
+      "source" : "dialog-ui",
+      "default" : 5.0,
+      "min" : 1.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Numbered",
+      "section" : "Bin Naming",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Borders",
+      "section" : "Bin Naming",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Midpoints",
+      "section" : "Bin Naming",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Force integer bounds",
+      "section" : "Auto Binner Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Replace target column(s)",
+      "section" : "Auto Binner Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Default formatting",
+      "section" : "Number Format Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Advanced formatting",
+      "configKey" : "advancedFormatting",
+      "keySource" : "label-match",
+      "section" : "Number Format Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Output format",
+      "configKey" : "outputFormat",
+      "keySource" : "label-match",
+      "section" : "Number Format Settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Standard String",
+        "label" : "Standard String"
+      }, {
+        "value" : "Plain String (no exponent)",
+        "label" : "Plain String (no exponent)"
+      }, {
+        "value" : "Engineering String",
+        "label" : "Engineering String"
+      } ],
+      "default" : "Standard String"
+    }, {
+      "type" : "number",
+      "label" : "Precision",
+      "configKey" : "precision",
+      "keySource" : "label-match",
+      "section" : "Number Format Settings",
+      "source" : "dialog-ui",
+      "default" : 3.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 1.0
+    }, {
+      "type" : "dropdown",
+      "label" : "Precision mode",
+      "configKey" : "precisionMode",
+      "keySource" : "label-match",
+      "section" : "Number Format Settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Decimal places",
+        "label" : "Decimal places"
+      }, {
+        "value" : "Significant figures",
+        "label" : "Significant figures"
+      } ],
+      "default" : "Decimal places"
+    }, {
+      "type" : "dropdown",
+      "label" : "Rounding mode",
+      "configKey" : "roundingMode",
+      "keySource" : "label-match",
+      "section" : "Number Format Settings",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "UP",
+        "label" : "UP"
+      }, {
+        "value" : "DOWN",
+        "label" : "DOWN"
+      }, {
+        "value" : "CEILING",
+        "label" : "CEILING"
+      }, {
+        "value" : "FLOOR",
+        "label" : "FLOOR"
+      }, {
+        "value" : "HALF_UP",
+        "label" : "HALF_UP"
+      }, {
+        "value" : "HALF_DOWN",
+        "label" : "HALF_DOWN"
+      }, {
+        "value" : "HALF_EVEN",
+        "label" : "HALF_EVEN"
+      } ],
+      "default" : "UP"
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 17,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

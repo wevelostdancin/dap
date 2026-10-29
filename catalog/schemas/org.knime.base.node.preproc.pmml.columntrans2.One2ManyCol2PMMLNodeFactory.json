@@ -1,0 +1,72 @@
+{
+  "id" : "org.knime.base.node.preproc.pmml.columntrans2.One2ManyCol2PMMLNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelColumnFilter2",
+      "configKey" : "columns2Btransformed",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelColumnFilter2",
+      "type" : "filter",
+      "default" : null,
+      "title" : "Columns2Btransformed",
+      "titleSource" : "field-name",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "removeSources",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "RemoveSources",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.preproc.columntrans2.One2ManyCol2NodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Manual Selection",
+      "section" : "Columns to transform",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce exclusion",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce inclusion",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Remove included columns from output",
+      "section" : "Columns to transform",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/2",
+    "uiElements" : 6
+  },
+  "tier" : "experimental"
+}

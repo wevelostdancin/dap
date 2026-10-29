@@ -1,0 +1,50 @@
+{
+  "id" : "org.knime.base.node.preproc.pmml.missingval.compute.MissingValueHandlerNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.pmml.missingval.compute.MissingValueHandlerNodeParameters",
+    "fields" : [ {
+      "field" : "m_noOrEmptyTableMessage",
+      "configKey" : "noOrEmptyTableMessage",
+      "title" : "NoOrEmptyTableMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_columnSettings",
+      "configKey" : "columnSettings",
+      "title" : "Treatment by column",
+      "description" : "Specify how to treat missing values for a specific column.",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add column treatment",
+      "default" : [ ]
+    }, {
+      "field" : "m_dataTypeSettings",
+      "configKey" : "dataTypeSettings",
+      "title" : "DataTypeSettings",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_treatmentsForPresentDataTypes",
+        "configKey" : "treatmentsForPresentDataTypes",
+        "title" : "Treatment by Data Type",
+        "description" : "Specify how to treat missing values for all columns of a certain data type.",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "object"
+        },
+        "addButtonText" : "",
+        "default" : [ ]
+      } ]
+    } ]
+  },
+  "tier" : "core"
+}

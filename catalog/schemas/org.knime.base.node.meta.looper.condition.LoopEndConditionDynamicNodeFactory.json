@@ -1,0 +1,100 @@
+{
+  "id" : "org.knime.base.node.meta.looper.condition.LoopEndConditionDynamicNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.meta.looper.condition.LoopEndConditionDynamicNodeParameters",
+    "fields" : [ {
+      "field" : "m_flowVariableName",
+      "configKey" : "variableName",
+      "title" : "Flow variables",
+      "description" : "Select one of the available flow variables to check the condition against.\nThe loop execution will be finished when the selected variable meets the specified condition.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.meta.looper.condition.LoopEndConditionDynamicNodeParameters$CompatibleFlowVariablesProvider",
+        "kind" : "dynamic"
+      },
+      "choices" : [ ],
+      "choicesResolved" : true
+    }, {
+      "field" : "m_flowVariableType",
+      "configKey" : "variableType",
+      "title" : "FlowVariableType",
+      "description" : "",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_makeDialogDirty",
+      "configKey" : "makeDialogDirty",
+      "title" : "MakeDialogDirty",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_operator",
+      "configKey" : "operator",
+      "title" : "Comparison operator",
+      "description" : "Choose the comparison operator for the condition which finishes the loop's execution. For string and\nboolean variables, only equality and inequality checks are possible.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : ">",
+        "label" : ">"
+      }, {
+        "value" : "<",
+        "label" : "<"
+      }, {
+        "value" : ">=",
+        "label" : ">="
+      }, {
+        "value" : "<=",
+        "label" : "<="
+      }, {
+        "value" : "!=",
+        "label" : "!="
+      }, {
+        "value" : "=",
+        "label" : "="
+      } ],
+      "default" : "=",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.meta.looper.condition.LoopEndConditionDynamicNodeParameters$OperatorChoicesProvider",
+        "kind" : "enum"
+      },
+      "choicesResolved" : true
+    }, {
+      "field" : "m_flowVariableValue",
+      "configKey" : "value",
+      "title" : "Condition value",
+      "description" : "Select the value to compare the chosen flow variable value against using the defined comparison operator.\nThe loop will end when the comparison evaluates to true.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_propagateLoopVariables",
+      "configKey" : "propagateLoopVariables",
+      "title" : "Propagate modified loop variables",
+      "description" : "If checked, variables whose values are modified within the loop are exported by this node.\nThese variables must be declared outside the loop, i.e. injected into the loop from a side-branch\nor be available upstream of the corresponding loop start node. For the latter, any modification of a\nvariable is passed back to the start node in subsequent iterations (e.g. moving sum calculation).\nNote that variables defined by the loop start node itself are excluded as these usually represent\nloop controls (e.g. \"currentIteration\").\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_portSettings",
+      "configKey" : "portSettings",
+      "title" : "Port settings",
+      "description" : "Configure settings for each collector port.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "",
+      "default" : [ ]
+    } ]
+  },
+  "tier" : "core"
+}

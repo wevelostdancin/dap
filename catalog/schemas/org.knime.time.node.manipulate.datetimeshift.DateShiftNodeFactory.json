@@ -1,0 +1,122 @@
+{
+  "id" : "org.knime.time.node.manipulate.datetimeshift.DateShiftNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.time.node.manipulate.datetimeshift.DateShiftNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Date&time columns",
+      "description" : "The date&amp;time columns whose values are shifted.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.time.node.manipulate.datetimeshift.DateShiftNodeSettings$ColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_shiftMode",
+      "configKey" : "shiftMode",
+      "title" : "Shift mode",
+      "description" : "Select the shift mode to use.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "SHIFT_VALUE",
+        "label" : "Shift value"
+      }, {
+        "value" : "PERIOD_COLUMN",
+        "label" : "Duration column"
+      }, {
+        "value" : "NUMERICAL_COLUMN",
+        "label" : "Number column"
+      } ],
+      "default" : "SHIFT_VALUE"
+    }, {
+      "field" : "m_shiftPeriodValue",
+      "configKey" : "shiftPeriodValue",
+      "title" : "Shift value",
+      "description" : "Select to insert a format string to use as constant shift value. The inserted string can be either in:\n<ul>\n  <li>\n    the ISO-8601 representation (see <a href=\"    http://docs.oracle.com/javase/8/docs/api/java/time/Period.html#parse-java.lang.CharSequence-\">     date-based duration format</a> for details)\n  </li>\n  <li>\n    the short letter representation (e.g. '2y 3M 1d'). In this case, for the  the letters     y, M, and d respectively indicate years, months, and days.\n  </li>\n  <li>\n    the long word representation (e.g. '2 years 3 months 1 day').\n  </li>\n</ul>\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.experimental.interval.DateInterval"
+    }, {
+      "field" : "m_periodColumn",
+      "configKey" : "periodColumn",
+      "title" : "Column",
+      "description" : "Select to choose the shift value from a date-based duration column.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "",
+      "choicesSource" : {
+        "provider" : "org.knime.time.util.DateTimeUtils$PeriodColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_numericalColumn",
+      "configKey" : "numericalColumn",
+      "title" : "Column",
+      "description" : "Select to choose the shift value from a numerical column. The shift value will be scaled by the selected granularity.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.time.node.manipulate.datetimeshift.DateTimeShiftSettingsUtils$NumberColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_granularity",
+      "configKey" : "granularity",
+      "title" : "Granularity",
+      "description" : "The granularity (i.e. days, weeks, etc) of the shift.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "YEARS",
+        "label" : "Years"
+      }, {
+        "value" : "MONTHS",
+        "label" : "Months"
+      }, {
+        "value" : "WEEKS",
+        "label" : "Weeks"
+      }, {
+        "value" : "DAYS",
+        "label" : "Days"
+      } ],
+      "default" : "DAYS"
+    }, {
+      "field" : "m_replaceOrAppend",
+      "configKey" : "replaceOrAppend",
+      "title" : "Output columns",
+      "description" : "Depending on this setting, the output columns will either replace the modified columns, or be appended to the table with a suffix.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append with suffix"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_outputColumnSuffix",
+      "configKey" : "outputColumnSuffix",
+      "title" : "Output column suffix",
+      "description" : "The suffix to append to the column names of the new columns.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : " (Shifted)"
+    } ]
+  },
+  "tier" : "experimental"
+}

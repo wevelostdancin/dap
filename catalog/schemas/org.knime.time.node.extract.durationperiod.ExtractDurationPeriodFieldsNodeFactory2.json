@@ -1,0 +1,36 @@
+{
+  "id" : "org.knime.time.node.extract.durationperiod.ExtractDurationPeriodFieldsNodeFactory2",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.time.node.extract.durationperiod.ExtractDurationPeriodFieldsNodeSettings",
+    "fields" : [ {
+      "field" : "m_selectedColumn",
+      "configKey" : "selectedColumn",
+      "title" : "Duration column",
+      "description" : "A duration column from which to extract the fields.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.time.node.extract.durationperiod.ExtractDurationPeriodFieldsNodeSettings$SelectedInputColumnHelpers$ColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_extractFields",
+      "configKey" : "extractFields",
+      "title" : "Extracted fields",
+      "description" : "Define the fields to extract and their column names.",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add field",
+      "default" : [ ]
+    } ]
+  },
+  "tier" : "experimental"
+}

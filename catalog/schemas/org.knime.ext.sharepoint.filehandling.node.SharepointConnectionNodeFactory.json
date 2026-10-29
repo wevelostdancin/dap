@@ -1,0 +1,130 @@
+{
+  "id" : "org.knime.ext.sharepoint.filehandling.node.SharepointConnectionNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.ext.sharepoint.filehandling.node.SharepointConnectionNodeParameters",
+    "fields" : [ {
+      "field" : "m_site",
+      "configKey" : "site",
+      "title" : "Site",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_message",
+        "configKey" : "message",
+        "title" : "Message",
+        "description" : "",
+        "advanced" : false,
+        "type" : "unknown",
+        "javaType" : "java.lang.Void"
+      }, {
+        "field" : "m_mode",
+        "configKey" : "mode",
+        "title" : "Connect via",
+        "description" : "Select how to connect to the SharePoint site.",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "ROOT",
+          "label" : "Root site"
+        }, {
+          "value" : "WEB_URL",
+          "label" : "Web URL"
+        }, {
+          "value" : "GROUP",
+          "label" : "Group site"
+        } ],
+        "default" : "ROOT"
+      }, {
+        "field" : "m_webUrl",
+        "configKey" : "webUrl",
+        "title" : "URL",
+        "description" : "The web URL of the SharePoint site, for example https://mycompany.sharepoint.com",
+        "advanced" : false,
+        "type" : "string",
+        "default" : "https://company.sharepoint.com"
+      }, {
+        "field" : "m_group",
+        "configKey" : "group",
+        "title" : "Group",
+        "description" : "The Office 365 group whose team site to connect to.",
+        "advanced" : false,
+        "type" : "string",
+        "default" : null,
+        "choicesSource" : {
+          "provider" : "org.knime.ext.sharepoint.parameters.SharepointSiteParameters$GroupChoicesProvider",
+          "kind" : "strings",
+          "note" : "варианты вычисляются провайдером"
+        },
+        "choicesError" : "ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0"
+      }, {
+        "field" : "m_subsite",
+        "configKey" : "subsite",
+        "title" : "Subsite",
+        "description" : "",
+        "advanced" : false,
+        "type" : "object",
+        "fields" : [ {
+          "field" : "m_displayedSubsite",
+          "configKey" : "displayedSubsite",
+          "title" : "Connect to subsite",
+          "description" : "A (nested) subsite of the SharePoint site specified above. If selected, the node will connect to\nthe subsite instead of the parent site. Note that access is limited to content\nof the subsite, not those of the parent site(s).\n",
+          "advanced" : false,
+          "type" : "string",
+          "nullable" : true,
+          "default" : null,
+          "optional" : true,
+          "choicesSource" : {
+            "provider" : "org.knime.ext.sharepoint.parameters.SharepointSiteParameters$SubsiteChoicesProvider",
+            "kind" : "strings",
+            "note" : "варианты вычисляются провайдером"
+          },
+          "choicesError" : "ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0"
+        }, {
+          "field" : "m_subsite",
+          "configKey" : "subsite",
+          "title" : "Subsite",
+          "description" : "",
+          "advanced" : false,
+          "type" : "string",
+          "default" : ""
+        } ]
+      } ]
+    }, {
+      "field" : "m_workingDirectory",
+      "configKey" : "workingDirectory",
+      "title" : "Working directory",
+      "description" : "The working directory of the resulting file system connection. The working\ndirectory must be specified as an absolute path that starts with '/'. A working directory allows\ndownstream nodes to access files/folders using relative paths. The default working directory\nis the virtual root \"/\", under which all the document libraries are located.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "/"
+    }, {
+      "field" : "m_timeout",
+      "configKey" : "timeout",
+      "title" : "Timeout",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_connectionTimeout",
+        "configKey" : "connectionTimeout",
+        "title" : "Connection timeout in seconds",
+        "description" : "The timeout in seconds to establish a connection, or 0 for an infinite timeout.",
+        "advanced" : false,
+        "type" : "integer",
+        "default" : 20
+      }, {
+        "field" : "m_readTimeout",
+        "configKey" : "readTimeout",
+        "title" : "Read timeout in seconds",
+        "description" : "The timeout in seconds to read data from an established connection, or\n0 for an infinite timeout.",
+        "advanced" : false,
+        "type" : "integer",
+        "default" : 20
+      } ]
+    } ]
+  },
+  "tier" : "experimental"
+}

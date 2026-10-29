@@ -1,0 +1,40 @@
+{
+  "id" : "org.knime.base.node.mine.knn.KnnNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.mine.knn.KnnNodeDialogPane",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Column with class labels",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "number",
+      "label" : "Number of neighbours to consider (k)",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 1000.0,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "section" : "Standard settings",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 4,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,137 @@
+{
+  "id" : "org.knime.base.node.preproc.colcompare.ColumnComparatorNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.colcompare.ColumnComparatorNodeParameters",
+    "fields" : [ {
+      "field" : "m_firstColumn",
+      "configKey" : "first_column",
+      "title" : "Left column",
+      "description" : "Left column selected for comparison.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_operator",
+      "configKey" : "operator",
+      "title" : "Operator",
+      "description" : "Comparison is done based on the selected operator option.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "==",
+        "label" : "=="
+      }, {
+        "value" : "!=",
+        "label" : "!="
+      }, {
+        "value" : "<",
+        "label" : "<"
+      }, {
+        "value" : "<=",
+        "label" : "<="
+      }, {
+        "value" : ">",
+        "label" : ">"
+      }, {
+        "value" : ">=",
+        "label" : ">="
+      } ],
+      "default" : "=="
+    }, {
+      "field" : "m_secondColumn",
+      "configKey" : "second_column",
+      "title" : "Right column",
+      "description" : "Right column selected for comparison.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.colcompare.ColumnComparatorNodeParameters$SecondColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_matchOption",
+      "configKey" : "match_option",
+      "title" : "Operator result 'true'",
+      "description" : "Depending on the result of the selected operator, a certain value is set into the new column.\nSelect one of the following options for the operator result 'true'.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LEFT_VALUE",
+        "label" : "Left value"
+      }, {
+        "value" : "RIGHT_VALUE",
+        "label" : "Right value"
+      }, {
+        "value" : "MISSING",
+        "label" : "Missing"
+      }, {
+        "value" : "USER_DEFINED",
+        "label" : "User-defined"
+      } ],
+      "default" : "LEFT_VALUE"
+    }, {
+      "field" : "m_matchValue",
+      "configKey" : "match_value",
+      "title" : "Tag",
+      "description" : "The text to set in the result column when the operator result is 'true'.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "TRUE"
+    }, {
+      "field" : "m_mismatchOption",
+      "configKey" : "mismatch_option",
+      "title" : "Operator result 'false'",
+      "description" : "Depending on the result of the selected operator, a certain value is set into the new column.\nSelect one of the following options for the operator result 'false'.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LEFT_VALUE",
+        "label" : "Left value"
+      }, {
+        "value" : "RIGHT_VALUE",
+        "label" : "Right value"
+      }, {
+        "value" : "MISSING",
+        "label" : "Missing"
+      }, {
+        "value" : "USER_DEFINED",
+        "label" : "User-defined"
+      } ],
+      "default" : "RIGHT_VALUE",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.colcompare.ColumnComparatorNodeParameters$MismatchOptionChoicesProvider",
+        "kind" : "enum"
+      },
+      "choicesResolved" : true
+    }, {
+      "field" : "m_mismatchValue",
+      "configKey" : "mismatch_value",
+      "title" : "Tag",
+      "description" : "The text to set in the result column when the operator result is 'false'.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "FALSE"
+    }, {
+      "field" : "m_newColumn",
+      "configKey" : "new_col_name",
+      "title" : "Output column name",
+      "description" : "Name of the output column.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "compare_result",
+      "placeholder" : "compare_result"
+    } ]
+  },
+  "tier" : "core"
+}

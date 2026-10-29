@@ -1,0 +1,72 @@
+{
+  "id" : "org.knime.base.node.mine.scorer.numeric2.NumericScorer2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.scorer.numeric2.NumericScorer2NodeParameters",
+    "fields" : [ {
+      "field" : "m_referenceColumn",
+      "configKey" : "referenceColumn",
+      "title" : "Reference column",
+      "description" : "Column with the correct, observed, training data values.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_predictedColumn",
+      "configKey" : "predictedColumn",
+      "title" : "Predicted column",
+      "description" : "Column with the modeled, predicted data values.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_overrideOutput",
+      "configKey" : "override default output name",
+      "title" : "Override output column name",
+      "description" : "Overrides the name of the column in the output. By default, the name of the predicted column is used.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_outputColumnName",
+      "configKey" : "output column",
+      "title" : "Output column name",
+      "description" : "The name of the column in the output.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_flowVariablePrefix",
+      "configKey" : "flowVariablePrefix",
+      "title" : "Export and prefix flow variables",
+      "description" : "If enabled, the scores will be exported as flow variables with hard coded names and prefixed by the given\nvalue.\n",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_numberOfPredictors",
+      "configKey" : "number_of_predictors",
+      "title" : "Number of predictors",
+      "description" : "The number of predictors used to compute the adjusted R squared. The adjusted R squared is calculated as:\n1 - ((1 - R²) * (n - 1)) / (n - p - 1), where n is the number of observations and p is the number of\npredictors.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 0
+    } ]
+  },
+  "tier" : "core"
+}

@@ -1,0 +1,198 @@
+{
+  "id" : "org.knime.ext.poi2.node.write3.XLSWriter2NodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelFileChooser2",
+      "configKey" : "FILE_CHOOSER",
+      "javaType" : "org.knime.filehandling.core.defaultnodesettings.SettingsModelFileChooser2",
+      "type" : "unknown",
+      "default" : null,
+      "title" : "FILE CHOOSER",
+      "titleSource" : "field-name",
+      "source" : "node-model"
+    } ],
+    "dialogClass" : "org.knime.ext.poi2.node.write3.XLSWriter2NodeDialogPane",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "File",
+      "section" : "Output location",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Files in folder",
+      "section" : "Output location",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Write to",
+      "section" : "Output location",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Local File System",
+        "label" : "Local File System"
+      }, {
+        "value" : "Relative to",
+        "label" : "Relative to"
+      }, {
+        "value" : "Mountpoint",
+        "label" : "Mountpoint"
+      }, {
+        "value" : "Custom URL",
+        "label" : "Custom URL"
+      } ],
+      "default" : "Local File System"
+    }, {
+      "type" : "dropdown",
+      "section" : "Output location",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "label" : "File",
+      "section" : "Output location",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Include subfolders",
+      "configKey" : "include_subfolders",
+      "keySource" : "label-match",
+      "section" : "Output location",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Overwrite existing file",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Open file after execution",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "label" : "Name of the sheet",
+      "section" : "Sheet name",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "add column headers",
+      "section" : "Add names and IDs",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "add row ids",
+      "section" : "Add names and IDs",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "For missing values write",
+      "section" : "Missing value pattern",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "section" : "Missing value pattern",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Autosize columns",
+      "section" : "Layout",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Portrait",
+      "section" : "Layout",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Landscape",
+      "section" : "Layout",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Layout",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "US Legal 8 1/2 x 14 in",
+        "label" : "US Legal 8 1/2 x 14 in"
+      }, {
+        "value" : "US Letter 8 1/2 x 11 in",
+        "label" : "US Letter 8 1/2 x 11 in"
+      }, {
+        "value" : "US Executive 7 1/4 x 10 1/2 in",
+        "label" : "US Executive 7 1/4 x 10 1/2 in"
+      }, {
+        "value" : "Envelope DL 110x220 mm",
+        "label" : "Envelope DL 110x220 mm"
+      }, {
+        "value" : "A5 - 148x210 mm",
+        "label" : "A5 - 148x210 mm"
+      }, {
+        "value" : "US Envelope #10 4 1/8 x 9 1/2",
+        "label" : "US Envelope #10 4 1/8 x 9 1/2"
+      }, {
+        "value" : "Envelope C5 162x229 mm",
+        "label" : "Envelope C5 162x229 mm"
+      }, {
+        "value" : "A4 - 210x297 mm",
+        "label" : "A4 - 210x297 mm"
+      }, {
+        "value" : "Envelope Monarch 98.4×190.5 mm",
+        "label" : "Envelope Monarch 98.4×190.5 mm"
+      } ],
+      "default" : "US Legal 8 1/2 x 14 in"
+    }, {
+      "type" : "boolean",
+      "label" : "Manual Selection",
+      "section" : "Settings",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce exclusion",
+      "section" : "Exclude",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : "Filter",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Enforce inclusion",
+      "section" : "Include",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/1",
+    "uiElements" : 22,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

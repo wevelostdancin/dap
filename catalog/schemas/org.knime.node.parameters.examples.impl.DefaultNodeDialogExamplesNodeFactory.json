@@ -1,0 +1,66 @@
+{
+  "id" : "org.knime.node.parameters.examples.impl.DefaultNodeDialogExamplesNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.node.parameters.examples.impl.DefaultNodeDialogExamplesNodeParameters",
+    "fields" : [ {
+      "field" : "m_includeExperimental",
+      "configKey" : "includeExperimental",
+      "title" : "Include experimental features (DON'T USE THEM)",
+      "description" : "Show examples for APIs that are internal and unstable. These concepts live under org.knime.node.parameters.experimental.* and can be renamed, removed, or promoted without notice. They are showcased here only so product / UX / migration authors can preview the resulting dialog — do not wire them into real nodes.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_searchTags",
+      "configKey" : "searchTags",
+      "title" : "Filter by search tags",
+      "description" : "Each example lists tags. Select a set to see only the list of examples that list all those tags.",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "string"
+      },
+      "addButtonText" : "",
+      "default" : [ ],
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.examples.impl.DefaultNodeDialogExamplesNodeParameters$SearchTagsChoicesProvider",
+        "kind" : "strings",
+        "note" : "варианты вычисляются провайдером"
+      },
+      "choicesError" : "NullPointerException: Cannot invoke \"java.lang.Boolean.booleanValue()\" because the return value of \"java.util.function.Supplier.get()\" is null"
+    }, {
+      "field" : "m_selectedExample",
+      "configKey" : "selectedExample",
+      "title" : "Example",
+      "description" : "Select an example to view its dialog",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "org.knime.node.parameters.examples.AdvancedParametersExample",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.examples.impl.DefaultNodeDialogExamplesNodeParameters$ExampleChoicesProvider",
+        "kind" : "strings",
+        "note" : "варианты вычисляются провайдером"
+      },
+      "choicesError" : "NullPointerException: Cannot invoke \"java.lang.Boolean.booleanValue()\" because the return value of \"java.util.function.Supplier.get()\" is null"
+    }, {
+      "field" : "m_relatedExamplesMessage",
+      "configKey" : "relatedExamplesMessage",
+      "title" : "RelatedExamplesMessage",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_exampleParameters",
+      "configKey" : "exampleParameters",
+      "title" : "ExampleParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ ]
+    } ]
+  },
+  "tier" : "experimental"
+}

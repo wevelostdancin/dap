@@ -1,0 +1,99 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validation deps
+        run: |
+          python -m pip install --disable-pip-version-check pyyaml
+          sudo apt-get update
+          sudo apt-get install -y shellcheck zstd
+      - name: Repository checks
+        run: python scripts/check_repo.py
+      - name: Python syntax
+        run: |
+          python -m py_compile adapters/mcp/dap_mcp.py tests/run_all.py tests/dap_client.py tests/golden/*.py tests/contract/*.py
+      - name: Shell syntax
+        run: |
+          for f in scripts/*.sh; do bash -n "$f"; done
+
+  engine:
+    name: engine + golden tests + image
+    needs: static
+    # Два режима:
+    #  - vars.DAP_RUNTIME_URL задан: рантайм скачивается из release-ассета;
+    #  - vars.DAP_ENGINE_RUNNER задан: self-hosted runner уже имеет runtime/knime.
+    if: ${{ vars.DAP_RUNTIME_URL != '' || vars.DAP_ENGINE_RUNNER != '' }}
+    runs-on: ${{ vars.DAP_ENGINE_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        if: vars.DAP_ENGINE_RUNNER == ''
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Fetch vendored runtime
+        if: vars.DAP_RUNTIME_URL != ''
+        env:
+          DAP_RUNTIME_URL: ${{ vars.DAP_RUNTIME_URL }}
+          DAP_RUNTIME_SHA256: ${{ vars.DAP_RUNTIME_SHA256 }}
+        run: ./scripts/fetch-runtime.sh
+      - name: Build engine
+        run: DAP_JDK="$JAVA_HOME" make build-engine
+      - name: Build catalog and schemas
+        run: DAP_JDK="$JAVA_HOME" make build-catalog
+      - name: Golden and contract tests
+        run: DAP_JDK="$JAVA_HOME" make test
+      - name: Upload catalog
+        uses: actions/upload-artifact@v4
+        with:
+          name: dap-catalog
+          path: catalog/
+          retention-days: 14
+      - name: Upload engine jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: dap-engine-jar
+          path: build/com.dap.engine_1.0.0.jar
+          retention-days: 14
+      - name: Build single-arch image
+        run: ./scripts/package-oci.sh --single-arch
+      - name: Run image and check health
+        run: |
+          docker rm -f dap-ci >/dev/null 2>&1 || true
+          docker run -d --name dap-ci -p 7800:7800 dap:1.0.0
+          for i in $(seq 1 60); do
+            status="$(docker inspect -f '{{.State.Health.Status}}' dap-ci 2>/dev/null || echo none)"
+            [ "$status" = healthy ] && break
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:7800/v1/health
+          docker rm -f dap-ci
+      - name: Save image
+        run: docker save dap:1.0.0 | gzip -1 > build/dap-ci-amd64.tar.gz
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: dap-image-amd64
+          path: build/dap-ci-amd64.tar.gz
+          retention-days: 7

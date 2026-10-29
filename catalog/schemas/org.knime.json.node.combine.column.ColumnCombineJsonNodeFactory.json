@@ -1,0 +1,80 @@
+{
+  "id" : "org.knime.json.node.combine.column.ColumnCombineJsonNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.json.node.combine.column.ColumnCombineJsonNodeParameters",
+    "fields" : [ {
+      "field" : "m_newColumn",
+      "configKey" : "newColumn",
+      "title" : "New column name",
+      "description" : "Name of the new JSON column",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "JSON"
+    }, {
+      "field" : "m_removeSourceColumns",
+      "configKey" : "removeSourceColumns",
+      "title" : "Remove source columns",
+      "description" : "When checked, the included columns and the data bound key/value columns will be removed from the resulting table",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_rootKeyType",
+      "configKey" : "rootKeyType",
+      "title" : "Root key type",
+      "description" : "How to create the root of the JSON value: Unnamed root elements generate JSON without a wrapping key, Custom key uses a constant key for all rows, Data bound key uses a column value from each row as the key",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "Unnamed",
+        "label" : "Unamed root elements"
+      }, {
+        "value" : "Constant",
+        "label" : "Custom key"
+      }, {
+        "value" : "DataBound",
+        "label" : "Data bound key"
+      } ],
+      "default" : "Unnamed"
+    }, {
+      "field" : "m_rootKeyName",
+      "configKey" : "rootKeyName",
+      "title" : "Custom key name",
+      "description" : "The constant key for the array of JSON values selected (Selected JSON columns)",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "array"
+    }, {
+      "field" : "m_keyNameColumn",
+      "configKey" : "keyNameColumn",
+      "title" : "Data bound key column",
+      "description" : "The column name, whose values become the key for the array of JSON values selected (Selected JSON columns)",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.combine.column.ColumnCombineJsonNodeParameters$StringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_selectedColumns",
+      "configKey" : "selectedColumns",
+      "title" : "Selected JSON columns",
+      "description" : "The included columns will be combined to a new JSON value for each row",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.combine.column.ColumnCombineJsonNodeParameters$JSONColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "experimental"
+}

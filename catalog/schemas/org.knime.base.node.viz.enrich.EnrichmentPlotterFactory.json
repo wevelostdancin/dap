@@ -1,0 +1,57 @@
+{
+  "id" : "org.knime.base.node.viz.enrich.EnrichmentPlotterFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.node.viz.enrich.EnrichmentPlotterDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Hit column",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "dropdown",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Sort descending",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "list",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Plot sum of hit values",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Hit threshold",
+      "configKey" : "hitThreshold",
+      "keySource" : "label-match",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "string",
+      "section" : "Curves to plot",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 7,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

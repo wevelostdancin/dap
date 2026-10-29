@@ -1,0 +1,70 @@
+{
+  "id" : "org.knime.base.node.mine.regression.polynomial.learner2.PolyRegLearnerNodeFactory2",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.regression.polynomial.learner2.PolyRegLearnerNodeParameters",
+    "fields" : [ {
+      "field" : "m_targetColumn",
+      "configKey" : "targetColumn",
+      "title" : "Target column (dependent variable)",
+      "description" : "The column that contains the dependent \"target\" variable.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_degree",
+      "configKey" : "degree",
+      "title" : "Maximum polynomial degree",
+      "description" : "The maximum degree the polynomial regression function should have.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 2
+    }, {
+      "field" : "m_includedColumns",
+      "configKey" : "includedColumns",
+      "title" : "Independent variables",
+      "description" : "Select the columns containing the independent variables and move them to the \"include\" list.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.mine.regression.polynomial.learner2.PolyRegLearnerNodeParameters$IncludedColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_missingValueHandling",
+      "configKey" : "missingValueHandling",
+      "title" : "Missing values in input data",
+      "description" : "Define how to handle rows with missing values in the input data.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FAIL",
+        "label" : "Fail"
+      }, {
+        "value" : "IGNORE",
+        "label" : "Ignore"
+      } ],
+      "default" : "FAIL"
+    }, {
+      "field" : "m_maxRowsForView",
+      "configKey" : "maxViewRows",
+      "title" : "Number of data points to show in view",
+      "description" : "This option can be used to change the number of data points in the node view if e.g. there are too\nmany points. The default value is 10,000 points.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 10000,
+      "step" : 10.0
+    } ]
+  },
+  "tier" : "core"
+}

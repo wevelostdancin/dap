@@ -1,0 +1,75 @@
+{
+  "id" : "org.knime.base.node.preproc.setoperator.SetOperatorNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.setoperator.SetOperatorNodeParameters",
+    "fields" : [ {
+      "field" : "m_col1",
+      "configKey" : "col1",
+      "title" : "First set",
+      "description" : "The column of the first data input table which contains the elements of the first set.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.AllColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_operation",
+      "configKey" : "operation",
+      "title" : "Operation",
+      "description" : "The set operation to perform on the selected sets.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "AND",
+        "label" : "Intersection"
+      }, {
+        "value" : "OR",
+        "label" : "Union"
+      }, {
+        "value" : "MINUS",
+        "label" : "Complement"
+      }, {
+        "value" : "XOR",
+        "label" : "Exclusive-or"
+      } ],
+      "default" : "AND"
+    }, {
+      "field" : "m_col2",
+      "configKey" : "col2",
+      "title" : "Second set",
+      "description" : "The column of the second data input table which contains the elements of the second set.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.setoperator.SetOperatorNodeParameters$AllColumnsProviderPort1",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_skipMissing",
+      "configKey" : "skipMissing",
+      "title" : "Skip missing values",
+      "description" : "All missing values will be skipped during computation thus the result set contains no missing value\nelements.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_enableHilite",
+      "configKey" : "enableHilite",
+      "title" : "Enable hiliting",
+      "description" : "If enabled, the hiliting of a set entry row will hilite all rows of this set entry in other views.\nDepending on the number of rows, enabling this feature might consume a lot of memory.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

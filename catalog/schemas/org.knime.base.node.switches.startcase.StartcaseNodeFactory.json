@@ -1,0 +1,67 @@
+{
+  "id" : "org.knime.base.node.switches.startcase.StartcaseNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "PortIndex",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "0",
+      "title" : "Select active port:",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "0",
+        "label" : "0"
+      }, {
+        "value" : "1",
+        "label" : "1"
+      }, {
+        "value" : "2",
+        "label" : "2"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "activate_all_outputs_during_configure",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : true,
+      "title" : "Activate all outputs during configure",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.switches.startcase.StartcaseNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Select active port",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "0",
+        "label" : "0"
+      }, {
+        "value" : "1",
+        "label" : "1"
+      }, {
+        "value" : "2",
+        "label" : "2"
+      } ],
+      "default" : "0"
+    }, {
+      "type" : "boolean",
+      "label" : "Activate all outputs during configuration step",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    } ],
+    "labelCoverage" : "1/2",
+    "uiElements" : 2
+  },
+  "tier" : "experimental"
+}

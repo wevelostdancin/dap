@@ -1,0 +1,24 @@
+{
+  "id" : "org.knime.base.node.preproc.colconvert.numbertostring2.NumberToString2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.colconvert.numbertostring2.NumberToStringSettings",
+    "fields" : [ {
+      "field" : "m_columns",
+      "configKey" : "columns",
+      "title" : "Columns",
+      "description" : "Select the columns to convert to String.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "core"
+}

@@ -1,0 +1,40 @@
+{
+  "id" : "org.knime.base.filehandling.urltofilepath.UrlToFilePathNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.filehandling.urltofilepath.UrlToFilePathNodeParameters",
+    "fields" : [ {
+      "field" : "m_columnName",
+      "configKey" : "StringColName",
+      "title" : "Column containing URLs",
+      "description" : "The column containing the URL strings.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "URL",
+      "choicesSource" : {
+        "provider" : "org.knime.base.filehandling.urltofilepath.UrlToFilePathNodeParameters$URLColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_failOnInvalidSyntax",
+      "configKey" : "FailOnInvalidSyntax",
+      "title" : "Fail if URL has invalid syntax",
+      "description" : "If checked, node will fail if an invalid URL string occurs, otherwise a missing value will be inserted as file path, parent folder, file name, and file extension.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_failOnInvalidLocation",
+      "configKey" : "FailOnInvalidLocation",
+      "title" : "Fail if file does not exist",
+      "description" : "If checked, node will fail if a file location does not exist, otherwise a missing value will be inserted as file path, parent folder, file name, and file extension.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "experimental"
+}

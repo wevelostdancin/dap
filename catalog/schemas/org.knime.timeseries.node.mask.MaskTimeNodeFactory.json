@@ -1,0 +1,94 @@
+{
+  "id" : "org.knime.timeseries.node.mask.MaskTimeNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "mask.time.selected.column",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Select the column that should be masked",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "replace.column",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : true,
+      "title" : "Replace.column",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "new.column.name",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "MaskedTime",
+      "title" : "Appended column name",
+      "titleSource" : "dialog",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "mask.time.selection",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Milliseconds only",
+      "title" : "Mask.time.selection",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.timeseries.node.mask.MaskTimeNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Select the column that should be masked",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Replace column",
+      "configKey" : "replace.column",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "string",
+      "label" : "Appended column name",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : "MaskedTime",
+      "editable" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Date",
+      "section" : "Mask",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Time (including milliseconds)",
+      "section" : "Mask",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Milliseconds only",
+      "section" : "Mask",
+      "source" : "dialog-ui",
+      "default" : true
+    } ],
+    "labelCoverage" : "2/4",
+    "uiElements" : 6
+  },
+  "tier" : "experimental"
+}

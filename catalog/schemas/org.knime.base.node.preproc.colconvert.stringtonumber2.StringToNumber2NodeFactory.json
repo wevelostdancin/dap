@@ -1,0 +1,74 @@
+{
+  "id" : "org.knime.base.node.preproc.colconvert.stringtonumber2.StringToNumber2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.colconvert.stringtonumber2.StringToNumber2NodeSettings",
+    "fields" : [ {
+      "field" : "m_decimalSep",
+      "configKey" : "decimal_separator",
+      "title" : "Decimal separator",
+      "description" : "Choose a decimal separator, which is used to mark the boundary between the integral and the  fractional parts of the decimal string.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "."
+    }, {
+      "field" : "m_thousandsSep",
+      "configKey" : "thousands_separator",
+      "title" : "Thousands separator",
+      "description" : "Choose a thousands separator used in the decimal string to group together three digits.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_parseType",
+      "configKey" : "parseType",
+      "title" : "Type",
+      "description" : "Choose the DataType that your string should be converted to.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "INT",
+        "label" : "Number (Integer)"
+      }, {
+        "value" : "DOUBLE",
+        "label" : "Number (Double)"
+      }, {
+        "value" : "LONG",
+        "label" : "Number (Long)"
+      } ],
+      "default" : "DOUBLE"
+    }, {
+      "field" : "m_genericParse",
+      "configKey" : "generic_parse",
+      "title" : "Accept type suffix, e.g. 'd', 'D', 'f', 'F'",
+      "description" : "When checked, the type suffix will be accepted, otherwise it fails to parse input like <tt>1d</tt>. These suffixes are typically used in java-style programs to represent floating point numbers ('f' for float and 'd' for double). Default is not checked.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_failOnError",
+      "configKey" : "fail_on_error",
+      "title" : "Fail on error",
+      "description" : "When checked, the node will fail if an error occurs.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_inclCols",
+      "configKey" : "inclCols",
+      "title" : "Column selection",
+      "description" : "Move the columns of interest into the &quot;Includes&quot; list",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$StringColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    } ]
+  },
+  "tier" : "core"
+}

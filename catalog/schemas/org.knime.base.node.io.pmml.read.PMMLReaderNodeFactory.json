@@ -1,0 +1,42 @@
+{
+  "id" : "org.knime.base.node.io.pmml.read.PMMLReaderNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "pmml.reader.file",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "",
+      "title" : "Pmml.reader.file",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.io.pmml.read.PMMLReaderNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "section" : "Input location",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Input location",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Input location",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    } ],
+    "labelCoverage" : "0/1",
+    "uiElements" : 3
+  },
+  "tier" : "experimental"
+}

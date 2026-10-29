@@ -1,0 +1,167 @@
+{
+  "id" : "org.knime.base.node.io.filehandling.linereader.LineReaderNodeFactory2",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.io.filehandling.linereader.LineReaderNodeParameters",
+    "fields" : [ {
+      "field" : "m_fileSelection",
+      "configKey" : "file_selection",
+      "title" : "FileSelection",
+      "description" : "",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.legacy.widget.file.LegacyMultiFileSelection"
+    }, {
+      "field" : "m_charSet",
+      "configKey" : "charSet",
+      "title" : "CharSet",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_fileEncoding",
+        "configKey" : "fileEncoding",
+        "title" : "File encoding",
+        "description" : "Defines the character set used to read or write a file that contains characters in a different encoding. You can choose from a list of character encodings (UTF-8, UTF-16, etc.), or specify any other encoding supported by your Java Virtual Machine (VM). The default value uses the default encoding of the Java VM, which may depend on the locale or the Java property &quot;file.encoding&quot;.\n",
+        "advanced" : true,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "DEFAULT",
+          "label" : "OS default (UTF-8)"
+        }, {
+          "value" : "ISO_8859_1",
+          "label" : "ISO-8859-1"
+        }, {
+          "value" : "US_ASCII",
+          "label" : "US-ASCII"
+        }, {
+          "value" : "UTF_8",
+          "label" : "UTF-8"
+        }, {
+          "value" : "UTF_16",
+          "label" : "UTF-16"
+        }, {
+          "value" : "UTF_16BE",
+          "label" : "UTF-16BE"
+        }, {
+          "value" : "UTF_16LE",
+          "label" : "UTF-16LE"
+        }, {
+          "value" : "OTHER",
+          "label" : "Other"
+        } ],
+        "default" : "UTF_8",
+        "choicesSource" : {
+          "provider" : "org.knime.base.node.io.filehandling.webui.FileEncodingParameters$EncodingChoicesProvider",
+          "kind" : "enum"
+        },
+        "choicesResolved" : true
+      }, {
+        "field" : "m_customEncoding",
+        "configKey" : "customEncoding",
+        "title" : "Custom encoding",
+        "description" : "A custom character set used to read a CSV file.",
+        "advanced" : true,
+        "type" : "string",
+        "default" : ""
+      } ]
+    }, {
+      "field" : "m_failOnDifferingSpecs",
+      "configKey" : "fail_on_different_specs",
+      "title" : "Fail on differing specs",
+      "description" : "If enabled and the specs of the files are different, the node will fail. This option is only\nrelevant when reading multiple files in a folder.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_rowHeaderPrefix",
+      "configKey" : "row_header_prefix",
+      "title" : "Row header prefix",
+      "description" : "Specifies the prefix of the row header. The default is \"Row\" and the resulting row headers are\n\"Row0\", \"Row1\", and so on.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Row"
+    }, {
+      "field" : "m_columnHeaderMode",
+      "configKey" : "columnHeaderMode",
+      "title" : "Column header",
+      "description" : "Select how the column header should be determined.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FIRST_LINE_AS_HEADER",
+        "label" : "Use first line as column header"
+      }, {
+        "value" : "SET_COLUMN_HEADER",
+        "label" : "Set column header"
+      } ],
+      "default" : "SET_COLUMN_HEADER"
+    }, {
+      "field" : "m_columnHeaderName",
+      "configKey" : "custom_col_header",
+      "title" : "Column header name",
+      "description" : "The name of the output column. The default is \"Column\".\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Column"
+    }, {
+      "field" : "m_emptyLineMode",
+      "configKey" : "empty_line_mode",
+      "title" : "Empty line handling",
+      "description" : "Select how empty lines should be handled.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE_BY_MISSING",
+        "label" : "Replace with missing cells"
+      }, {
+        "value" : "REPLACE_EMPTY",
+        "label" : "Replace with custom text"
+      }, {
+        "value" : "SKIP_EMPTY",
+        "label" : "Skip"
+      } ],
+      "default" : "REPLACE_BY_MISSING"
+    }, {
+      "field" : "m_emptyLineReplacement",
+      "configKey" : "empty_line_replacement",
+      "title" : "Replacement text",
+      "description" : "The text to use as replacement for empty lines.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_regex",
+      "configKey" : "regex",
+      "title" : "Filter with regular expression",
+      "description" : "Include in the output only lines matching the provided regular expression pattern. For example '12.*' will only match lines starting with 12 and have zero or more characters afterwards. The default value is '.*' which matches everything.",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_appendPathColumn",
+      "configKey" : "appendPathColumn",
+      "title" : "Append path column",
+      "description" : "If enabled, the node will append a path column with the provided name to the output table.\nThis column contains for each row which file it was read from. The node will fail if adding\nthe column with the provided name causes a name collision with any of the columns in the\nread table.\n",
+      "advanced" : false,
+      "type" : "string",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    }, {
+      "field" : "m_limitRows",
+      "configKey" : "limitRows",
+      "title" : "Limit data rows",
+      "description" : "If enabled, the number of rows which will be read and output by the node is limited\nto the specified value.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "nullable" : true,
+      "default" : null,
+      "optional" : true
+    } ]
+  },
+  "tier" : "core"
+}

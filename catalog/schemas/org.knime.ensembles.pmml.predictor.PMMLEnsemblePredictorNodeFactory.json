@@ -1,0 +1,78 @@
+{
+  "id" : "org.knime.ensembles.pmml.predictor.PMMLEnsemblePredictorNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "returnIndividualPredictions",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "ReturnIndividualPredictions",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "useMethodAsColumnName",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : false,
+      "title" : "UseMethodAsColumnName",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelString",
+      "configKey" : "tieBreakMethod",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "missing",
+      "title" : "Tie break",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "missing",
+        "label" : "missing"
+      }, {
+        "value" : "any",
+        "label" : "any"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.ensembles.pmml.predictor.PMMLEnsemblePredictorNodeDialog",
+    "ui" : [ {
+      "type" : "boolean",
+      "label" : "Return individual predictions",
+      "configKey" : "returnIndividualPredictions",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Use Multiple Model Method as result column name",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Tie break",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "missing",
+        "label" : "missing"
+      }, {
+        "value" : "any",
+        "label" : "any"
+      } ],
+      "default" : "missing"
+    } ],
+    "labelCoverage" : "1/3",
+    "uiElements" : 3
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,40 @@
+{
+  "id" : "org.knime.base.node.stats.testing.anova.OneWayANOVANodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.stats.testing.anova.OneWayANOVANodeParameters",
+    "fields" : [ {
+      "field" : "m_groupingColumn",
+      "configKey" : "groupingColumn",
+      "title" : "Factor",
+      "description" : "Column holding the grouping information data. This column defines the groups\nto be compared in the one-way ANOVA test.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.stats.testing.anova.OneWayANOVANodeParameters$GroupingColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_confidenceIntervalProb",
+      "configKey" : "confidenceIntervalProb",
+      "title" : "Confidence Interval (in %)",
+      "description" : "The limits for the confidence interval are computed using this number. The default is 95 which\nmeans that you can be 95% confident that the true value of the parameter is in the confidence\ninterval.\n",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 95.0
+    }, {
+      "field" : "m_testColumns",
+      "configKey" : "testColumns",
+      "title" : "Test columns",
+      "description" : "A one-way ANOVA is performed separately for each of these columns.\nOnly columns of numeric type (Double) can be selected for testing.\n",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter"
+    } ]
+  },
+  "tier" : "core"
+}

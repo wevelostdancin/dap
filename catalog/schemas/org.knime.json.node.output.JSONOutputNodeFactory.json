@@ -1,0 +1,72 @@
+{
+  "id" : "org.knime.json.node.output.JSONOutputNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.json.node.output.JSONOutputNodeParameters",
+    "fields" : [ {
+      "field" : "m_parameterName",
+      "configKey" : "parameterName",
+      "title" : "Parameter Name",
+      "description" : "A name, which serves as key in the resulting JSON object. This is used to assert uniqueness in case multiple output results (nodes) are present in workflow.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "json-output"
+    }, {
+      "field" : "m_useFullyQualifiedName",
+      "configKey" : "useFullyQualifiedName",
+      "title" : "Append unique ID to parameter name",
+      "description" : "If checked, the name set above will be amended by the node's ID to guarantee unique parameter names. Usually it's a good idea to have this box not checked and instead make sure to use meaningful and unique names in all container nodes present in a workflow.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_jsonColumnName",
+      "configKey" : "jsonColumnName",
+      "title" : "JSON Column",
+      "description" : "The column containing the JSON result. All other columns are ignored.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.json.node.output.JSONOutputNodeParameters$JSONValueColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_description",
+      "configKey" : "description",
+      "title" : "Description",
+      "description" : "A description for the output parameter. The description is shown in the API specification of the REST interface.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ""
+    }, {
+      "field" : "m_keepOneRowTablesSimple",
+      "configKey" : "keepOneRowTablesSimple",
+      "title" : "Keep single-row tables simple",
+      "description" : "For the special case that the input table contains one row with a non-missing JSON value this value is taken as result and not wrapped into a JSON array.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    }, {
+      "field" : "m_fillExampleButton",
+      "configKey" : "fillExampleButton",
+      "title" : "Fill example JSON from input data",
+      "description" : "Fill the example JSON field below with data from the input table. This requires that preceding nodes have been executed and that a JSON column is selected above.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "java.lang.Void"
+    }, {
+      "field" : "m_exampleJson",
+      "configKey" : "exampleJson",
+      "title" : "Example",
+      "description" : "A JSON representing an example of what output received by this node may look like. Mainly used for populating the \"example\" field of the generated OpenAPI output parameter specification, which is presented to end users for documentation purposes. The content of this node can be filled from input data (if preceding nodes are executed.)",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "{}"
+    } ]
+  },
+  "tier" : "experimental"
+}

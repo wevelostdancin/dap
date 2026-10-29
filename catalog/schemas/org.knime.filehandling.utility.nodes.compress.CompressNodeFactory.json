@@ -1,0 +1,238 @@
+{
+  "id" : "org.knime.filehandling.utility.nodes.compress.CompressNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.filehandling.utility.nodes.compress.CompressNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Read from",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Local File System",
+        "label" : "Local File System"
+      }, {
+        "value" : "Mountpoint",
+        "label" : "Mountpoint"
+      }, {
+        "value" : "Relative to",
+        "label" : "Relative to"
+      }, {
+        "value" : "Custom/KNIME URL",
+        "label" : "Custom/KNIME URL"
+      }, {
+        "value" : "Hub Space",
+        "label" : "Hub Space"
+      } ],
+      "default" : "Local File System"
+    }, {
+      "type" : "dropdown",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Current Hub Space",
+        "label" : "Current Hub Space"
+      }, {
+        "value" : "Current mountpoint",
+        "label" : "Current mountpoint"
+      }, {
+        "value" : "Current workflow",
+        "label" : "Current workflow"
+      }, {
+        "value" : "Current workflow data area",
+        "label" : "Current workflow data area"
+      } ],
+      "default" : "Current workflow data area"
+    }, {
+      "type" : "dropdown",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "choices" : [ ],
+      "default" : "knime-temp-space"
+    }, {
+      "type" : "dropdown",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "number",
+      "label" : "Timeout",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "default" : 10000.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 1000.0
+    }, {
+      "type" : "boolean",
+      "label" : "File",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "boolean",
+      "label" : "Folder",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Files in folder",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Include subfolders",
+      "configKey" : "include_subfolders",
+      "keySource" : "label-match",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "File",
+      "section" : "Source",
+      "source" : "dialog-ui",
+      "choices" : [ ],
+      "default" : ""
+    }, {
+      "type" : "dropdown",
+      "label" : "Write to",
+      "section" : "Destination",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Local File System",
+        "label" : "Local File System"
+      }, {
+        "value" : "Mountpoint",
+        "label" : "Mountpoint"
+      }, {
+        "value" : "Relative to",
+        "label" : "Relative to"
+      }, {
+        "value" : "Custom/KNIME URL",
+        "label" : "Custom/KNIME URL"
+      }, {
+        "value" : "Hub Space",
+        "label" : "Hub Space"
+      } ],
+      "default" : "Local File System"
+    }, {
+      "type" : "dropdown",
+      "section" : "Destination",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Current Hub Space",
+        "label" : "Current Hub Space"
+      }, {
+        "value" : "Current mountpoint",
+        "label" : "Current mountpoint"
+      }, {
+        "value" : "Current workflow",
+        "label" : "Current workflow"
+      }, {
+        "value" : "Current workflow data area",
+        "label" : "Current workflow data area"
+      } ],
+      "default" : "Current workflow data area"
+    }, {
+      "type" : "dropdown",
+      "section" : "Destination",
+      "source" : "dialog-ui",
+      "choices" : [ ],
+      "default" : "knime-temp-space"
+    }, {
+      "type" : "dropdown",
+      "section" : "Destination",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "number",
+      "label" : "Timeout",
+      "section" : "Destination",
+      "source" : "dialog-ui",
+      "default" : 10000.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 1000.0
+    }, {
+      "type" : "dropdown",
+      "label" : "File",
+      "section" : "Destination",
+      "source" : "dialog-ui",
+      "choices" : [ ],
+      "default" : ""
+    }, {
+      "type" : "boolean",
+      "label" : "Create missing folders",
+      "configKey" : "create_missing_folders",
+      "keySource" : "label-match",
+      "section" : "Destination",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "overwrite",
+      "section" : "Destination",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "fail",
+      "section" : "Destination",
+      "source" : "dialog-ui",
+      "default" : true
+    }, {
+      "type" : "dropdown",
+      "label" : "Compression",
+      "configKey" : "compression",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "zip",
+        "label" : "zip"
+      }, {
+        "value" : "jar",
+        "label" : "jar"
+      }, {
+        "value" : "tar",
+        "label" : "tar"
+      }, {
+        "value" : "tar.gz",
+        "label" : "tar.gz"
+      }, {
+        "value" : "tar.bz2",
+        "label" : "tar.bz2"
+      }, {
+        "value" : "cpio",
+        "label" : "cpio"
+      } ],
+      "default" : "zip"
+    }, {
+      "type" : "boolean",
+      "label" : "Include selected source folder",
+      "configKey" : "include_selected_source_folder",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Flatten hierarchy",
+      "configKey" : "flatten_hierarchy",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 22,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

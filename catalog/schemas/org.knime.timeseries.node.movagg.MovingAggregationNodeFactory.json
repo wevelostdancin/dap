@@ -1,0 +1,170 @@
+{
+  "id" : "org.knime.timeseries.node.movagg.MovingAggregationNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.timeseries.node.movagg.MovingAggregationNodeParameters",
+    "fields" : [ {
+      "field" : "m_cumulativeComputing",
+      "configKey" : "cumulativeComputing",
+      "title" : "Cumulative computation",
+      "description" : "Select this option to compute cumulative values e.g. cumulative\nsum over the whole table. Each result row is computed by\naggregating the values from the first row to the current row.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_windowType",
+      "configKey" : "windowType",
+      "title" : "Window type",
+      "description" : "Select the direction of the moving window.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "BACKWARD",
+        "label" : "Backward"
+      }, {
+        "value" : "CENTER",
+        "label" : "Central"
+      }, {
+        "value" : "FORWARD",
+        "label" : "Forward"
+      } ],
+      "default" : "BACKWARD"
+    }, {
+      "field" : "m_windowLength",
+      "configKey" : "windowLength",
+      "title" : "Window length",
+      "description" : "The number of samples to include in the moving window.\n<br/>\nMinimum value: 2 samples.\n<br/>\nMaximum Value: Time Series length.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 21
+    }, {
+      "field" : "m_handleMissings",
+      "configKey" : "handleMissings",
+      "title" : "Resolve missing values for incomplete windows",
+      "description" : "If selected the aggregation values of incomplete windows\nare computed based on the data rows available so far.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_columnAggregators",
+      "configKey" : "columnAggregators",
+      "title" : "Manual",
+      "description" : "Add one or more columns for aggregation from the available\ncolumns list. You can add the same column multiple times.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add manual",
+      "default" : [ ]
+    }, {
+      "field" : "m_patternAggregators",
+      "configKey" : "patternAggregators",
+      "title" : "Pattern",
+      "description" : "<p>The search pattern can either be a string with wildcards or a\n<a href=\"https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/regex/Pattern.html#sum\">\nregular expression</a>.</p>\n\nSupported wildcards are <code>*</code> (matches any number of characters) and <code>?</code>\n(matches one character) e.g. <code>KNI*</code>\nwould match all strings that start with \"KNI\" such as \"KNIME\" whereas <code>KNI?</code> would match only\nstrings that start with \"KNI\" followed by a fourth character.\n",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add pattern",
+      "default" : [ ]
+    }, {
+      "field" : "m_dataTypeAggregationParameters",
+      "configKey" : "dataTypeAggregationParameters",
+      "title" : "DataTypeAggregationParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_dataTypeAggregators",
+        "configKey" : "dataTypeAggregators",
+        "title" : "Type Based Aggregation",
+        "description" : "Aggregations are applied to all columns of the selected type.\n",
+        "advanced" : false,
+        "type" : "array",
+        "items" : {
+          "type" : "object"
+        },
+        "addButtonText" : "Add type",
+        "default" : [ ]
+      }, {
+        "field" : "m_typeMatch",
+        "configKey" : "typeMatch",
+        "title" : "Type matching",
+        "description" : "Define how strict the type matching for the aggregations is.",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "STRICT",
+          "label" : "Strict"
+        }, {
+          "value" : "SUB_TYPE",
+          "label" : "Include sub-types"
+        } ],
+        "default" : "STRICT"
+      } ]
+    }, {
+      "field" : "m_columnNamePolicyParameters",
+      "configKey" : "columnNamePolicyParameters",
+      "title" : "ColumnNamePolicyParameters",
+      "description" : "",
+      "advanced" : false,
+      "type" : "object",
+      "fields" : [ {
+        "field" : "m_columnNamePolicy",
+        "configKey" : "columnNamePolicy",
+        "title" : "Column naming",
+        "description" : "The name of the resulting aggregation column(s) depends on the\nselected naming schema.\n<ul>\n    <li>Keep original name(s):\n    Keeps the original column names.\n    Note that you can use all aggregation columns only once with\n    this column naming option to prevent duplicate column names.\n    </li>\n    <li>Aggregation method (column name):\n    Uses the aggregation method first and appends the column name\n    in brackets\n    </li>\n    <li>Column name (aggregation method):\n    Uses the column name first and appends the aggregation method\n    in brackets\n    </li>\n</ul>\nAll aggregation methods get a * appended if the missing value option\nis not ticked in the aggregation settings in order to distinguish\nbetween columns that considered missing values in the aggregation\nprocess and columns that do not.\n",
+        "advanced" : false,
+        "type" : "enum",
+        "choices" : [ {
+          "value" : "KEEP_ORIGINAL_NAME",
+          "label" : "Keep original name(s)"
+        }, {
+          "value" : "AGGREGATION_METHOD_COLUMN_NAME",
+          "label" : "Aggregation method (column name)"
+        }, {
+          "value" : "COLUMN_NAME_AGGREGATION_METHOD",
+          "label" : "Column name (aggregation method)"
+        } ],
+        "default" : "AGGREGATION_METHOD_COLUMN_NAME"
+      } ]
+    }, {
+      "field" : "m_removeAggregationColumns",
+      "configKey" : "removeAggregationColumns",
+      "title" : "Remove aggregation columns",
+      "description" : "If selected the columns used to aggregate are filtered from\nthe output table.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_removeRetainedColumns",
+      "configKey" : "removeRetainedColumns",
+      "title" : "Remove retained columns",
+      "description" : "If selected the columns that are not aggregate are filtered\nfrom the output table.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_maxUniqueVals",
+      "configKey" : "maxUniqueVals",
+      "title" : "Maximum unique values per group",
+      "description" : "Defines the maximum number of unique values per group to avoid\nproblems with memory overloading. All groups with more unique\nvalues are skipped during the calculation and a missing value is set\nin the corresponding column, and a warning is displayed.\n",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 100000,
+      "step" : 1000.0
+    }, {
+      "field" : "m_valueDelimiter",
+      "configKey" : "valueDelimiter",
+      "title" : "Value delimiter",
+      "description" : "The value delimiter used by aggregation methods such as concatenate.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : ", "
+    } ]
+  },
+  "tier" : "experimental"
+}

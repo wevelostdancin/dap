@@ -1,0 +1,58 @@
+{
+  "id" : "org.knime.base.node.util.sampledata.SampleDataNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.util.sampledata.SampleDataNodeParameters",
+    "fields" : [ {
+      "field" : "m_clusterCount",
+      "configKey" : "clusterCount",
+      "title" : "Cluster count",
+      "description" : "Comma-separated list defining the number of clusters to generate in each universe (e.g., \"2, 3\" creates 2 clusters in the first universe and 3 in the second).",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "2, 2"
+    }, {
+      "field" : "m_universeSizes",
+      "configKey" : "universeSizes",
+      "title" : "Universe sizes",
+      "description" : "Comma-separated list specifying the number of attributes (dimensions) for each universe (e.g., \"2, 3\" means first universe has 2 attributes, second has 3).",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "2, 2"
+    }, {
+      "field" : "m_patternCount",
+      "configKey" : "patcount",
+      "title" : "Pattern count",
+      "description" : "Total number of data patterns to generate across all clusters and universes.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 5400
+    }, {
+      "field" : "m_standardDeviation",
+      "configKey" : "stddeviation",
+      "title" : "Standard deviation",
+      "description" : "Controls the spread of data points within each cluster. Smaller values create tighter clusters.",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.1
+    }, {
+      "field" : "m_noiseFraction",
+      "configKey" : "noise",
+      "title" : "Noise fraction",
+      "description" : "Proportion of randomly distributed data points that don't belong to any cluster. Value between 0 (no noise) and 1 (all noise).",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 0.0
+    }, {
+      "field" : "m_randomSeed",
+      "configKey" : "seed",
+      "title" : "Random seed",
+      "description" : "Fixed value to ensure reproducible data generation. Use the same seed to generate identical datasets.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 1
+    } ]
+  },
+  "tier" : "experimental"
+}

@@ -1,0 +1,52 @@
+{
+  "id" : "org.knime.xml.node.rcombine.XMLRowCombinerNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.xml.node.rcombine.XMLRowCombinerNodeParameters",
+    "fields" : [ {
+      "field" : "m_inputColumn",
+      "configKey" : "inputColumn",
+      "title" : "Source XML Column",
+      "description" : "Select the column that contains the XML cells to merge.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.xml.node.rcombine.XMLRowCombinerNodeParameters$XMLColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_newColumn",
+      "configKey" : "newColumn",
+      "title" : "Output Column Name",
+      "description" : "Enter the name of the column that will store the combined XML cell.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_rootElement",
+      "configKey" : "rootElement",
+      "title" : "Root Element Name",
+      "description" : "Enter the name of the root element used in the combined XML cell.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null
+    }, {
+      "field" : "m_customAttributes",
+      "configKey" : "customAttributes",
+      "title" : "Custom Attributes",
+      "description" : "Define the attributes you want to add to the root XML element.",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add attribute",
+      "default" : [ ]
+    } ]
+  },
+  "tier" : "experimental"
+}

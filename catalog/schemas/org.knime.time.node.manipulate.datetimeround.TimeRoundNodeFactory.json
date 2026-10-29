@@ -1,0 +1,194 @@
+{
+  "id" : "org.knime.time.node.manipulate.datetimeround.TimeRoundNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.time.node.manipulate.datetimeround.TimeRoundNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Date&time columns",
+      "description" : "The date&amp;time columns whose values are shifted.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.time.util.DateTimeUtils$TimeColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_timeRoundingStrategy",
+      "configKey" : "timeRoundingStrategy",
+      "title" : "Round to",
+      "description" : "The rounding strategy to apply, either round to the first, last or nearest value of the chosen rounding precision.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FIRST_POINT_IN_TIME",
+        "label" : "First point in time"
+      }, {
+        "value" : "LAST_POINT_IN_TIME",
+        "label" : "Last point in time"
+      }, {
+        "value" : "NEAREST_POINT_IN_TIME",
+        "label" : "Nearest point in time"
+      } ],
+      "default" : "FIRST_POINT_IN_TIME"
+    }, {
+      "field" : "m_timeRoundingPrecision",
+      "configKey" : "timeRoundingPrecision",
+      "title" : "Rounding precision",
+      "description" : "The rounding precision. The date will be rounded to the first or last value of the chosen precision. Represented as a duration, i.e., PT1H for one hour.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "HOURS_24",
+        "label" : "24 Hours"
+      }, {
+        "value" : "HOURS_12",
+        "label" : "12 Hours"
+      }, {
+        "value" : "HOURS_6",
+        "label" : "6 Hours"
+      }, {
+        "value" : "HOURS_4",
+        "label" : "4 Hours"
+      }, {
+        "value" : "HOURS_3",
+        "label" : "3 Hours"
+      }, {
+        "value" : "HOURS_2",
+        "label" : "2 Hours"
+      }, {
+        "value" : "HOURS_1",
+        "label" : "1 Hour"
+      }, {
+        "value" : "MINUTES_30",
+        "label" : "30 Minutes"
+      }, {
+        "value" : "MINUTES_20",
+        "label" : "20 Minutes"
+      }, {
+        "value" : "MINUTES_15",
+        "label" : "15 Minutes"
+      }, {
+        "value" : "MINUTES_12",
+        "label" : "12 Minutes"
+      }, {
+        "value" : "MINUTES_10",
+        "label" : "10 Minutes"
+      }, {
+        "value" : "MINUTES_6",
+        "label" : "6 Minutes"
+      }, {
+        "value" : "MINUTES_5",
+        "label" : "5 Minutes"
+      }, {
+        "value" : "MINUTES_4",
+        "label" : "4 Minutes"
+      }, {
+        "value" : "MINUTES_3",
+        "label" : "3 Minutes"
+      }, {
+        "value" : "MINUTES_2",
+        "label" : "2 Minutes"
+      }, {
+        "value" : "MINUTES_1",
+        "label" : "1 Minute"
+      }, {
+        "value" : "SECONDS_30",
+        "label" : "30 Seconds"
+      }, {
+        "value" : "SECONDS_20",
+        "label" : "20 Seconds"
+      }, {
+        "value" : "SECONDS_15",
+        "label" : "15 Seconds"
+      }, {
+        "value" : "SECONDS_12",
+        "label" : "12 Seconds"
+      }, {
+        "value" : "SECONDS_10",
+        "label" : "10 Seconds"
+      }, {
+        "value" : "SECONDS_6",
+        "label" : "6 Seconds"
+      }, {
+        "value" : "SECONDS_5",
+        "label" : "5 Seconds"
+      }, {
+        "value" : "SECONDS_4",
+        "label" : "4 Seconds"
+      }, {
+        "value" : "SECONDS_3",
+        "label" : "3 Seconds"
+      }, {
+        "value" : "SECONDS_2",
+        "label" : "2 Seconds"
+      }, {
+        "value" : "SECONDS_1",
+        "label" : "1 Second"
+      }, {
+        "value" : "MILLISECONDS_500",
+        "label" : "500 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_250",
+        "label" : "250 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_125",
+        "label" : "125 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_100",
+        "label" : "100 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_50",
+        "label" : "50 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_25",
+        "label" : "25 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_20",
+        "label" : "20 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_10",
+        "label" : "10 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_5",
+        "label" : "5 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_2",
+        "label" : "2 Milliseconds"
+      }, {
+        "value" : "MILLISECONDS_1",
+        "label" : "1 Millisecond"
+      } ],
+      "default" : "HOURS_1"
+    }, {
+      "field" : "m_replaceOrAppend",
+      "configKey" : "replaceOrAppend",
+      "title" : "Output columns",
+      "description" : "Depending on this setting, the output columns will either replace the modified columns, or be appended to the table with a suffix.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "REPLACE",
+        "label" : "Replace"
+      }, {
+        "value" : "APPEND",
+        "label" : "Append with suffix"
+      } ],
+      "default" : "REPLACE"
+    }, {
+      "field" : "m_outputColumnSuffix",
+      "configKey" : "outputColumnSuffix",
+      "title" : "Output column suffix",
+      "description" : "The suffix to append to the column names of the new columns.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : " (Rounded)"
+    } ]
+  },
+  "tier" : "experimental"
+}

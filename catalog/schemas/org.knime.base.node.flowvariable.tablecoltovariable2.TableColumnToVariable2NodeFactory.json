@@ -1,0 +1,51 @@
+{
+  "id" : "org.knime.base.node.flowvariable.tablecoltovariable2.TableColumnToVariable2NodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelColumnName",
+      "configKey" : "column",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelColumnName",
+      "type" : "column",
+      "default" : "",
+      "title" : "Column name",
+      "titleSource" : "dialog",
+      "choicesSource" : {
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы",
+        "specIndex" : 0
+      },
+      "source" : "dialog"
+    }, {
+      "field" : "SettingsModelBoolean",
+      "configKey" : "ignore missing",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelBoolean",
+      "type" : "boolean",
+      "default" : true,
+      "title" : "Ignore missing",
+      "titleSource" : "field-name",
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.base.node.flowvariable.tablecoltovariable2.TableColumnToVariable2NodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Column name",
+      "configKey" : "columnName",
+      "keySource" : "label-match",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Skip missing values",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : true
+    } ],
+    "labelCoverage" : "1/2",
+    "uiElements" : 2
+  },
+  "tier" : "experimental"
+}

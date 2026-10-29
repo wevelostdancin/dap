@@ -1,0 +1,122 @@
+{
+  "id" : "org.knime.base.filehandling.remote.connectioninformation.node.ssh.SSHConnectionInformationNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ ],
+    "dialogClass" : "org.knime.base.filehandling.remote.connectioninformation.node.ConnectionInformationNodeDialog",
+    "ui" : [ {
+      "type" : "string",
+      "label" : "Host",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "number",
+      "label" : "Port",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 0.0,
+      "min" : 0.0,
+      "max" : 65535.0,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "User",
+      "section" : "Authentication",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "label" : "Keyfile",
+      "section" : "Authentication",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "boolean",
+      "section" : "Workflow credentials",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "section" : "Workflow credentials",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "string",
+      "label" : "User",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "string",
+      "label" : "Password",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : "",
+      "editable" : true
+    }, {
+      "type" : "dropdown",
+      "label" : "Keyfile",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    }, {
+      "type" : "boolean",
+      "label" : "Use known hosts",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "dropdown",
+      "label" : "Known hosts",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ ]
+    }, {
+      "type" : "boolean",
+      "label" : "Custom connection timeout [s]",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : false
+    }, {
+      "type" : "number",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 1.0,
+      "min" : 1.0,
+      "max" : 2147483.0,
+      "step" : 1.0
+    }, {
+      "type" : "number",
+      "label" : "Timeout (ms)",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "default" : 30000.0,
+      "min" : 0.0,
+      "max" : 2.147483647E9,
+      "step" : 100.0
+    } ],
+    "labelCoverage" : "0/0",
+    "uiElements" : 16,
+    "warnings" : [ "в диалоге не найдено DialogComponent" ]
+  },
+  "tier" : "experimental"
+}

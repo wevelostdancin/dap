@@ -1,0 +1,55 @@
+{
+  "id" : "org.knime.filehandling.utility.nodes.pathtostring.PathToStringNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.filehandling.utility.nodes.pathtostring.PathToStringNodeParameters",
+    "fields" : [ {
+      "field" : "m_selectedColumn",
+      "configKey" : "selected_column_name",
+      "title" : "Path column",
+      "description" : "The Path column that will be converted to a String column.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.filehandling.utility.nodes.pathtostring.PathToStringNodeParameters$FSLocationColumnChoicesProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_outputMode",
+      "configKey" : "generated_column_mode",
+      "title" : "Output mode",
+      "description" : "Choose whether to append a new column or replace the selected column.\n",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "APPEND_NEW",
+        "label" : "Append column"
+      }, {
+        "value" : "REPLACE_SELECTED",
+        "label" : "Replace selected column"
+      } ],
+      "default" : "APPEND_NEW"
+    }, {
+      "field" : "m_appendedColumnName",
+      "configKey" : "appended_column_name",
+      "title" : "Output column name",
+      "description" : "The name of the new column to be created.\n",
+      "advanced" : false,
+      "type" : "string",
+      "default" : "Location"
+    }, {
+      "field" : "m_createKNIMEUrl",
+      "configKey" : "create_knime_url",
+      "title" : "Create KNIME URL for 'Relative to' and 'Mountpoint' file systems",
+      "description" : "This option is only relevant for paths with the Relative to workflow data area,\nRelative to workflow, Relative to mountpoint or Mountpoint file system. If checked,\na String is created that contains a KNIME URL. Such a KNIME URL starts with \"knime://\"\nand can be used to e.g. control legacy reader nodes via flow variables. If unchecked,\na String is created that contains solely the path, i.e. without the knime protocol\nand hostname. Such a String can e.g. be used for manipulations and converted back to\na Path using the String to Path node.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "experimental"
+}

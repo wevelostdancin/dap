@@ -1,0 +1,46 @@
+{
+  "id" : "org.knime.base.node.preproc.columnheaderinsert.ColumnHeaderInsertNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.columnheaderinsert.ColumnHeaderInsertSettings",
+    "fields" : [ {
+      "field" : "m_lookupColumn",
+      "configKey" : "lookupColumnV2",
+      "title" : "Lookup column",
+      "description" : "The column in the 2nd input table containing the \"old\" names of the columns.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.StringOrEnum",
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.columnheaderinsert.ColumnHeaderInsertSettings$StringColumnsSecondTable",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_valueColumn",
+      "configKey" : "valueColumn",
+      "title" : "Names column",
+      "description" : "The column in the 2nd input table containing the \"new\" names of the columns.",
+      "advanced" : false,
+      "type" : "string",
+      "default" : null,
+      "choicesSource" : {
+        "provider" : "org.knime.base.node.preproc.columnheaderinsert.ColumnHeaderInsertSettings$StringColumnsSecondTable",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_failIfNoMatch",
+      "configKey" : "failIfNoMatch",
+      "title" : "Fail if no assignment in dictionary table",
+      "description" : "If selected, the node fails if there is no matching entry of a column name in the dictionary table. Otherwise it will keep the original column name.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : true
+    } ]
+  },
+  "tier" : "experimental"
+}

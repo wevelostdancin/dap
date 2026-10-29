@@ -1,0 +1,23 @@
+{
+  "id" : "org.knime.base.node.preproc.constantvalue.ConstantValueColumnNodeFactory2",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.preproc.constantvalue.ConstantValueColumnNodeSettings",
+    "fields" : [ {
+      "field" : "m_newColumnSettings",
+      "configKey" : "newColumnSettings",
+      "title" : "Constant columns",
+      "description" : "An array defining the constant columns to add to the data table.",
+      "advanced" : false,
+      "type" : "array",
+      "items" : {
+        "type" : "object"
+      },
+      "addButtonText" : "Add column",
+      "default" : null,
+      "defaultNote" : "значение не сериализуется без UI"
+    } ]
+  },
+  "tier" : "core"
+}

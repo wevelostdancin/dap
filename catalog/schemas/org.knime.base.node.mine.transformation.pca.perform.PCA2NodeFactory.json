@@ -1,0 +1,71 @@
+{
+  "id" : "org.knime.base.node.mine.transformation.pca.perform.PCA2NodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.base.node.mine.transformation.pca.perform.PCA2NodeParameters",
+    "fields" : [ {
+      "field" : "m_dimensionSelectionMethod",
+      "configKey" : "dimensionSelectionMethod",
+      "title" : "Target dimensions",
+      "description" : "Select the number of dimensions the input data is projected to.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "FIXED_DIMENSIONS",
+        "label" : "Dimension(s) to reduce to"
+      }, {
+        "value" : "INFORMATION_PRESERVATION",
+        "label" : "Minimum information fraction"
+      } ],
+      "default" : "FIXED_DIMENSIONS"
+    }, {
+      "field" : "m_numberOfDimensions",
+      "configKey" : "number_of_dimensions",
+      "title" : "Number of dimensions",
+      "description" : "The number of dimensions to reduce the data to.",
+      "advanced" : false,
+      "type" : "integer",
+      "default" : 2
+    }, {
+      "field" : "m_informationPreservation",
+      "configKey" : "information_preservation",
+      "title" : "Information preservation (%)",
+      "description" : "The minimum percentage of information to preserve in the reduced dimensions.",
+      "advanced" : false,
+      "type" : "number",
+      "default" : 100.0
+    }, {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Columns",
+      "description" : "Select the columns that are included by the PCA, i.e the original features.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.node.parameters.widget.choices.util.CompatibleColumnsProvider$DoubleColumnsProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_removeOriginalColumns",
+      "configKey" : "remove_used_columns",
+      "title" : "Remove original data columns",
+      "description" : "If checked, the columns containing the input data are removed.",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    }, {
+      "field" : "m_failOnMissings",
+      "configKey" : "fail_on_missings",
+      "title" : "Fail if missing values are encountered",
+      "description" : "If checked, execution fails, when the selected columns contain missing values. By default, rows\ncontaining missing values are ignored and not considered during the computation.\n",
+      "advanced" : false,
+      "type" : "boolean",
+      "default" : false
+    } ]
+  },
+  "tier" : "core"
+}

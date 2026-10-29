@@ -1,0 +1,40 @@
+{
+  "id" : "org.knime.ensembles.pmmlporttocell.PMMLPortToCellNodeFactory",
+  "available" : true,
+  "schemaKind" : "swing",
+  "schema" : {
+    "kind" : "swing",
+    "fields" : [ {
+      "field" : "SettingsModelString",
+      "configKey" : "generated_rowkey",
+      "javaType" : "org.knime.core.node.defaultnodesettings.SettingsModelString",
+      "type" : "string",
+      "default" : "Row0",
+      "title" : "Row Identifier:",
+      "titleSource" : "dialog",
+      "choices" : [ {
+        "value" : "Row0",
+        "label" : "Row0"
+      } ],
+      "choicesSource" : {
+        "kind" : "dialog-combo"
+      },
+      "source" : "dialog"
+    } ],
+    "dialogClass" : "org.knime.ensembles.pmmlporttocell.PMMLPortToCellNodeDialog",
+    "ui" : [ {
+      "type" : "dropdown",
+      "label" : "Row Identifier",
+      "section" : "Options",
+      "source" : "dialog-ui",
+      "choices" : [ {
+        "value" : "Row0",
+        "label" : "Row0"
+      } ],
+      "default" : "Row0"
+    } ],
+    "labelCoverage" : "1/1",
+    "uiElements" : 1
+  },
+  "tier" : "experimental"
+}

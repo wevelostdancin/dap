@@ -1,0 +1,60 @@
+{
+  "id" : "org.knime.time.node.format.durationperiodformatmanager.DurationPeriodFormatManagerNodeFactory",
+  "available" : true,
+  "schemaKind" : "annotations",
+  "schema" : {
+    "class" : "org.knime.time.node.format.durationperiodformatmanager.DurationPeriodFormatManagerNodeSettings",
+    "fields" : [ {
+      "field" : "m_columnFilter",
+      "configKey" : "columnFilter",
+      "title" : "Duration columns",
+      "description" : "The duration columns to create a formatter for.",
+      "advanced" : false,
+      "type" : "unknown",
+      "javaType" : "org.knime.node.parameters.widget.choices.filter.ColumnFilter",
+      "choicesSource" : {
+        "provider" : "org.knime.time.util.DateTimeUtils$IntervalColumnProvider",
+        "kind" : "columns",
+        "note" : "варианты зависят от входной таблицы"
+      },
+      "choicesNote" : "варианты появятся, когда к узлу подключена входная таблица"
+    }, {
+      "field" : "m_format",
+      "configKey" : "format",
+      "title" : "Duration format",
+      "description" : "The format of the output string.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "ISO",
+        "label" : "ISO 8601"
+      }, {
+        "value" : "WORDS",
+        "label" : "Whole words"
+      }, {
+        "value" : "LETTERS",
+        "label" : "Single letters"
+      } ],
+      "default" : "ISO"
+    }, {
+      "field" : "m_alignment",
+      "configKey" : "alignment",
+      "title" : "Alignment suggestion",
+      "description" : "Position the value horizontally in compatible views like the Table View.",
+      "advanced" : false,
+      "type" : "enum",
+      "choices" : [ {
+        "value" : "LEFT",
+        "label" : "Left"
+      }, {
+        "value" : "CENTER",
+        "label" : "Center"
+      }, {
+        "value" : "RIGHT",
+        "label" : "Right"
+      } ],
+      "default" : "LEFT"
+    } ]
+  },
+  "tier" : "experimental"
+}

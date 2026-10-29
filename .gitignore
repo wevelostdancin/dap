@@ -1,0 +1,21 @@
+# Vendored KNIME runtime (obtained from a release or scripts/vendor-runtime.sh)
+runtime/
+
+# Eclipse workspace and KNIME metadata
+workspace/
+
+# Build outputs
+build/
+
+# Python
+__pycache__/
+
+# Logs and OS metadata
+*.log
+.DS_Store
+
+# Generated audit report (large, reproducible)
+catalog/schema-report.json
+
+# Contract artifacts are intentionally NOT ignored:
+# catalog/, catalog/schemas/, catalog/catalog.json, catalog/curated.json
