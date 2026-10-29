@@ -15,10 +15,15 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Schedules workflow runs, enforces timeouts and supports cancellation. */
+/**
+ * Schedules workflow runs, enforces timeouts and supports cancellation. Runs of
+ * the same workflow are serialized so their shared node state cannot interleave;
+ * different workflows still run concurrently.
+ */
 public final class JobManager implements AutoCloseable {
     private static final int DEFAULT_TIMEOUT_SEC = 600;
     private static final AtomicInteger IDS = new AtomicInteger();
@@ -28,6 +33,7 @@ public final class JobManager implements AutoCloseable {
     private final WorkflowStore workflows;
     private final Dag dag;
     private final ConcurrentHashMap<String, Job> jobs = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ReentrantLock> workflowLocks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Future<?>> futures = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Connection> connections = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ScheduledFuture<?>> timeouts = new ConcurrentHashMap<>();
@@ -50,6 +56,10 @@ public final class JobManager implements AutoCloseable {
         Objects.requireNonNull(db, "db");
         if (closed.get()) {
             throw new IllegalStateException("job manager is closed");
+        }
+        Workflow tracked = workflows.find(workflow.session(), workflow.id());
+        if (tracked != null && tracked != workflow) {
+            throw new IllegalArgumentException("workflow '" + workflow.id() + "' is not managed by this store");
         }
         int timeout = timeoutSec <= 0 ? DEFAULT_TIMEOUT_SEC : timeoutSec;
         Job job = new Job("job-" + IDS.incrementAndGet(), workflow.id(), workflow.session(), timeout);
@@ -155,12 +165,20 @@ public final class JobManager implements AutoCloseable {
     }
 
     private void run(Job job, Workflow workflow, DuckDbSession db) {
+        ReentrantLock lock = workflowLocks.computeIfAbsent(workflow.id(), ignored -> new ReentrantLock(true));
+        boolean locked = false;
         try {
-            if (!job.start()) {
+            if (job.state().terminal()) {
                 return;
             }
-            if (Thread.currentThread().isInterrupted()) {
-                throw new InterruptedException("job interrupted before opening a connection");
+            lock.lockInterruptibly();
+            locked = true;
+            if (job.state().terminal()) {
+                return;
+            }
+            workflow.resetResults();
+            if (!job.start()) {
+                return;
             }
             Connection connection = db.newConnection();
             connections.put(job.id(), connection);
@@ -181,6 +199,9 @@ public final class JobManager implements AutoCloseable {
                 timeout.cancel(false);
             }
             closeJobConnection(job);
+            if (locked) {
+                lock.unlock();
+            }
         }
     }
 

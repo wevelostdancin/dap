@@ -1,7 +1,9 @@
 package com.dap.nativeengine.exec;
 
+import com.dap.nativeengine.api.Json;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,9 +11,11 @@ import org.junit.jupiter.api.Test;
 import java.sql.Connection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -226,5 +230,83 @@ class DagTest {
         Map<String, LazyPlan> results = new Dag(new Executors()).execute(workflow, db, jobConnection);
 
         assertTrue(results.isEmpty());
+    }
+
+    @Test
+    void failingSiblingInterruptsBlockedNodeAndFailsFast() {
+        CountDownLatch blocked = new CountDownLatch(1);
+        CountDownLatch interrupted = new CountDownLatch(1);
+        Executors registry = new Executors()
+                .register(ExecTestSupport.fake("dap.block", (context, inputs) -> {
+                    blocked.countDown();
+                    try {
+                        new CountDownLatch(1).await(2, TimeUnit.SECONDS);
+                    } catch (InterruptedException exception) {
+                        interrupted.countDown();
+                        throw exception;
+                    }
+                    return ExecTestSupport.plan(db, "SELECT 1 AS blocked", "blocked");
+                }))
+                .register(ExecTestSupport.fake("dap.fail", (context, inputs) -> {
+                    assertTrue(blocked.await(5, TimeUnit.SECONDS), "blocked sibling did not start");
+                    throw new IllegalStateException("sibling failure");
+                }));
+        Workflow workflow = new Workflow("wf-1", "interrupt", "s1");
+        WorkflowNode blockedNode = workflow.addNode("dap.block", "Block", null);
+        workflow.addNode("dap.fail", "Fail", null);
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> new Dag(registry).execute(workflow, db, jobConnection));
+
+        assertEquals("sibling failure", failure.getMessage());
+        try {
+            assertTrue(interrupted.await(5, TimeUnit.SECONDS), "blocked node did not observe interruption");
+        } catch (InterruptedException exception) {
+            throw new AssertionError("interrupted while waiting for the blocked node", exception);
+        }
+        assertEquals("ERROR", workflow.node(blockedNode.id()).state());
+    }
+
+    @Test
+    void executionUsesSnapshotTakenBeforeMidRunEdits() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicReference<String> configSeen = new AtomicReference<>();
+        Executors registry = new Executors()
+                .register(ExecTestSupport.fake("dap.gate", (context, inputs) -> {
+                    started.countDown();
+                    release.await(5, TimeUnit.SECONDS);
+                    return ExecTestSupport.plan(db, "SELECT 1 AS gate", "gate");
+                }))
+                .register(ExecTestSupport.fake("dap.check", (context, inputs) -> {
+                    configSeen.set(context.config().path("value").asText());
+                    return ExecTestSupport.plan(db, "SELECT 2 AS checked", "checked");
+                }));
+        Workflow workflow = new Workflow("wf-1", "snapshot", "s1");
+        WorkflowNode gate = workflow.addNode("dap.gate", "Gate", null);
+        ObjectNode config = Json.object();
+        config.put("value", "before");
+        WorkflowNode check = workflow.addNode("dap.check", "Check", config);
+        workflow.connect(new com.dap.nativeengine.exec.Connection(gate.id(), 0, check.id(), 0));
+        CompletableFuture<Map<String, LazyPlan>> execution = CompletableFuture.supplyAsync(() -> {
+            try {
+                return new Dag(registry).execute(workflow, db, jobConnection);
+            } catch (Exception failure) {
+                throw new java.util.concurrent.CompletionException(failure);
+            }
+        });
+        assertTrue(started.await(5, TimeUnit.SECONDS), "dag did not start");
+
+        // Mutate the live graph while the snapshot run is in flight.
+        workflow.setConfig(check.id(), Json.object().put("value", "after"));
+        WorkflowNode late = workflow.addNode("dap.late", "Late", null);
+        workflow.connect(new com.dap.nativeengine.exec.Connection(gate.id(), 0, late.id(), 0));
+        release.countDown();
+
+        Map<String, LazyPlan> results = execution.get(10, TimeUnit.SECONDS);
+        assertEquals(List.of(gate.id(), check.id()), List.copyOf(results.keySet()));
+        assertEquals("before", configSeen.get(), "downstream node must use the snapshot config");
+        assertEquals("after", workflow.node(check.id()).config().path("value").asText());
+        assertEquals("IDLE", workflow.node(late.id()).state(), "node added mid-run must not execute");
     }
 }

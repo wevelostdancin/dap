@@ -2,6 +2,7 @@ package com.dap.nativeengine.exec;
 
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,15 +10,21 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Executes a workflow graph in topological levels. Every node of a level starts
- * concurrently on its own virtual thread; the next level starts only after the
- * whole previous level finished, so a node sees all of its inputs as plans.
+ * Executes a workflow graph snapshot in topological levels. Every node of a
+ * level starts concurrently on its own virtual thread; the next level starts
+ * only after the whole previous level finished, so a node sees all of its
+ * inputs as plans. Structural edits made after the snapshot was taken do not
+ * affect the running execution.
  */
 public final class Dag {
     private final Executors executors;
@@ -28,7 +35,10 @@ public final class Dag {
 
     public Map<String, LazyPlan> execute(Workflow workflow, DuckDbSession db, java.sql.Connection jobConnection)
             throws Exception {
-        List<WorkflowNode> nodes = workflow.nodes();
+        Workflow.Graph graph = workflow.snapshot();
+        List<WorkflowNode> nodes = graph.nodes();
+        List<Connection> connections = graph.connections();
+        Map<String, ObjectNode> configs = graph.configs();
         if (nodes.isEmpty()) {
             return new LinkedHashMap<>();
         }
@@ -39,7 +49,7 @@ public final class Dag {
             incoming.put(node.id(), new ArrayList<>());
             outgoing.put(node.id(), new ArrayList<>());
         }
-        for (Connection connection : workflow.connections()) {
+        for (Connection connection : connections) {
             List<Connection> targets = incoming.get(connection.to());
             if (targets == null) {
                 throw new IllegalArgumentException("connection target is not a workflow node: " + connection.to());
@@ -79,28 +89,57 @@ public final class Dag {
                 for (String nodeId : current) {
                     inputs.put(nodeId, inputPlans(nodeId, incoming.get(nodeId), results));
                 }
-                Map<String, CompletableFuture<LazyPlan>> level = new LinkedHashMap<>();
+                Map<String, Future<LazyPlan>> level = new LinkedHashMap<>();
+                List<Future<LazyPlan>> pending = new CopyOnWriteArrayList<>();
+                AtomicReference<Throwable> firstFailure = new AtomicReference<>();
                 for (String nodeId : current) {
                     List<LazyPlan> nodeInputs = inputs.get(nodeId);
-                    level.put(nodeId, CompletableFuture.supplyAsync(
-                            () -> executeNode(workflow, nodeId, resolved.get(nodeId), nodeInputs, db, jobConnection),
-                            pool));
+                    NodeExecutor executor = resolved.get(nodeId);
+                    ObjectNode config = configs.get(nodeId);
+                    Future<?>[] self = new Future<?>[1];
+                    Future<LazyPlan> future = pool.submit((Callable<LazyPlan>) () -> {
+                        try {
+                            return executeNode(workflow, nodeId, executor, nodeInputs, config, db, jobConnection);
+                        } catch (Throwable failure) {
+                            firstFailure.compareAndSet(null, failure);
+                            for (Future<LazyPlan> sibling : pending) {
+                                if (sibling != self[0] && !sibling.isDone()) {
+                                    sibling.cancel(true);
+                                }
+                            }
+                            if (failure instanceof Exception exception) {
+                                throw exception;
+                            }
+                            throw new CompletionException(failure);
+                        }
+                    });
+                    self[0] = future;
+                    pending.add(future);
+                    level.put(nodeId, future);
                 }
-                CompletableFuture<Void> all = CompletableFuture.allOf(
-                        level.values().toArray(CompletableFuture[]::new));
+                if (firstFailure.get() != null) {
+                    cancelAll(level);
+                }
                 try {
-                    all.get();
+                    for (Map.Entry<String, Future<LazyPlan>> entry : level.entrySet()) {
+                        results.put(entry.getKey(), entry.getValue().get());
+                    }
                 } catch (InterruptedException interrupted) {
                     cancelAll(level);
                     Thread.currentThread().interrupt();
                     throw interrupted;
                 } catch (ExecutionException failed) {
                     cancelAll(level);
-                    rethrow(failed.getCause());
+                    rethrow(firstFailure.get() != null ? firstFailure.get() : failed.getCause());
                     throw new IllegalStateException("unreachable");
-                }
-                for (Map.Entry<String, CompletableFuture<LazyPlan>> entry : level.entrySet()) {
-                    results.put(entry.getKey(), entry.getValue().join());
+                } catch (CancellationException cancelled) {
+                    cancelAll(level);
+                    Throwable failure = firstFailure.get();
+                    if (failure != null) {
+                        rethrow(failure);
+                    }
+                    Thread.currentThread().interrupt();
+                    throw new InterruptedException("node execution was cancelled");
                 }
                 for (String nodeId : current) {
                     for (String target : outgoing.get(nodeId)) {
@@ -164,7 +203,7 @@ public final class Dag {
     }
 
     private LazyPlan executeNode(Workflow workflow, String nodeId, NodeExecutor executor, List<LazyPlan> inputs,
-                                 DuckDbSession db, java.sql.Connection jobConnection) {
+                                 ObjectNode config, DuckDbSession db, java.sql.Connection jobConnection) {
         try {
             WorkflowNode node = workflow.node(nodeId);
             if (node == null) {
@@ -172,8 +211,7 @@ public final class Dag {
             }
             node.running();
             LazyPlan plan = executor.execute(
-                    new NodeContext(workflow.id(), nodeId, workflow.session(), node.config(), db, jobConnection),
-                    inputs);
+                    new NodeContext(workflow.id(), nodeId, workflow.session(), config, db, jobConnection), inputs);
             workflow.executed(nodeId, plan);
             return plan;
         } catch (Throwable failure) {
@@ -196,8 +234,8 @@ public final class Dag {
         return next;
     }
 
-    private static void cancelAll(Map<String, CompletableFuture<LazyPlan>> level) {
-        for (CompletableFuture<LazyPlan> future : level.values()) {
+    private static void cancelAll(Map<String, Future<LazyPlan>> level) {
+        for (Future<LazyPlan> future : level.values()) {
             if (!future.isDone()) {
                 future.cancel(true);
             }

@@ -55,6 +55,24 @@ public final class Workflow {
         return List.copyOf(connections);
     }
 
+    /** One run-scoped view of the graph. Configs are deep copies taken under the workflow lock. */
+    public record Graph(List<WorkflowNode> nodes, List<Connection> connections, Map<String, ObjectNode> configs) {
+    }
+
+    /**
+     * Capture nodes, connections and configs under one lock. Structural edits made
+     * after this call (add/remove node, connect, setConfig) do not affect the run
+     * that uses the returned snapshot.
+     */
+    public synchronized Graph snapshot() {
+        List<WorkflowNode> nodeSnapshot = new ArrayList<>(nodes.values());
+        Map<String, ObjectNode> configs = new LinkedHashMap<>();
+        for (WorkflowNode node : nodeSnapshot) {
+            configs.put(node.id(), node.config().deepCopy());
+        }
+        return new Graph(List.copyOf(nodeSnapshot), List.copyOf(connections), Map.copyOf(configs));
+    }
+
     public synchronized WorkflowNode addNode(String factory, String displayName, ObjectNode config) {
         int numeric = Integer.parseInt(id.substring(3));
         String nodeId = numeric + ":" + nextIndex++;
