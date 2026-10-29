@@ -29,13 +29,25 @@ public final class CsvReaderExecutor implements NodeExecutor {
 
         ArrowTable table = CsvTableReader.read(Path.of(file), options);
         try {
-            String name = context.db().load(table, "csv_" + context.workflowId() + "_" + context.nodeId());
+            String name = context.db().loadInto(context.jobConnection(), table, tableName(context));
             return new LazyPlan(context.db(), "SELECT * FROM " + DuckDbSession.quote(name), table.columns());
         } catch (java.sql.SQLException failure) {
             throw new IllegalStateException("csv_reader: cannot load parsed CSV into DuckDB: " + failure.getMessage(), failure);
         } finally {
             table.close();
         }
+    }
+
+    /** Stable per-node table: a re-run replaces it instead of leaking a copy. */
+    private static String tableName(NodeContext context) {
+        return "csv_" + sanitize(context.workflowId()) + "_" + sanitize(context.nodeId());
+    }
+
+    private static String sanitize(String value) {
+        if (value == null || value.isEmpty()) {
+            return "default";
+        }
+        return value.replaceAll("[^A-Za-z0-9_]", "_");
     }
 
     private static CsvTableReader.Options options(JsonNode config) {

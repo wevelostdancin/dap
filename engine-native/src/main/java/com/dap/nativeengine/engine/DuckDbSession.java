@@ -76,6 +76,55 @@ public final class DuckDbSession implements AutoCloseable {
         return name;
     }
 
+    /**
+     * Create or replace {@code tableName} with this Arrow table on the given
+     * job connection. A stable name means a re-run replaces the previous copy
+     * instead of leaking one table per execution, and ingest runs on the job
+     * connection so a cancelled or timed-out job can interrupt it.
+     */
+    public String loadInto(Connection connection, ArrowTable table, String tableName) throws SQLException {
+        Objects.requireNonNull(table, "table");
+        if (connection == null) {
+            throw new IllegalArgumentException("loadInto requires a DuckDBConnection, got null");
+        }
+        if (!(connection instanceof DuckDBConnection duck)) {
+            throw new IllegalArgumentException("loadInto requires a DuckDBConnection, got "
+                    + connection.getClass().getName());
+        }
+        if (tableName == null || tableName.isEmpty()) {
+            throw new IllegalArgumentException("table name must not be empty");
+        }
+        List<ColumnSpec> columns = table.columns();
+        StringBuilder ddl = new StringBuilder("CREATE OR REPLACE TABLE ").append(quote(tableName)).append(" (");
+        for (int i = 0; i < columns.size(); i++) {
+            if (i > 0) {
+                ddl.append(", ");
+            }
+            ddl.append(quote(columns.get(i).name())).append(' ').append(columns.get(i).duckDbType());
+        }
+        ddl.append(')');
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(ddl.toString());
+        }
+        try (DuckDBAppender appender = duck.createAppender(tableName)) {
+            for (int row = 0; row < table.rowCount(); row++) {
+                appender.beginRow();
+                for (int column = 0; column < columns.size(); column++) {
+                    append(appender, table.get(column, row));
+                }
+                appender.endRow();
+            }
+        } catch (SQLException | RuntimeException failure) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("DROP TABLE IF EXISTS " + quote(tableName));
+            } catch (SQLException | RuntimeException ignored) {
+                // best effort: the failed job owns this table
+            }
+            throw failure;
+        }
+        return tableName;
+    }
+
     private static void append(DuckDBAppender appender, Object value) throws SQLException {
         if (value == null) {
             appender.appendNull();

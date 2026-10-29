@@ -29,13 +29,16 @@ public final class SorterExecutor implements NodeExecutor {
             throw new IllegalArgumentException("sorter: 'keys' must be an array of {column,direction}");
         }
 
-        String collation = NodeSql.text(config, "collation", null);
-        boolean nocase = false;
-        if (collation != null && !collation.isBlank()) {
-            if (!"nocase".equalsIgnoreCase(collation.trim())) {
-                throw new IllegalArgumentException("sorter: unsupported collation '" + collation + "' (expected nocase)");
-            }
+        String collation = NodeSql.text(config, "collation", "binary");
+        String normalized = collation.trim().toLowerCase(Locale.ROOT);
+        boolean nocase;
+        if (normalized.isEmpty() || "binary".equals(normalized)) {
+            nocase = false;
+        } else if ("nocase".equals(normalized)) {
             nocase = true;
+        } else {
+            throw new IllegalArgumentException("sorter: unsupported collation '" + collation
+                    + "' (expected binary or nocase)");
         }
 
         List<String> order = new ArrayList<>(keys.size());

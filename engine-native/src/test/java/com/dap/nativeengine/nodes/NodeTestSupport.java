@@ -9,6 +9,7 @@ import com.dap.nativeengine.exec.NodeContext;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.util.List;
 
 /** Builders shared by the five node executor tests. */
@@ -17,8 +18,12 @@ final class NodeTestSupport {
     }
 
     static NodeContext context(DuckDbSession db, String configJson) throws Exception {
+        return context(db, null, configJson);
+    }
+
+    static NodeContext context(DuckDbSession db, Connection jobConnection, String configJson) throws Exception {
         ObjectNode config = (ObjectNode) Json.parse(configJson);
-        return new NodeContext("wf", "node", "session", config, db, null);
+        return new NodeContext("wf", "node", "session", config, db, jobConnection);
     }
 
     /** Load rows into the session and return a plan over the loaded table. */

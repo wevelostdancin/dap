@@ -113,27 +113,28 @@ final class NodeSql {
 
     private static String numericLiteral(ColumnSpec column, JsonNode value) {
         String type = column.arrowType();
-        if (value.isNumber()) {
-            if ("Int64".equals(type)) {
+        if ("Float64".equals(type)) {
+            double number = value.isNumber() ? value.doubleValue() : Double.parseDouble(value.asText().trim());
+            if (!Double.isFinite(number)) {
+                throw new IllegalArgumentException("value for Float64 column '" + column.name()
+                        + "' must be finite, got " + number);
+            }
+            return Double.toString(number);
+        }
+        if ("Int64".equals(type)) {
+            if (value.isNumber()) {
                 if (!value.isIntegralNumber()) {
                     throw new IllegalArgumentException("value for Int64 column '" + column.name()
                             + "' must be an integer");
                 }
                 return Long.toString(value.longValue());
             }
-            if ("Float64".equals(type)) {
-                return Double.toString(value.doubleValue());
-            }
+            return Long.toString(Long.parseLong(value.asText().trim()));
+        }
+        if (value.isNumber()) {
             return value.decimalValue().toPlainString();
         }
-        String text = value.asText().trim();
-        if ("Int64".equals(type)) {
-            return Long.toString(Long.parseLong(text));
-        }
-        if ("Float64".equals(type)) {
-            return Double.toString(Double.parseDouble(text));
-        }
-        return new BigDecimal(text).toPlainString();
+        return new BigDecimal(value.asText().trim()).toPlainString();
     }
 
     private static String booleanLiteral(ColumnSpec column, JsonNode value) {
