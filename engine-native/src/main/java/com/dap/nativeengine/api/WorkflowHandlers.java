@@ -107,7 +107,11 @@ public final class WorkflowHandlers {
             throw ApiException.notFound("unknown node: " + nodeId);
         }
         JsonNode request = Json.parseBody(ctx.body());
-        applySettings(workflow, node, request.get("settings"));
+        JsonNode settings = request.get("settings");
+        if (settings == null || settings.isNull()) {
+            throw ApiException.badRequest("'settings' is required");
+        }
+        applySettings(workflow, node, settings);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);
         body.put("node", node.id());

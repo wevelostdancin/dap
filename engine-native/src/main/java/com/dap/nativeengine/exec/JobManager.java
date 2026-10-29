@@ -58,7 +58,7 @@ public final class JobManager implements AutoCloseable {
             throw new IllegalStateException("job manager is closed");
         }
         Workflow tracked = workflows.find(workflow.session(), workflow.id());
-        if (tracked != null && tracked != workflow) {
+        if (tracked != workflow) {
             throw new IllegalArgumentException("workflow '" + workflow.id() + "' is not managed by this store");
         }
         int timeout = timeoutSec <= 0 ? DEFAULT_TIMEOUT_SEC : timeoutSec;
@@ -176,10 +176,12 @@ public final class JobManager implements AutoCloseable {
             if (job.state().terminal()) {
                 return;
             }
-            workflow.resetResults();
             if (!job.start()) {
                 return;
             }
+            // Reset only after the job actually starts: a cancel that wins the queued
+            // window must not wipe the results of the previous successful run.
+            workflow.resetResults();
             Connection connection = db.newConnection();
             connections.put(job.id(), connection);
             dag.execute(workflow, db, connection);

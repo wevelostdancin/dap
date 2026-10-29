@@ -122,7 +122,7 @@
 - `grep -r "org.knime" engine-native/` пуст; `mvn test` зелёный.
 
 **Результат (29.10.2026):** все пункты выполнены на ветке `phase1-native`.
-`make test-native` — 111 тестов, 0 падений; cold start 379–416 мс; health 200 за 1 мс
+`make test-native` — 114 тестов, 0 падений; cold start 410–500 мс; health 200 за 1 мс
 при 10-секундном sync-run; `tests/native_smoke.py` — 9/9. Frozen-контракт содержит
 25 операций OpenAPI (не 26), зарегистрированы все. Замеры и решения — в
 [NATIVE.md](NATIVE.md).
@@ -247,4 +247,3 @@
 - Новый узел = `NodeSpec` JSON + executor + ≥3 теста + расширение корпуса.
 - Правка `/v1` = frozen + `.sha256` + CHANGELOG.
 - Сначала работает и совпадает с baseline, потом быстро, потом красиво.
-

@@ -46,6 +46,16 @@ class JobManagerTest {
         }
     }
 
+    @Test
+    void submitRejectsAWorkflowRemovedFromTheStore() throws Exception {
+        Workflow workflow = singleNodeWorkflow("s1", "dap.one");
+        workflows.delete("s1", workflow.id());
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> jobs.submit(workflow, db, 0));
+        assertTrue(failure.getMessage().contains("not managed"), failure.getMessage());
+        assertEquals(0, jobs.totalCount(), "a rejected submit must not create a job");
+    }
+
     private Workflow singleNodeWorkflow(String session, String factory) {
         Workflow workflow = workflows.create(session, "wf");
         workflow.addNode(factory, factory, null);

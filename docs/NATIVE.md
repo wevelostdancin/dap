@@ -14,7 +14,7 @@ persistence и HA в пилот не входят.
 
 | Что | Состояние на этой ветке |
 |---|---|
-| Сборка | `pom.xml`: javalin 6.7.0, duckdb_jdbc 1.5.6.0, arrow-vector/memory-netty 19.0.0, jackson 2.19.0, junit 5.11.4. `./mvnw -B test` — 111 тестов, 0 падений |
+| Сборка | `pom.xml`: javalin 6.7.0, duckdb_jdbc 1.5.6.0, arrow-vector/memory-netty 19.0.0, jackson 2.19.0, junit 5.11.4. `./mvnw -B test` — 114 тестов, 0 падений |
 | Каталог | 10 JSON-спеков + `index.txt`; `NodeRegistry`; 5 спеков с `available:true`, 5 — с `false`; `/dialog` строится из `configSchema` |
 | HTTP | Все 25 операций frozen-контракта `/v1` зарегистрированы в `NativeService`; `X-DAP-Session`, коды ошибок и Job-модель по frozen-контракту; 14 интеграционных HTTP-тестов |
 | Исполнение | `WorkflowStore`, `Dag`, `JobManager`, 5 executor-ов; runs одного workflow сериализованы, разные — параллельны; snapshot графа на run |
@@ -101,6 +101,8 @@ DuckDbSession (one in-memory DuckDB per session)
 - `csv_reader` вызывает `loadInto(jobConnection, table, "csv_<wf>_<node>")`:
   `CREATE OR REPLACE TABLE` на job-соединении и `DuckDBAppender`. Ре-ран заменяет ту же
   таблицу (не копит копии), а cancel/timeout может прервать ingestion закрытием соединения.
+  Ingest сериализован по connection: две независимые ветви `csv_reader` в одном уровне
+  DAG не интерливают pending-результаты DuckDB (стресс: 30 sync-run, 0 ошибок).
 - `load(ArrowTable)` остаётся для тестов и будущих writer-ов: префикс + счётчик.
 - `run` строит планы; `/table` вызывает `LazyPlan.preview` (`COUNT(*)` + `LIMIT`), `/profile`
   — `LazyPlan.profile` (`COUNT(*)`, `COUNT(DISTINCT)`, `MIN/MAX/AVG` для числовых колонок).
@@ -109,7 +111,7 @@ DuckDbSession (one in-memory DuckDB per session)
 ### 2.5 Граница данных
 
 - Arrow используется на входе CSV: `CsvParser` → `CsvTableReader` → `ArrowTable` →
-  `DuckDbSession.load` → таблица DuckDB. Дальше все преобразования — SQL-отношения.
+  `DuckDbSession.loadInto` → таблица DuckDB. Дальше все преобразования — SQL-отношения.
 - `CsvParser` хранит флаг `quoted` для каждого поля, поэтому пустое некавыченное поле
   становится SQL NULL, а кавыченное `""` — пустой строкой (если не включён
   `emptyStringIsNull`).
@@ -123,13 +125,13 @@ DuckDbSession (one in-memory DuckDB per session)
 
 | Что | Команда | Результат |
 |---|---|---|
-| Полный suite | `./mvnw -B test` | 111 тестов, 0 failures, 0 errors; BUILD SUCCESS, ~10 с |
+| Полный suite | `./mvnw -B test` | 114 тестов, 0 failures, 0 errors; BUILD SUCCESS, ~10 с |
 | HTTP-интеграция | `NativeServiceTest` (14 тестов) | реальный Javalin на свободном порту, все 25 операций, timeout/cancel, изоляция сессий |
 | Health во время sync-run | `-Ddap.test.slowMs=10000` | health 200 за 1 мс при 10-секундном узле; sync-run завершился 200 |
 | Spike 200k, 5 прогонов | `./mvnw -B -Dtest=ArrowDuckDbSpikeTest test` | 1952–2108 мс; 94 877–102 459 строк/с; медиана 1994 мс / 100 301 строк/с |
 | Jar | `./mvnw -B -DskipTests package`; `stat -f '%z'` | 98 035 998 Б ≈ 93,5 МиБ |
 | Native libs внутри jar | `unzip -l target/dap-native.jar` | ≈257 МБ (245 МиБ) несжатыми: osx_universal 107,6 МБ, linux_amd64 60,8 МБ, linux_arm64 53,6 МБ, windows_amd64 35,1 МБ |
-| Cold start финального jar, 3 прогона | `java -jar` + poll `/v1/health` | 379 / 407 / 416 мс (медиана 407 мс) |
+| Cold start финального jar, 3 прогона | `java -jar` + poll `/v1/health` | 410 / 411 / 500 мс (медиана 411 мс) |
 
 Spike: 200 000 строк, 3 колонки (`Int64`, `Utf8`, `Float64`); таймер включает
 `ArrowTable.of` и вставку в DuckDB, но не `COUNT(*)`. Прогоны (мс/строк/с):
@@ -196,14 +198,14 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
 
 | Пункт | Статус | Комментарий |
 |---|---|---|
-| `make build-native` → `target/dap-native.jar` | да | jar 94 МиБ (DuckDB native libs); `make test-native` — 111 тестов |
-| `make run-native` стартует < 2 с | да | 379–416 мс от `java -jar` до health 200 |
+| `make build-native` → `target/dap-native.jar` | да | jar 94 МиБ (DuckDB native libs); `make test-native` — 114 тестов |
+| `make run-native` стартует < 2 с | да | 410–500 мс от `java -jar` до health 200 |
 | `/v1/health` → `nodes=10` | да | живые счётчики registry/store/sessions; `coreNodes=10` |
 | Workflow из 3 узлов end-to-end | да | `csv_reader → missing_value → column_filter → row_filter → sorter`; 5 узлов, 3 строки |
 | `table` отдаёт данные, `profile` считается | да | строки/типы/NULL/`""`, `missing`/`distinct`/`min/max/mean` |
 | Health 200 во время 10-секундного sync-run | да | 1 мс при `dap.test.slowMs=10000`; job остаётся `running` |
 | `grep -r "org.knime" engine-native/` пуст | да | проверяется `scripts/check_repo.py` |
-| `mvn test` зелёный | да | 111 тестов, 0 падений |
+| `mvn test` зелёный | да | 114 тестов, 0 падений |
 | все маршруты frozen-контракта отвечают | да | 25 операций OpenAPI зарегистрированы; `tests/native_smoke.py` — 9/9 |
 
 ## 6. Дальше и риски
@@ -232,6 +234,14 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
   `""` и NULL, но DAP всё равно парсит CSV сам; роадмап говорит `conn.interrupt()`, код
   закрывает job-connection; `dap.sorter` теперь принимает и `binary`, и `nocase`; описание
   `emptyStringIsNull` в спеке исправлено.
+- **Осознанные отличия HTTP-слоя:** legacy-алиасы без `/v1` (например, `GET /health`) не
+  зарегистрированы — канонический контракт только `/v1/*`; sync-run выполняется на
+  виртуальном потоке, поэтому текст frozen-описания «blocks the dispatcher» к native не
+  относится; `PATCH .../nodes/{id}` без `settings` теперь 400 (поле обязательно);
+  `DELETE` неизвестного node — 404 (openapi допускает и 400, docs/API.md §5 — 400);
+  `health.sessions` считает открытые сессионные БД, а не workflow-сессии;
+  fallback `table` на первый табличный порт пока не нужен — у всех узлов один
+  табличный выход.
 
 ## 7. Сборка и запуск
 

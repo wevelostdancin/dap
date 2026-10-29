@@ -94,35 +94,39 @@ public final class DuckDbSession implements AutoCloseable {
         if (tableName == null || tableName.isEmpty()) {
             throw new IllegalArgumentException("table name must not be empty");
         }
-        List<ColumnSpec> columns = table.columns();
-        StringBuilder ddl = new StringBuilder("CREATE OR REPLACE TABLE ").append(quote(tableName)).append(" (");
-        for (int i = 0; i < columns.size(); i++) {
-            if (i > 0) {
-                ddl.append(", ");
-            }
-            ddl.append(quote(columns.get(i).name())).append(' ').append(columns.get(i).duckDbType());
-        }
-        ddl.append(')');
-        try (Statement statement = connection.createStatement()) {
-            statement.execute(ddl.toString());
-        }
-        try (DuckDBAppender appender = duck.createAppender(tableName)) {
-            for (int row = 0; row < table.rowCount(); row++) {
-                appender.beginRow();
-                for (int column = 0; column < columns.size(); column++) {
-                    append(appender, table.get(column, row));
+        // Parallel csv_reader nodes share one job connection, and DuckDB cannot
+        // interleave pending query results on a connection: serialize ingest.
+        synchronized (connection) {
+            List<ColumnSpec> columns = table.columns();
+            StringBuilder ddl = new StringBuilder("CREATE OR REPLACE TABLE ").append(quote(tableName)).append(" (");
+            for (int i = 0; i < columns.size(); i++) {
+                if (i > 0) {
+                    ddl.append(", ");
                 }
-                appender.endRow();
+                ddl.append(quote(columns.get(i).name())).append(' ').append(columns.get(i).duckDbType());
             }
-        } catch (SQLException | RuntimeException failure) {
+            ddl.append(')');
             try (Statement statement = connection.createStatement()) {
-                statement.execute("DROP TABLE IF EXISTS " + quote(tableName));
-            } catch (SQLException | RuntimeException ignored) {
-                // best effort: the failed job owns this table
+                statement.execute(ddl.toString());
             }
-            throw failure;
+            try (DuckDBAppender appender = duck.createAppender(tableName)) {
+                for (int row = 0; row < table.rowCount(); row++) {
+                    appender.beginRow();
+                    for (int column = 0; column < columns.size(); column++) {
+                        append(appender, table.get(column, row));
+                    }
+                    appender.endRow();
+                }
+            } catch (SQLException | RuntimeException failure) {
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute("DROP TABLE IF EXISTS " + quote(tableName));
+                } catch (SQLException | RuntimeException ignored) {
+                    // best effort: the failed job owns this table
+                }
+                throw failure;
+            }
+            return tableName;
         }
-        return tableName;
     }
 
     private static void append(DuckDBAppender appender, Object value) throws SQLException {

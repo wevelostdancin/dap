@@ -348,6 +348,9 @@ class NativeServiceTest {
                 Map.of("settings", Map.of("nope", 1)));
         assertEquals(400, patchUnknownSetting.status());
         assertTrue(patchUnknownSetting.error().contains("unknown setting"));
+        Resp patchMissingSettings = patch("/v1/workflows/" + workflow + "/nodes/" + nodeId, Map.of());
+        assertEquals(400, patchMissingSettings.status());
+        assertTrue(patchMissingSettings.error().contains("settings"));
 
         Resp patchOk = patch("/v1/workflows/" + workflow + "/nodes/" + nodeId,
                 Map.of("settings", Map.of("keys", List.of(Map.of("column", "age", "direction", "asc")))));
@@ -573,6 +576,18 @@ class NativeServiceTest {
     }
 
     // --------------------------------------------------------- isolation etc.
+
+    @Test
+    void twoIndependentCsvReadersRunWithoutConnectionErrors() throws Exception {
+        String workflow = createWorkflow("two-readers");
+        addNode(workflow, "dap.csv_reader", csvSettings(csvFile()));
+        addNode(workflow, "dap.csv_reader", csvSettings(csvFile()));
+        for (int attempt = 0; attempt < 5; attempt++) {
+            Resp run = post("/v1/workflows/" + workflow + "/run", Map.of());
+            assertEquals(200, run.status(), run.raw().body());
+            assertTrue(run.body().path("ok").asBoolean());
+        }
+    }
 
     @Test
     void sessionIsolationAndForeignObjects() throws Exception {
