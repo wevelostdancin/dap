@@ -199,3 +199,4 @@ DAP распространяется под **GNU GPL v3**. В дистрибу�
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — запуск, env, OCI, диагностика.
 - [docs/NODES.md](docs/NODES.md) — каталог, tiers, добавление узла.
 - [docs/INDEPENDENCE.md](docs/INDEPENDENCE.md) — зависимость от KNIME и план замены.
+- [docs/CI.md](docs/CI.md) — CI, runtime-ассет и self-hosted runner.
