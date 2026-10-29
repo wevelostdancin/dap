@@ -44,7 +44,7 @@
             "method": {
               "type": "string",
               "title": "Method",
-              "description": "Replacement source: a constant, the column mean, or the most frequent value.",
+              "description": "Replacement source: a constant, the Float64 column mean, or the most frequent value.",
               "enum": [
                 "constant",
                 "mean",

@@ -31,7 +31,7 @@ jobs:
         run: python scripts/check_repo.py
       - name: Python syntax
         run: |
-          python -m py_compile adapters/mcp/dap_mcp.py tests/run_all.py tests/dap_client.py tests/golden/*.py tests/contract/*.py
+          python -m py_compile adapters/mcp/dap_mcp.py tests/run_all.py tests/dap_client.py tests/native_smoke.py tests/golden/*.py tests/contract/*.py
       - name: Shell syntax
         run: |
           for f in scripts/*.sh; do bash -n "$f"; done
@@ -53,6 +53,16 @@ jobs:
         run: cd engine-native && ./mvnw -B -DskipTests package
       - name: Native jar
         run: ls -lh engine-native/target/dap-native.jar
+      - name: Native black-box smoke
+        run: |
+          java -Ddap.port=7861 -jar engine-native/target/dap-native.jar >/tmp/dap-native.log 2>&1 &
+          native_pid=$!
+          trap 'kill $native_pid 2>/dev/null || true' EXIT
+          for _ in $(seq 1 100); do
+            if curl -fsS -m 1 http://127.0.0.1:7861/v1/health >/dev/null 2>&1; then break; fi
+            sleep 0.1
+          done
+          python3 tests/native_smoke.py --base http://127.0.0.1:7861
 
   engine:
     name: engine + golden tests + image

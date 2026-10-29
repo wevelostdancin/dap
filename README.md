@@ -81,6 +81,25 @@ DAP_JDK=/path/to/jdk-21 make build-engine
 
 Все переменные окружения и сценарии эксплуатации — в [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
+### Нативный движок (engine-native)
+
+В репозитории также живёт независимый движок `engine-native/` (Javalin 6 + DuckDB +
+Arrow) с тем же контрактом `/v1`. Он не использует `runtime/knime` и пока покрывает
+5 узлов пилота; архитектура и замеры — в [docs/NATIVE.md](docs/NATIVE.md).
+
+```bash
+make build-native   # engine-native/target/dap-native.jar
+make test-native    # JUnit suite (111 тестов)
+make run-native     # 127.0.0.1:7800, блокирующий процесс
+```
+
+Если порт 7800 занят KNIME-сервисом, запустите с другим портом и прогоните чёрный ящик:
+
+```bash
+DAP_PORT=7861 make run-native &
+python3 tests/native_smoke.py --base http://127.0.0.1:7861
+```
+
 ### MCP
 
 Адаптер — тонкий stdio-транспорт JSON-RPC 2.0; вычисления остаются в JVM. Запускайте сервис

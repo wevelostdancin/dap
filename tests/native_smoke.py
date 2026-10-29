@@ -184,7 +184,30 @@ def check_workflow(api, tmpdir):
     saved = api.post("/v1/workflows/%s/save" % workflow, {"dir": str(save_dir)}).require()
     if not saved.get("ok") or not (save_dir / "workflow.json").is_file():
         raise AssertionError("save did not write workflow.json: %r" % (saved,))
+
+    # A failed re-run must clear results from the previous successful run.
+    invalid = {"keys": [{"column": "no_such_column", "direction": "asc"}]}
+    if api.configure(workflow, nodes["sort"], invalid).status != 200:
+        raise AssertionError("could not apply the failing sorter config")
+    if api.run(workflow).status != 500:
+        raise AssertionError("run with an unknown sort column did not fail")
+    stale = api.get("/v1/workflows/%s/nodes/%s/table" % (workflow, nodes["sort"]))
+    if stale.status != 400:
+        raise AssertionError("failed run kept a stale table: %s %r" % (stale.status, stale.body))
+    if configure_score_sort(api, workflow, nodes["sort"]).status != 200:
+        raise AssertionError("could not restore the sorter config")
+    rerun = api.run_ok(workflow)
+    if not rerun.get("ok"):
+        raise AssertionError("restored workflow did not run: %r" % (rerun,))
+    if api.table(workflow, nodes["sort"], limit=10)["rows"] != 3:
+        raise AssertionError("restored workflow lost its rows")
     return workflow, nodes, "rows=3 columns=%s" % (columns(table),)
+
+
+def configure_score_sort(api, workflow, node):
+    return api.configure(workflow, node, {
+        "keys": [{"column": "score", "direction": "desc"}],
+    })
 
 
 def check_async_job(api, workflow):

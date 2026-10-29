@@ -126,14 +126,17 @@ public final class Dag {
                     }
                 } catch (InterruptedException interrupted) {
                     cancelAll(level);
+                    closeQuietly(jobConnection);
                     Thread.currentThread().interrupt();
                     throw interrupted;
                 } catch (ExecutionException failed) {
                     cancelAll(level);
+                    closeQuietly(jobConnection);
                     rethrow(firstFailure.get() != null ? firstFailure.get() : failed.getCause());
                     throw new IllegalStateException("unreachable");
                 } catch (CancellationException cancelled) {
                     cancelAll(level);
+                    closeQuietly(jobConnection);
                     Throwable failure = firstFailure.get();
                     if (failure != null) {
                         rethrow(failure);
@@ -232,6 +235,18 @@ public final class Dag {
             }
         }
         return next;
+    }
+
+    /** Closing a DuckDB connection interrupts its running native query/appender. */
+    private static void closeQuietly(java.sql.Connection connection) {
+        if (connection == null) {
+            return;
+        }
+        try {
+            connection.close();
+        } catch (Exception ignored) {
+            // best effort: the job manager closes it again in its cleanup path
+        }
     }
 
     private static void cancelAll(Map<String, Future<LazyPlan>> level) {

@@ -1,6 +1,6 @@
 # ROADMAP — dap-native
 
-**Статус:** Фаза 0 закрыта (29.10.2026). Фаза 1 не начата.
+**Статус:** Фаза 0 закрыта (29.10.2026). Фаза 1 закрыта (29.10.2026). Фаза 2 не начата.
 **Область:** нативный движок `engine-native/` вместо KNIME-обёртки; `engine/`, `runtime/knime/`, `catalog/`
 остаются oracle-ом и не развиваются.
 **Связанные документы:** [PARITY.md](PARITY.md), [INDEPENDENCE.md](INDEPENDENCE.md), [API.md](API.md),
@@ -120,6 +120,12 @@
 - workflow из 3 узлов исполняется end-to-end, `table` отдаёт данные, `profile` считается;
 - health отвечает (200) во время 10-секундного sync-run;
 - `grep -r "org.knime" engine-native/` пуст; `mvn test` зелёный.
+
+**Результат (29.10.2026):** все пункты выполнены на ветке `phase1-native`.
+`make test-native` — 111 тестов, 0 падений; cold start 379–416 мс; health 200 за 1 мс
+при 10-секундном sync-run; `tests/native_smoke.py` — 9/9. Frozen-контракт содержит
+25 операций OpenAPI (не 26), зарегистрированы все. Замеры и решения — в
+[NATIVE.md](NATIVE.md).
 
 ## 5. Фаза 2 — остальные 5 узлов, schemas, parity (5–7 дней)
 
