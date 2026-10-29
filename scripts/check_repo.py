@@ -142,6 +142,29 @@ def check_stale() -> None:
         warn("stale build-runtime.sh references: " + ", ".join(stale))
 
 
+
+def check_native() -> None:
+    """The native engine must not depend on the KNIME oracle in any form."""
+    native = ROOT / "engine-native"
+    if not native.exists():
+        return
+    skipped = ("target", ".tools", ".git")
+    offenders = []
+    for path in native.rglob("*"):
+        if not path.is_file() or any(part in skipped for part in path.parts):
+            continue
+        if path.suffix not in {".java", ".json", ".xml", ".properties", ".txt", ".md", ".yaml", ".yml"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if "org.knime" in text:
+            offenders.append(str(path.relative_to(ROOT)))
+    if offenders:
+        fail("engine-native references org.knime: " + ", ".join(offenders[:5]))
+
+
 def check_python_syntax() -> None:
     for path in list((ROOT / "adapters").rglob("*.py")) + list((ROOT / "tests").rglob("*.py")):
         try:
@@ -157,6 +180,7 @@ def main() -> int:
     check_frozen_contract()
     check_catalog()
     check_stale()
+    check_native()
     check_python_syntax()
     for msg in WARNINGS:
         print(f"WARN  {msg}")

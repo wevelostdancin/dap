@@ -4,12 +4,15 @@ SHELL := /bin/bash
 DAP_JDK ?= $(HOME)/Projects/tools/jdk-21.0.13+9/Contents/Home
 export DAP_JDK
 
-.PHONY: help build-engine build-catalog run test image lint fetch-runtime runtime-archive clean
+.PHONY: help build-engine build-catalog build-native test-native run-native clean-native run test image lint fetch-runtime runtime-archive clean
 
 help:
 	@echo "DAP 1.0.0"
 	@echo ""
 	@echo "  make build-engine   compile com.dap.engine against runtime/knime"
+	@echo "  make build-native   build engine-native/target/dap-native.jar (DuckDB + Arrow + Javalin)"
+	@echo "  make test-native    run the dap-native JUnit suite"
+	@echo "  make run-native     start dap-native on 127.0.0.1:7800 (blocking)"
 	@echo "  make build-catalog  rebuild catalog/catalog.json and catalog/schemas/*.json"
 	@echo "  make run            start HTTP /v1 on 127.0.0.1:7800 (blocking)"
 	@echo "  make test           run python3 tests/run_all.py"
@@ -27,6 +30,19 @@ build-engine:
 
 build-catalog:
 	./scripts/build-catalog.sh
+
+build-native:
+	cd engine-native && ./mvnw -q -DskipTests package
+
+test-native:
+	cd engine-native && ./mvnw -q test
+
+run-native: build-native
+	cd engine-native && "$(DAP_JDK)/bin/java" -jar target/dap-native.jar
+
+clean-native:
+	rm -rf engine-native/target
+	@echo "cleaned engine-native/target"
 
 run:
 	./scripts/run.sh
