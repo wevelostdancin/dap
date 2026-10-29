@@ -219,8 +219,10 @@ def check_errors(api):
             raise AssertionError("unknown connect target did not return 400")
         if api.connect(wf, node, node).status != 400:
             raise AssertionError("self-connect did not return 400")
+        if api.configure(wf, node, {"keys": [{"column": "no_such_column", "direction": "asc"}]}).status != 200:
+            raise AssertionError("valid sorter settings were rejected")
         if api.run(wf).status != 500:
-            raise AssertionError("empty sorter run did not return 500")
+            raise AssertionError("unknown-column run did not return 500")
         if api.get("/v1/workflows/%s/nodes/%s/table" % (wf, node)).status != 400:
             raise AssertionError("failed node table did not return 400")
         if api.get("/v1/workflows/wf-999999").status != 404:
