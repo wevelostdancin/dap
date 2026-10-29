@@ -168,7 +168,9 @@ public final class NativeService implements AutoCloseable {
 
     public NativeService start(int requestedPort) {
         app.start(settings.bindHost(), requestedPort);
-        this.port = app.port();
+        // Port 0 lets the OS pick a free port (used by tests); ask Jetty for the real one.
+        int bound = app.jettyServer().port();
+        this.port = bound > 0 ? bound : app.port();
         return this;
     }
 

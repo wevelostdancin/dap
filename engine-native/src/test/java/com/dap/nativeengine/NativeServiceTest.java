@@ -15,7 +15,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.ServerSocket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -680,7 +679,7 @@ class NativeServiceTest {
         });
         NativeService slow = new NativeService(new NativeService.Settings(100, 600, "127.0.0.1", 0),
                 registry, executors);
-        slow.start(freePort());
+        slow.start(0);
         extras.add(slow);
         base = "http://127.0.0.1:" + slow.port();
         return slow;
@@ -725,7 +724,7 @@ class NativeServiceTest {
     private NativeService startService(NativeService.Settings settings, NodeRegistry registry,
                                        Executors executors) throws IOException {
         NativeService started = new NativeService(settings, registry, executors);
-        started.start(freePort());
+        started.start(0);
         base = "http://127.0.0.1:" + started.port();
         return started;
     }
@@ -863,12 +862,6 @@ class NativeServiceTest {
             }
         }
         return new Resp(response.statusCode(), parsed, response);
-    }
-
-    private static int freePort() throws IOException {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            return socket.getLocalPort();
-        }
     }
 
     private record Resp(int status, JsonNode body, HttpResponse<String> raw) {
