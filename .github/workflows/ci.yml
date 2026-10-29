@@ -82,7 +82,7 @@ jobs:
         run: |
           docker rm -f dap-ci >/dev/null 2>&1 || true
           docker run -d --name dap-ci -p 7800:7800 dap:1.0.0
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             status="$(docker inspect -f '{{.State.Health.Status}}' dap-ci 2>/dev/null || echo none)"
             [ "$status" = healthy ] && break
             sleep 2
