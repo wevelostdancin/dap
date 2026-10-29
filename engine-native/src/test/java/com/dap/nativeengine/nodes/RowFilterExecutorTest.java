@@ -128,4 +128,24 @@ class RowFilterExecutorTest {
             assertTrue(unknownOp.getMessage().contains("like"), unknownOp.getMessage());
         }
     }
+
+    @Test
+    void nonFiniteFloatValuesAreRejected() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = NodeTestSupport.table(db, COLUMNS, rows());
+
+            IllegalArgumentException nan = assertThrows(IllegalArgumentException.class,
+                    () -> new RowFilterExecutor().execute(NodeTestSupport.context(db, """
+                            {"where":[{"column":"score","op":"eq","value":"NaN"}]}
+                            """), List.of(input)));
+            assertTrue(nan.getMessage().contains("finite"), nan.getMessage());
+            assertTrue(nan.getMessage().contains("score"), nan.getMessage());
+
+            IllegalArgumentException infinity = assertThrows(IllegalArgumentException.class,
+                    () -> new RowFilterExecutor().execute(NodeTestSupport.context(db, """
+                            {"where":[{"column":"score","op":"gt","value":"Infinity"}]}
+                            """), List.of(input)));
+            assertTrue(infinity.getMessage().contains("finite"), infinity.getMessage());
+        }
+    }
 }

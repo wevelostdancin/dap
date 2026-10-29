@@ -13,7 +13,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -52,6 +54,14 @@ public final class CsvTableReader {
                 ? rows.get(0).stream().map(CsvParser.Field::text).toList()
                 : null;
         int firstDataRow = hasHeader ? 1 : 0;
+        if (hasHeader) {
+            Set<String> seen = new HashSet<>();
+            for (String name : header) {
+                if (!seen.add(name)) {
+                    throw new IllegalArgumentException("CSV header contains duplicate column name '" + name + "'");
+                }
+            }
+        }
 
         List<String> names;
         List<String> types;
@@ -153,8 +163,13 @@ public final class CsvTableReader {
         boolean bool = true;
         for (int row = firstDataRow; row < rows.size(); row++) {
             CsvParser.Field field = rows.get(row).get(sourceIndex);
-            if (isNull(field, options) || field.text().isEmpty()) {
+            if (isNull(field, options)) {
                 continue;
+            }
+            if (field.text().isEmpty()) {
+                // A quoted empty string is a value, not a missing marker, so a
+                // column holding it cannot be numeric or boolean: keep strings.
+                return "Utf8";
             }
             any = true;
             String text = field.text().trim();

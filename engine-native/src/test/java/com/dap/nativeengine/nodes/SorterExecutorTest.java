@@ -82,6 +82,41 @@ class SorterExecutorTest {
     }
 
     @Test
+    void binaryCollationIsAcceptedAndKeepsByteOrder() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            List<ColumnSpec> columns = List.of(ColumnSpec.of("s", "Utf8"));
+            List<Object[]> rows = List.of(
+                    new Object[]{"Beta"},
+                    new Object[]{"alpha"},
+                    new Object[]{"Gamma"});
+            LazyPlan input = NodeTestSupport.table(db, columns, rows);
+            NodeContext context = NodeTestSupport.context(db, """
+                    {"keys":[{"column":"s","direction":"asc"}],"collation":"binary"}
+                    """);
+
+            LazyPlan plan = new SorterExecutor().execute(context, List.of(input));
+
+            // binary collation is the default: upper-case letters sort before lower-case ones
+            assertEquals(List.of("Beta", "Gamma", "alpha"), column(plan.preview(10), 0));
+        }
+    }
+
+    @Test
+    void unknownCollationIsRejected() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            List<ColumnSpec> columns = List.of(ColumnSpec.of("s", "Utf8"));
+            LazyPlan input = NodeTestSupport.table(db, columns, List.<Object[]>of(new Object[]{"a"}));
+
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> new SorterExecutor().execute(NodeTestSupport.context(db, """
+                            {"keys":[{"column":"s","direction":"asc"}],"collation":"unicode"}
+                            """), List.of(input)));
+            assertTrue(failure.getMessage().contains("unicode"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("binary"), failure.getMessage());
+        }
+    }
+
+    @Test
     void unknownColumnOrDirectionFails() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             List<ColumnSpec> columns = List.of(ColumnSpec.of("s", "Utf8"));
