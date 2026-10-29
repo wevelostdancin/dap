@@ -6,14 +6,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Job lifecycle: success, failure, cancellation, timeout and session scoping. */
@@ -193,5 +196,71 @@ class JobManagerTest {
 
         assertTrue(job.await(5_000), "close must finish active jobs");
         assertEquals(JobState.cancelled, job.state());
+        assertThrows(IllegalStateException.class, () -> jobs.submit(workflow, db, 5));
+    }
+
+    @Test
+    void concurrentRunsOfSameWorkflowAreSerialized() throws Exception {
+        List<String> events = new CopyOnWriteArrayList<>();
+        AtomicInteger active = new AtomicInteger();
+        AtomicInteger overlaps = new AtomicInteger();
+        AtomicInteger invocations = new AtomicInteger();
+        CountDownLatch firstStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        registry.register(ExecTestSupport.fake("dap.serial", (context, inputs) -> {
+            int run = invocations.incrementAndGet();
+            if (active.incrementAndGet() > 1) {
+                overlaps.incrementAndGet();
+            }
+            events.add("start-" + run);
+            try {
+                if (run == 1) {
+                    firstStarted.countDown();
+                    releaseFirst.await(10, TimeUnit.SECONDS);
+                }
+                return ExecTestSupport.plan(db, "SELECT " + run + " AS x", "x");
+            } finally {
+                active.decrementAndGet();
+                events.add("end-" + run);
+            }
+        }));
+        Workflow workflow = singleNodeWorkflow("s1", "dap.serial");
+        Job first = jobs.submit(workflow, db, 10);
+        assertTrue(firstStarted.await(5, TimeUnit.SECONDS), "first run did not start");
+        Job second = jobs.submit(workflow, db, 10);
+        releaseFirst.countDown();
+        assertTrue(first.await(10_000), "first run did not finish");
+        assertTrue(second.await(10_000), "second run did not finish");
+
+        assertEquals(JobState.succeeded, first.state());
+        assertEquals(JobState.succeeded, second.state());
+        assertEquals(0, overlaps.get(), "runs of the same workflow must not overlap");
+        assertEquals(List.of("start-1", "end-1", "start-2", "end-2"), events);
+        assertEquals(2, invocations.get());
+        assertEquals("SELECT 2 AS x", workflow.nodes().get(0).result().sql());
+        assertEquals("EXECUTED", workflow.nodes().get(0).state());
+        for (Job job : List.of(first, second)) {
+            NodeStateView view = job.result().nodes().get(0);
+            assertEquals("EXECUTED", view.state());
+        }
+    }
+
+    @Test
+    void differentWorkflowsStillRunConcurrently() throws Exception {
+        CountDownLatch bothStarted = new CountDownLatch(2);
+        registry.register(ExecTestSupport.fake("dap.parallel", (context, inputs) -> {
+            bothStarted.countDown();
+            assertTrue(bothStarted.await(5, TimeUnit.SECONDS), "different workflows must run concurrently");
+            return ExecTestSupport.plan(db, "SELECT 1 AS x", "x");
+        }));
+        Workflow one = singleNodeWorkflow("s1", "dap.parallel");
+        Workflow two = singleNodeWorkflow("s1", "dap.parallel");
+        Job first = jobs.submit(one, db, 10);
+        Job second = jobs.submit(two, db, 10);
+        assertTrue(first.await(10_000), "first workflow did not finish");
+        assertTrue(second.await(10_000), "second workflow did not finish");
+
+        assertEquals(JobState.succeeded, first.state());
+        assertEquals(JobState.succeeded, second.state());
     }
 }
