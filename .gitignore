@@ -19,3 +19,10 @@ catalog/schema-report.json
 
 # Contract artifacts are intentionally NOT ignored:
 # catalog/, catalog/schemas/, catalog/catalog.json, catalog/curated.json
+
+# dap-native build and agent scratch
+.tools/
+engine-native/target/
+engine-native/.tools/
+.worktrees/
+.superpowers/
