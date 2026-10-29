@@ -10,8 +10,15 @@ if [ ! -d "$RUNTIME/plugins" ]; then
 fi
 CP=$(find "$RUNTIME/plugins" -maxdepth 2 -name "*.jar" | tr '\n' ':')
 rm -rf "$ROOT/build/classes" && mkdir -p "$ROOT/build/classes"
-"$JDK/bin/javac" -nowarn -d "$ROOT/build/classes" -cp "$CP" \
-  $(find "$ROOT/engine/src/main/java" -name "*.java")
+SOURCES=()
+while IFS= read -r file; do
+  SOURCES+=("$file")
+done < <(find "$ROOT/engine/src/main/java" -name "*.java")
+if [ "${#SOURCES[@]}" -eq 0 ]; then
+  echo "no Java sources under engine/src/main/java" >&2
+  exit 1
+fi
+"$JDK/bin/javac" -nowarn -d "$ROOT/build/classes" -cp "$CP" "${SOURCES[@]}"
 "$JDK/bin/jar" cfm "$ROOT/build/com.dap.engine_1.0.0.jar" \
   "$ROOT/engine/META-INF/MANIFEST.MF" \
   -C "$ROOT/build/classes" . -C "$ROOT/engine" plugin.xml
