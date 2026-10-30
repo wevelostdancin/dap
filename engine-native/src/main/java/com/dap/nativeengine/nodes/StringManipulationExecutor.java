@@ -45,13 +45,24 @@ public final class StringManipulationExecutor implements NodeExecutor {
             case "trim" -> "trim(" + quoted + ", ' ' || chr(9) || chr(10) || chr(11) || chr(12) || chr(13))";
             case "replace" -> "replace(" + quoted + ", "
                     + NodeSql.literal(NodeSql.requiredText(config, "search")) + ", "
-                    + NodeSql.literal(NodeSql.requiredText(config, "value")) + ")";
-            case "concat" -> "(" + quoted + " || "
-                    + NodeSql.literal(NodeSql.requiredText(config, "value")) + ")";
+                    + NodeSql.literal(valueText(config)) + ")";
+            case "concat" -> "(" + quoted + " || " + NodeSql.literal(valueText(config)) + ")";
             default -> throw new IllegalArgumentException("string_manipulation: unknown op '" + op
                     + "' (expected upper, lower, trim, replace, concat)");
         };
         return "append".equals(mode) ? append(plan, expression) : replace(plan, column, expression);
+    }
+
+    /** replace/concat text: may be empty (delete occurrences / identity concat), but must be textual. */
+    private static String valueText(JsonNode config) {
+        JsonNode value = config == null ? null : config.get("value");
+        if (value == null || value.isNull()) {
+            return "";
+        }
+        if (!value.isTextual()) {
+            throw new IllegalArgumentException("string_manipulation: config field 'value' must be a string");
+        }
+        return value.textValue();
     }
 
     /** One nested SELECT that rewrites only the target column, keeping schema order and type. */

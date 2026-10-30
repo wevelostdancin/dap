@@ -154,6 +154,12 @@ class MathFormulaExecutorTest {
                             """));
             assertTrue(syntax.getMessage().contains("oops"), syntax.getMessage());
 
+            IllegalArgumentException aggregate = assertThrows(IllegalArgumentException.class,
+                    () -> execute(db, input(db), """
+                            {"outputs":[{"name":"total","expression":"SUM(id)"}]}
+                            """));
+            assertTrue(aggregate.getMessage().contains("projection"), aggregate.getMessage());
+
             IllegalArgumentException unsupported = assertThrows(IllegalArgumentException.class,
                     () -> execute(db, input(db), """
                             {"outputs":[{"name":"blobby","expression":"CAST(id AS BLOB)"}]}

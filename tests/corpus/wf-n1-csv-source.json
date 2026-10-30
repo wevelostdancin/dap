@@ -56,12 +56,7 @@
       "kind": "equivalent",
       "workflow": "wf-02-iris-groupby",
       "node_ref": "g"
-    },
-    {
-      "node": "sort",
-      "kind": "table",
-      "limit": 10,
-      "order": "ordered"
     }
-  ]
+  ],
+  "notes": "Only the equivalent check matters here: sorter coverage lives in wf-02, so a bare table check would assert nothing."
 }

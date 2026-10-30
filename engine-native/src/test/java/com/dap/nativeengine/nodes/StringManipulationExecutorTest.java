@@ -146,6 +146,24 @@ class StringManipulationExecutorTest {
     }
 
     @Test
+    void emptyReplacementDeletesOccurrencesAndEmptyConcatLeavesTheValue() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = NodeTestSupport.table(db, COLUMNS, List.<Object[]>of(
+                    new Object[]{1L, "banana", null}));
+
+            LazyPlan deleted = new StringManipulationExecutor().execute(NodeTestSupport.context(db, """
+                    {"column":"name","op":"replace","search":"an","value":""}
+                    """), List.of(input));
+            assertEquals("ba", deleted.preview(10).data().get(0).get(1));
+
+            LazyPlan identity = new StringManipulationExecutor().execute(NodeTestSupport.context(db, """
+                    {"column":"name","op":"concat","mode":"append","value":""}
+                    """), List.of(input));
+            assertEquals("banana", identity.preview(10).data().get(0).get(3));
+        }
+    }
+
+    @Test
     void appendRejectsAnExistingNewColumnName() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             List<ColumnSpec> columns = List.of(
@@ -199,18 +217,6 @@ class StringManipulationExecutorTest {
                             {"column":"name","op":"upper","mode":"prepend"}
                             """), List.of(input)));
             assertTrue(badMode.getMessage().contains("prepend"), badMode.getMessage());
-
-            IllegalArgumentException missingValue = assertThrows(IllegalArgumentException.class,
-                    () -> new StringManipulationExecutor().execute(NodeTestSupport.context(db, """
-                            {"column":"name","op":"concat","mode":"append"}
-                            """), List.of(input)));
-            assertTrue(missingValue.getMessage().contains("value"), missingValue.getMessage());
-
-            IllegalArgumentException blankValue = assertThrows(IllegalArgumentException.class,
-                    () -> new StringManipulationExecutor().execute(NodeTestSupport.context(db, """
-                            {"column":"name","op":"concat","mode":"append","value":"   "}
-                            """), List.of(input)));
-            assertTrue(blankValue.getMessage().contains("value"), blankValue.getMessage());
 
             IllegalArgumentException missingSearch = assertThrows(IllegalArgumentException.class,
                     () -> new StringManipulationExecutor().execute(NodeTestSupport.context(db, """

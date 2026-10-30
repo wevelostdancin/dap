@@ -165,6 +165,18 @@
         <dap.duckdb.native.linux_arm64>${dap.duckdb.keep}</dap.duckdb.native.linux_arm64>
       </properties>
     </profile>
+    <!-- The JVM on Linux aarch64 reports os.arch=aarch64, and Maven's <os><arch> match is a
+         literal comparison, so the arm64 profile above alone would not activate. -->
+    <profile>
+      <id>duckdb-native-host-linux-aarch64</id>
+      <activation>
+        <os><name>Linux</name><arch>aarch64</arch></os>
+        <property><name>!dap.duckdb.native</name></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.linux_arm64>${dap.duckdb.keep}</dap.duckdb.native.linux_arm64>
+      </properties>
+    </profile>
     <profile>
       <id>duckdb-native-host-windows-amd64</id>
       <activation>

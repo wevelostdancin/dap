@@ -159,8 +159,7 @@ class ExecuteTest(unittest.TestCase):
         observation = parity.run_on_native(api, CORPUS["wf-07-adult-join"], CORPUS, DATASETS)
         self.assertEqual("ok", observation["status"])
         self.assertIn(("wf-07-adult-join", "dap.csv_reader",
-                       {k: v for k, v in parity.native_binding(
-                           "table_source", {"dataset": "ADULT"}, DATASETS)[1].items()}), api.added)
+                       parity.native_binding("table_source", {"dataset": "ADULT"}, DATASETS)[1]), api.added)
         joiner_settings = [settings for name, factory, settings in api.added
                            if name == "wf-07-adult-join" and factory == "dap.joiner"][0]
         self.assertEqual(["education"], joiner_settings["left_keys"])

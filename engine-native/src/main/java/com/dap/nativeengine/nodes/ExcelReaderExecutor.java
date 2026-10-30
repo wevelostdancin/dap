@@ -63,11 +63,10 @@ public final class ExcelReaderExecutor implements NodeExecutor {
                 if (!sheetNode.textValue().isBlank()) {
                     sheet = sheetNode.textValue().trim();
                 }
-            } else if (sheetNode.isIntegralNumber()) {
-                sheet = Long.toString(sheetNode.longValue());
             } else {
+                // configSchema declares a string: a zero-based index is passed as "0", not 0.
                 throw new IllegalArgumentException(
-                        "excel_reader: config field 'sheet' must be a name or a zero-based index");
+                        "excel_reader: config field 'sheet' must be a string (name or zero-based index)");
             }
         }
         boolean header = NodeSql.bool(config, "header", true);

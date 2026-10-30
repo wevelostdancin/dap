@@ -48,6 +48,10 @@ public final class MathFormulaExecutor implements NodeExecutor {
             sql.append(", (").append(output.expression()).append(") AS ").append(NodeSql.quote(output.name()));
         }
         sql.append(" FROM ").append(input.asTable()).append(" AS dap_input");
+        // Bind the projection as it will run: a per-output DESCRIBE cannot see, for example,
+        // an aggregate expression mixed with plain input columns, which would otherwise fail
+        // only later in /table or /profile.
+        validateProjection(context, sql.toString());
         return new LazyPlan(context.db(), sql.toString(), columns);
     }
 
@@ -108,6 +112,16 @@ public final class MathFormulaExecutor implements NodeExecutor {
         } catch (SQLException failure) {
             throw new IllegalArgumentException("math_formula: output '" + output.name()
                     + "' has an invalid expression (" + output.expression() + "): " + failure.getMessage(), failure);
+        }
+    }
+
+    private static void validateProjection(NodeContext context, String sql) {
+        try (Connection connection = context.db().newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("DESCRIBE " + sql)) {
+            result.next();
+        } catch (SQLException failure) {
+            throw new IllegalArgumentException("math_formula: invalid projection: " + failure.getMessage(), failure);
         }
     }
 

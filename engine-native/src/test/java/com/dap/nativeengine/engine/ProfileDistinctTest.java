@@ -82,7 +82,7 @@ class ProfileDistinctTest {
             assertEquals(approximate, id.distinct(),
                     "above the cap the profile must return APPROX_COUNT_DISTINCT, not the exact " + rows);
             assertNotEquals(rows, approximate, "the test dataset must make the sketch differ from the exact count");
-            assertTrue(relativeError(id.distinct(), rows) <= 0.10,
+            assertTrue(relativeError(id.distinct(), rows) <= 0.05,
                     "approximate distinct " + id.distinct() + " for " + rows + " rows is outside the measured sketch error");
         }
     }

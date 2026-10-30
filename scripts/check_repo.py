@@ -165,6 +165,30 @@ def check_native() -> None:
         fail("engine-native references org.knime: " + ", ".join(offenders[:5]))
 
 
+def check_native_jar() -> None:
+    """The built jar, when present, must hold exactly one DuckDB native and stay under 50 MB."""
+    jar = ROOT / "engine-native" / "target" / "dap-native.jar"
+    if not jar.exists():
+        return
+    size = jar.stat().st_size
+    if size >= 50 * 1024 * 1024:
+        fail("engine-native/target/dap-native.jar is %.1f MiB, the limit is 50 MiB"
+             % (size / (1024 * 1024)))
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(jar) as archive:
+            natives = [name for name in archive.namelist()
+                       if name.startswith("libduckdb_java")]
+    except Exception as exc:  # noqa: BLE001 - a broken jar is a failed check
+        fail("cannot read engine-native/target/dap-native.jar: %s" % exc)
+        return
+    if not natives:
+        fail("dap-native.jar contains no DuckDB native library (check the dap.duckdb.native profiles)")
+    elif len(natives) > 1:
+        warn("dap-native.jar carries %d DuckDB natives (cross-platform build?)" % len(natives))
+
+
 def check_python_syntax() -> None:
     for path in list((ROOT / "adapters").rglob("*.py")) + list((ROOT / "tests").rglob("*.py")):
         try:
@@ -181,6 +205,7 @@ def main() -> int:
     check_catalog()
     check_stale()
     check_native()
+    check_native_jar()
     check_python_syntax()
     for msg in WARNINGS:
         print(f"WARN  {msg}")

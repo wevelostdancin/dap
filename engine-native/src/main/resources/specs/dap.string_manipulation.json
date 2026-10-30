@@ -62,7 +62,7 @@
       "value": {
         "type": "string",
         "title": "Value",
-        "description": "Replacement text for replace or appended text for concat."
+        "description": "Replacement text for replace (empty deletes the search text) or appended text for concat (empty leaves the value unchanged)."
       }
     },
     "required": [

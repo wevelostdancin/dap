@@ -647,7 +647,7 @@ def _native_check(api, workflow_id, workflow, nodes, check, observation,
             body = api.profile(workflow_id, api_node)
             expected = {"rows": check.get("rows"),
                         "columns": _expected_columns(stats, body.get("columns") or [])}
-            compare_profile(label, expected, _native_profile(body), problems)
+            compare_profile(label, expected, _native_profile(body), problems, declared_only=True)
         return
 
     if kind == "expect_profile":

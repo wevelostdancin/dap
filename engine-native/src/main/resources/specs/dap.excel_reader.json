@@ -30,7 +30,7 @@
       "sheet": {
         "type": "string",
         "title": "Sheet",
-        "description": "Worksheet name or zero-based index; the first sheet is used when omitted."
+        "description": "Worksheet name or zero-based index as a string, e.g. \"0\"; the first sheet is used when omitted."
       },
       "header": {
         "type": "boolean",

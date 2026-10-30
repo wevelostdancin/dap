@@ -167,7 +167,7 @@ class ExcelReaderExecutorTest {
             LazyPlan byName = read(db, job,
                     "{\"file\":\"" + jsonPath(irisXlsx()) + "\",\"sheet\":\"iris\"}");
             LazyPlan byIndex = read(db, job,
-                    "{\"file\":\"" + jsonPath(irisXlsx()) + "\",\"sheet\":0}");
+                    "{\"file\":\"" + jsonPath(irisXlsx()) + "\",\"sheet\":\"0\"}");
 
             for (LazyPlan plan : List.of(byName, byIndex)) {
                 assertEquals(List.of(
@@ -192,7 +192,7 @@ class ExcelReaderExecutorTest {
         Path file = writeXlsx(dir, "two-sheets.xlsx", sheets, null, null);
 
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
-            LazyPlan byIndex = read(db, job, "{\"file\":\"" + jsonPath(file) + "\",\"sheet\":1}");
+            LazyPlan byIndex = read(db, job, "{\"file\":\"" + jsonPath(file) + "\",\"sheet\":\"1\"}");
             LazyPlan byName = read(db, job, "{\"file\":\"" + jsonPath(file) + "\",\"sheet\":\"second\"}");
 
             for (LazyPlan plan : List.of(byIndex, byName)) {
@@ -205,6 +205,18 @@ class ExcelReaderExecutorTest {
                 result.next();
                 assertEquals(1, result.getLong(1));
             }
+        }
+    }
+
+    @Test
+    void numericSheetIndexIsRejectedBecauseTheSchemaDeclaresAString() throws Exception {
+        Map<String, String> sheets = new LinkedHashMap<>();
+        sheets.put("only", sheet("<row r=\"1\">" + inline(1, "A", "x") + "</row>"));
+        Path file = writeXlsx(dir, "numeric-sheet.xlsx", sheets, null, null);
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> read(db, job, "{\"file\":\"" + jsonPath(file) + "\",\"sheet\":0}"));
+            assertTrue(failure.getMessage().contains("sheet"), failure.getMessage());
         }
     }
 
