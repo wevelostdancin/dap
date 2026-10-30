@@ -41,7 +41,8 @@ public final class StringManipulationExecutor implements NodeExecutor {
         String expression = switch (op) {
             case "upper" -> "upper(" + quoted + ")";
             case "lower" -> "lower(" + quoted + ")";
-            case "trim" -> "trim(" + quoted + ")";
+            // KNIME's trim() strips every ASCII whitespace character (Java String.trim).
+            case "trim" -> "trim(" + quoted + ", ' ' || chr(9) || chr(10) || chr(11) || chr(12) || chr(13))";
             case "replace" -> "replace(" + quoted + ", "
                     + NodeSql.literal(NodeSql.requiredText(config, "search")) + ", "
                     + NodeSql.literal(NodeSql.requiredText(config, "value")) + ")";
@@ -66,6 +67,12 @@ public final class StringManipulationExecutor implements NodeExecutor {
 
     /** Original columns untouched, transformed value appended last as KNIME's "new column". */
     private static LazyPlan append(LazyPlan plan, String expression) {
+        for (ColumnSpec existing : plan.columns()) {
+            if (APPENDED_COLUMN.equals(existing.name())) {
+                throw new IllegalArgumentException("string_manipulation: append would duplicate the existing column '"
+                        + APPENDED_COLUMN + "'");
+            }
+        }
         String projection = NodeSql.projection(plan.columns()) + ", " + expression
                 + " AS " + NodeSql.quote(APPENDED_COLUMN);
         List<ColumnSpec> columns = new ArrayList<>(plan.columns());

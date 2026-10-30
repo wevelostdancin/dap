@@ -56,6 +56,11 @@ public final class ServiceState implements AutoCloseable {
         });
     }
 
+    /** Existing session database, or null; unlike session(id) this never creates one. */
+    public DuckDbSession sessionIfPresent(String sessionId) {
+        return sessions.get(sessionId);
+    }
+
     public int sessionCount() {
         return sessions.size();
     }

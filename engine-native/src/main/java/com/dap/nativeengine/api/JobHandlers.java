@@ -1,5 +1,6 @@
 package com.dap.nativeengine.api;
 
+import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Job;
 import com.dap.nativeengine.exec.JobState;
 import com.dap.nativeengine.exec.Workflow;
@@ -78,7 +79,10 @@ public final class JobHandlers {
         if (cancelled) {
             // A /table or /profile read runs on its own connection, so the job-connection
             // close above cannot reach it; close the reads registered for this workflow.
-            state.session(job.sessionId()).interruptReads(job.workflowId());
+            DuckDbSession db = state.sessionIfPresent(job.sessionId());
+            if (db != null) {
+                db.interruptReads(job.workflowId());
+            }
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", cancelled);

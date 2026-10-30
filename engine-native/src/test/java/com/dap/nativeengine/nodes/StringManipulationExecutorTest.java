@@ -126,6 +126,42 @@ class StringManipulationExecutorTest {
     }
 
     @Test
+    void trimRemovesEveryAsciiWhitespaceCharacter() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = NodeTestSupport.table(db, COLUMNS, List.of(
+                    new Object[]{1L, "x", "\t padded \n"},
+                    new Object[]{2L, "y", "\r\nvalue\r\n"},
+                    new Object[]{3L, "z", " \t\n "}));
+
+            LazyPlan plan = new StringManipulationExecutor().execute(
+                    NodeTestSupport.context(db, """
+                            {"column":"note","op":"trim","mode":"replace"}
+                            """), List.of(input));
+
+            TableData data = plan.preview(10);
+            assertEquals("padded", data.data().get(0).get(2));
+            assertEquals("value", data.data().get(1).get(2));
+            assertEquals("", data.data().get(2).get(2), "whitespace-only text trims to the empty string");
+        }
+    }
+
+    @Test
+    void appendRejectsAnExistingNewColumnName() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            List<ColumnSpec> columns = List.of(
+                    ColumnSpec.of("name", "Utf8"), ColumnSpec.of("new column", "Utf8"));
+            LazyPlan input = NodeTestSupport.table(db, columns, List.<Object[]>of(
+                    new Object[]{"ada", "already there"}));
+
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> new StringManipulationExecutor().execute(NodeTestSupport.context(db, """
+                            {"column":"name","op":"upper","mode":"append"}
+                            """), List.of(input)));
+            assertTrue(failure.getMessage().contains("new column"), failure.getMessage());
+        }
+    }
+
+    @Test
     void appendAlsoWorksForUpperAndLeavesSourceColumnIntact() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             LazyPlan input = NodeTestSupport.table(db, COLUMNS, List.<Object[]>of(
