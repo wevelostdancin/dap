@@ -24,6 +24,9 @@ DAP — производная KNIME Analytics Platform 5.12 под GPLv3. `com.
 внутренние классы диалогов. Поэтому формулировка «DAP не зависит от KNIME» неверна;
 верна формулировка «DAP не требует установленного KNIME».
 
+Пилотный нативный движок (`engine-native/`, артефакт `dap-native`) не меняет этот вывод
+для основного дистрибутива: он собирается отдельно, не линкует `org.knime` и разобран в §11.
+
 ## 2. Что уже независимо
 
 - **Поставка.** `runtime/knime` (610 бандлов, ≈662 МБ) входит в релизный артефакт/образ.
@@ -223,3 +226,52 @@ job-модель проходит тесты на таймаут/отмену.
 3. Вести parity-корпус и метрики с этапа 0 — без них замена превращается в веру.
 4. Обновлять `runtime` вместе с security-фиксами KNIME, пока зависимость не снята.
 5. Фиксировать каждое изменение контракта `/v1`: это единственное, что переживёт замену.
+
+## 11. Нативный движок (dap-native)
+
+`engine-native/` — отдельный артефакт `dap-native` (один shaded jar, ≈44 МиБ), который
+реализует замороженный контракт `/v1` без KNIME: Javalin 6.7 + DuckDB 1.5.6 + Arrow 19,
+собственный каталог из 10 JSON-спеков (`dap.*`) и собственные исполнители узлов.
+
+### 11.1. Граница зависимостей
+
+- **Нет `org.knime`.** `grep -r "org.knime" engine-native/` пуст — это проверяет
+  `make lint` (`scripts/check_repo.py`); в собранном `dap-native.jar` классов `org/knime`
+  также нет.
+- **Нет vendored runtime.** `engine-native` не читает `runtime/knime` и
+  `catalog/catalog.json`; сборка и запуск не требуют этих каталогов.
+- **Один артефакт.** `engine-native/target/dap-native.jar` — ≈44 МиБ, вместе с одной
+  платформенной native-библиотекой DuckDB; лимит 50 МиБ проверяется в `make lint`, когда
+  jar собран.
+- **Сторонние зависимости.** DuckDB JDBC (MIT), Apache Arrow vector/memory (Apache-2.0),
+  Javalin (Apache-2.0), Eclipse Jetty (EPL-2.0 или Apache-2.0), Jackson (Apache-2.0),
+  SLF4J (MIT), Logback (EPL-1.0 или LGPL-2.1). JUnit 5 (EPL-2.0) — только test scope.
+  Перечень с ссылками — в `NOTICE`, раздел 2.
+
+### 11.2. Что это значит для GPL/EPL
+
+- `dap-native.jar` не содержит кода KNIME и не является производной `org.knime.core`;
+  лицензионные обязательства KNIME-рантайма (разделы 3–4) к нему не относятся.
+- Сам DAP распространяется под GPLv3. Лицензии зависимостей native — MIT, Apache-2.0,
+  EPL-2.0 (Jetty) и EPL-1.0/LGPL-2.1 (Logback); JUnit 5 (EPL-2.0) в артефакт не входит.
+- Легаси-движок `engine/` остаётся связанным с `org.knime.core` (EPL). Два артефакта
+  различаются по составу и лицензионным обязательствам, хотя собираются из одного
+  репозитория.
+
+### 11.3. Что остаётся общим
+
+- **Контракт `/v1`.** `api/openapi-v1-frozen.yaml` и его `.sha256`; native его не меняет,
+  `make lint` сверяет контрольную сумму.
+- **Конвенции каталога.** id `dap.<type>`, tier (`core`/`experimental`), JSON-схема узла и
+  форма `/dialog`. Native читает свои `specs/*.json`, а не `catalog/catalog.json`.
+- **Parity-корпус.** `tests/corpus/*.json` и `tests/parity.py` — один корпус и одни правила
+  сравнения для oracle (KNIME) и native.
+
+### 11.4. Пределы утверждения
+
+- Семантика узлов следует конвенциям KNIME (имена, типы, missing/NULL, сортировка), а
+  корпус сравнивает native с oracle. Это совместимость поведения, а не общий код.
+- Код KNIME не линкуется и не поставляется в `dap-native.jar`; `org.knime` в
+  `engine-native/` отсутствует.
+- Это пилот Фазы 3: 10 спеков, из них 5 исполнителей; пока production-default — за
+  KNIME-движком. Статус и границы — [NATIVE.md](NATIVE.md), [ROADMAP-NATIVE.md](ROADMAP-NATIVE.md).

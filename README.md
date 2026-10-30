@@ -208,6 +208,10 @@ Tier — это **обещание поддержки**, а не огранич�
 DAP распространяется под **GNU GPL v3**. В дистрибутив входит производный от KNIME 5.12
 рантайм (GPLv3, с дополнительными разрешениями KNIME по разделу 7) и EPL-компоненты Eclipse.
 Полный текст — [LICENSE](LICENSE), сведения об источниках и изменениях — [NOTICE](NOTICE).
+DAP-native (`engine-native/`, артефакт `dap-native.jar`) собирается отдельно и не содержит
+кода KNIME; его зависимости — MIT/Apache-2.0/EPL-LGPL, границы и лицензии —
+[docs/INDEPENDENCE.md](docs/INDEPENDENCE.md), [docs/NATIVE.md](docs/NATIVE.md),
+[docs/ROADMAP-NATIVE.md](docs/ROADMAP-NATIVE.md).
 Гарантий нет; см. `LICENSE`.
 
 ## Документация
