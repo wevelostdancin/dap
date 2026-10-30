@@ -53,7 +53,15 @@ public final class JoinerExecutor implements NodeExecutor {
         Set<String> outputNames = new HashSet<>();
         StringJoiner projection = new StringJoiner(", ");
         for (ColumnSpec column : left.columns()) {
-            projection.add("l." + NodeSql.quote(column.name()));
+            // A merged key is one output column: for a right-only row the left key is NULL,
+            // so take the right value instead of dropping it with the right key column.
+            if (mergeKeys && leftKeys.contains(column.name())) {
+                int index = leftKeys.indexOf(column.name());
+                projection.add("COALESCE(l." + NodeSql.quote(column.name()) + ", r."
+                        + NodeSql.quote(rightKeys.get(index)) + ") AS " + NodeSql.quote(column.name()));
+            } else {
+                projection.add("l." + NodeSql.quote(column.name()));
+            }
             outputNames.add(column.name());
         }
         Set<String> rightKeyNames = new HashSet<>(rightKeys);

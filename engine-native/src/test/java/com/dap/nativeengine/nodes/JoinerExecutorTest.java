@@ -104,9 +104,9 @@ class JoinerExecutorTest {
                     ColumnSpec.of("rv", "Float64")), plan.columns());
             TableData data = plan.preview(10);
             assertEquals(4, data.rows());
-            // the merged key is the left column, so the unmatched (right-only) row has no
-            // left key value at all; its right key is dropped by merge_keys=true
-            assertEquals(List.of("1|a|10.5", "1|a|11.5", "3|c|30.0", "<null>|<null>|50.0"),
+            // merge_keys=true keeps one key column: it must carry the right key value for a
+            // right-only row (the right key column itself is dropped from the output)
+            assertEquals(List.of("1|a|10.5", "1|a|11.5", "3|c|30.0", "5|<null>|50.0"),
                     canonicalRows(data));
         }
     }
