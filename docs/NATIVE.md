@@ -205,7 +205,7 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
 | `table` отдаёт данные, `profile` считается | да | строки/типы/NULL/`""`, `missing`/`distinct`/`min/max/mean` |
 | Health 200 во время 10-секундного sync-run | да | 1 мс при `dap.test.slowMs=10000`; job остаётся `running` |
 | `grep -r "org.knime" engine-native/` пуст | да | проверяется `scripts/check_repo.py` |
-| `mvn test` зелёный | да | 114 тестов на момент приёмки Фазы 1; 175 после Фазы 2 (§5.1) |
+| `mvn test` зелёный | да | 114 тестов на момент приёмки Фазы 1; 179 после Фазы 2 (§5.1) |
 | все маршруты frozen-контракта отвечают | да | 25 операций OpenAPI зарегистрированы; `tests/native_smoke.py` — 9/9 |
 
 ## 5.1 Приёмка Фазы 2
@@ -222,7 +222,7 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
 | profile distinct cap 100k | да | точный `COUNT(DISTINCT)` до 100k различных значений, выше — sketch + досчёт у границы (§6) |
 | отмена `/table`//`/profile` | да | `interruptReads(workflowId)` + закрытие сессии; замер: прерывание за 0–1 мс |
 | jar < 50 МБ | да | 46 246 388 Б ≈ 44,1 МиБ (одна платформенная native-библиотека) |
-| тесты и smoke | да | `mvn test` — 175 тестов, 0 падений; `tests/native_smoke.py` — 9/9; `tests/test_parity_native.py` — 27/27 |
+| тесты и smoke | да | `mvn test` — 179 тестов, 0 падений; `tests/native_smoke.py` — 9/9; `tests/test_parity_native.py` — 27/27 |
 
 ## 6. Дальше и риски
 
@@ -245,7 +245,9 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
   cross-platform упаковки выбор переопределяется
   `-Ddap.duckdb.native=all|osx_universal|linux_amd64|linux_arm64|windows_amd64`
   (менять выбор и пересобирать нужно с `clean package`: shade не пересобирает уже
-  shaded jar).
+  shaded jar). `make lint` проверяет собранный jar: < 50 МиБ и хотя бы одна
+  DuckDB-native библиотека (ноль библиотек — ERROR, несколько — WARN для
+  cross-platform сборки).
 - **Polars:** порог — ≥2× на конкретном узле; бенчмарка ещё нет, поэтому остаёмся на DuckDB.
 - **Отмена материализации:** `DuckDbSession` учитывает активные `/table`/`/profile`-чтения
   (соединение + workflow + node); `close()` сессии, `POST /v1/shutdown` и
