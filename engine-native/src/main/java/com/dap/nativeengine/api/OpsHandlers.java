@@ -1,5 +1,6 @@
 package com.dap.nativeengine.api;
 
+import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Workflow;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.javalin.http.Context;
@@ -45,9 +46,25 @@ public final class OpsHandlers {
     }
 
     public void debug(Context ctx) {
-        String session = Http.session(ctx);
-        Workflow workflow = state.requireWorkflow(session, ctx.pathParam("workflowId"));
-        Http.ok(ctx, workflow.debug());
+        String sessionId = Http.session(ctx);
+        Workflow workflow = state.requireWorkflow(sessionId, ctx.pathParam("workflowId"));
+        Map<String, Object> body = new LinkedHashMap<>(workflow.debug());
+        Map<String, Object> duckdb = new LinkedHashMap<>();
+        // Effective values come from the session database once it exists; before the first
+        // data request /debug reports what was configured (null means DuckDB's default).
+        DuckDbSession database = state.sessionIfPresent(sessionId);
+        if (database != null) {
+            DuckDbSession.Resources resources = database.resources();
+            duckdb.put("memoryLimit", resources.memoryLimit());
+            duckdb.put("threads", resources.threads());
+            duckdb.put("tempDirectory", resources.tempDirectory());
+        } else {
+            duckdb.put("memoryLimit", state.settings().duckdbMemoryLimit());
+            duckdb.put("threads", state.settings().duckdbThreads());
+            duckdb.put("tempDirectory", state.settings().duckdbTempDirectory());
+        }
+        body.put("duckdb", duckdb);
+        Http.ok(ctx, body);
     }
 
     public void shutdown(Context ctx) {

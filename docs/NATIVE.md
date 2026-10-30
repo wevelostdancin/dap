@@ -179,6 +179,44 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
 `interrupt()`. Это совпадает с замером, но расходится с формулировкой роадмапа
 «`conn.interrupt()`».
 
+### 3.4 Ресурсные лимиты DuckDB
+
+Лимиты задаются только через env (`Settings.fromEnv()` — единственное место чтения):
+
+| Переменная | Смысл | Пример |
+|---|---|---|
+| `DAP_DUCKDB_MEMORY_LIMIT` | `SET memory_limit` на БД сессии | `2GB` |
+| `DAP_DUCKDB_THREADS` | `SET threads`, положительное целое | `3` |
+| `DAP_DUCKDB_TEMP_DIR` | `SET temp_directory`; каталог создаётся при отсутствии | `/var/tmp/dap` |
+
+Незаданные переменные оставляют умолчания DuckDB (на стенде `6.3 GiB`, `8`, `.tmp`).
+Настройки выполняются на базовом соединении, а `duplicate()` их наследует, потому что это
+настройки уровня БД; `temp_directory` создаётся до `SET`. Эффективные значения (после
+нормализации: `2GB` → `1.8 GiB`, `1GB` → `953.6 MiB`) читаются `current_setting` и
+отдаются в `GET /v1/workflows/{id}/debug` полем `duckdb:{memoryLimit, threads,
+tempDirectory}` (до создания БД сессии — сконфигурированные значения, `null` — умолчание
+DuckDB).
+
+Проверено (`DuckDbSessionSettingsTest`, 6 тестов):
+
+| Проверка | Результат |
+|---|---|
+| `SELECT current_setting('memory_limit'), current_setting('threads'), current_setting('temp_directory')` на duplicate после `SET` | `953.6 MiB`, `2`, `/tmp/.../spill` — те же, что на базовом |
+| `SELECT COUNT(*) FROM (SELECT i FROM range(20000000) t(i) ORDER BY i DESC)` при `memory_limit=64MB`, `threads=2` | 20 000 000 строк, ~810 мс, без OOM; в `temp_directory` появляются файлы (polling во время запроса) |
+| `SET memory_limit='banana'` | SQLException `invalid DuckDB memory limit 'banana': Parser Error: Memory must have a number (e.g. 1GB)` |
+| `SET memory_limit='0GB'` | DuckDB принимает `SET`, но следующий запрос не может выделить память; чтение `current_setting` после `SET` валит создание сессии: `invalid DuckDB memory limit '0GB': Out of Memory Error...` |
+| `DAP_DUCKDB_THREADS=0` / `-1` | `IllegalArgumentException: DAP_DUCKDB_THREADS must be a positive integer` при разборе env; прямой конструктор сессии — `DuckDB threads must be positive` |
+| temp-путь под существующим файлом | SQLException `cannot create DuckDB temp directory '...'` |
+
+Проверка живого jar (значения после нормализации DuckDB):
+
+```bash
+DAP_DUCKDB_MEMORY_LIMIT=2GB DAP_DUCKDB_THREADS=3 DAP_DUCKDB_TEMP_DIR=/tmp/dap-res-verify \
+  java -Ddap.port=7863 -jar target/dap-native.jar &
+curl -s -H 'X-DAP-Session: verify' http://127.0.0.1:7863/v1/workflows/wf-1/debug
+# "duckdb":{"memoryLimit":"1.8 GiB","threads":3,"tempDirectory":"/tmp/dap-res-verify"}
+```
+
 ## 4. Решения и следствия
 
 | Решение | Следствие |
@@ -266,6 +304,15 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
   нет, поэтому сервис должен слушать loopback (по умолчанию 127.0.0.1).
 - **Память job-таблиц:** finished jobs не эвиктятся, lock-и по workflow не удаляются —
   приемлемо для пилота, но требует ревизии при долгих сессиях.
+- **Ресурсы DuckDB:** `memory_limit`/`threads`/`temp_directory` применяются при создании
+  БД **каждой** сессии, поэтому общепроцессный потолок — примерно
+  `sessions × DAP_DUCKDB_MEMORY_LIMIT`; без `DAP_DUCKDB_TEMP_DIR` spill идёт в `.tmp`
+  относительно рабочего каталога процесса, деплою нужен явный каталог. Лимит DuckDB не
+  ограничивает JVM heap и Arrow-таблицы CSV/Excel ingestion (они живут вне buffer manager),
+  поэтому для 10M-строк нужны оба лимита. Невалидные `DAP_DUCKDB_MEMORY_LIMIT`/
+  `DAP_DUCKDB_TEMP_DIR` обнаруживаются на первом запросе, которому нужна БД (500 с текстом
+  настройки), `DAP_DUCKDB_THREADS` — при старте; всё это фиксирует
+  `DuckDbSessionSettingsTest`.
 - **Память excel_reader:** весь лист держится в `TreeMap<row, Map<col, Cell>>` (сырая строка +
   double на числовую ячейку), затем копируется в Arrow — ~2–3× объёма таблицы и без лимита,
   поэтому очень большая книга может упереться в heap. Ограничение размера — задача волны

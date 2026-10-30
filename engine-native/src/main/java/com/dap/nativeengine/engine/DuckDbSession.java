@@ -3,7 +3,10 @@ package com.dap.nativeengine.engine;
 import org.duckdb.DuckDBAppender;
 import org.duckdb.DuckDBConnection;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -33,18 +36,102 @@ public final class DuckDbSession implements AutoCloseable {
      */
     private static final int REFINE_DISTINCT = MAX_DISTINCT + MAX_DISTINCT / 10;
 
+    /** Effective database settings, read back from DuckDB (normalized, e.g. 1GB -> 953.6 MiB). */
+    public record Resources(String memoryLimit, Integer threads, String tempDirectory) {
+    }
+
     private final DuckDBConnection base;
+    private final Resources resources;
     private final AtomicLong tableIds = new AtomicLong();
     private final Object loadLock = new Object();
     private final ConcurrentHashMap<DuckDBConnection, Read> reads = new ConcurrentHashMap<>();
     private final Object readsLock = new Object();
     private boolean closed;
 
+    /** Defaults: DuckDB's own resource settings are left untouched. */
     public DuckDbSession() throws SQLException {
+        this(null, null, null);
+    }
+
+    /**
+     * Applies the configured DuckDB resources on the base connection, which owns the database:
+     * duplicated connections inherit them because memory_limit, threads and temp_directory are
+     * database-level settings. Invalid values fail here with a message naming the setting.
+     */
+    public DuckDbSession(String memoryLimit, Integer threads, String tempDirectory) throws SQLException {
+        if (threads != null && threads <= 0) {
+            throw new IllegalArgumentException("DuckDB threads must be positive, got " + threads);
+        }
         this.base = (DuckDBConnection) DriverManager.getConnection("jdbc:duckdb:");
+        try {
+            apply(memoryLimit, threads, tempDirectory);
+            this.resources = readResources(memoryLimit);
+        } catch (SQLException | RuntimeException failure) {
+            closeQuietly(base);
+            throw failure;
+        }
+    }
+
+    public Resources resources() {
+        return resources;
+    }
+
+    private void apply(String memoryLimit, Integer threads, String tempDirectory) throws SQLException {
         try (Statement statement = base.createStatement()) {
             statement.execute("SET TimeZone='UTC'");
         }
+        if (threads != null) {
+            try (Statement statement = base.createStatement()) {
+                statement.execute("SET threads=" + threads);
+            }
+        }
+        if (memoryLimit != null) {
+            try (Statement statement = base.createStatement()) {
+                statement.execute("SET memory_limit=" + literal(memoryLimit));
+            } catch (SQLException failure) {
+                throw new SQLException("invalid DuckDB memory limit '" + memoryLimit + "': "
+                        + failure.getMessage(), failure);
+            }
+        }
+        if (tempDirectory != null) {
+            try {
+                Files.createDirectories(Path.of(tempDirectory));
+            } catch (IOException failure) {
+                throw new SQLException("cannot create DuckDB temp directory '" + tempDirectory + "': "
+                        + failure.getMessage(), failure);
+            }
+            try (Statement statement = base.createStatement()) {
+                statement.execute("SET temp_directory=" + literal(tempDirectory));
+            } catch (SQLException failure) {
+                throw new SQLException("invalid DuckDB temp directory '" + tempDirectory + "': "
+                        + failure.getMessage(), failure);
+            }
+        }
+    }
+
+    private Resources readResources(String configuredMemoryLimit) throws SQLException {
+        try (Statement statement = base.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT current_setting('memory_limit'), current_setting('threads'), "
+                             + "current_setting('temp_directory')")) {
+            result.next();
+            String tempDirectory = result.getString(3);
+            return new Resources(result.getString(1),
+                    Integer.valueOf(result.getString(2).strip()),
+                    tempDirectory == null || tempDirectory.isEmpty() ? null : tempDirectory);
+        } catch (SQLException failure) {
+            if (configuredMemoryLimit != null) {
+                // DuckDB accepts SET memory_limit='0GB' and then cannot allocate at all, so the
+                // read-back is the first place a too-small limit surfaces.
+                throw new SQLException("invalid DuckDB memory limit '" + configuredMemoryLimit + "': "
+                        + failure.getMessage(), failure);
+            }
+            throw failure;
+        }
+    }
+
+    private static String literal(String value) {
+        return "'" + value.replace("'", "''") + "'";
     }
 
     public DuckDBConnection newConnection() throws SQLException {
