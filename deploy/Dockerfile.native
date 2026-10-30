@@ -111,6 +111,7 @@ ARG DAP_GID=10001
 ENV DAP_PORT=7800 \
     DAP_BIND=0.0.0.0 \
     DAP_HEAP=1g \
+    DAP_DUCKDB_TEMP_DIR=/tmp/dap \
     PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     LANG=C.UTF-8
 

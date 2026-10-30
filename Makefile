@@ -4,7 +4,8 @@ SHELL := /bin/bash
 DAP_JDK ?= $(HOME)/Projects/tools/jdk-21.0.13+9/Contents/Home
 export DAP_JDK
 
-.PHONY: help build-engine build-catalog build-native test-native run-native clean-native run test image lint fetch-runtime runtime-archive clean
+.PHONY: help build-engine build-catalog build-native test-native run-native clean-native run test image lint fetch-runtime runtime-archive clean \
+        bench bench-full mcp-e2e image-native run-native-image
 
 help:
 	@echo "DAP 1.0.0"
@@ -13,6 +14,10 @@ help:
 	@echo "  make build-native   build engine-native/target/dap-native.jar (DuckDB + Arrow + Javalin)"
 	@echo "  make test-native    run the dap-native JUnit suite"
 	@echo "  make run-native     start dap-native on 127.0.0.1:7800 (blocking)"
+	@echo "  make bench          dap-native 100k-row benchmark"
+	@echo "  make bench-full     dap-native 10M-row benchmark -> build/bench.json"
+	@echo "  make mcp-e2e        MCP create/add/run/table e2e against dap-native"
+	@echo "  make image-native   build the dap-native image (Docker host required)"
 	@echo "  make build-catalog  rebuild catalog/catalog.json and catalog/schemas/*.json"
 	@echo "  make run            start HTTP /v1 on 127.0.0.1:7800 (blocking)"
 	@echo "  make test           run python3 tests/run_all.py"
@@ -43,6 +48,25 @@ run-native: build-native
 clean-native:
 	rm -rf engine-native/target
 	@echo "cleaned engine-native/target"
+
+# --- native Phase 3 targets -------------------------------------------------
+bench: build-native
+	python3 tests/bench.py --jar engine-native/target/dap-native.jar --rows 100000
+
+bench-full: build-native
+	python3 tests/bench.py --jar engine-native/target/dap-native.jar \
+		--json build/bench.json --keep-data
+
+mcp-e2e: build-native
+	python3 tests/mcp_e2e.py
+
+DAP_NATIVE_IMAGE ?= dap-native:local
+
+image-native:
+	docker build -f deploy/Dockerfile.native -t $(DAP_NATIVE_IMAGE) engine-native
+
+run-native-image: image-native
+	docker run --rm -p 7800:7800 $(DAP_NATIVE_IMAGE)
 
 run:
 	./scripts/run.sh

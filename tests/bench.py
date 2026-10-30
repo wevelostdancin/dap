@@ -38,6 +38,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.request
 import urllib.parse
 import zipfile
 
@@ -326,13 +327,21 @@ def duckdb_version(jar, override):
 
 
 def jar_reads_duckdb_env(jar):
-    """True when NativeService.class carries a DAP_DUCKDB_* literal."""
+    """True when any engine class carries a DAP_DUCKDB_* literal.
+
+    The names are read in NativeService.Settings, which the compiler emits as
+    NativeService$Settings.class, so the outer class alone is not enough.
+    """
     try:
         with zipfile.ZipFile(jar) as archive:
-            data = archive.read("com/dap/nativeengine/NativeService.class")
+            names = [name for name in archive.namelist()
+                     if name.startswith("com/dap/nativeengine/") and name.endswith(".class")]
+            for name in names:
+                if b"DAP_DUCKDB" in archive.read(name):
+                    return True
     except (KeyError, OSError, zipfile.BadZipFile):
         return None
-    return b"DAP_DUCKDB" in data
+    return False
 
 
 def duckdb_settings():

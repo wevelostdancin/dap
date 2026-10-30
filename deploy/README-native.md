@@ -97,15 +97,15 @@ docker run --rm --read-only --tmpfs /tmp:size=256m --cap-drop ALL \
 | `JAVA_OPTS` | — | есть (entrypoint) | произвольные флаги JVM, например `-Xmx4g -XX:+UseZGC` |
 | `DAP_MAX_WORKFLOWS` | `100` (код) | есть | лимит workflow на сессию |
 | `DAP_JOB_TIMEOUT` | `600` (код) | есть | таймаут job по умолчанию, секунды |
-| `DAP_DUCKDB_MEMORY_LIMIT` | — | **план** (resources agent) | `memory_limit` DuckDB |
-| `DAP_DUCKDB_THREADS` | — | **план** (resources agent) | `SET threads` |
-| `DAP_DUCKDB_TEMP_DIR` | `/tmp/dap` (каталог создан) | **план** (resources agent) | `temp_directory` для out-of-core |
+| `DAP_DUCKDB_MEMORY_LIMIT` | — (по умолчанию DuckDB) | реализовано | `memory_limit` DuckDB; лимит **на сессию** |
+| `DAP_DUCKDB_THREADS` | — (по умолчанию DuckDB) | реализовано | `SET threads` |
+| `DAP_DUCKDB_TEMP_DIR` | `/tmp/dap` | реализовано | `temp_directory` для out-of-core |
 
-Пока `DAP_DUCKDB_TEMP_DIR` не реализован, DuckDB для in-memory БД использует свой
-дефолтный временный каталог: в контейнере дайте записываемый `/tmp`
-(`--tmpfs /tmp`), иначе out-of-core запросы под `--read-only` могут упасть. После
-реализации переменной достаточно
-`-e DAP_DUCKDB_TEMP_DIR=/tmp/dap -e DAP_DUCKDB_MEMORY_LIMIT=2GB`.
+Лимит памяти — на сессионную БД: при нескольких сессиях потолок ≈ сессии × лимит,
+поэтому в контейнере задавайте его явно (`-e DAP_DUCKDB_MEMORY_LIMIT=2GB`) и
+учитывайте, что CSV-ингест живёт в JVM heap (`-Xmx`/`DAP_HEAP`), а не в этом лимите.
+`DAP_DUCKDB_TEMP_DIR=/tmp/dap` уже выставлен в образе; под `--read-only` смонтируйте
+записываемый `/tmp` (`--tmpfs /tmp`). Детали и SQL — docs/NATIVE.md §3.4.
 
 HEALTHCHECK: `--interval=2s --timeout=2s --start-period=5s --retries=3`,
 команда — `/opt/java/openjdk/bin/java -cp /opt/dap/health HealthCheck` (`java.base`-сокет, без curl).

@@ -1,16 +1,17 @@
 # BENCH — замеры dap-native
 
 Фаза 3. Харнесс — `tests/bench.py` (Python 3, только stdlib). Пилотные числа
-(10 млн строк) снимает интегратор на merged jar; в §4.1 они помечены `TBD` и для
-каждой ячейки указано, какой командой и какое поле JSON её заполняет.
+(10 млн строк) сняты на merged jar 30.10.2026, отчёт — §4.1.
 
 ## 1. Статус
 
-- Харнесс готов и провалидирован на 100 000 и 1 000 000 строк (§4.2) на ветке
-  `phase3/bench`; 10M здесь сознательно не запускался.
-- Размер jar на этой ветке: 46 290 332 Б = 44,1 МиБ (лимит 50 МБ, ROADMAP §9).
+- Харнесс готов и покрывает три секции: `cold`, `csv`, `branches`.
+- Пилот на 10M строк снят (§4.1): cold 473 мс, ingest 11,7 с, `/table` 69 мс,
+  heap peak 4,65 ГБ; ветви измерены на 5M (ratio 1,18×) из-за лимита 8 ГиБ RAM.
+- Размер jar: 46 298 055 Б = 44,2 МиБ (лимит 50 МБ, ROADMAP §9).
 - Образ (< 200 МБ, healthy < 5 с) в этой среде не измерим: Docker-демона нет
-  (см. §3); строка `TBD`, владелец — задача образа.
+  (см. §3); Dockerfile и арифметика размера — [deploy/README-native.md](../deploy/README-native.md),
+  строка `TBD` до прогона на Docker-хосте.
 
 ## 2. Метод
 
@@ -22,7 +23,8 @@
 | JDK | Temurin 21.0.13+9 (`$HOME/Projects/tools/jdk-21.0.13+9/Contents/Home`) |
 | DuckDB | 1.5.6.0 (`duckdb_jdbc`, версия из `engine-native/pom.xml`) |
 | Jar | `engine-native/target/dap-native.jar`, `-DskipTests package` |
-| JVM | `-Xmx4g`, по умолчанию; loopback `127.0.0.1:<port>` |
+| JVM | `--heap 6g` в пилоте (`-Xmx4g` — дефолт харнесса); loopback `127.0.0.1:<port>` |
+| DuckDB | `DAP_DUCKDB_MEMORY_LIMIT=2GB`, `DAP_DUCKDB_THREADS=8`, `DAP_DUCKDB_TEMP_DIR=/tmp/dap-bench-tmp` |
 
 Что и как измеряется:
 
@@ -52,9 +54,12 @@ JIT: по умолчанию один **неизмеряемый** warmup-про
 его время пишется в `warmupRunsMs`. Без него первый ingest на 100k занимает ~2,5 с вместо
 ~0,12 с (JIT), поэтому сравнивать «холодный» и «тёплый» прогоны нельзя.
 
-Peak RSS: фоновый поток каждые 200 мс читает `ps -o rss= -p <pid>` (на macOS нет
-`/proc`) и держит максимум; поле `csv.rssPeakBytes`. Это RSS всего JVM-процесса,
-включая базовый JVM-оверхед; разрешение 200 мс пропускает короткие пики.
+Память: фоновый поток каждые 200 мс читает `ps -o rss= -p <pid>` (`csv.rssPeakBytes`,
+RSS всего JVM) и, независимо, `GET /v1/health` → `memory.usedMb/maxMb`
+(`csv.heapPeakMb`, `csv.heapMaxMb`). Второе — ровно формула ROADMAP §9
+(`Runtime.totalMemory()-freeMemory()`) и работает там, где `ps` запрещён песочницей.
+Каждое поле имеет смысл отдельно: heap не включает DuckDB-буферы и JVM-оверхед, RSS —
+включает всё, но с разрешением 200 мс.
 
 Ветви: `DuckDbSession.loadInto` синхронизирован на job-соединении
 ([NATIVE.md](NATIVE.md) §2.4), поэтому `CREATE TABLE`+`Appender` двух
@@ -78,8 +83,9 @@ SQL-ветви ленивые и исполняются на `/table`, поэт�
   число KNIME для 10M-пайплайна получить нельзя; в таблице — `n/a` с причиной, а не
   выдуманная цифра. Cold start и размер jar — тоже не сравнение с KNIME.
 - **RSS.** `ps`-семплирование раз в 200 мс; пики короче пропускаются; RSS включает
-  JVM-базу. В песочнице исполнителя этой ветки `ps` был запрещён, поэтому в §4.2
-  `rssPeakBytes = null` и харнесс печатает warning; на обычной машине поле заполняется.
+  JVM-базу. В песочнице исполнителя `ps` запрещён (`Operation not permitted`), поэтому
+  `rssPeakBytes = null`, а харнесс пишет note и заполняет `heapPeakMb` из `/v1/health`.
+  На обычной машине заполняются оба поля.
 - **Шум.** JIT (см. §2), планировщик macOS, page cache, фоновые процессы. При `--branch-reps 1`
   и прогонах < 100 мс отношение ветвей шумит (харнесс предупреждает); для стабильности —
   `--branch-reps 3` и 10M. Медианы по 3 прогонам для cold start — минимум, а не
@@ -88,41 +94,68 @@ SQL-ветви ленивые и исполняются на `/table`, поэт�
   свободного места это нормально, но `--keep-data` оставляет файл в temp (путь — в
   `dataDir` JSON).
 - **Ветви: память.** В одном DAG две `csv_reader`-ветви держат две копии таблицы; на 10M
-  это ~2× памяти сессии, что при 8 ГиБ и `-Xmx4g` надо учитывать.
+  при `-Xmx4g` прогон ветвей упал с `Java heap space` (это и есть причина мерить ветви на
+  5M при `-Xmx6g`). Для 10M-ветвей нужен heap ≥ 8 ГиБ, то есть машина крупнее этой.
 - **DuckDB-настройки.** `DAP_DUCKDB_MEMORY_LIMIT`/`DAP_DUCKDB_THREADS`/
-  `DAP_DUCKDB_TEMP_DIR` движок на этой ветке **не читает** (харнесс проверяет это по
-  `NativeService.class` и пишет `engineReadsDapDuckdbEnv: false`; значения env, если
-  заданы, всё равно попадают в `environment.duckdb.settings`). Если их добавят, харнесс начнёт
-  фиксировать их автоматически.
+  `DAP_DUCKDB_TEMP_DIR` движок читает ([NATIVE.md](NATIVE.md) §3.4); харнесс определяет это
+  по классам движка (`engineReadsDapDuckdbEnv: true`) и пишет фактические значения в
+  `environment.duckdb.settings`.
 
 ## 4. Результаты
 
-### 4.1 Пилот: 10M строк, merged jar (`TBD`)
+### 4.1 Пилот: 10M строк, merged jar (30.10.2026)
 
-Команда, заполняющая **все** `TBD` ниже:
+Команда, которой сняты числа (полный прогон без ветвей — они отдельно, §4.1.1):
 
     cd engine-native
     export JAVA_HOME=$HOME/Projects/tools/jdk-21.0.13+9/Contents/Home
     export PATH="$JAVA_HOME/bin:$PATH"
     ./mvnw -q -o -DskipTests package
     cd ..
-    python3 tests/bench.py --jar engine-native/target/dap-native.jar \
-        --json build/bench.json --keep-data
+    export DAP_DUCKDB_MEMORY_LIMIT=2GB DAP_DUCKDB_THREADS=8 \
+           DAP_DUCKDB_TEMP_DIR=/tmp/dap-bench-tmp
+    python3 tests/bench.py --jar engine-native/target/dap-native.jar --rows 10000000 \
+        --heap 6g --only cold,csv --json build/bench-10m.json
 
 | Метрика | Цель (ROADMAP §9) | native, merged jar | KNIME oracle | Поле JSON |
 |---|---|---|---|---|
-| Cold start, медиана 3 прогонов | < 2 с | `TBD` | n/a (KNIME — desktop) | `cold.medianMs` |
-| Cold start, min / max | — | `TBD` / `TBD` | n/a | `cold.minMs` / `cold.maxMs` |
-| 10M sync-run (ingest) | — | `TBD` | n/a (PARITY §6.6.1) | `csv.runMs` |
-| 10M `/table` (материализация конвейера) | — | `TBD` | n/a (PARITY §6.6.1) | `csv.tableMs` |
-| 10M end-to-end = run + `/table` | ≥ 3× быстрее KNIME | `TBD` | n/a (PARITY §6.6.1) | `csv.totalMs` |
-| 10M `/profile` финального узла | — | `TBD` | n/a | `csv.profileMs` |
-| 10M `/profile` источника (полный проход) | — | `TBD` | n/a | `csv.profileSourceMs` |
-| Peak RSS JVM на 10M | ≤ KNIME | `TBD` | n/a | `csv.rssPeakBytes` |
-| Размер jar | < 50 МБ | 44,1 МиБ (46 290 332 Б) | n/a | `environment.jar.mib` |
-| Размер образа | < 200 МБ | `TBD` (нет Docker-демона) | n/a | `docker images dap-native` |
+| Cold start, медиана 3 прогонов | < 2 с | **473 мс** | n/a (KNIME — desktop) | `cold.medianMs` |
+| Cold start, min / max | — | 473 / 480 мс | n/a | `cold.minMs` / `cold.maxMs` |
+| 10M sync-run (ingest) | — | **11 667 мс** (~857k строк/с) | n/a (PARITY §6.6.1) | `csv.runMs` |
+| 10M `/table` (filter+group_by+sorter) | — | **69 мс** | n/a (PARITY §6.6.1) | `csv.tableMs` |
+| 10M end-to-end = run + `/table` | ≥ 3× быстрее KNIME | **11 736 мс** | n/a (PARITY §6.6.1) | `csv.totalMs` |
+| 10M `/profile` финального узла | — | **118 мс** (8 строк) | n/a | `csv.profileMs` |
+| 10M `/profile` источника (полный проход) | — | **176 мс** | n/a | `csv.profileSourceMs` |
+| JVM heap peak на 10M (формула ROADMAP) | ≤ KNIME | **4 653 МиБ** при `-Xmx6g` (макс. 6 144) | n/a | `csv.heapPeakMb` |
+| Peak RSS JVM на 10M | ≤ KNIME | `null` — `ps` запрещён песочницей | n/a | `csv.rssPeakBytes` |
+| Размер jar | < 50 МБ | 44,2 МиБ (46 298 055 Б) | n/a | `environment.jar.mib` |
+| Размер образа | < 200 МБ | `TBD` (нет Docker-демона; арифметика ~152 МБ) | n/a | `docker images dap-native` |
 | `docker run` healthy | < 5 с | `TBD` (нет Docker-демона) | n/a | `docker run` + poll `/v1/health` |
-| Две независимые ветви: ratio | ≥ 1.8× | `TBD` (на 1M: 1,11×, см. §4.2) | n/a | `branches.ratio` |
+
+Дополнительно: CSV 169,6 МиБ сгенерирован за 4,1 с; warmup-прогон (не в счёте) — 13,4 с
+против 11,7 с прогретого; heap idle — 31 МиБ; `engineReadsDapDuckdbEnv: true`.
+Ingest упирается в JVM heap (Arrow-таблица + построчный Appender), а не в DuckDB: SQL-часть
+конвейера на 10M занимает 69 мс.
+
+#### 4.1.1 Ветви (5M, `-Xmx6g`, 3 повтора)
+
+На 10M при `-Xmx4g` прогон двух `csv_reader`-ветвей падает с `Java heap space`
+(две копии таблицы), поэтому ratio измерен на 5M:
+
+    python3 tests/bench.py --jar engine-native/target/dap-native.jar --rows 5000000 \
+        --heap 6g --only csv,branches --branch-reps 3 --json build/bench-branches.json
+
+| Метрика | Значение |
+|---|---|
+| parallel (2 ветви в одном DAG) | 9 510 мс |
+| sequential (два прогона подряд) | 11 262 мс |
+| **ratio** | **1,18×** (цель ≥ 1,8× — не достигнута) |
+| csv 5M: ingest / `/table` / `/profile` | 4 658 / 37 / 96 мс |
+
+Причина зафиксирована в `branches.reason`: `DuckDbSession.loadInto` синхронизирован на
+job-соединении, поэтому parse перекрывается, а `CREATE TABLE`+`Appender` — нет. Это
+архитектурное ограничение пилота, а не ошибка харнесса; чтобы получить ≥1,8×, нужен
+параллельный ingest (несколько соединений/appender'ов) — кандидат в волну IO.
 
 Почему `n/a` в колонке KNIME: oracle исполняет только in-memory workflow через `/v1`;
 файловые ридеры требуют workflow-context и падают, а shipped-датасетов на 10M строк нет. Это
@@ -161,21 +194,30 @@ parse перекрывается, append сериализован (§2), поэ�
 не подгоняются. На 100k одиночный ingest ~83 мс, отношение шумит — харнесс предупреждает
 (`--branch-reps`).
 
-### 4.3 Что это значит для решения по Polars
+### 4.3 Решение по Polars (принято по измеренным данным)
 
 Порог из ROADMAP §6: Polars — **только** если бенчмарк узла даёт ≥ 2× против DuckDB; иначе
-остаёмся на DuckDB. Текущий харнесс меряет workflow целиком (ingest + SQL-конвейер), а не
-отдельный узел, поэтому решения по порогу он не даёт:
+остаёмся на DuckDB. Решение: **остаёмся на DuckDB**.
 
-- в замерах §4.2 нет ни одного узла с измеренным ≥ 2× — наоборот, ingest упирается в
-  сериализованный `loadInto` и JIT, а SQL-часть ленивая;
-- между узлами нет Arrow-шины ([NATIVE.md](NATIVE.md) §4): Polars потребовал бы отдельной
-  границы данных, а не «замены движка»;
-- чтобы закрыть вопрос, нужен отдельный per-node замер (например, `group_by`/`sorter` на
-  10M строк) — его в этой ветке нет.
+Основания (из §4.1, а не из ожиданий):
 
-Вывод: **до появления per-node числа ≥ 2× остаёмся на DuckDB**; решение по Polars принимает
-интегратор по цифрам, а не харнесс.
+1. **SQL-часть уже не является стоимостью.** filter + group_by + sorter на 10M строк
+   материализуются за **69 мс**, полный `/profile` источника — 176 мс. Узлам нечего
+   ускорять в 2×: замена DuckDB на Polars на этом профиле не даёт измеримого выигрыша.
+2. **Стоимость — в ingest и памяти, и она наша.** 10M ingest = 11,7 с и 4,65 ГБ heap
+   (`CsvParser` → `ArrowTable` → построчный `Appender`), то есть узкое место — не
+   SQL-движок, а путь данных. Polars не заменяет этот путь: между узлами нет Arrow-шины
+   ([NATIVE.md](NATIVE.md) §4), поэтому Polars потребовал бы отдельной границы данных,
+   а не «замены движка».
+3. **Per-node ≥ 2× не измерен ни на одном узле.** Харнесс меряет workflow; отдельный
+   per-node microbench, который мог бы дать порог, не проводился — при этом п.1 показывает,
+   что ускорять там нечего: 69 мс на 10M — это уже ниже практического порога
+   (round-trip HTTP на порядок больше).
+
+Условия пересмотра (зафиксированы, чтобы решение не было «навсегда»): появится узел, у
+которого доля DuckDB-исполнения в end-to-end ≥ 50 %, и прототип на Polars покажет ≥ 2× на
+его профиле; либо стоимость ingest станет доминировать настолько, что понадобится
+векторизованный scan (тогда рассматривается Arrow-native путь, а не замена SQL-движка).
 
 ## 5. Как воспроизвести
 
@@ -185,14 +227,18 @@ parse перекрывается, append сериализован (§2), поэ�
     cd engine-native
     export JAVA_HOME=$HOME/Projects/tools/jdk-21.0.13+9/Contents/Home
     export PATH="$JAVA_HOME/bin:$PATH"
-    ./mvnw -q -o test                 # 181 тест, 0 падений (проверка сборки)
+    ./mvnw -q -o test                 # 199 тестов, 0 падений (проверка сборки)
     ./mvnw -q -o -DskipTests package  # engine-native/target/dap-native.jar
     cd ..
 
-Пилот (10M, все секции, JSON-отчёт; ~160 МиБ CSV в temp):
+Пилот (10M строк, JSON-отчёт; ~170 МиБ CSV в temp). Числа §4.1 сняты с
+`DAP_DUCKDB_MEMORY_LIMIT=2GB DAP_DUCKDB_THREADS=8 DAP_DUCKDB_TEMP_DIR=/tmp/dap-bench-tmp`
+и `--heap 6g`; ветви — отдельно на 5M (§4.1.1):
 
-    python3 tests/bench.py --jar engine-native/target/dap-native.jar \
-        --json build/bench.json --keep-data
+    python3 tests/bench.py --jar engine-native/target/dap-native.jar --rows 10000000 \
+        --heap 6g --only cold,csv --json build/bench-10m.json
+    python3 tests/bench.py --jar engine-native/target/dap-native.jar --rows 5000000 \
+        --heap 6g --only csv,branches --branch-reps 3 --json build/bench-branches.json
 
 Смоук (100k, порт 7925, ничего не оставляет после себя):
 
@@ -218,10 +264,7 @@ parse перекрывается, append сериализован (§2), поэ�
 JSON-отчёт отсортирован по ключам (`meta.schema = 1`): между прогонами меняются только
 `meta.generatedAt`, `environment` и измеренные поля, поэтому диффы читаемы.
 
-Предлагаемые цели Makefile (в этой ветке **не добавлены** — Makefile не редактировался):
+Цели Makefile (добавлены в Фазе 3):
 
-    bench:
-    	python3 tests/bench.py --jar engine-native/target/dap-native.jar --rows 100000
-
-    bench-full:
-    	python3 tests/bench.py --jar engine-native/target/dap-native.jar --json build/bench.json
+    make bench        # 100k, быстрая проверка харнесса
+    make bench-full   # 10M, отчёт build/bench.json (--keep-data; каталог данных удалить вручную)

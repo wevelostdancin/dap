@@ -1,6 +1,8 @@
 # ROADMAP — dap-native
 
 **Статус:** Фаза 0 закрыта (29.10.2026). Фаза 1 закрыта (29.10.2026). Фаза 2 закрыта (30.10.2026).
+Фаза 3 закрыта по коду и замерам (30.10.2026); проверка образа (< 200 МБ, healthy < 5 с) отложена
+до Docker-хоста — на машине разработки Docker-демона нет.
 **Область:** нативный движок `engine-native/` вместо KNIME-обёртки; `engine/`, `runtime/knime/`, `catalog/`
 остаются oracle-ом и не развиваются.
 **Связанные документы:** [PARITY.md](PARITY.md), [INDEPENDENCE.md](INDEPENDENCE.md), [API.md](API.md),
@@ -166,6 +168,19 @@ native-библиотекой; profile `distinct` точен до 100k разл�
 **Acceptance:** числа в BENCH.md, образ < 200 МБ, MCP-адаптер проходит
 `dap_workflow_create` → `dap_add_node` → `dap_run` без изменений.
 
+**Результат (30.10.2026):** `tests/bench.py` + [BENCH.md](BENCH.md) сняты на merged jar:
+cold 473 мс, 10M ingest 11,7 с (~857k строк/с), `/table` 69 мс, heap peak 4,65 ГБ,
+ветви 1,18× (append сериализован — зафиксировано), jar 44,2 МиБ.
+Решение по Polars: **остаёмся на DuckDB** — SQL-часть 10M-конвейера 69 мс, узкое место
+в ingest/памяти, Polars его не заменяет (BENCH.md §4.3).
+`deploy/Dockerfile.native` + [deploy/README-native.md](../deploy/README-native.md) готовы
+(jlink-рантайм, арифметика образа ~152 МБ, healthcheck без curl, non-root), но
+`docker build`/`docker run` не выполнялись: Docker-демона нет, статус в README — честный
+«не проверено». `docs/MIGRATION.md` + 11-й узел `column_renamer` + `wf-n3` — шаблон
+воспроизводим. MCP e2e (`tests/mcp_e2e.py`, `DAP_NATIVE=1`) проходит create → add_node →
+connect → run → table → delete за 3,6 с. Лицензии/граница зависимостей — NOTICE и
+INDEPENDENCE §11.
+
 ## 7. Волны после пилота
 
 Волна открывается, если: пилот прошёл DoD, есть спрос агента (использование в сценариях),
@@ -195,13 +210,13 @@ native-библиотекой; profile `distinct` точен до 100k разл�
 
 | Метрика | Метод | Цель |
 |---|---|---|
-| Cold start | `java -jar` → `/v1/health` = 200 | < 2 с |
-| CSV 10M read+filter+groupby | `tests/bench.py` | ≥ 3× быстрее KNIME |
-| RAM на 10M | `Runtime.totalMemory()-freeMemory()` после исполнения | ≤ KNIME |
-| Размер jar | `du -sh target/*.jar` | < 50 МБ (Фаза 2: 44,1 МиБ) |
-| Размер образа | `docker images dap-native` | < 200 МБ |
-| Параллельные ветви DAG | workflow с 2 независимыми ветвями | ≥ 1.8× против последовательно |
-| Parity | `tests/parity.py --engine native` | ≥ 90 % ячеек (Фаза 2: 1563/1563 = 100 %) |
+| Cold start | `java -jar` → `/v1/health` = 200 | < 2 с (**473 мс**, Фаза 3) |
+| CSV 10M read+filter+groupby | `tests/bench.py` | ≥ 3× быстрее KNIME (**n/a**: oracle не читает файлы через `/v1`, PARITY §6.6.1; native 11,7 с, SQL-часть 69 мс) |
+| RAM на 10M | `Runtime.totalMemory()-freeMemory()` после исполнения | ≤ KNIME (**n/a**; native heap peak 4,65 ГБ при `-Xmx6g`) |
+| Размер jar | `du -sh target/*.jar` | < 50 МБ (**44,2 МиБ**, Фаза 3) |
+| Размер образа | `docker images dap-native` | < 200 МБ (**TBD**: Dockerfile есть, арифметика ~152 МБ, демона нет) |
+| Параллельные ветви DAG | workflow с 2 независимыми ветвями | ≥ 1.8× (**1,18×** на 5M: ingest-append сериализован; кандидат в волну IO) |
+| Parity | `tests/parity.py --engine native` | ≥ 90 % ячеек (Фаза 3: 1563/1563 = 100 %, 13 workflow) |
 
 ## 10. Definition of Done и трассировка
 
@@ -212,8 +227,8 @@ native-библиотекой; profile `distinct` точен до 100k разл�
 | 10 узлов + `configSchema` в dialog | `GET /v1/nodes/{id}/dialog` ×10 | 2 |
 | корпус исполняется | `tests/parity.py --engine native` | 2 |
 | parity ≥ 90 % | там же | 2 |
-| бенчмарки и цифры | `tests/bench.py`, BENCH.md | 3 |
-| образ < 200 МБ, healthy < 5 с | `docker build`/`docker run` | 3 |
+| бенчмарки и цифры | `tests/bench.py`, BENCH.md | 3 (готово: BENCH.md §4) |
+| образ < 200 МБ, healthy < 5 с | `docker build`/`docker run` | 3 (Dockerfile + README готовы; **прогон не выполнен** — нет Docker-демона) |
 | нет `org.knime` | `grep -r`, CI | 1+ |
 | docs заполнены | NATIVE.md, PARITY.md, BENCH.md, MIGRATION.md | 3 |
 | MCP без изменений | e2e create/add/run | 3 |
@@ -224,7 +239,8 @@ native-библиотекой; profile `distinct` точен до 100k разл�
    frozen под формулировку «404 для узла»? Сейчас — контракт.
 2. **Рабочая папка сессии:** писать в `~/Projects/dap` из сессии с workspace `~/Projects/knime-mcp`
    можно только через approval. Для фаз 1–3 открыть сессию с workspace `~/Projects/dap`.
-3. **Polars:** порог входа — ≥2× на узле; кто принимает решение по цифрам bench (владелец фазы 3).
+3. **Polars:** решено в Фазе 3 по замерам — **остаёмся на DuckDB** (SQL-часть 10M-конвейера
+   69 мс, узкое место — ingest; условие пересмотра — BENCH.md §4.3).
 
 ## 12. Чеклист по неделям
 

@@ -243,7 +243,7 @@ curl -s -H 'X-DAP-Session: verify' http://127.0.0.1:7863/v1/workflows/wf-1/debug
 | `table` отдаёт данные, `profile` считается | да | строки/типы/NULL/`""`, `missing`/`distinct`/`min/max/mean` |
 | Health 200 во время 10-секундного sync-run | да | 1 мс при `dap.test.slowMs=10000`; job остаётся `running` |
 | `grep -r "org.knime" engine-native/` пуст | да | проверяется `scripts/check_repo.py` |
-| `mvn test` зелёный | да | 114 тестов на момент приёмки Фазы 1; 181 после Фазы 2 (§5.1) |
+| `mvn test` зелёный | да | 114 тестов на момент приёмки Фазы 1; 199 после Фазы 3 (§5.1–5.2) |
 | все маршруты frozen-контракта отвечают | да | 25 операций OpenAPI зарегистрированы; `tests/native_smoke.py` — 9/9 |
 
 ## 5.1 Приёмка Фазы 2
@@ -262,14 +262,28 @@ curl -s -H 'X-DAP-Session: verify' http://127.0.0.1:7863/v1/workflows/wf-1/debug
 | jar < 50 МБ | да | 46 246 388 Б ≈ 44,1 МиБ (одна платформенная native-библиотека) |
 | тесты и smoke | да | `mvn test` — 181 тест, 0 падений; `tests/native_smoke.py` — 9/9; `tests/test_parity_native.py` — 27/27 |
 
+## 5.2 Приёмка Фазы 3
+
+Пункты из [ROADMAP-NATIVE.md](ROADMAP-NATIVE.md) §6; проверено на `phase3-native`.
+
+| Пункт | Статус | Комментарий |
+|---|---|---|
+| `tests/bench.py` + [BENCH.md](BENCH.md) | да | cold 473 мс, 10M ingest 11,7 с, `/table` 69 мс, heap peak 4,65 ГБ, ветви 1,18× (5M) |
+| Решение по Polars | да | остаёмся на DuckDB: SQL-часть 10M-конвейера 69 мс, узкое место — ingest (BENCH.md §4.3) |
+| `deploy/Dockerfile.native` + [deploy/README-native.md](../deploy/README-native.md) | определение готово | multi-stage, jlink-рантайм, non-root, healthcheck без curl; арифметика ~152 МБ; **`docker build`/`run` не выполнены** (нет Docker-демона) |
+| `docs/MIGRATION.md` + 11-й узел | да | `dap.column_renamer` + `wf-n3`; каталог 11 узлов, parity 13/13 |
+| MCP e2e | да | `tests/mcp_e2e.py` (`DAP_NATIVE=1`): create → add_node → connect → run → table → delete, 3,6 с |
+| Лицензии/граница | да | [NOTICE](../NOTICE) §2, [INDEPENDENCE.md](INDEPENDENCE.md) §11 |
+| Тесты | да | `mvn test` — 199 тестов; parity 13/13, `matching cells 1563/1563 (100 %)`; smoke 9/9; MCP 27+1 |
 ## 6. Дальше и риски
 
-- **Все 10 узлов доступны; патчи волн A–C — единственные оставшиеся узлы.** `excel_reader`
+- **Все 11 узлов доступны (10 пилотных + `column_renamer` как шаблон [MIGRATION.md](MIGRATION.md));
+  остальные узлы волн A–C ещё не реализованы.** `excel_reader`
   реализован без Apache POI (лимит jar): JDK `zip`+`StAX`, поддерживаются `inlineStr`,
   shared strings (rich-text склеивается), числа, boolean, error→NULL, ISO-даты и даты по
   `numFmtId`; `.xls`, шифрованные книги и формулы без кэша не читаются (формула берётся
   из кэшированного значения).
-- **Parity-раннер:** `tests/parity.py --engine native` исполняет корпус (12/12, 100 % ячеек);
+- **Parity-раннер:** `tests/parity.py --engine native` исполняет корпус (13/13, 100 % ячеек);
   `dataset`-shorthand разворачивает раннер, а не узел: `csv_reader` требует реальный путь.
   Валидация корпуса запрещает native-only проверки на dual-run workflow и требует
   `name`+`type` у колонок `expect`, чтобы опечатка не проходила молча.
@@ -298,6 +312,24 @@ curl -s -H 'X-DAP-Session: verify' http://127.0.0.1:7863/v1/workflows/wf-1/debug
   **running** job того же workflow: отмена queued job не трогает чтения работающего соседа.
   Прерванный запрос `/table`/`/profile` возвращает замороженный 500 (ошибка исполнения)
   с сообщением драйвера об interruption.
+- **Память 10M-пайплайна — в JVM heap, не в DuckDB.** Ingest 10M строк (`CsvParser` →
+  `ArrowTable` → построчный `Appender`) требует ~4,65 ГБ heap при лимите `-Xmx6g`;
+  `DAP_DUCKDB_MEMORY_LIMIT` ограничивает только буфер DuckDB. Для 10M на 8 ГиБ машине
+  `-Xmx4g` недостаточно (проверено падением `Java heap space`); для двух ветвей на 10M
+  нужно ≥ 8 ГиБ heap (в BENCH.md ветви измерены на 5M).
+- **Параллельные ветви: 1,18× вместо 1,8×.** `DuckDbSession.loadInto` синхронизирован на
+  job-соединении: parse перекрывается, `CREATE TABLE`+`Appender` — нет. Для цели ≥1,8×
+  нужен параллельный ingest (несколько соединений/appender'ов) — кандидат в волну IO;
+  харнесс пишет измеренное отношение и причину, ничего не подгоняя.
+- **Образ не проверен в этой среде.** `deploy/Dockerfile.native` собран по арифметике
+  (~152 МБ: debian-bookworm-slim 74 МБ + jlink JRE 38 МБ + jar 34 МБ), но `docker build`/
+  `docker run` на Docker-хосте не выполнялись (демона нет) — статус "не проверено"
+  в [deploy/README-native.md](../deploy/README-native.md); `java.desktop` удалён из jlink
+  (проверено smoke + parity на урезанном рантайме).
+- **RSS-семплирование недоступно в песочнице** (`ps` запрещён) — BENCH.md фиксирует heap peak
+  из `/v1/health` (формула роадмапа) и `rssPeakBytes = null`; на обычной машине заполняются оба.
+- **KNIME-сравнение для 10M невозможно:** oracle не читает файлы через `/v1` (PARITY §6.6.1),
+  а shipped-датасеты ≤ 32k строк — в BENCH.md это `n/a` с причиной, а не выдуманная цифра.
 - **Отмена узлов, игнорирующих interrupt:** job-состояние всё равно терминально
   (watchdog/cancel), но run-поток может жить до возврата нативного вызова.
 - **Файловая граница:** `csv_reader` читает любой путь, доступный процессу; auth в пилоте
@@ -318,7 +350,7 @@ curl -s -H 'X-DAP-Session: verify' http://127.0.0.1:7863/v1/workflows/wf-1/debug
   поэтому очень большая книга может упереться в heap. Ограничение размера — задача волны
   IO; сейчас книга читается целиком.
 - **native_smoke:** 9 проверок покрывают контракт и пять узлов Фазы 1; e2e всех десяти узлов
-  проверяет `tests/parity.py --engine native` (12 workflow), а не smoke.
+  проверяет `tests/parity.py --engine native` (13 workflow), а не smoke.
 - **Расхождения, зафиксированные замерами:** `registerArrowStream` public, но требует
   `arrow-c-data` (zero-copy не используется); `allow_quoted_nulls=false` различает
   `""` и NULL, но DAP всё равно парсит CSV сам; роадмап говорит `conn.interrupt()`, код
