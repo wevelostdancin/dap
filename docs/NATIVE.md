@@ -1,28 +1,31 @@
 # NATIVE — движок dap-native
 
-**Статус:** Фаза 1 закрыта (29.10.2026, ветка `phase1-native`): каталог, планировщик,
-пять исполнителей и полный HTTP-слой `/v1` работают; приёмка подтверждена ниже.
+**Статус:** Фазы 1–3 закрыты (29–30.10.2026, ветка `phase3-native`): каталог из 11 узлов
+(10 пилотных + `column_renamer`), планировщик, 11 исполнителей и полный HTTP-слой `/v1`
+работают; parity 13/13. Приёмка Фаз 1–3 — §5–5.2.
 **Область:** `engine-native/`; **связанные:** [ROADMAP-NATIVE.md](ROADMAP-NATIVE.md),
 [PARITY.md](PARITY.md), [API.md](API.md), [../ARCHITECTURE.md](../ARCHITECTURE.md).
 
 ## 1. Назначение и статус
 
 `dap-native` — один JVM-процесс: Javalin 6.7 + DuckDB 1.5.6.0 + Arrow 19.0.0, контракт
-`/v1` из `api/openapi-v1-frozen.yaml`. Цель Фазы 1 — 5 доступных узлов, 10 спецификаций,
-ленивые SQL-планы и in-memory модель workflow/job. 832 узла, auth, multi-tenancy,
-persistence и HA в пилот не входят.
+`/v1` из `api/openapi-v1-frozen.yaml`. Фаза 1 начиналась с 5 доступных узлов и 10
+спецификаций; сейчас доступны все 11 (10 пилотных + `column_renamer`), ленивые SQL-планы и
+in-memory модель workflow/job. 832 узла, auth, multi-tenancy, persistence и HA в пилот не
+входят.
 
 | Что | Состояние на этой ветке |
 |---|---|
-| Сборка | `pom.xml`: javalin 6.7.0, duckdb_jdbc 1.5.6.0, arrow-vector/memory-netty 19.0.0, jackson 2.19.0, junit 5.11.4. `./mvnw -B test` — 114 тестов, 0 падений |
-| Каталог | 10 JSON-спеков + `index.txt`; `NodeRegistry`; 5 спеков с `available:true`, 5 — с `false`; `/dialog` строится из `configSchema` |
-| HTTP | Все 25 операций frozen-контракта `/v1` зарегистрированы в `NativeService`; `X-DAP-Session`, коды ошибок и Job-модель по frozen-контракту; 14 интеграционных HTTP-тестов |
-| Исполнение | `WorkflowStore`, `Dag`, `JobManager`, 5 executor-ов; runs одного workflow сериализованы, разные — параллельны; snapshot графа на run |
+| Сборка | `pom.xml`: javalin 6.7.0, duckdb_jdbc 1.5.6.0, arrow-vector/memory-netty 19.0.0, jackson 2.19.0, junit 5.11.4. `./mvnw -B test` — 199 тестов, 0 падений |
+| Каталог | 11 JSON-спеков + `index.txt`; `NodeRegistry`; все 11 с `available:true` (10 пилотных + `column_renamer`); `/dialog` строится из `configSchema` |
+| HTTP | Все 25 операций frozen-контракта `/v1` зарегистрированы в `NativeService`; `X-DAP-Session`, коды ошибок и Job-модель по frozen-контракту; 16 интеграционных HTTP-тестов |
+| Исполнение | `WorkflowStore`, `Dag`, `JobManager`, 11 executor-ов; runs одного workflow сериализованы, разные — параллельны; snapshot графа на run |
+| Parity | `tests/parity.py --engine native`: 13/13 workflow, `matching cells 1563/1563 (100 %)`; `tests/native_smoke.py` — 9/9; MCP e2e (`tests/mcp_e2e.py`) — PASS |
 | Данные | `DuckDbSession`, `ArrowTable`, `LazyPlan`, `CsvParser`/`CsvTableReader`; одна in-memory БД на сессию (`ServiceState`), ingestion CSV идёт через job-connection |
 | Вне пилота | auth, persistence, HA, 832 узла, изменения `engine/`, `runtime/knime/`, `catalog/` |
 
 Проверка: `tests/native_smoke.py` (9 чёрных проверок по HTTP) и `NativeServiceTest`
-(14 интеграционных тестов) проходят на собранном jar.
+(16 интеграционных тестов) проходят на собранном jar.
 
 ## 2. Архитектура
 
@@ -59,7 +62,7 @@ DuckDbSession (one in-memory DuckDB per session)
 - Идентификаторы `wf-N` и `job-N` сквозные в процессе; объекты видны только своей сессии.
 - Javalin запускается с `useVirtualThreads=true`; sync-run ждёт job в виртуальном потоке,
   поэтому health отвечает во время блокирующего run (проверено: 1 мс при 10-секундном узле).
-- `/v1/health` отдаёт `nodes=10`, `coreNodes=10`, `workflows`, `sessions`, активные `jobs`
+- `/v1/health` отдаёт `nodes=11`, `coreNodes=11`, `workflows`, `sessions`, активные `jobs`
   текущей сессии и память JVM из живых `NodeRegistry`/`WorkflowStore`/`ServiceState`.
 
 ### 2.2 Каталог узлов
@@ -70,9 +73,9 @@ DuckDbSession (one in-memory DuckDB per session)
 - `configSchema` превращается в поля `/dialog`: `field`, `configKey`, `title`, `type`,
   `optional`, `default`, `choices`, `items`; плюс `labelCoverage` и `warnings`.
   Для `available:false` dialog отдаёт `available:false` и `reason`, без схемы.
-- Сейчас 10 спеков: 5 доступных (`csv_reader`, `row_filter`, `column_filter`, `sorter`,
-  `missing_value`) и 5 заявленных, но не реализованных (`excel_reader`, `group_by`,
-  `joiner`, `string_manipulation`, `math_formula`).
+- Сейчас 11 спеков, все доступны: 10 пилотных (`csv_reader`, `row_filter`, `column_filter`,
+  `sorter`, `missing_value`, `excel_reader`, `group_by`, `joiner`, `string_manipulation`,
+  `math_formula`) и `column_renamer` — шаблон 11-го узла ([MIGRATION.md](MIGRATION.md)).
 
 ### 2.3 Исполнение
 
@@ -89,8 +92,9 @@ DuckDbSession (one in-memory DuckDB per session)
   прерывает блокированные ветви. Результат — `Map<nodeId, LazyPlan>`; трансформации данные
   не читают, исключение — `csv_reader` (ingestion на run).
 - `NodeExecutor` получает `NodeContext` (config, сессия, job-connection) и входные планы,
-  возвращает `LazyPlan`. Пять executor-ов: `csv_reader`, `row_filter`, `column_filter`,
-  `sorter`, `missing_value`.
+  возвращает `LazyPlan`. Одиннадцать executor-ов: `csv_reader`, `row_filter`, `column_filter`,
+  `sorter`, `missing_value`, `excel_reader`, `group_by`, `joiner`, `string_manipulation`,
+  `math_formula`, `column_renamer`.
 
 ### 2.4 Хранилище
 
@@ -125,8 +129,8 @@ DuckDbSession (one in-memory DuckDB per session)
 
 | Что | Команда | Результат |
 |---|---|---|
-| Полный suite | `./mvnw -B test` | 114 тестов, 0 failures, 0 errors; BUILD SUCCESS, ~10 с |
-| HTTP-интеграция | `NativeServiceTest` (14 тестов) | реальный Javalin на свободном порту, все 25 операций, timeout/cancel, изоляция сессий |
+| Полный suite | `./mvnw -B test` | 199 тестов, 0 failures, 0 errors; BUILD SUCCESS, ~10 с (114 на момент Фазы 1) |
+| HTTP-интеграция | `NativeServiceTest` (16 тестов) | реальный Javalin на свободном порту, все 25 операций, timeout/cancel, изоляция сессий |
 | Health во время sync-run | `-Ddap.test.slowMs=10000` | health 200 за 1 мс при 10-секундном узле; sync-run завершился 200 |
 | Spike 200k, 5 прогонов | `./mvnw -B -Dtest=ArrowDuckDbSpikeTest test` | 1952–2108 мс; 94 877–102 459 строк/с; медиана 1994 мс / 100 301 строк/с |
 | Jar (native-библиотека хоста) | `./mvnw -B -DskipTests package`; `stat -f '%z'` | 46 246 388 Б ≈ 44,1 МиБ на macOS arm64 |
@@ -304,7 +308,10 @@ curl -s -H 'X-DAP-Session: verify' http://127.0.0.1:7863/v1/workflows/wf-1/debug
   shaded jar). `make lint` проверяет собранный jar: < 50 МиБ и хотя бы одна
   DuckDB-native библиотека (ноль библиотек — ERROR, несколько — WARN для
   cross-platform сборки).
-- **Polars:** порог — ≥2× на конкретном узле; бенчмарка ещё нет, поэтому остаёмся на DuckDB.
+- **Polars:** бенчмарк снят в Фазе 3 (BENCH.md §4.1): SQL-часть 10M-конвейера — 69 мс,
+  узкое место — ingest (11,7 с) и heap, а не SQL-движок. Решение: **остаёмся на DuckDB**
+  (BENCH.md §4.3); пересмотр — если появится узел с долей DuckDB ≥ 50 % и прототип Polars
+  покажет ≥ 2× на его профиле.
 - **Отмена материализации:** `DuckDbSession` учитывает активные `/table`/`/profile`-чтения
   (соединение + workflow + node); `close()` сессии, `POST /v1/shutdown` и
   `DELETE /v1/jobs/{id}` (через `interruptReads(workflowId)`) закрывают их и прерывают нативный
@@ -349,8 +356,8 @@ curl -s -H 'X-DAP-Session: verify' http://127.0.0.1:7863/v1/workflows/wf-1/debug
   double на числовую ячейку), затем копируется в Arrow — ~2–3× объёма таблицы и без лимита,
   поэтому очень большая книга может упереться в heap. Ограничение размера — задача волны
   IO; сейчас книга читается целиком.
-- **native_smoke:** 9 проверок покрывают контракт и пять узлов Фазы 1; e2e всех десяти узлов
-  проверяет `tests/parity.py --engine native` (13 workflow), а не smoke.
+- **native_smoke:** 9 проверок покрывают контракт и пять узлов Фазы 1; e2e всех одиннадцати
+  узлов проверяет `tests/parity.py --engine native` (13 workflow), а не smoke.
 - **Расхождения, зафиксированные замерами:** `registerArrowStream` public, но требует
   `arrow-c-data` (zero-copy не используется); `allow_quoted_nulls=false` различает
   `""` и NULL, но DAP всё равно парсит CSV сам; роадмап говорит `conn.interrupt()`, код

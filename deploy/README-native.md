@@ -47,14 +47,15 @@ docker build --build-arg DAP_DUCKDB_NATIVE=linux_arm64 \
    `--strip-debug --no-header-files --no-man-pages --compress=zip-6`. Набор получен
    из самого jar (`jdeps --multi-release 21 --ignore-missing-deps
    --print-module-deps`) и прогнан запуском jar на этом рантайме: smoke 9/9 и
-   корпус parity 12/12 (см. «Проверка»). `java.desktop` исключён: его ссылки —
+   корпус parity 13/13 (см. «Проверка»). `java.desktop` исключён: его ссылки —
    необязательные Jetty leak-preventer'ы, `Jackson Java7SupportImpl` и ImageIO,
    вне пути запроса Javalin (~14 МиБ экономии).
 3. **healthcheck**: крошечный `HealthCheck` (`java.base`, сокет + `GET /v1/health`)
    компилируется build-JDK в `/out/health`; curl в образе не нужен.
 4. **runtime stage** (`debian:bookworm-slim`): non-root пользователь `dap`
    (uid/gid 10001, build-arg `DAP_UID`/`DAP_GID`), `/opt/dap/dap-native.jar`,
-   `/opt/java/openjdk`, пустой `/tmp/dap` (будущий `DAP_DUCKDB_TEMP_DIR`).
+   `/opt/java/openjdk`, `/tmp/dap` — он же `DAP_DUCKDB_TEMP_DIR` (переменная уже
+   реализована и выставлена в образе).
 
 ## Платформа и DuckDB native
 
@@ -141,7 +142,7 @@ HEALTHCHECK: `--interval=2s --timeout=2s --start-period=5s --retries=3`,
 | `jdeps --multi-release 21 --ignore-missing-deps --print-module-deps target/dap-native.jar` | `java.base,java.desktop,java.instrument,java.management,java.naming,java.security.jgss,java.sql,jdk.jfr,jdk.unsupported` | ✅ |
 | `jlink --add-modules ... --strip-debug --no-header-files --no-man-pages --compress=zip-6` | 39 096 КиБ | ✅ |
 | запуск jar на этом jlink-рантайме + `python3 tests/native_smoke.py --base http://127.0.0.1:7882` | `native smoke (9 pass, 0 fail, 0 skip)` | ✅ |
-| `python3 tests/parity.py --engine native --base http://127.0.0.1:7885` на том же jlink-рантайме | 12/12 workflow ok, `matching cells 1563/1563 (100.0 %)` — все 10 узлов, включая `excel_reader`, `joiner`, `math_formula` | ✅ |
+| `python3 tests/parity.py --engine native --base http://127.0.0.1:7885` на том же jlink-рантайме | 13/13 workflow ok, `matching cells 1563/1563 (100.0 %)` — все 11 узлов (10 пилотных + `column_renamer`), включая `excel_reader`, `joiner`, `math_formula` | ✅ |
 | `java -cp /tmp/hc HealthCheck` против живого сервиса / против закрытого порта | код 0 / код 1 + `Connection refused` | ✅ |
 | entrypoint-развёртывание heap: `HEAP=${DAP_HEAP:-1g}; ${JAVA_OPTS:--Xmx$HEAP}` | нет env → `-Xmx1g`; `DAP_HEAP=2g` → `-Xmx2g`; `JAVA_OPTS=-Xmx4g -XX:+UseZGC` → как задано; оба → `JAVA_OPTS` | ✅ (sh/POSIX) |
 | cold start на jlink-рантайме (fork → health 200, опрос каждые 5 мс) | 556, 575, 574, 560, 587 мс (5 прогонов); первый прогон сразу после `jlink` — 2820 мс (macOS валидация бинарей) | ✅ |
@@ -175,7 +176,7 @@ python3 ../tests/native_smoke.py --base http://127.0.0.1:7871
 4. Multi-arch сборка/манифест (`linux/amd64` + `linux/arm64`), запуск arm64-образа
    на arm64-хосте и amd64-образа на amd64-хосте.
 5. Отсутствие `java.desktop` на всех путях: проверено smoke 9/9 и полным корпусом
-   parity (12 workflow, 1563/1563 ячеек), но не ручными сценариями вне корпуса.
+   parity (13 workflow, 1563/1563 ячеек), но не ручными сценариями вне корпуса.
    При проблеме вернуть `java.desktop` в `--add-modules` (+~14 МиБ).
 
 Команды для проверки на Docker-хосте:
@@ -195,10 +196,9 @@ docker run --rm --read-only --tmpfs /tmp:size=256m --cap-drop ALL \
 docker rm -f dap-native-check
 ```
 
-## Предлагаемые цели Makefile
+## Цели Makefile
 
-`Makefile` не редактировался. Предложение (хост-платформу при необходимости
-подставить через `--build-arg DAP_DUCKDB_NATIVE=...`, если TARGETARCH не передаётся):
+Цели для образа, MCP e2e и бенчмарка уже добавлены в `Makefile`:
 
 ```make
 DAP_NATIVE_IMAGE ?= dap-native:local
@@ -209,16 +209,14 @@ image-native:
 run-native-image: image-native
 	docker run --rm -p 7800:7800 $(DAP_NATIVE_IMAGE)
 
-verify-native-image: image-native
-	@docker rm -f dap-native-check >/dev/null 2>&1 || true
-	docker run -d --name dap-native-check -p 7801:7800 $(DAP_NATIVE_IMAGE) >/dev/null
-	@start=$$(date +%s%N); \
-	until [ "$$(docker inspect -f '{{.State.Health.Status}}' dap-native-check 2>/dev/null)" = healthy ]; do \
-	  sleep 0.1; \
-	done; \
-	echo "healthy in $$(( ($$(date +%s%N) - start) / 1000000 )) ms"; \
-	docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}' $(DAP_NATIVE_IMAGE); \
-	docker rm -f dap-native-check >/dev/null
+mcp-e2e: build-native
+	python3 tests/mcp_e2e.py
+
+bench: build-native
+	python3 tests/bench.py --jar engine-native/target/dap-native.jar --rows 100000
 ```
 
+`make bench-full` — тот же харнесс на 10M с отчётом `build/bench.json`.
 `make test-native` не меняется: образ — упаковка уже протестированного jar.
+Отдельной цели `verify-native-image` нет: health и размер проверяются командами из
+предыдущего раздела после `make image-native`.

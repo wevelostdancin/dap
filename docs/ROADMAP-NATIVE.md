@@ -33,14 +33,15 @@
 
 Строим:
 
-- `engine-native/` — Javalin + DuckDB (in-process) + Arrow bus, 10 узлов, `/v1` 1:1.
+- `engine-native/` — Javalin + DuckDB (in-process) + Arrow bus, 11 узлов (10 пилотных +
+  `column_renamer`), `/v1` 1:1.
 - Собственные JSON Schema узлов (`configSchema`) — агент настраивает узел без `settingsXml`.
 - Lazy plan: `executor` возвращает план, материализация только в `table`/`profile`.
 - Async DAG-планировщик: топосорт, параллельные ветви, отмена, timeout.
 
 Не строим (в пилоте):
 
-- 832 узла (только 10, дальше волнами по спросу);
+- 832 узла (только 11, дальше волнами по спросу);
 - auth, multi-tenancy, persistence, HA;
 - production-hardening до parity;
 - любые изменения `engine/`, `runtime/knime/`, `catalog/`;
@@ -247,7 +248,7 @@ INDEPENDENCE §11.
 **Неделя 1 (Фаза 1, часть 1)** — закрыто 29.10.2026
 
 - [x] pom, скелет `NativeService`, `/v1/health`, виртуальные потоки
-- [x] `NodeRegistry` + 10 спеков, `DuckDbSession`, `LazyPlan`
+- [x] `NodeRegistry` + 11 спеков (10 пилотных; `column_renamer` — в Фазе 3), `DuckDbSession`, `LazyPlan`
 - [x] spike Arrow↔DuckDB с замером
 - [x] `csv_reader`, `row_filter`, `sorter` + тесты
 - [x] cold start замер
@@ -259,13 +260,15 @@ INDEPENDENCE §11.
 - [x] `group_by` (multi-agg), `joiner`
 - [x] parity-раннер native + первый прогон
 
-**Неделя 3 (Фаза 2 завершение + Фаза 3)** — Фаза 2 закрыта 30.10.2026
+**Неделя 3 (Фаза 2 завершение + Фаза 3)** — Фаза 2 и Фаза 3 закрыты 30.10.2026
 
 - [x] `joiner`, `string_manipulation`, `math_formula`, `excel_reader`
 - [x] dialog/profile, parity 100 % (порог ≥ 90 %), PARITY.md и NATIVE.md обновлены
 - [x] `docs/MIGRATION.md` + 11-й узел `column_renamer` (Фаза 3)
-- [ ] bench.py, BENCH.md, Dockerfile — Фаза 3
-- [ ] MCP e2e — Фаза 3
+- [x] `tests/bench.py` + `docs/BENCH.md` — Фаза 3 (числа §4.1; Polars — остаёмся на DuckDB)
+- [x] MCP e2e — Фаза 3 (`tests/mcp_e2e.py`, PASS)
+- [x] `deploy/Dockerfile.native` + README написаны; `docker build`/`run` **не выполнены**
+      (нет Docker-демона) — образ не проверен
 
 ## 13. Правила работы
 

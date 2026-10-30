@@ -72,7 +72,7 @@
 export JAVA_HOME="$HOME/Projects/tools/jdk-21.0.13+9/Contents/Home"
 export PATH="$JAVA_HOME/bin:$PATH"
 cd engine-native
-./mvnw -q -o test                          # 187 тестов, 0 failures
+./mvnw -q -o test                          # 199 тестов, 0 failures
 ./mvnw -q -o -DskipTests package           # target/dap-native.jar
 DAP_PORT=7924 "$JAVA_HOME/bin/java" -jar target/dap-native.jar &
 cd ..
@@ -88,9 +88,11 @@ make lint                                   # OK: 0 errors
 `13 workflows ok ... matching cells 1563/1563 (100.0%)`. На чистом worktree Maven-кэш
 `.tools/` сидируется из основного checkout и не коммитится.
 
-Предлагаемые цели Makefile (сейчас не добавлены): `test-native-offline` (`mvnw -q -o test`),
-`parity-validate` (`python3 tests/parity.py --validate`), `parity-native` (build + запуск на
-свободном порту + прогон корпуса + остановка).
+Цели Makefile для проверки уже есть: `make build-native` (jar), `make test-native`
+(`mvnw test`), `make bench` (100k), `make bench-full` (10M + `build/bench.json`),
+`make mcp-e2e` (`tests/mcp_e2e.py`), `make image-native` / `make run-native-image`.
+Отдельные `test-native-offline`, `parity-validate` и `parity-native` в Makefile не
+добавлены: используйте команды выше.
 
 ## 5. Чего автор узла не трогает
 
@@ -100,7 +102,8 @@ make lint                                   # OK: 0 errors
   вручную в baseline не добавляется.
 - `docs/NATIVE.md`, `docs/PARITY.md`, `docs/BENCH.md`, `docs/ROADMAP-NATIVE.md` — у них свои
   владельцы; числа корпуса (12→13) и приёмку обновляют они.
-- `Makefile` — цели только предлагаются.
+- `Makefile` — менять не нужно: `build-native`, `test-native`, `bench`, `mcp-e2e`,
+  `image-native` уже есть.
 - `engine-native/.tools/` — gitignored кэш Maven.
 - Чужие executor'ы, спеки и тесты — не рефакторим; правим только пины каталога, которые
   сломались из-за нового узла.
