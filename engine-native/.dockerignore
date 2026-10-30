@@ -1,0 +1,11 @@
+# Build context for deploy/Dockerfile.native is engine-native/, so Docker reads this
+# file (a .dockerignore next to a Dockerfile that lives outside the context is
+# ignored). Only sources, mvnw and pom.xml are needed; the image build creates its
+# own Maven cache inside the build stage.
+target/
+.tools/
+.git
+.gitignore
+.gitattributes
+**/.DS_Store
+*.log
