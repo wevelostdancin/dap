@@ -47,7 +47,7 @@ public final class DataHandlers {
         if (port < 0 || port >= outPorts) {
             throw ApiException.badRequest("node has " + outPorts + " out ports");
         }
-        TableData table = plan.preview(limit);
+        TableData table = plan.preview(limit, workflow.id(), nodeId);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("rows", table.rows());
         body.put("columns", columns(table.columns()));
@@ -69,7 +69,7 @@ public final class DataHandlers {
         if (plan == null) {
             throw ApiException.badRequest("node has no table output");
         }
-        ProfileData profile = plan.profile();
+        ProfileData profile = plan.profile(workflow.id(), nodeId);
         List<Map<String, Object>> columns = new ArrayList<>();
         for (ProfileColumn column : profile.columns()) {
             Map<String, Object> view = new LinkedHashMap<>();

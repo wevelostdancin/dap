@@ -18,6 +18,15 @@
     <arrow.version>19.0.0</arrow.version>
     <jackson.version>2.19.0</jackson.version>
     <junit.version>5.11.4</junit.version>
+    <!-- The shaded jar keeps one platform's duckdb_jdbc native library. Each of these
+         properties holds the file to exclude, so a profile hides the build host's own
+         library behind a sentinel pattern; -Ddap.duckdb.native=all|osx_universal|
+         linux_amd64|linux_arm64|windows_amd64 overrides the host default. -->
+    <dap.duckdb.keep>__dap_keep_native__</dap.duckdb.keep>
+    <dap.duckdb.native.osx_universal>libduckdb_java.so_osx_universal</dap.duckdb.native.osx_universal>
+    <dap.duckdb.native.linux_amd64>libduckdb_java.so_linux_amd64</dap.duckdb.native.linux_amd64>
+    <dap.duckdb.native.linux_arm64>libduckdb_java.so_linux_arm64</dap.duckdb.native.linux_arm64>
+    <dap.duckdb.native.windows_amd64>libduckdb_java.so_windows_amd64</dap.duckdb.native.windows_amd64>
   </properties>
 
   <dependencies>
@@ -100,6 +109,15 @@
                     <exclude>META-INF/*.RSA</exclude>
                   </excludes>
                 </filter>
+                <filter>
+                  <artifact>org.duckdb:duckdb_jdbc</artifact>
+                  <excludes>
+                    <exclude>**/${dap.duckdb.native.osx_universal}</exclude>
+                    <exclude>**/${dap.duckdb.native.linux_amd64}</exclude>
+                    <exclude>**/${dap.duckdb.native.linux_arm64}</exclude>
+                    <exclude>**/${dap.duckdb.native.windows_amd64}</exclude>
+                  </excludes>
+                </filter>
               </filters>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
@@ -113,4 +131,100 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- Host defaults: keep the native library of the machine that runs the build.
+         The host profile is disabled as soon as -Ddap.duckdb.native is given. -->
+    <profile>
+      <id>duckdb-native-host-macos</id>
+      <activation>
+        <os><family>mac</family></os>
+        <property><name>!dap.duckdb.native</name></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.osx_universal>${dap.duckdb.keep}</dap.duckdb.native.osx_universal>
+      </properties>
+    </profile>
+    <profile>
+      <id>duckdb-native-host-linux-amd64</id>
+      <activation>
+        <os><name>Linux</name><arch>amd64</arch></os>
+        <property><name>!dap.duckdb.native</name></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.linux_amd64>${dap.duckdb.keep}</dap.duckdb.native.linux_amd64>
+      </properties>
+    </profile>
+    <profile>
+      <id>duckdb-native-host-linux-arm64</id>
+      <activation>
+        <os><name>Linux</name><arch>arm64</arch></os>
+        <property><name>!dap.duckdb.native</name></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.linux_arm64>${dap.duckdb.keep}</dap.duckdb.native.linux_arm64>
+      </properties>
+    </profile>
+    <profile>
+      <id>duckdb-native-host-windows-amd64</id>
+      <activation>
+        <os><family>windows</family><arch>amd64</arch></os>
+        <property><name>!dap.duckdb.native</name></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.windows_amd64>${dap.duckdb.keep}</dap.duckdb.native.windows_amd64>
+      </properties>
+    </profile>
+
+    <!-- Explicit cross-platform packaging: -Ddap.duckdb.native=all|osx_universal|
+         linux_amd64|linux_arm64|windows_amd64. -->
+    <profile>
+      <id>duckdb-native-all</id>
+      <activation>
+        <property><name>dap.duckdb.native</name><value>all</value></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.osx_universal>${dap.duckdb.keep}</dap.duckdb.native.osx_universal>
+        <dap.duckdb.native.linux_amd64>${dap.duckdb.keep}</dap.duckdb.native.linux_amd64>
+        <dap.duckdb.native.linux_arm64>${dap.duckdb.keep}</dap.duckdb.native.linux_arm64>
+        <dap.duckdb.native.windows_amd64>${dap.duckdb.keep}</dap.duckdb.native.windows_amd64>
+      </properties>
+    </profile>
+    <profile>
+      <id>duckdb-native-osx-universal</id>
+      <activation>
+        <property><name>dap.duckdb.native</name><value>osx_universal</value></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.osx_universal>${dap.duckdb.keep}</dap.duckdb.native.osx_universal>
+      </properties>
+    </profile>
+    <profile>
+      <id>duckdb-native-linux-amd64</id>
+      <activation>
+        <property><name>dap.duckdb.native</name><value>linux_amd64</value></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.linux_amd64>${dap.duckdb.keep}</dap.duckdb.native.linux_amd64>
+      </properties>
+    </profile>
+    <profile>
+      <id>duckdb-native-linux-arm64</id>
+      <activation>
+        <property><name>dap.duckdb.native</name><value>linux_arm64</value></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.linux_arm64>${dap.duckdb.keep}</dap.duckdb.native.linux_arm64>
+      </properties>
+    </profile>
+    <profile>
+      <id>duckdb-native-windows-amd64</id>
+      <activation>
+        <property><name>dap.duckdb.native</name><value>windows_amd64</value></property>
+      </activation>
+      <properties>
+        <dap.duckdb.native.windows_amd64>${dap.duckdb.keep}</dap.duckdb.native.windows_amd64>
+      </properties>
+    </profile>
+  </profiles>
 </project>

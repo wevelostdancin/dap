@@ -15,7 +15,9 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -28,6 +30,9 @@ public final class DuckDbSession implements AutoCloseable {
     private final DuckDBConnection base;
     private final AtomicLong tableIds = new AtomicLong();
     private final Object loadLock = new Object();
+    private final ConcurrentHashMap<DuckDBConnection, Read> reads = new ConcurrentHashMap<>();
+    private final Object readsLock = new Object();
+    private boolean closed;
 
     public DuckDbSession() throws SQLException {
         this.base = (DuckDBConnection) DriverManager.getConnection("jdbc:duckdb:");
@@ -152,9 +157,15 @@ public final class DuckDbSession implements AutoCloseable {
     }
 
     public TableData preview(String sql, List<ColumnSpec> columns, int limit) throws SQLException {
+        return preview(sql, columns, limit, null, null);
+    }
+
+    /** Preview registered against a workflow/node so session close and job cancel can interrupt it. */
+    public TableData preview(String sql, List<ColumnSpec> columns, int limit,
+                             String workflowId, String nodeId) throws SQLException {
         int safeLimit = Math.max(0, limit);
-        try (DuckDBConnection connection = newConnection();
-             Statement statement = connection.createStatement()) {
+        DuckDBConnection connection = openRead(workflowId, nodeId);
+        try (Statement statement = connection.createStatement()) {
             long rows = countWith(statement, sql);
             List<List<String>> data = new ArrayList<>();
             try (ResultSet result = statement.executeQuery(
@@ -168,6 +179,8 @@ public final class DuckDbSession implements AutoCloseable {
                 }
             }
             return new TableData(rows, columns, data);
+        } finally {
+            endRead(connection);
         }
     }
 
@@ -187,14 +200,26 @@ public final class DuckDbSession implements AutoCloseable {
     }
 
     public ProfileData profile(String sql, List<ColumnSpec> columns) throws SQLException {
-        try (DuckDBConnection connection = newConnection();
-             Statement statement = connection.createStatement()) {
+        return profile(sql, columns, null, null);
+    }
+
+    /** Profile registered against a workflow/node so session close and job cancel can interrupt it. */
+    public ProfileData profile(String sql, List<ColumnSpec> columns,
+                               String workflowId, String nodeId) throws SQLException {
+        DuckDBConnection connection = openRead(workflowId, nodeId);
+        try (Statement statement = connection.createStatement()) {
             long rows = countWith(statement, sql);
             List<ProfileColumn> profile = new ArrayList<>(columns.size());
             for (ColumnSpec column : columns) {
                 String quoted = quote(column.name());
                 String projected = "CAST(" + quoted + " AS VARCHAR)";
-                String stats = "COUNT(*) - COUNT(" + quoted + ") AS missing, COUNT(DISTINCT " + quoted + ") AS distinct";
+                // KNIME counts distinct exactly up to 100k rows per column; above that the
+                // approximate sketch is allowed to differ (PARITY.md §6.3). Decide from the
+                // single COUNT(*) taken for the whole plan, not from a count per column.
+                String distinctSql = rows > MAX_DISTINCT
+                        ? "APPROX_COUNT_DISTINCT(" + quoted + ")"
+                        : "COUNT(DISTINCT " + quoted + ")";
+                String stats = "COUNT(*) - COUNT(" + quoted + ") AS missing, " + distinctSql + " AS distinct";
                 if (column.numeric()) {
                     stats += ", MIN(" + quoted + ") AS min_value, MAX(" + quoted + ") AS max_value, AVG(" + quoted + ") AS mean_value";
                 }
@@ -210,6 +235,8 @@ public final class DuckDbSession implements AutoCloseable {
                 }
             }
             return new ProfileData(rows, profile);
+        } finally {
+            endRead(connection);
         }
     }
 
@@ -285,12 +312,61 @@ public final class DuckDbSession implements AutoCloseable {
         return names;
     }
 
+    /** One in-flight materialization; closing its connection interrupts the running query. */
+    private record Read(String workflowId, String nodeId) {
+    }
+
+    private DuckDBConnection openRead(String workflowId, String nodeId) throws SQLException {
+        DuckDBConnection connection = newConnection();
+        synchronized (readsLock) {
+            if (closed) {
+                closeQuietly(connection);
+                throw new SQLException("session is closed");
+            }
+            reads.put(connection, new Read(workflowId, nodeId));
+        }
+        return connection;
+    }
+
+    private void endRead(DuckDBConnection connection) {
+        reads.remove(connection);
+        closeQuietly(connection);
+    }
+
+    /** Interrupt the in-flight /table and /profile reads of one workflow only. */
+    public void interruptReads(String workflowId) {
+        if (workflowId == null) {
+            return;
+        }
+        for (Map.Entry<DuckDBConnection, Read> entry : reads.entrySet()) {
+            if (workflowId.equals(entry.getValue().workflowId())
+                    && reads.remove(entry.getKey()) != null) {
+                closeQuietly(entry.getKey());
+            }
+        }
+    }
+
+    int activeReadCount() {
+        return reads.size();
+    }
+
+    private static void closeQuietly(Connection connection) {
+        try {
+            connection.close();
+        } catch (SQLException ignored) {
+            // best effort: closing a connection interrupts its running query
+        }
+    }
+
     @Override
     public void close() {
-        try {
-            base.close();
-        } catch (SQLException ignored) {
-            // shutdown path: nothing useful to do
+        synchronized (readsLock) {
+            closed = true;
+            for (DuckDBConnection connection : reads.keySet()) {
+                closeQuietly(connection);
+            }
+            reads.clear();
         }
+        closeQuietly(base);
     }
 }
