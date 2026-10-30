@@ -278,7 +278,8 @@ curl -s -H 'X-DAP-Session: verify' http://127.0.0.1:7863/v1/workflows/wf-1/debug
 | `docs/MIGRATION.md` + 11-й узел | да | `dap.column_renamer` + `wf-n3`; каталог 11 узлов, parity 13/13 |
 | MCP e2e | да | `tests/mcp_e2e.py` (`DAP_NATIVE=1`): create → add_node → connect → run → table → delete, 3,6 с |
 | Лицензии/граница | да | [NOTICE](../NOTICE) §2, [INDEPENDENCE.md](INDEPENDENCE.md) §11 |
-| Тесты | да | `mvn test` — 203 теста; parity 13/13, `matching cells 1563/1563 (100 %)`; smoke 9/9; MCP 27+1 |
+| Тесты | да | `mvn test` — 203 теста; parity 13/13, `matching cells 1563/1563 (100 %)`; smoke 9/9; MCP: e2e PASS + 7 launch-тестов |
+
 ## 6. Дальше и риски
 
 - **Все 11 узлов доступны (10 пилотных + `column_renamer` как шаблон [MIGRATION.md](MIGRATION.md));
