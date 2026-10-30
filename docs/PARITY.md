@@ -202,7 +202,9 @@ python3 tests/parity.py --engine native --base http://127.0.0.1:7911
   `columns[{name,type}]` (Arrow), `emptyStringIsNull: false`; `excel_reader` — `<stem>.xlsx`
   без `sheet`; неизвестный датасет или нет файла — FAIL, не SKIP.
 - Native-only: `expect`/`expect_profile` сверяют `rows`, колонки (имя/тип и
-  `missing`/`distinct`/`min`/`max`/`mean`, если заданы) и `data` по §2–§4; `equivalent`
+  `missing`/`distinct`/`min`/`max`/`mean`, если заданы) и `data` по §2–§4; `expect_profile`
+  сверяет только объявленные колонки (по имени; отсутствие объявленной — FAIL, лишние
+  колонки ответа игнорируются); `equivalent`
   исполняет указанный workflow и сравнивает таблицу `node_ref` (unordered). Состояния
   узлов с baseline не сравниваются (имена engine-specific), успешность — все `EXECUTED`.
 - 90 % роадмапа — `matching cells N/M (X%)` по восьми dual-run: `rows`, имя+тип

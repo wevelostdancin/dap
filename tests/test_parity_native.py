@@ -266,6 +266,30 @@ class ExpectTest(unittest.TestCase):
         observation = parity.run_on_native(api, CORPUS["wf-10-iris-pipeline"], CORPUS, DATASETS)
         self.assertTrue(any("121" in problem for problem in observation["checkProblems"]))
 
+    def test_expect_profile_ignores_extra_response_columns(self):
+        api = FakeApi()
+        api.profiles[("wf-10-iris-pipeline", "dap.column_filter")] = {
+            "rows": 122,
+            "columns": [{"name": "species", "type": "String", "missing": 0, "distinct": 3},
+                        {"name": "sepal_total", "type": "Number (Float)", "missing": 0,
+                         "distinct": 122},
+                        {"name": "sepal_length", "type": "Number (Float)", "missing": 0,
+                         "distinct": 35}],
+        }
+        observation = parity.run_on_native(api, CORPUS["wf-10-iris-pipeline"], CORPUS, DATASETS)
+        self.assertFalse(any("expect_profile" in problem
+                             for problem in observation["checkProblems"]))
+
+    def test_expect_profile_fails_when_a_declared_column_is_missing(self):
+        api = FakeApi()
+        api.profiles[("wf-10-iris-pipeline", "dap.column_filter")] = {
+            "rows": 122,
+            "columns": [{"name": "species", "type": "String", "missing": 0, "distinct": 3}],
+        }
+        observation = parity.run_on_native(api, CORPUS["wf-10-iris-pipeline"], CORPUS, DATASETS)
+        self.assertTrue(any("expect_profile" in problem and "sepal_total" in problem
+                            for problem in observation["checkProblems"]))
+
 
 class EquivalentTest(unittest.TestCase):
     GROUP_BY = table_body(3,
