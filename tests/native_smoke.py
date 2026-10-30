@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Black-box acceptance checks for dap-native (Phase 1).
+"""Black-box acceptance checks for dap-native (Phase 2).
 
 Runs against an already running native service, so it can be used by CI, by the
 make acceptance flow, or by hand. It only uses the frozen /v1 contract and the
@@ -26,6 +26,11 @@ AVAILABLE_NODES = {
     "dap.column_filter",
     "dap.sorter",
     "dap.missing_value",
+    "dap.excel_reader",
+    "dap.group_by",
+    "dap.joiner",
+    "dap.string_manipulation",
+    "dap.math_formula",
 }
 
 
@@ -77,8 +82,7 @@ def check_catalog_errors(api):
         raise AssertionError("GET unknown catalog node did not return 404")
     if api.dialog("dap.no_such_node").status != 400:
         raise AssertionError("GET unknown dialog did not return 400")
-    if api.dialog("dap.group_by").body.get("available") is not False:
-        raise AssertionError("unavailable node dialog is not marked unavailable")
+    # Every pilot node is available in Phase 2; only the unknown-id codes remain.
     if api.get("/v1/nodes?limit=not-a-number").status != 500:
         raise AssertionError("non-integer limit did not return 500")
     return "404/400/500 semantics ok"
@@ -233,8 +237,6 @@ def check_errors(api):
     try:
         if api.add_node(wf, "dap.no_such_factory").status != 400:
             raise AssertionError("unknown factory did not return 400")
-        if api.add_node(wf, "dap.group_by", {}).status != 400:
-            raise AssertionError("unavailable node did not return 400")
         node = api.add_node_ok(wf, "dap.sorter", {"keys": []})
         if api.configure(wf, node, {"no_such_key": 1}).status != 400:
             raise AssertionError("unknown setting did not return 400")
