@@ -54,6 +54,11 @@
         ],
         "default": "replace"
       },
+      "search": {
+        "type": "string",
+        "title": "Search text",
+        "description": "Text to find and replace (replace only)."
+      },
       "value": {
         "type": "string",
         "title": "Value",

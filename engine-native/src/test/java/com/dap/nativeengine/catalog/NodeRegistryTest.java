@@ -102,7 +102,7 @@ class NodeRegistryTest {
         assertEquals(Set.of("keys", "aggregations"), registry.require("dap.group_by").settingKeys());
         assertEquals(Set.of("how", "left_keys", "right_keys", "merge_keys"),
                 registry.require("dap.joiner").settingKeys());
-        assertEquals(Set.of("column", "op", "mode", "value"),
+        assertEquals(Set.of("column", "op", "mode", "search", "value"),
                 registry.require("dap.string_manipulation").settingKeys());
         assertEquals(Set.of("outputs"), registry.require("dap.math_formula").settingKeys());
     }
