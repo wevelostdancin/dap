@@ -7,7 +7,9 @@
 Если движок не отвечает на /v1/health, адаптер один раз запускает
 "$DAP_HOME/scripts/run.sh" (legacy KNIME) либо, при DAP_NATIVE=1 или
 DAP_ENGINE=native, "java -Xmx${DAP_HEAP:-2g} -jar engine-native/target/dap-native.jar",
-и ждёт health до 60 с. Уже запущенный сервис не перезапускается и не останавливается.
+и ждёт health до 60 с. Запущенный дочерний процесс опрашивается: если он умер или
+health не наступил, адаптер гасит его и возвращает ошибку с хвостом service.log.
+Уже запущенный сервис не перезапускается и не останавливается.
 
 Переменные окружения: DAP_HOME, DAP_PORT, DAP_SESSION, DAP_BIND, DAP_NATIVE,
 DAP_ENGINE, DAP_HEAP.
@@ -73,10 +75,10 @@ def _java() -> str:
     return "java"
 
 
-def _launch_native(env: dict, log) -> None:
+def _launch_native(env: dict, log) -> subprocess.Popen:
     cmd = [_java(), f"-Xmx{HEAP}", "-jar", NATIVE_JAR]
     try:
-        subprocess.Popen(
+        return subprocess.Popen(
             cmd,
             cwd=DAP_HOME,
             stdin=subprocess.DEVNULL,
@@ -91,6 +93,49 @@ def _launch_native(env: dict, log) -> None:
             code=-32001,
             data={"base": BASE, "jar": NATIVE_JAR},
         )
+
+
+def _log_tail(limit: int = 4000) -> str:
+    """Последние строки service.log — без исключений, лог может быть пустым."""
+    try:
+        with open(LOG, "rb") as stream:
+            stream.seek(0, os.SEEK_END)
+            size = stream.tell()
+            stream.seek(max(0, size - limit))
+            return stream.read().decode("utf-8", errors="replace").strip()
+    except OSError:
+        return ""
+
+
+def _startup_error(message: str, data: dict) -> DapError:
+    tail = _log_tail()
+    if tail:
+        message = f"{message}; хвост {LOG}:\n{tail}"
+        data = dict(data, tail=tail)
+    return DapError(message, code=-32001, data=data)
+
+
+def _stop_child(proc: subprocess.Popen) -> None:
+    """Погасить дочерний процесс: terminate, затем kill; ошибки не пробрасываем."""
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+    except OSError:
+        return
+    try:
+        proc.wait(timeout=5)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        proc.kill()
+    except OSError:
+        return
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def ensure_service() -> None:
@@ -117,9 +162,14 @@ def ensure_service() -> None:
             )
     with open(LOG, "ab") as log:
         if NATIVE:
-            _launch_native(env, log)
+            child = _launch_native(env, log)
+            try:
+                print(f"dap-mcp: native engine pid={child.pid}",
+                      file=sys.stderr, flush=True)
+            except OSError:
+                pass
         else:
-            subprocess.Popen(
+            child = subprocess.Popen(
                 ["bash", script],
                 cwd=DAP_HOME,
                 stdin=subprocess.DEVNULL,
@@ -128,16 +178,25 @@ def ensure_service() -> None:
                 start_new_session=True,
                 env=env,
             )
-    deadline = time.time() + START_WAIT
-    while time.time() < deadline:
-        if health():
-            return
-        time.sleep(1)
-    raise DapError(
-        f"движок DAP не поднялся за {START_WAIT} с, смотри {LOG}",
-        code=-32001,
-        data={"base": BASE, "log": LOG},
-    )
+    try:
+        deadline = time.monotonic() + START_WAIT
+        while time.monotonic() < deadline:
+            if health():
+                return
+            code = child.poll()
+            if code is not None:
+                raise _startup_error(
+                    f"движок DAP завершился при запуске (код выхода {code})",
+                    {"base": BASE, "log": LOG, "exitCode": code},
+                )
+            time.sleep(1)
+        raise _startup_error(
+            f"движок DAP не поднялся за {START_WAIT:g} с",
+            {"base": BASE, "log": LOG},
+        )
+    except BaseException:
+        _stop_child(child)
+        raise
 
 
 def call(method: str, path: str, body=None, timeout: int = TIMEOUT):
