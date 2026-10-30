@@ -116,9 +116,13 @@ Row Aggregator, а harness нормализует `OCCURRENCE_COUNT` → `Count(
 normalize переименовывает её в `Mean(x)`.
 
 ### 6.3 `distinct` в профиле
-KNIME считает точный `distinct` до 100 000 значений на колонку. Native использует
-`COUNT(DISTINCT)` до того же порога, выше — `APPROX_COUNT_DISTINCT` с допуском 1 %.
-Максимум в корпусе — 33k (ADULT `fnlwgt`), на пилоте сверка точная.
+KNIME считает точный `distinct` до 100 000 различных значений на колонку. Native:
+при `rows <= 100 000` — точный `COUNT(DISTINCT)`; выше — `APPROX_COUNT_DISTINCT`, и если
+оценка `<= 105 000`, значение досчитывается точным `COUNT(DISTINCT)`, чтобы обещание
+«точно до 100k» выдерживалось. DuckDB 1.5.6 реализует sketch как HLL P=10
+(σ ≈ 3,2 %, измеренная ошибка на 150k строк — 2–4,9 %), поэтому для кардинальности
+явно выше порога допуск считается измеренным (≤ 5 %), а не 1 %.
+Максимум в корпусе — 33k (ADULT `fnlwgt`), поэтому на корпусе `distinct` всегда точный.
 
 ### 6.4 NULL в ключах сортировки
 Корпус не сортирует по колонкам с NULL (WORLDBANK-колонки с NULL не участвуют в
@@ -183,7 +187,13 @@ Shipped-датасеты пустых строк не содержат, поэт
 - Несколько агрегатов в одном GroupBy (oracle-блокер §6.6.3) — проверяется unit-тестами native.
 - `column_filter.include`, `missing_value` с `mean`/`mode`, `string_manipulation` кроме `upper`
   — реализуются в native, но не имеют dual-run пары; покрываются unit-тестами.
-- Joiner `left`/`right` outer: биндинг поддерживает `how: "left"`, в корпусе только `inner`.
+- Joiner `left`/`right` outer: биндинг поддерживает `how: "left"`, в корпусе только `inner`
+  (outer-режимы и `merge_keys=false` проверяются unit-тестами).
+- `math_formula` и `excel_reader` живут только в native-only проверках (`wf-05`, `wf-10`,
+  `wf-n2`), потому что oracle их не исполняет (§6.6.1, §6.6.5); это `expect`/`equivalent`,
+  а не dual-run.
+- Сортировка строк: `wf-07` зависит от KNIME `NATURAL` (`1st-4th` < `10th`); native реализует
+  её при `collation: natural` (по умолчанию), `binary`/`nocase` — явные альтернативы (§4).
 
 ## 7. Native engine run
 
@@ -211,6 +221,8 @@ python3 tests/parity.py --engine native --base http://127.0.0.1:7911
   узлов с baseline не сравниваются (имена engine-specific), успешность — все `EXECUTED`.
 - 90 % роадмапа — `matching cells N/M (X%)` по восьми dual-run: `rows`, имя+тип
   колонки, ячейки data и поля профиля из baseline; native-only не в счёт.
+- Прогон 30.10.2026 (Фаза 2): `12 workflows ok, 0 failed, 0 skipped; matching cells
+  1563/1563 (100.0%)`, exit 0 — все dual-run и все native-only проверки зелёные.
 
 ## 8. Как перегенерировать baseline
 

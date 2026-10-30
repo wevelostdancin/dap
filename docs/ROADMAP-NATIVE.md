@@ -1,6 +1,6 @@
 # ROADMAP — dap-native
 
-**Статус:** Фаза 0 закрыта (29.10.2026). Фаза 1 закрыта (29.10.2026). Фаза 2 не начата.
+**Статус:** Фаза 0 закрыта (29.10.2026). Фаза 1 закрыта (29.10.2026). Фаза 2 закрыта (30.10.2026).
 **Область:** нативный движок `engine-native/` вместо KNIME-обёртки; `engine/`, `runtime/knime/`, `catalog/`
 остаются oracle-ом и не развиваются.
 **Связанные документы:** [PARITY.md](PARITY.md), [INDEPENDENCE.md](INDEPENDENCE.md), [API.md](API.md),
@@ -13,7 +13,7 @@
 | `/v1` контракт | заморожен, `api/openapi-v1-frozen.yaml`, sha256 `e2225093…`, проверка в `make lint` |
 | Корпус | 12 workflow (`tests/corpus/`): 8 dual-run на oracle + 4 native-only |
 | Baseline | `tests/baseline.json`, 20 наблюдений (таблицы + профили), воспроизводим 2/2 прогона |
-| Harness | `tests/parity.py`: `--validate`, `--write-baseline`, `--check-baseline`, `--engine native` (заглушка) |
+| Harness | `tests/parity.py`: `--validate`, `--write-baseline`, `--check-baseline`, `--engine native` (dual-run + native-only, dataset-shorthand) |
 | Правила сравнения | [PARITY.md](PARITY.md): float 1e-9, точные int/NULL, `""≠NULL`, ordered/unordered, типы |
 | Данные | 4 shipped-датасета KNIME, экспорт через `/table`, схема в `tests/corpus/data/datasets.json` |
 
@@ -144,6 +144,14 @@
 - `/v1/nodes/{id}/dialog` отдаёт `configSchema` для 10 узлов;
 - все 12 workflow корпуса исполняются end-to-end.
 
+**Результат (30.10.2026):** все пункты выполнены на ветке `phase2-native`.
+`make test-native` — 175 тестов, 0 падений; `tests/parity.py --engine native` —
+12/12 workflow ok, `matching cells 1563/1563 (100 %)`; `tests/native_smoke.py` — 9/9;
+`tests/test_parity_native.py` — 27/27; jar 44,1 МиБ (< 50 МБ) одной платформенной
+native-библиотекой; profile `distinct` точен до 100k различных значений, выше — sketch
+с досчётом у границы; `/table`/`/profile` отменяются через закрытие сессии и
+`DELETE /v1/jobs/{id}` (0–1 мс). Детали — в [NATIVE.md](NATIVE.md) §5.1.
+
 ## 6. Фаза 3 — бенчмарки, образ, Polars (3–5 дней)
 
 | # | Задача | Результат |
@@ -175,8 +183,8 @@
 | DuckDB CSV не различает `""` и NULL | явные `nullstr`/`all_varchar=false` + правило `emptyStringIsNull`; unit-тест + эквивалентность `wf-n1` |
 | Arrow↔DuckDB копирует данные | spike в Фазе 1 (день 1–2), замер; при отсутствии zero-copy — `ArrowStreamReader`/Appender и честная цифра в NATIVE.md |
 | Javalin синхронный run блокирует диспетчер | `Executors.newVirtualThreadPerTaskExecutor()`, sync-run ждёт в виртуальном потоке; тест «health во время run» |
-| Отмена запроса не доходит до DuckDB | `conn.interrupt()` + `Future.cancel(true)`; терминальные `cancelled`/`timeout` |
-| Excel-расширения DuckDB нет офлайн | fallback Apache POI → Arrow; решение фиксируется в Фазе 2 |
+| Отмена запроса не доходит до DuckDB | закрытие job-connection + `Future.cancel(true)` (так же в Фазе 1); в Фазе 2 materialization-чтения `/table`/`/profile` учитываются в сессии и закрываются на job-cancel/shutdown |
+| Excel-расширения DuckDB нет офлайн | решено в Фазе 2: POI запрещён лимитом jar, написан JDK-ридер xlsx (zip+StAX, ~900 строк) с поддержкой inline/shared strings, чисел, boolean, error и дат; `.xls` и шифрованные книги не читаются |
 | 10M строк не влезают в heap | DuckDB out-of-core, `memory_limit`/`temp_directory`; замер RAM в bench |
 | Расхождение float на агрегатах | правило 1e-9·max(1, \|a\|, \|b\|); при систематике — запись в PARITY.md, не «чинить ценой» |
 | oracle-узлы сломаны (формулы, missing) | native-only goldens (`wf-05`, `wf-10`) + unit-тесты; не инвестировать в oracle |
@@ -189,10 +197,10 @@
 | Cold start | `java -jar` → `/v1/health` = 200 | < 2 с |
 | CSV 10M read+filter+groupby | `tests/bench.py` | ≥ 3× быстрее KNIME |
 | RAM на 10M | `Runtime.totalMemory()-freeMemory()` после исполнения | ≤ KNIME |
-| Размер jar | `du -sh target/*.jar` | < 50 МБ |
+| Размер jar | `du -sh target/*.jar` | < 50 МБ (Фаза 2: 44,1 МиБ) |
 | Размер образа | `docker images dap-native` | < 200 МБ |
 | Параллельные ветви DAG | workflow с 2 независимыми ветвями | ≥ 1.8× против последовательно |
-| Parity | `tests/parity.py --engine native` | ≥ 90 % ячеек |
+| Parity | `tests/parity.py --engine native` | ≥ 90 % ячеек (Фаза 2: 1563/1563 = 100 %) |
 
 ## 10. Definition of Done и трассировка
 
@@ -219,27 +227,27 @@
 
 ## 12. Чеклист по неделям
 
-**Неделя 1 (Фаза 1, часть 1)**
+**Неделя 1 (Фаза 1, часть 1)** — закрыто 29.10.2026
 
-- [ ] pom, скелет `NativeService`, `/v1/health`, виртуальные потоки
-- [ ] `NodeRegistry` + 10 спеков, `DuckDbSession`, `LazyPlan`
-- [ ] spike Arrow↔DuckDB с замером
-- [ ] `csv_reader`, `row_filter`, `sorter` + тесты
-- [ ] cold start замер
+- [x] pom, скелет `NativeService`, `/v1/health`, виртуальные потоки
+- [x] `NodeRegistry` + 10 спеков, `DuckDbSession`, `LazyPlan`
+- [x] spike Arrow↔DuckDB с замером
+- [x] `csv_reader`, `row_filter`, `sorter` + тесты
+- [x] cold start замер
 
-**Неделя 2 (Фаза 1, часть 2 + старт Фазы 2)**
+**Неделя 2 (Фаза 1, часть 2 + старт Фазы 2)** — закрыто 30.10.2026
 
-- [ ] `column_filter`, `missing_value`
-- [ ] `Dag`, `JobManager` (cancel/timeout), `WorkflowStore`, все маршруты
-- [ ] `group_by` (multi-agg), начало `joiner`
-- [ ] parity-раннер native + первый прогон
+- [x] `column_filter`, `missing_value`
+- [x] `Dag`, `JobManager` (cancel/timeout), `WorkflowStore`, все маршруты
+- [x] `group_by` (multi-agg), `joiner`
+- [x] parity-раннер native + первый прогон
 
-**Неделя 3 (Фаза 2 завершение + Фаза 3)**
+**Неделя 3 (Фаза 2 завершение + Фаза 3)** — Фаза 2 закрыта 30.10.2026
 
-- [ ] `joiner`, `string_manipulation`, `math_formula`, `excel_reader`
-- [ ] dialog/profile, parity ≥ 90 %, PARITY.md обновлён
-- [ ] bench.py, BENCH.md, Dockerfile, NATIVE.md, MIGRATION.md
-- [ ] MCP e2e
+- [x] `joiner`, `string_manipulation`, `math_formula`, `excel_reader`
+- [x] dialog/profile, parity 100 % (порог ≥ 90 %), PARITY.md и NATIVE.md обновлены
+- [ ] bench.py, BENCH.md, Dockerfile, MIGRATION.md — Фаза 3
+- [ ] MCP e2e — Фаза 3
 
 ## 13. Правила работы
 

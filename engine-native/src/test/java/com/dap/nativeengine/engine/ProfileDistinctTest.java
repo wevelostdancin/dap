@@ -14,13 +14,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * /profile distinct: exact COUNT(DISTINCT) at or below the row cap, APPROX_COUNT_DISTINCT above it.
+ * /profile distinct: exact COUNT(DISTINCT) up to the 100k cap, APPROX_COUNT_DISTINCT only for
+ * genuinely large cardinality.
  *
  * <p>DuckDB 1.5.6 implements APPROX_COUNT_DISTINCT with a 64-byte HyperLogLog sketch (P=10,
- * duckdb#20916) whose standard error is ~3.2 %, so the 1 % tolerance promised by PARITY.md
- * cannot be asserted against this dependency. The large-table tests therefore pin the sketch
- * to its actually measured error and, more importantly, pin that the approximate path is the
- * one that runs above the cap (the exact value is not returned there).
+ * duckdb#20916) whose standard error is ~3.2 %. Above the row cap the profile therefore
+ * refines the sketch with an exact count whenever the estimate is still near the cap, so the
+ * "exact up to 100k distinct values" promise holds; the tests pin both the refined case and
+ * the large-cardinality case where the sketch is returned (within its measured ~10 % error).
  */
 class ProfileDistinctTest {
     private static final int ROW_CAP = 100_000;
@@ -87,7 +88,7 @@ class ProfileDistinctTest {
     }
 
     @Test
-    void duplicateHeavyLargeTableStaysCloseToTheExactCount() throws Exception {
+    void duplicateHeavyLargeTableIsRefinedToTheExactCount() throws Exception {
         int rows = 150_000;
         int distinct = 100;
         List<ColumnSpec> columns = List.of(ColumnSpec.of("v", "Int64"));
@@ -105,11 +106,31 @@ class ProfileDistinctTest {
 
             assertEquals(rows, profile.rows());
             ProfileColumn v = profile.columns().get(0);
-            assertEquals(approximate, v.distinct(),
-                    "above the cap the duplicate-heavy column must also use APPROX_COUNT_DISTINCT");
-            assertNotEquals(distinct, approximate, "the chosen dataset must make the sketch differ from the exact count");
-            assertTrue(relativeError(v.distinct(), distinct) <= 0.05,
-                    "approximate distinct " + v.distinct() + " must stay close to the exact " + distinct);
+            assertEquals(distinct, v.distinct(),
+                    "a low-cardinality column above the row cap must be refined to the exact count");
+            assertNotEquals(distinct, approximate, "the sketch is imprecise here, which is why refinement runs");
+        }
+    }
+
+    @Test
+    void lowCardinalityAboveTheRowCapIsRefinedToTheExactCount() throws Exception {
+        int rows = 120_000;
+        int distinct = 90_000;
+        List<ColumnSpec> columns = List.of(ColumnSpec.of("v", "Int64"));
+        List<Object[]> data = new ArrayList<>(rows);
+        for (int i = 0; i < rows; i++) {
+            data.add(new Object[]{(long) (i % distinct)});
+        }
+        try (DuckDbSession db = new DuckDbSession();
+             ArrowTable table = ArrowTable.of(columns, data)) {
+            String name = db.load(table, "profile_low_cardinality");
+            LazyPlan plan = new LazyPlan(db, "SELECT * FROM " + DuckDbSession.quote(name), columns);
+
+            ProfileData profile = plan.profile();
+
+            assertEquals(rows, profile.rows());
+            assertEquals(distinct, profile.columns().get(0).distinct(),
+                    "90k distinct values are below the cap, so the exact count must be returned");
         }
     }
 

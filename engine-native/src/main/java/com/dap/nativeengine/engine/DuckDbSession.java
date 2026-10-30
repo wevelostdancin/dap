@@ -26,6 +26,8 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public final class DuckDbSession implements AutoCloseable {
     private static final int MAX_DISTINCT = 100_000;
+    /** Sketch estimates this close to the cap are refined with an exact count (~5 % margin). */
+    private static final int REFINE_DISTINCT = MAX_DISTINCT + MAX_DISTINCT / 20;
 
     private final DuckDBConnection base;
     private final AtomicLong tableIds = new AtomicLong();
@@ -213,9 +215,9 @@ public final class DuckDbSession implements AutoCloseable {
             for (ColumnSpec column : columns) {
                 String quoted = quote(column.name());
                 String projected = "CAST(" + quoted + " AS VARCHAR)";
-                // KNIME counts distinct exactly up to 100k rows per column; above that the
-                // approximate sketch is allowed to differ (PARITY.md §6.3). Decide from the
-                // single COUNT(*) taken for the whole plan, not from a count per column.
+                // KNIME counts distinct exactly up to 100k distinct values per column; above
+                // that the approximate sketch is allowed to differ (PARITY.md §6.3). Decide
+                // from the single COUNT(*) taken for the whole plan, not per column.
                 String distinctSql = rows > MAX_DISTINCT
                         ? "APPROX_COUNT_DISTINCT(" + quoted + ")"
                         : "COUNT(DISTINCT " + quoted + ")";
@@ -231,12 +233,27 @@ public final class DuckDbSession implements AutoCloseable {
                     Double min = column.numeric() ? asDouble(result.getObject("min_value")) : null;
                     Double max = column.numeric() ? asDouble(result.getObject("max_value")) : null;
                     Double mean = column.numeric() ? asDouble(result.getObject("mean_value")) : null;
+                    if (rows > MAX_DISTINCT && distinct <= REFINE_DISTINCT) {
+                        // The sketch may only differ for genuinely large cardinality: when its
+                        // estimate is still near the cap, refine to the exact count so the
+                        // "exact up to 100k" promise survives the sketch's ~3-5 % error. This
+                        // runs after every column stat was read, because it closes the ResultSet.
+                        distinct = exactDistinct(statement, sql, quoted);
+                    }
                     profile.add(new ProfileColumn(column.name(), column.knimeType(), missing, distinct, min, max, mean));
                 }
             }
             return new ProfileData(rows, profile);
         } finally {
             endRead(connection);
+        }
+    }
+
+    private static long exactDistinct(Statement statement, String sql, String quoted) throws SQLException {
+        try (ResultSet result = statement.executeQuery(
+                "SELECT COUNT(DISTINCT " + quoted + ") FROM (" + LazyPlan.stripSemicolon(sql) + ") AS dap_plan")) {
+            result.next();
+            return result.getLong(1);
         }
     }
 

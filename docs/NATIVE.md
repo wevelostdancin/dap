@@ -190,7 +190,7 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
 | `csv_reader` принимает реальный путь к файлу | Детерминированный IO. Сокращение `dataset` из корпуса — забота parity-раннера, не узла |
 | `run` ленивый: строится план, SELECT-ы не выполняются | Sync-run может завершиться без материализации. Исключение — `csv_reader`: он читает файл и загружает таблицу уже на run |
 | `/table` и `/profile` материализуют результат | Вся стоимость — в этих запросах; `profile` делает полный проход и агрегаты |
-| Отмена — через закрытие job-connection | Работает, когда запрос идёт на этом соединении. `/table` и `/profile` открывают свои соединения и этим механизмом не покрыты |
+| Отмена — через закрытие соединения | Job-connection закрывается на cancel/timeout; materialization-соединения `/table`/`/profile` учитываются в сессии и закрываются при `close()`, `interruptReads(workflowId)` и teardown-е сессии (Фаза 2) |
 
 ## 5. Приёмка Фазы 1
 
@@ -198,24 +198,45 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
 
 | Пункт | Статус | Комментарий |
 |---|---|---|
-| `make build-native` → `target/dap-native.jar` | да | jar 44,1 МиБ: shade оставляет только native-библиотеку платформы сборки, `-Ddap.duckdb.native=all` возвращает все четыре; `make test-native` — 114 тестов |
+| `make build-native` → `target/dap-native.jar` | да | jar 44,1 МиБ: shade оставляет только native-библиотеку платформы сборки, `-Ddap.duckdb.native=all` возвращает все четыре |
 | `make run-native` стартует < 2 с | да | 410–500 мс от `java -jar` до health 200 |
 | `/v1/health` → `nodes=10` | да | живые счётчики registry/store/sessions; `coreNodes=10` |
 | Workflow из 3 узлов end-to-end | да | `csv_reader → missing_value → column_filter → row_filter → sorter`; 5 узлов, 3 строки |
 | `table` отдаёт данные, `profile` считается | да | строки/типы/NULL/`""`, `missing`/`distinct`/`min/max/mean` |
 | Health 200 во время 10-секундного sync-run | да | 1 мс при `dap.test.slowMs=10000`; job остаётся `running` |
 | `grep -r "org.knime" engine-native/` пуст | да | проверяется `scripts/check_repo.py` |
-| `mvn test` зелёный | да | 114 тестов, 0 падений |
+| `mvn test` зелёный | да | 114 тестов на момент приёмки Фазы 1; 175 после Фазы 2 (§5.1) |
 | все маршруты frozen-контракта отвечают | да | 25 операций OpenAPI зарегистрированы; `tests/native_smoke.py` — 9/9 |
+
+## 5.1 Приёмка Фазы 2
+
+Пункты из [ROADMAP-NATIVE.md](ROADMAP-NATIVE.md) §5; проверено на `phase2-native`.
+
+| Пункт | Статус | Комментарий |
+|---|---|---|
+| 10/10 узлов | да | `excel_reader`, `group_by`, `joiner`, `string_manipulation`, `math_formula` добавлены к пяти пилотным |
+| `configSchema` в `/v1/nodes/{id}/dialog` для 10 узлов | да | `available: true` у всех 10; `available: false`/reason остаётся для будущих волн |
+| 8 dual-run workflow ≥ 90 % ячеек | да | `tests/parity.py --engine native`: 12/12 workflow ok, `matching cells 1563/1563 (100 %)` |
+| 4 native-only workflow | да | `expect`/`expect_profile`/`equivalent` (`wf-05`, `wf-10`, `wf-n1`, `wf-n2`) зелёные на живом движке |
+| dataset-shorthand в раннере | да | `{"dataset": ...}` → `dap.csv_reader`/`excel_reader` с абсолютным путём и схемой из `datasets.json` |
+| profile distinct cap 100k | да | точный `COUNT(DISTINCT)` до 100k различных значений, выше — sketch + досчёт у границы (§6) |
+| отмена `/table`//`/profile` | да | `interruptReads(workflowId)` + закрытие сессии; замер: прерывание за 0–1 мс |
+| jar < 50 МБ | да | 46 246 388 Б ≈ 44,1 МиБ (одна платформенная native-библиотека) |
+| тесты и smoke | да | `mvn test` — 175 тестов, 0 падений; `tests/native_smoke.py` — 9/9; `tests/test_parity_native.py` — 27/27 |
 
 ## 6. Дальше и риски
 
-- **5 недоступных узлов:** `excel_reader`, `group_by`, `joiner`, `string_manipulation`,
-  `math_formula` — Фаза 2; в каталоге уже `available:false`.
-- **Parity-раннер:** `tests/parity.py --engine native` пока заглушка; native-прогон корпуса —
-  Фаза 2. `csv_reader` требует реальный путь; подстановка dataset — задача раннера.
-- **Profile distinct:** `MAX_DISTINCT = 100_000` объявлен, но пока не используется: всегда
-  точный `COUNT(DISTINCT)`; порог/`APPROX_COUNT_DISTINCT` — Фаза 2 (API/PARITY обещают 100k).
+- **Все 10 узлов доступны; патчи волн A–C — единственные оставшиеся узлы.** `excel_reader`
+  реализован без Apache POI (лимит jar): JDK `zip`+`StAX`, поддерживаются `inlineStr`,
+  shared strings (rich-text склеивается), числа, boolean, error→NULL, ISO-даты и даты по
+  `numFmtId`; `.xls`, шифрованные книги и формулы без кэша не читаются (формула берётся
+  из кэшированного значения).
+- **Parity-раннер:** `tests/parity.py --engine native` исполняет корпус (12/12, 100 % ячеек);
+  `dataset`-shorthand разворачивает раннер, а не узел: `csv_reader` требует реальный путь.
+- **Profile distinct:** точный `COUNT(DISTINCT)` при `rows <= 100 000`; выше — `APPROX_COUNT_DISTINCT`,
+  и если оценка `<= 105 000`, значение досчитывается точно, чтобы обещание «точно до 100k
+  различных» выдерживалось. DuckDB 1.5.6 использует HLL P=10 (σ ≈ 3,2 %, измерено ≤ 5 %),
+  поэтому 1 %-допуск PARITY заменён на измеренный.
 - **Исходные таблицы:** `csv_reader` заменяет одну стабильную таблицу на узел
   (`CREATE OR REPLACE`), поэтому ре-раны не копят копии; eviction по сессии всё ещё нет.
 - **Размер jar:** 44,1 МиБ: shade оставляет native-библиотеку платформы сборки (macOS →
@@ -226,8 +247,10 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
   (менять выбор и пересобирать нужно с `clean package`: shade не пересобирает уже
   shaded jar).
 - **Polars:** порог — ≥2× на конкретном узле; бенчмарка ещё нет, поэтому остаёмся на DuckDB.
-- **Отмена материализации:** `/table`/`/profile` открывают свои соединения и не покрыты
-  job-cancel; чтобы отменять долгий preview/profile, нужен хэндл запроса, привязанный к job.
+- **Отмена материализации:** `DuckDbSession` учитывает активные `/table`/`/profile`-чтения
+  (соединение + workflow + node); `close()` сессии, `POST /v1/shutdown` и
+  `DELETE /v1/jobs/{id}` (через `interruptReads(workflowId)`) закрывают их и прерывают нативный
+  запрос за 0–1 мс. Отмена job при этом не трогает чужие workflow.
 - **Отмена узлов, игнорирующих interrupt:** job-состояние всё равно терминально
   (watchdog/cancel), но run-поток может жить до возврата нативного вызова.
 - **Файловая граница:** `csv_reader` читает любой путь, доступный процессу; auth в пилоте
@@ -237,7 +260,10 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
 - **Расхождения, зафиксированные замерами:** `registerArrowStream` public, но требует
   `arrow-c-data` (zero-copy не используется); `allow_quoted_nulls=false` различает
   `""` и NULL, но DAP всё равно парсит CSV сам; роадмап говорит `conn.interrupt()`, код
-  закрывает job-connection; `dap.sorter` теперь принимает и `binary`, и `nocase`; описание
+  закрывает соединения; `dap.sorter` принимает `natural` (по умолчанию), `binary` и `nocase`;
+  `dap.joiner` при `merge_keys` берёт `COALESCE(left, right)`, чтобы right-only строка не
+  теряла ключ; `dap.math_formula` выводит тип через `DESCRIBE ... LIMIT 0` на отдельном
+  короткоживущем соединении (bind-only, не отменяется job-cancel); описание
   `emptyStringIsNull` в спеке исправлено.
 - **Осознанные отличия HTTP-слоя:** legacy-алиасы без `/v1` (например, `GET /health`) не
   зарегистрированы — канонический контракт только `/v1/*`; sync-run выполняется на
