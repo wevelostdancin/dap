@@ -19,19 +19,19 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tests")
 
 import dap_client as dap
 
-NATIVE_NODES = 10
-AVAILABLE_NODES = {
-    "dap.csv_reader",
-    "dap.row_filter",
-    "dap.column_filter",
-    "dap.sorter",
-    "dap.missing_value",
-    "dap.excel_reader",
-    "dap.group_by",
-    "dap.joiner",
-    "dap.string_manipulation",
-    "dap.math_formula",
-}
+SPECS = pathlib.Path(__file__).resolve().parent.parent / "engine-native" / "src" / "main" / "resources" / "specs"
+
+
+def _specs():
+    index = SPECS / "index.txt"
+    names = [line.strip() for line in index.read_text(encoding="utf-8").splitlines()
+             if line.strip() and not line.strip().startswith("#")]
+    return [json.loads((SPECS / name).read_text(encoding="utf-8")) for name in names]
+
+
+_SPECS = _specs()
+NATIVE_NODES = len(_SPECS)
+AVAILABLE_NODES = {spec["id"] for spec in _SPECS if spec.get("available", True)}
 
 
 def columns(body):
