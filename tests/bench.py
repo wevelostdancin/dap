@@ -222,21 +222,50 @@ def read_rss(pid):
         return None
 
 
-class RssSampler(threading.Thread):
-    """Samples ps -o rss= until stopped; keeps the maximum in peak."""
+def read_heap(base):
+    """JVM heap (usedMb, maxMb) from /v1/health; the roadmap's RAM formula lives here.
 
-    def __init__(self, pid, interval):
+    /health reports Runtime.totalMemory()-freeMemory(), which is the metric the roadmap
+    specifies for the 10M run. A separate short connection keeps the sampler thread away
+    from the client's keep-alive socket.
+    """
+    try:
+        with urllib.request.urlopen(base + "/v1/health", timeout=2) as response:
+            memory = (json.loads(response.read().decode("utf-8")) or {}).get("memory") or {}
+        used = memory.get("usedMb")
+        maximum = memory.get("maxMb")
+        return (float(used) if used is not None else None,
+                float(maximum) if maximum is not None else None)
+    except (OSError, ValueError, AttributeError):
+        return None, None
+
+
+class RssSampler(threading.Thread):
+    """Samples ps RSS and /health heap until stopped; keeps both maxima."""
+
+    def __init__(self, pid, base, interval):
         super().__init__(name="dap-bench-rss", daemon=True)
         self.pid = pid
+        self.base = base
         self.interval = interval
         self.peak = None
+        self.heap_peak_mb = None
+        self.heap_max_mb = None
         self._stop = threading.Event()
+
+    def sample(self):
+        value = read_rss(self.pid)
+        if value is not None and (self.peak is None or value > self.peak):
+            self.peak = value
+        used, maximum = read_heap(self.base)
+        if used is not None and (self.heap_peak_mb is None or used > self.heap_peak_mb):
+            self.heap_peak_mb = used
+        if maximum is not None:
+            self.heap_max_mb = maximum
 
     def run(self):
         while not self._stop.wait(self.interval):
-            value = read_rss(self.pid)
-            if value is not None and (self.peak is None or value > self.peak):
-                self.peak = value
+            self.sample()
 
     def stop(self):
         self._stop.set()
@@ -499,6 +528,8 @@ def csv_section(client, args, workdir, sampler, errors):
         "profileSourceMs": round(source_ms, 1),
         "profileSourceRows": observed_rows,
         "rssPeakBytes": None if sampler is None else read_rss(sampler.pid),
+        "heapPeakMb": None if sampler is None else sampler.heap_peak_mb,
+        "heapMaxMb": None if sampler is None else sampler.heap_max_mb,
         "note": ("sync-run measures ingestion (csv_reader is the only eager node); "
                  "/table on the final node materializes the SQL pipeline, so "
                  "totalMs = runMs + tableMs approximates end-to-end"),
@@ -580,11 +611,12 @@ def new_report(args, only, java):
         },
         "environment": environment,
         "service": {"ran": False, "mode": None, "base": None, "startupMs": None,
-                    "rssIdleBytes": None},
+                    "rssIdleBytes": None, "heapIdleMb": None},
         "cold": {"ran": False, "runsMs": None, "medianMs": None, "minMs": None, "maxMs": None},
         "csv": {"ran": False},
         "branches": {"ran": False},
         "errors": [],
+        "notes": [],
     }
 
 
@@ -766,22 +798,29 @@ def main(argv=None):
                     raise BenchError("service did not answer /v1/health within %.0fs "
                                      "(log: %s)" % (args.start_timeout, log_path))
                 startup_ms = (time.monotonic() - started) * 1000.0
-                sampler = RssSampler(proc.pid, args.rss_interval)
-                sampler.start()
-                sampler.peak = read_rss(proc.pid)
-                idle_rss = sampler.peak
                 client = Client(base, args.timeout)
+                sampler = RssSampler(proc.pid, base, args.rss_interval)
+                sampler.start()
+                sampler.sample()
+                idle_rss = sampler.peak
                 report["service"] = {"ran": True, "mode": "spawned", "base": base,
                                      "startupMs": round(startup_ms, 1),
-                                     "rssIdleBytes": idle_rss, "log": log_path}
+                                     "rssIdleBytes": idle_rss,
+                                     "heapIdleMb": sampler.heap_peak_mb, "log": log_path}
 
             if "csv" in args.only:
                 result = csv_section(client, args, workdir, sampler, report["errors"])
                 if sampler is not None:
                     result["rssPeakBytes"] = sampler.peak
-                    if sampler.peak is None:
+                    result["heapPeakMb"] = sampler.heap_peak_mb
+                    result["heapMaxMb"] = sampler.heap_max_mb
+                    if sampler.peak is None and sampler.heap_peak_mb is None:
                         report["errors"].append(
-                            "peak RSS unavailable: ps -o rss= failed for pid %d" % proc.pid)
+                            "no memory sample: ps and /v1/health both failed for pid %d" % proc.pid)
+                    elif sampler.peak is None:
+                        report["notes"].append(
+                            "RSS unavailable (ps blocked); JVM heap peak from /v1/health is reported "
+                            "as heapPeakMb, which is the roadmap RAM formula")
                 report["csv"] = result
                 args.csv_path = result["csv"]["path"]
             if "branches" in args.only:
