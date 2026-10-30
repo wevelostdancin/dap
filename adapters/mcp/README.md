@@ -26,6 +26,9 @@ DAP_SESSION=claude python3 adapters/mcp/dap_mcp.py
 | `DAP_PORT` | `7800` | порт движка |
 | `DAP_SESSION` | `default` | сессия агента, уходит заголовком `X-DAP-Session` в каждом запросе |
 | `DAP_BIND` | `127.0.0.1` | адрес движка; `0.0.0.0` и `::` для запросов заменяются на `127.0.0.1` |
+| `DAP_NATIVE` | — | `1` — поднимать нативный `dap-native.jar` вместо legacy KNIME |
+| `DAP_ENGINE` | — | `native` — то же, что `DAP_NATIVE=1`; иное значение — legacy |
+| `DAP_HEAP` | `2g` (native) | `-Xmx` для нативного jar; в legacy его читает сам `run.sh` (по умолчанию `3g`) |
 
 Базовый URL: `http://$DAP_BIND:$DAP_PORT`. Таймаут HTTP-запроса — 600 с.
 
@@ -34,12 +37,60 @@ DAP_SESSION=claude python3 adapters/mcp/dap_mcp.py
 При первом `tools/call` адаптер проверяет `GET /v1/health`:
 
 1. движок отвечает `200` — работаем с ним;
-2. не отвечает — запускает `bash "$DAP_HOME/scripts/run.sh"` (stdout и stderr — в
-   `$DAP_HOME/service.log`) и ждёт health до 60 с.
+2. не отвечает — запускает движок (stdout и stderr — в `$DAP_HOME/service.log`) и
+   ждёт health до 60 с:
+   - по умолчанию — `bash "$DAP_HOME/scripts/run.sh"` (legacy KNIME);
+   - при `DAP_NATIVE=1` или `DAP_ENGINE=native` — `java -Xmx$DAP_HEAP -jar
+     engine-native/target/dap-native.jar` (см. ниже).
 
 Уже запущенный сервис адаптер не перезапускает и не останавливает: при выходе
-движок продолжает работать. Если `run.sh` не найден или сервис не поднялся за
-60 с, инструмент вернёт JSON-RPC error `-32001` с путём к логу.
+движок продолжает работать. Если launcher (или нативный jar) не найден или сервис
+не поднялся за 60 с, инструмент вернёт JSON-RPC error `-32001` с путём к логу.
+
+## Нативный движок (dap-native)
+
+Фаза 3: адаптер умеет поднимать нативный движок вместо legacy KNIME. Протокол,
+имена и схемы инструментов не меняются, legacy остаётся режимом по умолчанию.
+
+```bash
+# один раз: собрать jar (нужен JDK 21)
+cd engine-native && ./mvnw -o -DskipTests package && cd ..
+
+# адаптер сам запустит jar при первом tools/call
+DAP_NATIVE=1 DAP_PORT=7923 DAP_SESSION=claude python3 adapters/mcp/dap_mcp.py
+```
+
+`DAP_ENGINE=native` — эквивалент. Java ищется в `$JAVA_HOME/bin/java`, иначе в `PATH`;
+jar — всегда `$DAP_HOME/engine-native/target/dap-native.jar`. Если jar нет, первый
+вызов вернёт `-32001` с командой сборки.
+
+Чем native отличается для агента:
+
+- каталог — 10 узлов с id `dap.*` (`dap.csv_reader`, `dap.sorter`, ...), а не 832 KNIME;
+- настройки — плоский JSON по `configKey` из `dap_node_dialog_schema`, без XML;
+- нет `runtime/knime`, `workspace/` и KNIME-рантайма; jar самодостаточен;
+- `DAP_BIND` для native — `127.0.0.1`, `localhost` или `0.0.0.0` (`::` движок не принимает);
+- `/v1` тот же (замороженный контракт), поэтому остальные инструменты и сессии
+  работают как раньше; legacy-алиасы без `/v1` (`GET /health`) в native не зарегистрированы;
+- sync `dap_run` в native не блокирует HTTP-диспетчер (виртуальный поток), но
+  `dap_run_async` + `dap_job_status` по-прежнему предпочтительны для долгих workflow;
+- файловые ридеры читают путь, доступный процессу jar (loopback, без auth).
+
+### Сквозная проверка (e2e)
+
+`tests/mcp_e2e.py` — stdlib-клиент MCP: поднимает адаптер с `DAP_NATIVE=1` на свободном
+порту, ждёт health, проходит `dap_workflow_create` → `dap_add_node` (csv_reader, sorter)
+→ `dap_connect` → `dap_run` → `dap_get_table` → `dap_delete_workflow`, проверяет
+отсортированные значения и гасит сервис через `POST /v1/shutdown`.
+
+```bash
+cd engine-native && ./mvnw -o -DskipTests package && cd ..
+python3 tests/mcp_e2e.py                  # порт 7923, общий лимит 120 с
+python3 tests/mcp_e2e.py --port 7924      # другой порт
+```
+
+Legacy KNIME не запускается, Docker не нужен. Код возврата 0 — успех, 1 — провал с
+сообщением; stderr адаптера печатается при ошибке.
 
 ## Подключение к агенту
 

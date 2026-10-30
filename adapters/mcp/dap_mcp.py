@@ -5,10 +5,12 @@
 адаптер ищет узлы, собирает workflow, запускает задания и читает таблицы.
 
 Если движок не отвечает на /v1/health, адаптер один раз запускает
-"$DAP_HOME/scripts/run.sh" и ждёт health до 60 с. Уже запущенный сервис
-не перезапускается и не останавливается.
+"$DAP_HOME/scripts/run.sh" (legacy KNIME) либо, при DAP_NATIVE=1 или
+DAP_ENGINE=native, "java -Xmx${DAP_HEAP:-2g} -jar engine-native/target/dap-native.jar",
+и ждёт health до 60 с. Уже запущенный сервис не перезапускается и не останавливается.
 
-Переменные окружения: DAP_HOME, DAP_PORT, DAP_SESSION, DAP_BIND.
+Переменные окружения: DAP_HOME, DAP_PORT, DAP_SESSION, DAP_BIND, DAP_NATIVE,
+DAP_ENGINE, DAP_HEAP.
 
 Транспорт: по одному JSON-объекту на строку в stdin, ответы — строки в stdout.
 Логи и трассировки — только в stderr, чтобы не ломать поток протокола.
@@ -36,6 +38,10 @@ SESSION = (os.environ.get("DAP_SESSION") or "default").strip() or "default"
 LOG = os.path.join(DAP_HOME, "service.log")
 TIMEOUT = 600
 START_WAIT = 60
+NATIVE = (os.environ.get("DAP_NATIVE") or "").strip() == "1" or \
+    (os.environ.get("DAP_ENGINE") or "").strip().lower() == "native"
+NATIVE_JAR = os.path.join(DAP_HOME, "engine-native", "target", "dap-native.jar")
+HEAP = (os.environ.get("DAP_HEAP") or "").strip() or "2g"
 
 
 class DapError(Exception):
@@ -57,22 +63,21 @@ def health() -> bool:
         return False
 
 
-def ensure_service() -> None:
-    """Поднять движок, если он ещё не запущен; чужой сервис не трогаем."""
-    if health():
-        return
-    script = os.path.join(DAP_HOME, "scripts", "run.sh")
-    if not os.path.isfile(script):
-        raise DapError(
-            f"движок DAP не отвечает на {BASE}/v1/health, а {script} не найден",
-            code=-32001,
-            data={"base": BASE, "dapHome": DAP_HOME},
-        )
-    env = dict(os.environ)
-    env.update({"DAP_HOME": DAP_HOME, "DAP_PORT": str(PORT), "DAP_BIND": BIND})
-    with open(LOG, "ab") as log:
+def _java() -> str:
+    """JAVA_HOME/bin/java, если он есть, иначе java из PATH."""
+    java_home = os.environ.get("JAVA_HOME")
+    if java_home:
+        candidate = os.path.join(java_home, "bin", "java")
+        if os.path.isfile(candidate):
+            return candidate
+    return "java"
+
+
+def _launch_native(env: dict, log) -> None:
+    cmd = [_java(), f"-Xmx{HEAP}", "-jar", NATIVE_JAR]
+    try:
         subprocess.Popen(
-            ["bash", script],
+            cmd,
             cwd=DAP_HOME,
             stdin=subprocess.DEVNULL,
             stdout=log,
@@ -80,6 +85,49 @@ def ensure_service() -> None:
             start_new_session=True,
             env=env,
         )
+    except OSError as e:
+        raise DapError(
+            f"не удалось запустить нативный движок ({cmd[0]}): {e}",
+            code=-32001,
+            data={"base": BASE, "jar": NATIVE_JAR},
+        )
+
+
+def ensure_service() -> None:
+    """Поднять движок, если он ещё не запущен; чужой сервис не трогаем."""
+    if health():
+        return
+    env = dict(os.environ)
+    env.update({"DAP_HOME": DAP_HOME, "DAP_PORT": str(PORT), "DAP_BIND": BIND})
+    if NATIVE:
+        if not os.path.isfile(NATIVE_JAR):
+            raise DapError(
+                f"движок DAP не отвечает на {BASE}/v1/health, а {NATIVE_JAR} не найден; "
+                "соберите jar: cd engine-native && ./mvnw -DskipTests package",
+                code=-32001,
+                data={"base": BASE, "jar": NATIVE_JAR, "dapHome": DAP_HOME},
+            )
+    else:
+        script = os.path.join(DAP_HOME, "scripts", "run.sh")
+        if not os.path.isfile(script):
+            raise DapError(
+                f"движок DAP не отвечает на {BASE}/v1/health, а {script} не найден",
+                code=-32001,
+                data={"base": BASE, "dapHome": DAP_HOME},
+            )
+    with open(LOG, "ab") as log:
+        if NATIVE:
+            _launch_native(env, log)
+        else:
+            subprocess.Popen(
+                ["bash", script],
+                cwd=DAP_HOME,
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=log,
+                start_new_session=True,
+                env=env,
+            )
     deadline = time.time() + START_WAIT
     while time.time() < deadline:
         if health():
