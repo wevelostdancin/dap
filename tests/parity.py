@@ -90,7 +90,7 @@ def load_corpus(only=None):
 ROW_FILTER_OPS = {"eq", "ne", "lt", "le", "gt", "ge", "is_null", "not_null"}
 AGGREGATIONS = {"mean", "count", "sum"}
 LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "sorter",
-                 "group_by", "joiner", "column_filter", "missing_value",
+                 "group_by", "joiner", "column_filter", "column_renamer", "missing_value",
                  "string_manipulation", "math_formula"}
 CHECK_KINDS = {"table", "profile", "equivalent", "expect", "expect_profile"}
 
@@ -173,6 +173,13 @@ def validate_corpus(workflows, datasets):
             elif node_type == "column_filter":
                 if not (config.get("include") or config.get("exclude")):
                     problems.append("%s/%s: column_filter needs include[] or exclude[]" % (workflow_id, node_id))
+            elif node_type == "column_renamer":
+                renames = config.get("renames")
+                if not isinstance(renames, list):
+                    problems.append("%s/%s: column_renamer needs renames[]" % (workflow_id, node_id))
+                for rename in renames or []:
+                    if not rename.get("from") or not rename.get("to"):
+                        problems.append("%s/%s: rename needs from+to" % (workflow_id, node_id))
             elif node_type == "joiner":
                 if not config.get("left_keys") or not config.get("right_keys"):
                     problems.append("%s/%s: joiner needs left_keys+right_keys" % (workflow_id, node_id))

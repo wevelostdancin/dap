@@ -17,24 +17,25 @@ class NodeRegistryTest {
     private final NodeRegistry registry = new NodeRegistry();
 
     @Test
-    void loadsExactlyTenUniqueSpecs() {
-        assertEquals(10, registry.size());
+    void loadsExactlyElevenUniqueSpecs() {
+        assertEquals(11, registry.size());
         List<String> ids = registry.all().stream().map(NodeSpec::id).toList();
-        assertEquals(10, new HashSet<>(ids).size(), "node ids must be unique");
+        assertEquals(11, new HashSet<>(ids).size(), "node ids must be unique");
         assertEquals(Set.of("dap.csv_reader", "dap.row_filter", "dap.column_filter", "dap.sorter",
                         "dap.missing_value", "dap.excel_reader", "dap.group_by", "dap.joiner",
-                        "dap.string_manipulation", "dap.math_formula"),
+                        "dap.string_manipulation", "dap.math_formula", "dap.column_renamer"),
                 new HashSet<>(ids));
     }
 
     @Test
-    void everyPilotSpecIsAvailable() {
-        assertEquals(10, registry.availableCount());
+    void everySpecIsAvailable() {
+        assertEquals(11, registry.availableCount());
         Set<String> available = new HashSet<>();
         registry.all().stream().filter(NodeSpec::available).forEach(spec -> available.add(spec.id()));
         assertEquals(Set.of("dap.csv_reader", "dap.row_filter", "dap.column_filter",
                 "dap.sorter", "dap.missing_value", "dap.excel_reader", "dap.group_by",
-                "dap.joiner", "dap.string_manipulation", "dap.math_formula"), available);
+                "dap.joiner", "dap.string_manipulation", "dap.math_formula",
+                "dap.column_renamer"), available);
     }
 
     @Test
@@ -95,6 +96,7 @@ class NodeRegistryTest {
                 registry.require("dap.csv_reader").settingKeys());
         assertEquals(Set.of("logic", "where"), registry.require("dap.row_filter").settingKeys());
         assertEquals(Set.of("include", "exclude"), registry.require("dap.column_filter").settingKeys());
+        assertEquals(Set.of("renames"), registry.require("dap.column_renamer").settingKeys());
         assertEquals(Set.of("keys", "collation"), registry.require("dap.sorter").settingKeys());
         assertEquals(Set.of("rules"), registry.require("dap.missing_value").settingKeys());
         assertEquals(Set.of("file", "sheet", "header", "columns", "emptyStringIsNull"),
@@ -161,6 +163,10 @@ class NodeRegistryTest {
         JsonNode missingRule = property("dap.missing_value", "rules").path("items");
         assertEquals("string", missingRule.path("properties").path("column").path("type").asText());
 
+        JsonNode rename = property("dap.column_renamer", "renames").path("items");
+        assertEquals("string", rename.path("properties").path("from").path("type").asText());
+        assertEquals("string", rename.path("properties").path("to").path("type").asText());
+
         JsonNode output = property("dap.math_formula", "outputs").path("items");
         assertEquals("string", output.path("properties").path("name").path("type").asText());
         assertEquals("string", output.path("properties").path("expression").path("type").asText());
@@ -200,8 +206,8 @@ class NodeRegistryTest {
 
     @Test
     void limitCapsTheResultInNameOrder() {
-        assertEquals(10, registry.search(null, null, -1).size());
-        assertEquals(List.of("Column Filter", "CSV Reader", "Excel Reader"),
+        assertEquals(11, registry.search(null, null, -1).size());
+        assertEquals(List.of("Column Filter", "Column Renamer", "CSV Reader"),
                 registry.search(null, null, 3).stream().map(NodeSpec::name).toList());
         assertTrue(registry.search(null, null, 0).isEmpty());
     }

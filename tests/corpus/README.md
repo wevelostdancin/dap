@@ -1,4 +1,4 @@
-# Corpus — 12 workflows для dual-run parity
+# Corpus — 13 workflows для dual-run parity
 
 Корпус описывает **реальные аналитические сценарии**, а не проверку API: фильтрация,
 группировка, соединение, производные колонки, очистка NULL. Каждый workflow — JSON без
@@ -18,10 +18,11 @@ wf-09-empty-result.json            IRIS   filter matching nothing (schema stays)
 wf-10-iris-pipeline.json           IRIS   native-only: 5-node chain with a formula
 wf-n1-csv-source.json              native-only: csv_reader equivalence
 wf-n2-excel-source.json            native-only: excel_reader equivalence
+wf-n3-iris-renamer.json            IRIS   native-only: column_renamer + mean by species
 data/                              фикстуры + datasets.json (схема, NULL, строки)
 ```
 
-8 workflow исполняются на oracle (`dual-run`); 4 помечены `native-only` с причиной
+8 workflow исполняются на oracle (`dual-run`); 5 помечены `native-only` с причиной
 `oracle_skip_reason` — для них baseline хранит `status: skipped`, а проверки
 (`expect`, `expect_profile`, `equivalent`) исполняются в Phase 2 на native.
 
@@ -64,6 +65,7 @@ data/                              фикстуры + datasets.json (схема,
 | `group_by` | `{"keys": [<колонка>], "aggregations": [{"column", "fn": "mean"\|"count"\|"sum"}]}` | **ровно один** ключ и один агрегат (oracle) |
 | `joiner` | `{"how": "inner"\|"left", "left_keys": [], "right_keys": [], "merge_keys": bool}` | в корпусе только `inner` |
 | `column_filter` | `{"exclude": []}` | `include` не выражается в oracle |
+| `column_renamer` | `{"renames": [{"from": "<колонка>", "to": "<новое имя>"}]}` | native-only: у oracle нет биндинга |
 | `missing_value` | `{"rules": [{"column", "method": "constant", "value": <литерал>}]}` | один столбец, только `constant` |
 | `string_manipulation` | `{"column", "op": "upper", "mode": "replace"}` | в корпусе только `upper` |
 | `math_formula` | `{"outputs": [{"name", "expression": "<арифметика над числовыми колонками>"}]}` | native-only (oracle-блокер) |

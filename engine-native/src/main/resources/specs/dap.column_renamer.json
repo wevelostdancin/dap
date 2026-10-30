@@ -1,0 +1,61 @@
+{
+  "id": "dap.column_renamer",
+  "name": "Column Renamer",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Renames columns in place. Renames are applied simultaneously, keep the input order and types, and add no data copy.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Column Renamer configuration",
+    "additionalProperties": false,
+    "properties": {
+      "renames": {
+        "type": "array",
+        "title": "Renames",
+        "description": "Pairs of an existing input column and its new name; omitted columns keep their names.",
+        "items": {
+          "type": "object",
+          "title": "Rename",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "string",
+              "title": "From",
+              "description": "Name of the input column to rename."
+            },
+            "to": {
+              "type": "string",
+              "title": "To",
+              "description": "New column name; it must not duplicate another output column."
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        }
+      }
+    },
+    "required": [
+      "renames"
+    ]
+  }
+}
