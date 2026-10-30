@@ -654,6 +654,30 @@ class NativeServiceTest {
     }
 
     @Test
+    void debugReportsEffectiveDuckDbResources() throws Exception {
+        Path spill = tempDir.resolve("spill");
+        NativeService limited = startService(
+                new NativeService.Settings(100, 600, "127.0.0.1", 0, "1GB", 2, spill.toString()),
+                new NodeRegistry(), NativeService.defaultExecutors());
+        extras.add(limited);
+
+        String workflow = createWorkflow("resources");
+        addNode(workflow, "dap.csv_reader", csvSettings(csvFile()));
+        Resp run = post("/v1/workflows/" + workflow + "/run", Map.of());
+        assertEquals(200, run.status(), run.raw().body());
+
+        Resp debug = get("/v1/workflows/" + workflow + "/debug");
+        assertEquals(200, debug.status());
+        assertEquals(workflow, debug.body().path("workflow").asText());
+        JsonNode duckdb = debug.body().path("duckdb");
+        assertTrue(duckdb.isObject(), debug.body().toString());
+        assertEquals(2, duckdb.path("threads").asInt());
+        assertEquals(spill.toString(), duckdb.path("tempDirectory").asText());
+        assertTrue(duckdb.path("memoryLimit").asText().endsWith("MiB"), duckdb.toString());
+        assertTrue(Files.isDirectory(spill), "the session must create the configured temp directory");
+    }
+
+    @Test
     void shutdownStopsTheService() throws Exception {
         Resp response = post("/v1/shutdown", Map.of());
         assertEquals(200, response.status());

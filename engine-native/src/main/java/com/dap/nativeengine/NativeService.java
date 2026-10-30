@@ -38,17 +38,40 @@ public final class NativeService implements AutoCloseable {
     private static final String ERROR_BODY_ATTRIBUTE = "dap.errorBody";
 
     /** Service configuration; production defaults come from the DAP_* environment. */
-    public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port) {
-        public static Settings fromEnv() {
-            return new Settings(
-                    intEnv("DAP_MAX_WORKFLOWS", 100),
-                    intEnv("DAP_JOB_TIMEOUT", 600),
-                    System.getenv().getOrDefault("DAP_BIND", "127.0.0.1"),
-                    intEnv("DAP_PORT", 7800));
+    public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
+                           String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory) {
+        public Settings {
+            duckdbMemoryLimit = blankToNull(duckdbMemoryLimit);
+            duckdbTempDirectory = blankToNull(duckdbTempDirectory);
+            if (duckdbThreads != null && duckdbThreads <= 0) {
+                throw new IllegalArgumentException(
+                        "DAP_DUCKDB_THREADS must be a positive integer, got " + duckdbThreads);
+            }
         }
 
-        private static int intEnv(String name, int fallback) {
-            String raw = System.getenv(name);
+        /** Phase-1/2 tests build the HTTP settings only; DuckDB resources stay at their defaults. */
+        public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port) {
+            this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, null, null, null);
+        }
+
+        public static Settings fromEnv() {
+            return fromEnv(System.getenv());
+        }
+
+        /** Environment snapshot, injectable for tests; {@link #fromEnv()} is the only caller of System.getenv. */
+        static Settings fromEnv(Map<String, String> env) {
+            return new Settings(
+                    intEnv(env, "DAP_MAX_WORKFLOWS", 100),
+                    intEnv(env, "DAP_JOB_TIMEOUT", 600),
+                    env.getOrDefault("DAP_BIND", "127.0.0.1"),
+                    intEnv(env, "DAP_PORT", 7800),
+                    env.get("DAP_DUCKDB_MEMORY_LIMIT"),
+                    positiveIntEnv(env, "DAP_DUCKDB_THREADS"),
+                    env.get("DAP_DUCKDB_TEMP_DIR"));
+        }
+
+        private static int intEnv(Map<String, String> env, String name, int fallback) {
+            String raw = env.get(name);
             if (raw == null || raw.isBlank()) {
                 return fallback;
             }
@@ -57,6 +80,23 @@ public final class NativeService implements AutoCloseable {
             } catch (NumberFormatException ignored) {
                 return fallback;
             }
+        }
+
+        private static Integer positiveIntEnv(Map<String, String> env, String name) {
+            String raw = env.get(name);
+            if (raw == null || raw.isBlank()) {
+                return null;
+            }
+            try {
+                return Integer.parseInt(raw.strip());
+            } catch (NumberFormatException failure) {
+                throw new IllegalArgumentException(
+                        name + " must be a positive integer, got '" + raw.strip() + "'", failure);
+            }
+        }
+
+        private static String blankToNull(String value) {
+            return value == null || value.isBlank() ? null : value.strip();
         }
     }
 
@@ -264,7 +304,8 @@ public final class NativeService implements AutoCloseable {
             System.err.println("dap-native: unsupported DAP_BIND " + bind);
             System.exit(2);
         }
-        Settings settings = new Settings(defaults.maxWorkflows(), defaults.defaultJobTimeoutSec(), bind, port);
+        Settings settings = new Settings(defaults.maxWorkflows(), defaults.defaultJobTimeoutSec(), bind, port,
+                defaults.duckdbMemoryLimit(), defaults.duckdbThreads(), defaults.duckdbTempDirectory());
         NativeService service = new NativeService(settings, new NodeRegistry(), defaultExecutors());
         Runtime.getRuntime().addShutdownHook(new Thread(service::close, "dap-shutdown-hook"));
         service.start(port);

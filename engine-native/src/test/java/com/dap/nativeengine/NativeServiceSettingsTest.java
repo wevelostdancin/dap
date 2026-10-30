@@ -1,0 +1,71 @@
+package com.dap.nativeengine;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** Parsing and validation of the DAP_* environment settings (DuckDB resources, Phase 3). */
+class NativeServiceSettingsTest {
+
+    @Test
+    void defaultSettingsLeaveDuckDbResourcesUnset() {
+        NativeService.Settings settings = NativeService.Settings.fromEnv(Map.of());
+        assertEquals(100, settings.maxWorkflows());
+        assertEquals(600, settings.defaultJobTimeoutSec());
+        assertEquals("127.0.0.1", settings.bindHost());
+        assertEquals(7800, settings.port());
+        assertNull(settings.duckdbMemoryLimit());
+        assertNull(settings.duckdbThreads());
+        assertNull(settings.duckdbTempDirectory());
+    }
+
+    @Test
+    void fourArgumentConstructorLeavesDuckDbResourcesUnset() {
+        NativeService.Settings settings = new NativeService.Settings(5, 30, "127.0.0.1", 7801);
+        assertNull(settings.duckdbMemoryLimit());
+        assertNull(settings.duckdbThreads());
+        assertNull(settings.duckdbTempDirectory());
+    }
+
+    @Test
+    void envNamesConfigureDuckDbResources() {
+        NativeService.Settings settings = NativeService.Settings.fromEnv(Map.of(
+                "DAP_DUCKDB_MEMORY_LIMIT", "2GB",
+                "DAP_DUCKDB_THREADS", "4",
+                "DAP_DUCKDB_TEMP_DIR", "/tmp/dap-duckdb"));
+        assertEquals("2GB", settings.duckdbMemoryLimit());
+        assertEquals(4, settings.duckdbThreads());
+        assertEquals("/tmp/dap-duckdb", settings.duckdbTempDirectory());
+    }
+
+    @Test
+    void blankDuckDbEnvValuesMeanUnset() {
+        NativeService.Settings settings = NativeService.Settings.fromEnv(Map.of(
+                "DAP_DUCKDB_MEMORY_LIMIT", "  ",
+                "DAP_DUCKDB_THREADS", "",
+                "DAP_DUCKDB_TEMP_DIR", "\t"));
+        assertNull(settings.duckdbMemoryLimit());
+        assertNull(settings.duckdbThreads());
+        assertNull(settings.duckdbTempDirectory());
+    }
+
+    @Test
+    void invalidThreadsEnvFailsLoudly() {
+        IllegalArgumentException notANumber = assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_DUCKDB_THREADS", "many")));
+        assertTrue(notANumber.getMessage().contains("DAP_DUCKDB_THREADS"), notANumber.getMessage());
+        assertTrue(notANumber.getMessage().contains("many"), notANumber.getMessage());
+
+        IllegalArgumentException zero = assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_DUCKDB_THREADS", "0")));
+        assertTrue(zero.getMessage().contains("DAP_DUCKDB_THREADS"), zero.getMessage());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_DUCKDB_THREADS", "-2")));
+    }
+}
