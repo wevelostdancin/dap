@@ -38,7 +38,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 ADAPTER = ROOT / "adapters" / "mcp" / "dap_mcp.py"
 JAR = ROOT / "engine-native" / "target" / "dap-native.jar"
 PROTOCOL = "2024-11-05"
-NATIVE_NODES = 10
+SPECS_INDEX = ROOT / "engine-native" / "src" / "main" / "resources" / "specs" / "index.txt"
 REQUIRED_TOOLS = {
     "dap_search_nodes",
     "dap_workflow_create",
@@ -222,9 +222,11 @@ def scenario(client, source, base):
                           timeout=client.deadline - time.monotonic())
     nodes = catalog.get("nodes") or []
     ids = [node.get("id") for node in nodes]
-    check(len(ids) == NATIVE_NODES,
-          "native catalog should expose %d nodes, got %d: %s"
-          % (NATIVE_NODES, len(ids), sorted(ids)))
+    expected = len([line for line in SPECS_INDEX.read_text(encoding="utf-8").splitlines()
+                    if line.strip() and not line.strip().startswith("#")])
+    check(len(ids) == expected,
+          "native catalog should expose one node per spec (%d), got %d: %s"
+          % (expected, len(ids), sorted(ids)))
     check(all(str(node_id).startswith("dap.") for node_id in ids),
           "non-native node ids in catalog: %s" % sorted(ids))
     check(health(base), "engine did not become healthy at %s" % base)

@@ -10,7 +10,7 @@
 |---|---|
 | `api/openapi-v1-frozen.yaml` | замороженный контракт `/v1` (байт-в-байт копия `openapi.yaml` на момент заморозки) |
 | `api/openapi-v1-frozen.sha256` | контрольная сумма замороженного контракта |
-| `tests/corpus/*.json` | 12 workflow, движко-нейтральное описание |
+| `tests/corpus/*.json` | 13 workflow, движко-нейтральное описание (8 dual-run + 5 native-only) |
 | `tests/corpus/data/` | фикстуры + `datasets.json` (схема, NULL, строки) |
 | `tests/baseline.json` | наблюдения oracle в **native-словаре** (после нормализации) |
 | `tests/parity.py` | dual-run harness (`--validate`, `--write-baseline`, `--check-baseline`) |
@@ -232,6 +232,11 @@ python3 tests/parity.py --engine native --base http://127.0.0.1:7911
   колонки, ячейки data и поля профиля из baseline; native-only не в счёт.
 - Прогон 30.10.2026 (Фаза 2): `12 workflows ok, 0 failed, 0 skipped; matching cells
   1563/1563 (100.0%)`, exit 0 — все dual-run и все native-only проверки зелёные.
+- Прогон 30.10.2026 (Фаза 3): корпус вырос до 13 workflow (`wf-n3-iris-renamer` добавлен
+  шаблоном `column_renamer`), результат — `13 workflows ok, 0 failed, 0 skipped;
+  matching cells 1563/1563 (100.0%)`; native-only проверки `wf-n3` (2 `expect`) зелёные.
+  `matching cells` считает только ячейки baseline dual-run, поэтому для `--only wf-n3`
+  выводится `0/0` при зелёных проверках.
 
 ## 8. Как перегенерировать baseline
 

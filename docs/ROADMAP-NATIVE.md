@@ -11,7 +11,7 @@
 | Артефакт | Состояние |
 |---|---|
 | `/v1` контракт | заморожен, `api/openapi-v1-frozen.yaml`, sha256 `e2225093…`, проверка в `make lint` |
-| Корпус | 12 workflow (`tests/corpus/`): 8 dual-run на oracle + 4 native-only |
+| Корпус | 13 workflow (`tests/corpus/`): 8 dual-run на oracle + 5 native-only (`wf-n3` — шаблон 11-го узла, Фаза 3) |
 | Baseline | `tests/baseline.json`, 20 наблюдений (таблицы + профили), воспроизводим 2/2 прогона |
 | Harness | `tests/parity.py`: `--validate`, `--write-baseline`, `--check-baseline`, `--engine native` (dual-run + native-only, dataset-shorthand) |
 | Правила сравнения | [PARITY.md](PARITY.md): float 1e-9, точные int/NULL, `""≠NULL`, ordered/unordered, типы |
@@ -145,8 +145,9 @@
 - все 12 workflow корпуса исполняются end-to-end.
 
 **Результат (30.10.2026):** все пункты выполнены на ветке `phase2-native`.
-`make test-native` — 181 тест, 0 падений; `tests/parity.py --engine native` —
-12/12 workflow ok, `matching cells 1563/1563 (100 %)`; `tests/native_smoke.py` — 9/9;
+`make test-native` — 181 тест, 0 падений (на момент закрытия Фазы 2);
+`tests/parity.py --engine native` — 12/12 workflow ok, `matching cells 1563/1563 (100 %)`
+(корпус вырос до 13 workflow в Фазе 3); `tests/native_smoke.py` — 9/9;
 `tests/test_parity_native.py` — 27/27; jar 44,1 МиБ (< 50 МБ) одной платформенной
 native-библиотекой; profile `distinct` точен до 100k различных значений, выше — sketch
 с досчётом у границы; `/table`/`/profile` отменяются через закрытие сессии и
@@ -173,7 +174,7 @@ native-библиотекой; profile `distinct` точен до 100k разл�
 | Волна | Узлы | Критерий входа |
 |---|---|---|
 | A — IO | csv_writer, table_reader/writer, excel_writer, json_reader | нужен агентам для выгрузки результатов |
-| B — manipulation | concatenate, row_splitter, column_renamer, column_resorter, duplicate_filter, rule_engine, полный набор string/math ops | частые запросы в сценариях |
+| B — manipulation | concatenate, row_splitter, column_resorter, duplicate_filter, rule_engine, полный набор string/math ops (`column_renamer` уже добавлен как шаблон 11-го узла — [MIGRATION.md](MIGRATION.md)) | частые запросы в сценариях |
 | C — analytics | row_aggregator, pivot, binner, normalizer, correlation, window, time series | после того как A/B стабильны |
 
 ## 8. Риски и меры
@@ -246,7 +247,8 @@ native-библиотекой; profile `distinct` точен до 100k разл�
 
 - [x] `joiner`, `string_manipulation`, `math_formula`, `excel_reader`
 - [x] dialog/profile, parity 100 % (порог ≥ 90 %), PARITY.md и NATIVE.md обновлены
-- [ ] bench.py, BENCH.md, Dockerfile, MIGRATION.md — Фаза 3
+- [x] `docs/MIGRATION.md` + 11-й узел `column_renamer` (Фаза 3)
+- [ ] bench.py, BENCH.md, Dockerfile — Фаза 3
 - [ ] MCP e2e — Фаза 3
 
 ## 13. Правила работы
