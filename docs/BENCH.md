@@ -174,33 +174,33 @@ job-соединении, поэтому parse перекрывается, а `C
     time docker run --rm -d --name dap-bench -p 7925:7800 dap-native
     curl -sf http://127.0.0.1:7925/v1/health
 
-### 4.2 Валидация харнесса (не пилотные числа)
+Замеры на том же стенде (jar 44,2 МиБ, `--heap 4g`), уже с прогреваемыми ветвями,
+измеренным per-run overhead и нормализованным `adjustedRatio`; 10M здесь не запускался.
 
-Замеры этой ветки на том же стенде, jar 44,2 МиБ, `-Xmx4g`;
-10M здесь не запускался.
-
-    python3 tests/bench.py --jar engine-native/target/dap-native.jar --port 7925 --rows 100000
-    python3 tests/bench.py --jar engine-native/target/dap-native.jar --port 7925 --rows 1000000 --branch-reps 3
+    python3 tests/bench.py --jar engine-native/target/dap-native.jar --port 7932 --rows 100000
+    python3 tests/bench.py --jar engine-native/target/dap-native.jar --port 7932 --rows 1000000 \
+        --branch-reps 3
 
 | Метрика | 100k | 1M (`--branch-reps 3`) |
 |---|---|---|
-| Cold start: медиана (min–max) | 466 мс (436–583) | 501 мс (482–576) |
-| Первый `/v1/health` после spawn | 436 мс | 726 мс |
-| Sync-run (ingest) | 123 мс | 1363 мс |
-| end-to-end (run + `/table`) | 132 мс | 1382 мс |
-| `/table` финального узла | 9,2 мс | 19,6 мс |
-| `/profile` финального узла | 15,5 мс | 27,5 мс |
-| `/profile` источника | 16,8 мс | 30,4 мс |
+| Cold start: медиана (min–max) | 490 мс (451–504) | 420 мс (394–424) |
+| Первый `/v1/health` после spawn | 493 мс | 389 мс |
+| Sync-run (ingest) | 477 мс | 844 мс |
+| end-to-end (run + `/table`) | 489 мс | 855 мс |
+| `/table` финального узла | 12 мс | 11 мс |
+| `/profile` финального узла | 23 мс | 18 мс |
+| `/profile` источника | 24 мс | 21 мс |
+| JVM heap peak (`/v1/health`) | 83 МиБ | 885 МиБ |
 | CSV-файл | 1,5 МиБ | 16,0 МиБ |
-| Ветви: parallel / sequential / ratio | 150 / 167 мс / 1,11× | 1731 / 1915 мс / 1,11× |
+| Ветви: parallel / sequential / ratio | 148 / 276 мс / 1,86× (1 пара) | 1143 / 1434 мс / 1,25× |
 | Peak RSS | `null` (в песочнице запрещён `ps`) | `null` |
 
-Наблюдения: первый ingest на 100k — 2,5 с против 0,12 с тёплого (JIT: warmup-прогон в
-`warmupRunsMs`); на 1M это 4,4 с против 1,4 с. Отношение ветвей на 1M стабильно ~1,1×:
-parse перекрывается, append сериализован (§2), поэтому потолок «2×» не достигается и числа
-не подгоняются. На 100k одиночный ingest ~83 мс, отношение шумит — харнесс предупреждает
-(`--branch-reps`).
-
+Наблюдения: 100k — один пара замеров без стабилизации медианы (`--branch-reps 1`), поэтому
+1,86× здесь — иллюстрация механики (parse перекрывается, append сериализован), а не
+устойчивое число; на 1M с 3 повторами — 1,25×. Per-run overhead измерен отдельно
+пустым workflow (0,8–3,1 мс) и на разрыв не влияет. На 10M доля serialized append растёт,
+поэтому ratio снижается (§4.1.1: 1,27× на 5M). Warmup-прогоны (JIT, первый CREATE TABLE)
+пишутся в `warmupRunsMs`: на 1M первый ingest ~4,4 с против 0,84 с прогретого.
 ### 4.3 Решение по Polars (принято по измеренным данным)
 
 Порог из ROADMAP §6: Polars — **только** если бенчмарк узла даёт ≥ 2× против DuckDB; иначе
