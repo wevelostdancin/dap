@@ -237,7 +237,7 @@ def read_heap(base):
         maximum = memory.get("maxMb")
         return (float(used) if used is not None else None,
                 float(maximum) if maximum is not None else None)
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, TypeError, AttributeError):
         return None, None
 
 
@@ -252,17 +252,24 @@ class RssSampler(threading.Thread):
         self.peak = None
         self.heap_peak_mb = None
         self.heap_max_mb = None
+        self._lock = threading.Lock()
         self._stop = threading.Event()
 
     def sample(self):
         value = read_rss(self.pid)
-        if value is not None and (self.peak is None or value > self.peak):
-            self.peak = value
         used, maximum = read_heap(self.base)
-        if used is not None and (self.heap_peak_mb is None or used > self.heap_peak_mb):
-            self.heap_peak_mb = used
-        if maximum is not None:
-            self.heap_max_mb = maximum
+        with self._lock:
+            if value is not None and (self.peak is None or value > self.peak):
+                self.peak = value
+            if used is not None and (self.heap_peak_mb is None or used > self.heap_peak_mb):
+                self.heap_peak_mb = used
+            if maximum is not None:
+                self.heap_max_mb = maximum
+
+    def snapshot(self):
+        """Consistent copy; the sampler thread only ever writes under this lock."""
+        with self._lock:
+            return {"rss": self.peak, "heap": self.heap_peak_mb, "heapMax": self.heap_max_mb}
 
     def run(self):
         while not self._stop.wait(self.interval):
@@ -536,20 +543,42 @@ def csv_section(client, args, workdir, sampler, errors):
         "profileRows": profile.get("rows"),
         "profileSourceMs": round(source_ms, 1),
         "profileSourceRows": observed_rows,
-        "rssPeakBytes": None if sampler is None else read_rss(sampler.pid),
-        "heapPeakMb": None if sampler is None else sampler.heap_peak_mb,
-        "heapMaxMb": None if sampler is None else sampler.heap_max_mb,
+        "rssPeakBytes": None if sampler is None else sampler.snapshot()["rss"],
+        "heapPeakMb": None if sampler is None else sampler.snapshot()["heap"],
+        "heapMaxMb": None if sampler is None else sampler.snapshot()["heapMax"],
         "note": ("sync-run measures ingestion (csv_reader is the only eager node); "
                  "/table on the final node materializes the SQL pipeline, so "
                  "totalMs = runMs + tableMs approximates end-to-end"),
     }
 
 
+def delete_workflow(client, workflow):
+    reply = client.request("DELETE", "/v1/workflows/%s" % workflow)
+    if reply.status not in (200, 404):
+        raise BenchError("delete workflow %s -> HTTP %s: %s"
+                         % (workflow, reply.status, short(reply.body)))
+
 def branches_section(client, args):
     parallel = create_workflow(client, "bench-branches-parallel")
     first = add_chain(client, parallel, args.csv_path, args.threshold)
     second = add_chain(client, parallel, args.csv_path, args.threshold)
     single = build_chain(client, "bench-branches-single", args.csv_path, args.threshold)
+
+    # Fixed per-run cost: an empty workflow still pays HTTP + job + reset.
+    overhead_wf = create_workflow(client, "bench-branches-overhead")
+    try:
+        overhead_runs = [run_workflow(client, overhead_wf, args.timeout)[0]
+                         for _ in range(3)]
+    finally:
+        delete_workflow(client, overhead_wf)
+    overhead = statistics.median(overhead_runs)
+
+    # Warmup: JIT, page cache and the first DuckDB table create, not measured.
+    warmup_runs = []
+    if args.warmup:
+        warmup_runs.append(round(run_workflow(client, single["workflow"], args.timeout)[0], 1))
+        warmup_runs.append(round(run_workflow(client, single["workflow"], args.timeout)[0], 1))
+        warmup_runs.append(round(run_workflow(client, parallel, args.timeout)[0], 1))
 
     sequential_runs = []
     parallel_runs = []
@@ -563,23 +592,33 @@ def branches_section(client, args):
     sequential = statistics.median(sequential_runs)
     concurrent = statistics.median(parallel_runs)
     ratio = sequential / concurrent if concurrent else None
+    adjusted_sequential = sequential - 2 * overhead
+    adjusted_parallel = concurrent - overhead
+    adjusted = (adjusted_sequential / adjusted_parallel
+                if adjusted_parallel > 0 else None)
     reason = ("DuckDbSession.loadInto serializes CREATE TABLE + DuckDBAppender "
               "on the shared job connection (docs/NATIVE.md 2.4), but CSV parsing "
               "runs before that lock: parsing overlaps, appending does not. The "
-              "ratio is therefore size-dependent (small files: parse dominates, "
-              "ratio > 1.0x; large files: serialized append dominates, ratio -> "
-              "1.0x). The measured ratio is reported as-is, not forced.")
+              "raw ratio also contains one per-run overhead less on the parallel "
+              "side, so adjustedRatio removes the measured empty-workflow cost "
+              "from both sides; even adjusted, a fully serialized ingest stays "
+              "below 2.0x. Numbers are reported as measured, not forced.")
     return {
         "ran": True,
         "workflow": parallel,
         "singleWorkflow": single["workflow"],
         "nodes": {"first": first, "second": second},
         "branchReps": args.branch_reps,
+        "warmupRunsMs": warmup_runs or None,
+        "overheadMs": round(overhead, 1),
+        "overheadRunsMs": [round(value, 1) for value in overhead_runs],
         "sequentialRunsMs": sequential_runs,
         "parallelRunsMs": parallel_runs,
         "sequentialMs": round(sequential, 1),
         "parallelMs": round(concurrent, 1),
         "ratio": None if ratio is None else round(ratio, 2),
+        "adjustedRatio": None if adjusted is None else round(adjusted, 2),
+        "ratioMeaning": "end-to-end speedup of one two-source DAG vs two single-source runs",
         "expectedIfFullySerialized": 1.0,
         "expectedIfFullyParallel": 2.0,
         "ingestSerialized": True,
@@ -670,24 +709,29 @@ def print_report(report):
     if csv["ran"]:
         source = csv["csv"]
         print("  csv %s rows%s   run %s   total %s   /table %s   /profile %s   "
-              "/profile(src) %s   rss peak %s" % (
+              "/profile(src) %s   heap peak %s   rss peak %s" % (
                   source["rows"], " (generated)" if source["generated"] else "",
                   ms(csv["runMs"]), ms(csv["totalMs"]), ms(csv["tableMs"]),
                   ms(csv["profileMs"]), ms(csv["profileSourceMs"]),
-                  mib(csv["rssPeakBytes"])))
+                  mib_mb(csv.get("heapPeakMb")), mib(csv["rssPeakBytes"])))
     else:
         print("  csv                   skipped")
 
     branches = report["branches"]
     if branches["ran"]:
         print("  branches (%d sources)  parallel %s   sequential %s   ratio %s   "
-              "(append serialized, parse overlaps)" % (
+              "adjusted %s (overhead %s, append serialized, parse overlaps)" % (
                   len(branches["nodes"]), ms(branches["parallelMs"]),
                   ms(branches["sequentialMs"]),
-                  "n/a" if branches["ratio"] is None else "%.2fx" % branches["ratio"]))
+                  "n/a" if branches["ratio"] is None else "%.2fx" % branches["ratio"],
+                  "n/a" if branches.get("adjustedRatio") is None
+                  else "%.2fx" % branches["adjustedRatio"],
+                  ms(branches.get("overheadMs"))))
     else:
         print("  branches              skipped")
 
+    for note in report["notes"]:
+        print("  note      %s" % note)
     for warning in report["errors"]:
         print("  warning   %s" % warning)
     print("")
@@ -703,6 +747,11 @@ def mib(value):
     if value is None:
         return "-"
     return "%.0f MiB" % (value / (1024.0 * 1024.0))
+
+
+def mib_mb(value):
+    """Value already in MiB (the /health heap peak), unlike mib() which takes bytes."""
+    return "-" if value is None else "%.0f MiB" % value
 
 
 # -------------------------------------------------------------------- main
@@ -759,6 +808,8 @@ def parse_args(argv):
         parser.error("--rows must be positive")
     if args.cold_runs < 1 or args.branch_reps < 1 or args.warmup < 0:
         parser.error("--cold-runs/--branch-reps must be positive; --warmup must be >= 0")
+    if not args.rss_interval > 0:
+        parser.error("--rss-interval must be positive (seconds between samples)")
     if not args.heap:
         parser.error("--heap must not be empty")
     return args
@@ -811,25 +862,32 @@ def main(argv=None):
                 sampler = RssSampler(proc.pid, base, args.rss_interval)
                 sampler.start()
                 sampler.sample()
-                idle_rss = sampler.peak
+                idle = sampler.snapshot()
                 report["service"] = {"ran": True, "mode": "spawned", "base": base,
                                      "startupMs": round(startup_ms, 1),
-                                     "rssIdleBytes": idle_rss,
-                                     "heapIdleMb": sampler.heap_peak_mb, "log": log_path}
+                                     "rssIdleBytes": idle["rss"],
+                                     "heapIdleMb": idle["heap"], "log": log_path}
 
             if "csv" in args.only:
                 result = csv_section(client, args, workdir, sampler, report["errors"])
                 if sampler is not None:
-                    result["rssPeakBytes"] = sampler.peak
-                    result["heapPeakMb"] = sampler.heap_peak_mb
-                    result["heapMaxMb"] = sampler.heap_max_mb
-                    if sampler.peak is None and sampler.heap_peak_mb is None:
+                    # csv_section already sampled once more after the last timed call; keep
+                    # the larger peak so the final reading is never lost.
+                    snap = sampler.snapshot()
+                    for key, value in (("rssPeakBytes", snap["rss"]),
+                                       ("heapPeakMb", snap["heap"]),
+                                       ("heapMaxMb", snap["heapMax"])):
+                        current = result.get(key)
+                        result[key] = value if current is None else max(current, value or current)
+                    if result["rssPeakBytes"] is None and result["heapPeakMb"] is None:
                         report["errors"].append(
                             "no memory sample: ps and /v1/health both failed for pid %d" % proc.pid)
-                    elif sampler.peak is None:
+                    elif result["rssPeakBytes"] is None:
                         report["notes"].append(
                             "RSS unavailable (ps blocked); JVM heap peak from /v1/health is reported "
-                            "as heapPeakMb, which is the roadmap RAM formula")
+                            "as heapPeakMb, which is the roadmap RAM formula. The sampler adds one "
+                            "GET /v1/health per rss-interval (~1 ms), so timed latencies include "
+                            "that overhead: <0.5% at 100k rows, <0.1% at 10M")
                 report["csv"] = result
                 args.csv_path = result["csv"]["path"]
             if "branches" in args.only:
@@ -840,6 +898,10 @@ def main(argv=None):
                     report["errors"].append(
                         "branch ratio is noisy below 100 ms; use --branch-reps 3 "
                         "or a larger --rows")
+                elif args.branch_reps == 1:
+                    report["notes"].append(
+                        "branch ratio with --branch-reps 1 is a single pair of runs; "
+                        "use --branch-reps 3 for a stable median")
     except BenchError as error:
         failed = True
         report["errors"].append(str(error))

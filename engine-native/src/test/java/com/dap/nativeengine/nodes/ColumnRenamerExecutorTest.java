@@ -47,6 +47,55 @@ class ColumnRenamerExecutorTest {
     }
 
     @Test
+    void simultaneousSwapKeepsBothColumnsInPlace() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            NodeContext context = NodeTestSupport.context(db, """
+                    {"renames":[{"from":"id","to":"note"},{"from":"note","to":"id"}]}
+                    """);
+
+            LazyPlan plan = new ColumnRenamerExecutor().execute(context, List.of(input(db)));
+
+            assertEquals(List.of(
+                    ColumnSpec.of("note", "Int64"),
+                    ColumnSpec.of("id", "Utf8"),
+                    ColumnSpec.of("score", "Float64")), plan.columns());
+            TableData data = plan.preview(10);
+            assertEquals(List.of("1", "a", "1.5"), data.data().get(0));
+        }
+    }
+
+    @Test
+    void duplicateSourceIsRejected() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            NodeContext context = NodeTestSupport.context(db, """
+                    {"renames":[{"from":"note","to":"a"},{"from":"note","to":"b"}]}
+                    """);
+
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> new ColumnRenamerExecutor().execute(context, List.of(input(db))));
+            assertTrue(failure.getMessage().contains("note"), failure.getMessage());
+        }
+    }
+
+    @Test
+    void malformedRenamesAreRejectedWithTheProblemNamed() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            for (String config : List.of(
+                    "{\"renames\":\"note\"}",
+                    "{\"renames\":null}",
+                    "{\"renames\":[\"note\"]}",
+                    "{\"renames\":[{\"to\":\"x\"}]}")) {
+                IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                        () -> new ColumnRenamerExecutor().execute(
+                                NodeTestSupport.context(db, config), List.of(input(db))),
+                        config);
+                assertTrue(failure.getMessage().contains("renames") || failure.getMessage().contains("from"),
+                        config + " -> " + failure.getMessage());
+            }
+        }
+    }
+
+    @Test
     void emptyRenamesIsPassthrough() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             NodeContext context = NodeTestSupport.context(db, """

@@ -295,7 +295,15 @@ public final class NativeService implements AutoCloseable {
     }
 
     public static void main(String[] args) {
-        Settings defaults = Settings.fromEnv();
+        Settings defaults;
+        try {
+            defaults = Settings.fromEnv();
+        } catch (IllegalArgumentException invalidSettings) {
+            // Bad DAP_* configuration must exit like the DAP_BIND check, not as a stack trace.
+            System.err.println("dap-native: " + invalidSettings.getMessage());
+            System.exit(2);
+            return;
+        }
         int port = defaults.port();
         String configuredPort = System.getProperty("dap.port");
         if (configuredPort != null && !configuredPort.isBlank()) {

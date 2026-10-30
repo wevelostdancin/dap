@@ -177,8 +177,12 @@ def validate_corpus(workflows, datasets):
                 renames = config.get("renames")
                 if not isinstance(renames, list):
                     problems.append("%s/%s: column_renamer needs renames[]" % (workflow_id, node_id))
-                for rename in renames or []:
-                    if not rename.get("from") or not rename.get("to"):
+                    continue
+                for rename in renames:
+                    if not isinstance(rename, dict):
+                        problems.append("%s/%s: rename entries must be objects with from+to"
+                                        % (workflow_id, node_id))
+                    elif not rename.get("from") or not rename.get("to"):
                         problems.append("%s/%s: rename needs from+to" % (workflow_id, node_id))
             elif node_type == "joiner":
                 if not config.get("left_keys") or not config.get("right_keys"):

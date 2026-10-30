@@ -122,9 +122,13 @@ public final class DuckDbSession implements AutoCloseable {
         } catch (SQLException failure) {
             if (configuredMemoryLimit != null) {
                 // DuckDB accepts SET memory_limit='0GB' and then cannot allocate at all, so the
-                // read-back is the first place a too-small limit surfaces.
-                throw new SQLException("invalid DuckDB memory limit '" + configuredMemoryLimit + "': "
-                        + failure.getMessage(), failure);
+                // read-back is the first place a too-small limit surfaces. Any other read-back
+                // failure keeps its own message instead of blaming the memory limit.
+                String message = String.valueOf(failure.getMessage());
+                if (message.contains("Memory") || message.contains("memory")) {
+                    throw new SQLException("invalid DuckDB memory limit '" + configuredMemoryLimit + "': "
+                            + message, failure);
+                }
             }
             throw failure;
         }

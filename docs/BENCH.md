@@ -32,7 +32,7 @@
 |---|---|---|
 | `cold` | spawn `java -Xmx4g -Ddap.port=N -jar …` → первый `200 {ok:true}` от `GET /v1/health` | монотонные часы от `Popen` до успешного probe, опрос каждые 20 мс; 3 прогона, медиана + min/max |
 | `csv` | детерминированный CSV → `csv_reader → row_filter(value >= 50) → group_by(grp, mean+sum value) → sorter(grp asc)` через `/v1` | четыре числа ниже |
-| `branches` | один DAG с двумя независимыми `csv_reader`-ветвями vs те же два ingest'а подряд (два прогона одно-ветвевого workflow) | `ratio = median(seq) / median(parallel)`; sync-run меряет только ingest |
+| `branches` | один DAG с двумя независимыми `csv_reader`-ветвями vs те же два ingest'а подряд (два прогона одно-ветвевого workflow) | `ratio = median(seq) / median(parallel)` — end-to-end ускорение; `adjustedRatio` вычитает измеренную стоимость пустого прогона (3 замера) с обеих сторон; оба variant'а прогреваются перед замерами (JIT/кэш), sync-run меряет только ingest |
 
 CSV (детерминированный, без `random`): `id` = 0…N−1 (Int64),
 `value` = `(i*7919 % 100000) / 1000.0` (Float64, [0, 100)),
@@ -140,22 +140,28 @@ Ingest упирается в JVM heap (Arrow-таблица + построчны
 #### 4.1.1 Ветви (5M, `-Xmx6g`, 3 повтора)
 
 На 10M при `-Xmx4g` прогон двух `csv_reader`-ветвей падает с `Java heap space`
-(две копии таблицы), поэтому ratio измерен на 5M:
+(две копии таблицы), поэтому ratio измерен на 5M. Харнесс прогревает оба варианта,
+измеряет стоимость пустого workflow (per-run overhead) и вычитает её из обеих сторон:
 
     python3 tests/bench.py --jar engine-native/target/dap-native.jar --rows 5000000 \
         --heap 6g --only csv,branches --branch-reps 3 --json build/bench-branches.json
 
 | Метрика | Значение |
 |---|---|
-| parallel (2 ветви в одном DAG) | 9 510 мс |
-| sequential (два прогона подряд) | 11 262 мс |
-| **ratio** | **1,18×** (цель ≥ 1,8× — не достигнута) |
-| csv 5M: ingest / `/table` / `/profile` | 4 658 / 37 / 96 мс |
+| parallel (2 ветви в одном DAG) | 8 345 мс |
+| sequential (два прогона подряд) | 10 574 мс |
+| **ratio** (end-to-end speedup) | **1,27×** (цель ≥ 1,8× — не достигнута) |
+| per-run overhead (пустой workflow, медиана 3) | 0,6 мс |
+| **adjustedRatio** (без overhead) | **1,27×** — overhead не объясняет разрыв |
+| csv 5M: ingest / `/table` / `/profile` | 4 298 / 31 / 59 мс |
+| heap peak на 5M | 2 628 МиБ |
 
 Причина зафиксирована в `branches.reason`: `DuckDbSession.loadInto` синхронизирован на
 job-соединении, поэтому parse перекрывается, а `CREATE TABLE`+`Appender` — нет. Это
 архитектурное ограничение пилота, а не ошибка харнесса; чтобы получить ≥1,8×, нужен
 параллельный ingest (несколько соединений/appender'ов) — кандидат в волну IO.
+Раннее измерение без прогрева/нормализации давало 1,18× (`--branch-reps 1`), полный
+прогон с warmup и 3 повторами — 1,27×; оба числа end-to-end, не «чистая» параллельность DAG.
 
 Почему `n/a` в колонке KNIME: oracle исполняет только in-memory workflow через `/v1`;
 файловые ридеры требуют workflow-context и падают, а shipped-датасетов на 10M строк нет. Это

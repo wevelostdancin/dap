@@ -654,6 +654,27 @@ class NativeServiceTest {
     }
 
     @Test
+    void debugReportsConfiguredResourcesBeforeTheSessionDatabaseExists() throws Exception {
+        Path spill = tempDir.resolve("spill-config");
+        NativeService limited = startService(
+                new NativeService.Settings(100, 600, "127.0.0.1", 0, "1GB", 2, spill.toString()),
+                new NodeRegistry(), NativeService.defaultExecutors());
+        extras.add(limited);
+
+        String workflow = createWorkflow("resources-config");
+        Resp debug = get("/v1/workflows/" + workflow + "/debug");
+        assertEquals(200, debug.status());
+        JsonNode duckdb = debug.body().path("duckdb");
+        assertTrue(duckdb.isObject(), debug.body().toString());
+        // No run yet: GET reports the configured values and must not create a session database.
+        assertEquals("1GB", duckdb.path("memoryLimit").asText());
+        assertEquals(2, duckdb.path("threads").asInt());
+        assertEquals(spill.toString(), duckdb.path("tempDirectory").asText());
+        assertEquals(0, get("/v1/health").body().path("sessions").asInt(),
+                "GET /debug must not create a session database");
+    }
+
+    @Test
     void debugReportsEffectiveDuckDbResources() throws Exception {
         Path spill = tempDir.resolve("spill");
         NativeService limited = startService(
