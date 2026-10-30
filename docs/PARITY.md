@@ -183,7 +183,32 @@ Shipped-датасеты пустых строк не содержат, поэт
   — реализуются в native, но не имеют dual-run пары; покрываются unit-тестами.
 - Joiner `left`/`right` outer: биндинг поддерживает `how: "left"`, в корпусе только `inner`.
 
-## 7. Как перегенерировать baseline
+## 7. Native engine run
+
+`--engine native` исполняет корпус на `dap-native` и сравнивает table/profile с
+`tests/baseline.json`; baseline пишет только oracle (`--write-baseline` + native — exit 2).
+
+```bash
+cd engine-native && ./mvnw -q -o -DskipTests package
+DAP_PORT=7911 java -jar target/dap-native.jar &
+python3 tests/parity.py --engine native --base http://127.0.0.1:7911
+```
+
+- Биндинг: логический тип -> `dap.<type>`; `POST .../nodes` с `{"factory": "dap.<type>",
+  "settings": <config>}`, связи — `connect` с `toPort`, `POST .../run` синхронный;
+  не-200 add/run или узел не в успешном состоянии — FAIL с id узла и текстом ошибки.
+- Dataset shorthand: `{"dataset": "IRIS"}` разворачивает раннер в `dap.csv_reader`:
+  `file` — абсолютный путь из `data/datasets.json`, `delimiter`, `header`,
+  `columns[{name,type}]` (Arrow), `emptyStringIsNull: false`; `excel_reader` — `<stem>.xlsx`
+  без `sheet`; неизвестный датасет или нет файла — FAIL, не SKIP.
+- Native-only: `expect`/`expect_profile` сверяют `rows`, колонки (имя/тип и
+  `missing`/`distinct`/`min`/`max`/`mean`, если заданы) и `data` по §2–§4; `equivalent`
+  исполняет указанный workflow и сравнивает таблицу `node_ref` (unordered). Состояния
+  узлов с baseline не сравниваются (имена engine-specific), успешность — все `EXECUTED`.
+- 90 % роадмапа — `matching cells N/M (X%)` по восьми dual-run: `rows`, имя+тип
+  колонки, ячейки data и поля профиля из baseline; native-only не в счёт.
+
+## 8. Как перегенерировать baseline
 
 ```bash
 make run                                          # oracle на 127.0.0.1:7800
