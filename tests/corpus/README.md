@@ -24,7 +24,8 @@ data/                              фикстуры + datasets.json (схема,
 
 8 workflow исполняются на oracle (`dual-run`); 5 помечены `native-only` с причиной
 `oracle_skip_reason` — для них baseline хранит `status: skipped`, а проверки
-(`expect`, `expect_profile`, `equivalent`) исполняются в Phase 2 на native.
+(`expect`, `expect_profile`, `equivalent`) исполняются на native: `wf-05`, `wf-10`, `wf-n1`,
+`wf-n2` — с Фазы 2, `wf-n3-iris-renamer` — с Фазы 3.
 
 ## Схема workflow
 

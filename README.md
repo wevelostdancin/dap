@@ -84,12 +84,13 @@ DAP_JDK=/path/to/jdk-21 make build-engine
 ### Нативный движок (engine-native)
 
 В репозитории также живёт независимый движок `engine-native/` (Javalin 6 + DuckDB +
-Arrow) с тем же контрактом `/v1`. Он не использует `runtime/knime` и пока покрывает
-5 узлов пилота; архитектура и замеры — в [docs/NATIVE.md](docs/NATIVE.md).
+Arrow) с тем же контрактом `/v1`. Он не использует `runtime/knime` и покрывает 11 узлов
+(10 пилотных + `column_renamer`); архитектура, parity и замеры — в [docs/NATIVE.md](docs/NATIVE.md),
+шаблон нового узла — в [docs/MIGRATION.md](docs/MIGRATION.md).
 
 ```bash
 make build-native   # engine-native/target/dap-native.jar
-make test-native    # JUnit suite (114 тестов)
+make test-native    # JUnit suite (199 тестов)
 make run-native     # 127.0.0.1:7800, блокирующий процесс
 ```
 
@@ -124,10 +125,9 @@ python3 adapters/mcp/dap_mcp.py
 }
 ```
 
-Инструменты: `knime_search_nodes`, `knime_node_details`, `knime_node_dialog_schema`,
-`knime_workflow_create`, `knime_add_node`, `knime_configure_node`, `knime_connect`,
-`knime_disconnect`, `knime_remove_node`, `knime_run`, `knime_get_table`,
-`knime_profile_table`, `knime_list_workflows`, `knime_save_workflow`.
+Инструменты — 19 штук с префиксом `dap_*` (поиск узлов, схемы настроек, сборка workflow,
+запуск, таблицы и профили); полный список с аргументами —
+[adapters/mcp/README.md](adapters/mcp/README.md).
 
 ## API-обзор
 

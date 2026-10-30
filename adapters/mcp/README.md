@@ -66,7 +66,7 @@ jar — всегда `$DAP_HOME/engine-native/target/dap-native.jar`. Если j
 
 Чем native отличается для агента:
 
-- каталог — 10 узлов с id `dap.*` (`dap.csv_reader`, `dap.sorter`, ...), а не 832 KNIME;
+- каталог — 11 узлов с id `dap.*` (10 пилотных + `dap.column_renamer`), а не 832 KNIME;
 - настройки — плоский JSON по `configKey` из `dap_node_dialog_schema`, без XML;
 - нет `runtime/knime`, `workspace/` и KNIME-рантайма; jar самодостаточен;
 - `DAP_BIND` для native — `127.0.0.1`, `localhost` или `0.0.0.0` (`::` движок не принимает);
