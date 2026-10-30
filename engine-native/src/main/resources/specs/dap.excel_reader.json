@@ -6,8 +6,8 @@
   "contributor": "dap-native",
   "tier": "core",
   "deprecated": false,
-  "available": false,
-  "description": "Reads a worksheet from an Excel workbook into a data table. The native engine does not implement this node yet.",
+  "available": true,
+  "description": "Reads a worksheet from an Excel workbook into a data table. Cells become typed columns from the header or the explicit column schema.",
   "inPorts": [],
   "outPorts": [
     {

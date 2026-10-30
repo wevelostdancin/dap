@@ -224,19 +224,6 @@ class CatalogHandlersTest {
     }
 
     @Test
-    void dialogForUnavailableNodeExplainsTheGap() throws Exception {
-        HttpResponse<String> response = fetch("/nodes/dap.excel_reader/dialog", "s");
-        assertEquals(200, response.statusCode());
-        JsonNode body = body(response);
-        assertEquals("dap.excel_reader", body.path("id").asText());
-        assertEquals(false, body.path("available").asBoolean());
-        assertEquals("not implemented in native engine yet", body.path("reason").asText());
-        assertEquals("core", body.path("tier").asText());
-        assertEquals(true, body.path("precomputed").asBoolean());
-        assertFalse(body.has("schema"));
-    }
-
-    @Test
     void dialogForUnknownNodeIs400() throws Exception {
         HttpResponse<String> response = fetch("/nodes/dap.nope/dialog", "s");
         assertEquals(400, response.statusCode());

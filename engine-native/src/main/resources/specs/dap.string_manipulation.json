@@ -6,7 +6,7 @@
   "contributor": "dap-native",
   "tier": "core",
   "deprecated": false,
-  "available": false,
+  "available": true,
   "description": "Transforms string values in one column, for example upper-casing, trimming, replacing or concatenating. The result can replace the column or be appended as a new one.",
   "inPorts": [
     {

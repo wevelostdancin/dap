@@ -6,7 +6,7 @@
   "contributor": "dap-native",
   "tier": "core",
   "deprecated": false,
-  "available": false,
+  "available": true,
   "description": "Computes new columns from SQL-style expressions over the input columns. Each output name becomes a new column.",
   "inPorts": [
     {

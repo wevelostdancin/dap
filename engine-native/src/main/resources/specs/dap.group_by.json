@@ -6,7 +6,7 @@
   "contributor": "dap-native",
   "tier": "core",
   "deprecated": false,
-  "available": false,
+  "available": true,
   "description": "Groups rows by key columns and computes aggregate values per group. Aggregate columns are named like Mean(age).",
   "inPorts": [
     {

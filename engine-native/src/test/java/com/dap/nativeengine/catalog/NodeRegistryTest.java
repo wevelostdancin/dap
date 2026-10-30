@@ -28,12 +28,13 @@ class NodeRegistryTest {
     }
 
     @Test
-    void exactlyFiveSpecsAreAvailable() {
-        assertEquals(5, registry.availableCount());
+    void everyPilotSpecIsAvailable() {
+        assertEquals(10, registry.availableCount());
         Set<String> available = new HashSet<>();
         registry.all().stream().filter(NodeSpec::available).forEach(spec -> available.add(spec.id()));
         assertEquals(Set.of("dap.csv_reader", "dap.row_filter", "dap.column_filter",
-                "dap.sorter", "dap.missing_value"), available);
+                "dap.sorter", "dap.missing_value", "dap.excel_reader", "dap.group_by",
+                "dap.joiner", "dap.string_manipulation", "dap.math_formula"), available);
     }
 
     @Test

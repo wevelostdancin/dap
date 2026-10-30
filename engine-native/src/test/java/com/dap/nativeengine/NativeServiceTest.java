@@ -313,9 +313,6 @@ class NativeServiceTest {
         assertEquals(400, unknown.status());
         assertEquals("unknown node: dap.nope", unknown.error());
 
-        Resp unavailable = post("/v1/workflows/" + workflow + "/nodes", Map.of("factory", "dap.group_by"));
-        assertEquals(400, unavailable.status());
-        assertEquals("node not available in native engine: dap.group_by", unavailable.error());
         assertEquals(0, get("/v1/workflows/" + workflow + "/nodes").body().path("nodes").size());
 
         Resp badShape = post("/v1/workflows/" + workflow + "/nodes",

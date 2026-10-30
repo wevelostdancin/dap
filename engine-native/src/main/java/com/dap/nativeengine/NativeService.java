@@ -12,9 +12,14 @@ import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.nodes.ColumnFilterExecutor;
 import com.dap.nativeengine.nodes.CsvReaderExecutor;
+import com.dap.nativeengine.nodes.ExcelReaderExecutor;
+import com.dap.nativeengine.nodes.GroupByExecutor;
+import com.dap.nativeengine.nodes.JoinerExecutor;
+import com.dap.nativeengine.nodes.MathFormulaExecutor;
 import com.dap.nativeengine.nodes.MissingValueExecutor;
 import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
+import com.dap.nativeengine.nodes.StringManipulationExecutor;
 import io.javalin.Javalin;
 
 import java.util.LinkedHashMap;
@@ -232,14 +237,19 @@ public final class NativeService implements AutoCloseable {
         }
     }
 
-    /** All five Phase-1 node executors. */
+    /** All ten pilot node executors. */
     public static Executors defaultExecutors() {
         return new Executors()
                 .register(new CsvReaderExecutor())
                 .register(new RowFilterExecutor())
                 .register(new ColumnFilterExecutor())
                 .register(new SorterExecutor())
-                .register(new MissingValueExecutor());
+                .register(new MissingValueExecutor())
+                .register(new ExcelReaderExecutor())
+                .register(new GroupByExecutor())
+                .register(new JoinerExecutor())
+                .register(new StringManipulationExecutor())
+                .register(new MathFormulaExecutor());
     }
 
     public static void main(String[] args) {

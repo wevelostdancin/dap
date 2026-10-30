@@ -6,7 +6,7 @@
   "contributor": "dap-native",
   "tier": "core",
   "deprecated": false,
-  "available": false,
+  "available": true,
   "description": "Joins two tables on key columns using an inner, left, or right join. Key columns can be merged into one output column.",
   "inPorts": [
     {

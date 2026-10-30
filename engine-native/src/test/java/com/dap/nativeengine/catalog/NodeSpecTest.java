@@ -54,8 +54,13 @@ class NodeSpecTest {
     }
 
     @Test
-    void fullMarksUnavailableSpecs() {
-        Map<String, Object> full = registry.require("dap.excel_reader").full();
+    void fullMarksUnavailableSpecs() throws Exception {
+        // Every pilot node is available; the flag keeps working for future waves.
+        NodeSpec future = NodeSpec.fromJson(Json.parse("""
+                {"id":"dap.future","name":"Future","category":"/IO/Read","type":"Source","available":false,
+                 "configSchema":{"type":"object","properties":{"sheet":{"type":"string"}}}}
+                """));
+        Map<String, Object> full = future.full();
         assertEquals(false, full.get("available"));
         assertTrue(((List<?>) full.get("settings")).contains("sheet"));
         assertNull(full.get("settingsXml"));
@@ -136,9 +141,13 @@ class NodeSpecTest {
     }
 
     @Test
-    void unavailableDialogExplainsTheGap() {
-        JsonNode dialog = dialog("dap.excel_reader");
-        assertEquals("dap.excel_reader", dialog.path("id").asText());
+    void unavailableDialogExplainsTheGap() throws Exception {
+        // Every pilot node is available; the reason payload stays for future waves.
+        NodeSpec future = NodeSpec.fromJson(Json.parse("""
+                {"id":"dap.future","name":"Future","category":"/IO/Read","type":"Source","available":false}
+                """));
+        JsonNode dialog = Json.MAPPER.valueToTree(future.dialog());
+        assertEquals("dap.future", dialog.path("id").asText());
         assertFalse(dialog.path("available").asBoolean());
         assertEquals("not implemented in native engine yet", dialog.path("reason").asText());
         assertEquals("core", dialog.path("tier").asText());
