@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 /** Arrow type names used by the native engine and their DuckDB / KNIME equivalents. */
 public final class TypeMap {
     private static final Pattern DECIMAL = Pattern.compile("Decimal128\\((\\d+),\\s*(\\d+)\\)");
+    private static final Pattern DUCKDB_DECIMAL = Pattern.compile("DECIMAL\\((\\d+),\\s*(\\d+)\\)");
 
     private TypeMap() {
     }
@@ -77,6 +78,29 @@ public final class TypeMap {
         return switch (type) {
             case "Int64", "Float64", "Utf8", "Boolean", "Date32", "Time64", "Timestamp" -> true;
             default -> type.startsWith("Decimal128");
+        };
+    }
+
+    /** Map a DuckDB type name (as reported by DESCRIBE / typeof) to the engine's Arrow type name. */
+    public static String fromDuckDb(String duckDbType) {
+        if (duckDbType == null || duckDbType.isBlank()) {
+            throw new IllegalArgumentException("empty DuckDB type name");
+        }
+        String value = duckDbType.trim().toUpperCase(Locale.ROOT);
+        Matcher decimal = DUCKDB_DECIMAL.matcher(value);
+        if (decimal.matches()) {
+            return "Decimal128(" + decimal.group(1) + "," + decimal.group(2) + ")";
+        }
+        return switch (value) {
+            case "BIGINT", "INTEGER", "INT", "SMALLINT", "TINYINT", "HUGEINT",
+                 "UBIGINT", "UINTEGER", "USMALLINT", "UTINYINT" -> "Int64";
+            case "DOUBLE", "REAL", "FLOAT" -> "Float64";
+            case "VARCHAR", "TEXT", "STRING", "CHAR" -> "Utf8";
+            case "BOOLEAN", "BOOL" -> "Boolean";
+            case "DATE" -> "Date32";
+            case "TIME" -> "Time64";
+            case "TIMESTAMP", "DATETIME" -> "Timestamp";
+            default -> throw new IllegalArgumentException("unsupported DuckDB type: " + duckDbType);
         };
     }
 
