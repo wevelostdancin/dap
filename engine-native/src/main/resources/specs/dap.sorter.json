@@ -60,12 +60,13 @@
       "collation": {
         "type": "string",
         "title": "Collation",
-        "description": "String comparison used when sorting text values.",
+        "description": "String comparison used when sorting text values. natural compares digit runs numerically (1st-4th before 10th), binary compares byte order, nocase ignores case.",
         "enum": [
+          "natural",
           "binary",
           "nocase"
         ],
-        "default": "binary"
+        "default": "natural"
       }
     },
     "required": [

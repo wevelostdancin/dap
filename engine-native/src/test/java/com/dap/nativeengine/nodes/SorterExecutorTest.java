@@ -82,6 +82,57 @@ class SorterExecutorTest {
     }
 
     @Test
+    void naturalCollationOrdersDigitRunsNumerically() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            List<ColumnSpec> columns = List.of(ColumnSpec.of("s", "Utf8"));
+            List<Object[]> rows = List.of(
+                    new Object[]{"10th"},
+                    new Object[]{"1st-4th"},
+                    new Object[]{"2nd"},
+                    new Object[]{"9th"},
+                    new Object[]{"Assoc-acdm"},
+                    new Object[]{"HS-grad"});
+            LazyPlan input = NodeTestSupport.table(db, columns, rows);
+
+            // natural is the default, mirroring KNIME's Sorter stringComparison
+            LazyPlan defaulted = new SorterExecutor().execute(NodeTestSupport.context(db, """
+                    {"keys":[{"column":"s","direction":"asc"}]}
+                    """), List.of(input));
+            assertEquals(List.of("1st-4th", "2nd", "9th", "10th", "Assoc-acdm", "HS-grad"),
+                    column(defaulted.preview(10), 0));
+
+            LazyPlan explicit = new SorterExecutor().execute(NodeTestSupport.context(db, """
+                    {"keys":[{"column":"s","direction":"asc"}],"collation":"natural"}
+                    """), List.of(input));
+            assertEquals(List.of("1st-4th", "2nd", "9th", "10th", "Assoc-acdm", "HS-grad"),
+                    column(explicit.preview(10), 0));
+        }
+    }
+
+    @Test
+    void naturalSortHandlesTextBeforeDigitsAndDescending() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            List<ColumnSpec> columns = List.of(ColumnSpec.of("s", "Utf8"));
+            List<Object[]> rows = List.of(
+                    new Object[]{"a10"},
+                    new Object[]{"a2"},
+                    new Object[]{"a1"},
+                    new Object[]{"b1"});
+            LazyPlan input = NodeTestSupport.table(db, columns, rows);
+
+            LazyPlan ascending = new SorterExecutor().execute(NodeTestSupport.context(db, """
+                    {"keys":[{"column":"s","direction":"asc"}]}
+                    """), List.of(input));
+            assertEquals(List.of("a1", "a2", "a10", "b1"), column(ascending.preview(10), 0));
+
+            LazyPlan descending = new SorterExecutor().execute(NodeTestSupport.context(db, """
+                    {"keys":[{"column":"s","direction":"desc"}]}
+                    """), List.of(input));
+            assertEquals(List.of("b1", "a10", "a2", "a1"), column(descending.preview(10), 0));
+        }
+    }
+
+    @Test
     void binaryCollationIsAcceptedAndKeepsByteOrder() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             List<ColumnSpec> columns = List.of(ColumnSpec.of("s", "Utf8"));
@@ -96,7 +147,7 @@ class SorterExecutorTest {
 
             LazyPlan plan = new SorterExecutor().execute(context, List.of(input));
 
-            // binary collation is the default: upper-case letters sort before lower-case ones
+            // explicit binary collation: upper-case letters sort before lower-case ones
             assertEquals(List.of("Beta", "Gamma", "alpha"), column(plan.preview(10), 0));
         }
     }

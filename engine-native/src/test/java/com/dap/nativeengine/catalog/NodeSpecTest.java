@@ -137,7 +137,7 @@ class NodeSpecTest {
 
         JsonNode collation = field(dialog("dap.sorter"), "collation");
         assertEquals("enum", collation.path("type").asText());
-        assertEquals(List.of("binary", "nocase"), texts(collation.path("choices"), "value"));
+        assertEquals(List.of("natural", "binary", "nocase"), texts(collation.path("choices"), "value"));
     }
 
     @Test

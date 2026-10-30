@@ -134,7 +134,7 @@ class NodeRegistryTest {
                 enumValues(property("dap.row_filter", "where").path("items").path("properties").path("op")));
         assertEquals(List.of("asc", "desc"), enumValues(property("dap.sorter", "keys")
                 .path("items").path("properties").path("direction")));
-        assertEquals(List.of("binary", "nocase"), enumValues(property("dap.sorter", "collation")));
+        assertEquals(List.of("natural", "binary", "nocase"), enumValues(property("dap.sorter", "collation")));
         assertEquals(List.of("constant", "mean", "mode"), enumValues(property("dap.missing_value", "rules")
                 .path("items").path("properties").path("method")));
         assertEquals(List.of("mean", "sum", "count", "min", "max"), enumValues(property("dap.group_by", "aggregations")
