@@ -16,6 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -264,7 +265,20 @@ class DagTest {
         } catch (InterruptedException exception) {
             throw new AssertionError("interrupted while waiting for the blocked node", exception);
         }
-        assertEquals("ERROR", workflow.node(blockedNode.id()).state());
+        // The sibling is cancelled by the Dag; its terminal state is published on the
+        // scheduler thread, so poll briefly instead of racing the state transition.
+        awaitState(workflow.node(blockedNode.id()), "ERROR", 2_000);
+    }
+
+    private static void awaitState(WorkflowNode node, String expected, long timeoutMillis) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        while (System.nanoTime() < deadline) {
+            if (expected.equals(node.state())) {
+                return;
+            }
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10));
+        }
+        assertEquals(expected, node.state(), "node state did not settle in time");
     }
 
     @Test
