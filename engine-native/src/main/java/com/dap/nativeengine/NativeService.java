@@ -11,6 +11,7 @@ import com.dap.nativeengine.api.WorkflowHandlers;
 import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.nodes.ColumnFilterExecutor;
+import com.dap.nativeengine.nodes.ColumnRenamerExecutor;
 import com.dap.nativeengine.nodes.CsvReaderExecutor;
 import com.dap.nativeengine.nodes.ExcelReaderExecutor;
 import com.dap.nativeengine.nodes.GroupByExecutor;
@@ -237,12 +238,13 @@ public final class NativeService implements AutoCloseable {
         }
     }
 
-    /** All ten pilot node executors. */
+    /** All eleven node executors. */
     public static Executors defaultExecutors() {
         return new Executors()
                 .register(new CsvReaderExecutor())
                 .register(new RowFilterExecutor())
                 .register(new ColumnFilterExecutor())
+                .register(new ColumnRenamerExecutor())
                 .register(new SorterExecutor())
                 .register(new MissingValueExecutor())
                 .register(new ExcelReaderExecutor())

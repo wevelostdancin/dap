@@ -61,15 +61,16 @@ class CatalogHandlersTest {
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(10, body.path("count").asInt());
+        assertEquals(11, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(10, nodes.size());
-        assertEquals(List.of("Column Filter", "CSV Reader", "Excel Reader", "Group By", "Joiner",
-                "Math Formula", "Missing Value", "Row Filter", "Sorter", "String Manipulation"), names(nodes));
+        assertEquals(11, nodes.size());
+        assertEquals(List.of("Column Filter", "Column Renamer", "CSV Reader", "Excel Reader", "Group By",
+                "Joiner", "Math Formula", "Missing Value", "Row Filter", "Sorter",
+                "String Manipulation"), names(nodes));
 
         JsonNode first = nodes.get(0);
         assertEquals("dap.column_filter", first.path("id").asText());
-        JsonNode csvNode = nodes.get(1);
+        JsonNode csvNode = nodes.get(2);
         assertEquals("dap.csv_reader", csvNode.path("id").asText());
         assertEquals("CSV Reader", csvNode.path("name").asText());
         assertEquals("/IO/Read", csvNode.path("category").asText());
@@ -102,7 +103,7 @@ class CatalogHandlersTest {
     void appliesLimitAndReturnsEmptyForUnknownValues() throws Exception {
         JsonNode limited = body(fetch("/nodes?limit=3", "s"));
         assertEquals(3, limited.path("count").asInt());
-        assertEquals(List.of("Column Filter", "CSV Reader", "Excel Reader"), names(limited.path("nodes")));
+        assertEquals(List.of("Column Filter", "Column Renamer", "CSV Reader"), names(limited.path("nodes")));
 
         HttpResponse<String> empty = fetch("/nodes?q=no-such-node", "s");
         assertEquals(200, empty.statusCode());

@@ -8,3 +8,4 @@ dap.group_by.json
 dap.joiner.json
 dap.string_manipulation.json
 dap.math_formula.json
+dap.column_renamer.json

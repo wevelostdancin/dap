@@ -114,8 +114,8 @@ class NativeServiceTest {
         assertEquals("DAP", body.path("name").asText());
         assertEquals("1.0.0", body.path("version").asText());
         assertEquals("1", body.path("api").asText());
-        assertEquals(10, body.path("nodes").asInt());
-        assertEquals(10, body.path("coreNodes").asInt());
+        assertEquals(11, body.path("nodes").asInt());
+        assertEquals(11, body.path("coreNodes").asInt());
         assertEquals(0, body.path("workflows").asInt());
         assertEquals(0, body.path("sessions").asInt());
         assertEquals(0, body.path("jobs").asInt());
@@ -133,7 +133,7 @@ class NativeServiceTest {
     void catalogRoutes() throws Exception {
         Resp list = get("/v1/nodes?limit=100");
         assertEquals(200, list.status());
-        assertEquals(10, list.body().path("count").asInt());
+        assertEquals(11, list.body().path("count").asInt());
 
         Resp node = get("/v1/nodes/dap.csv_reader");
         assertEquals(200, node.status());
