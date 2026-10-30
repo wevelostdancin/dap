@@ -1,0 +1,140 @@
+# syntax=docker/dockerfile:1.7
+# DAP native engine (dap-native): multi-stage image < 200 MB, non-root, no data volume.
+#
+# Build (context = engine-native/, see engine-native/.dockerignore):
+#   docker build -f deploy/Dockerfile.native -t dap-native:local engine-native
+# Multi-arch (each platform gets its own DuckDB native library, selected by TARGETARCH):
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     -f deploy/Dockerfile.native -t dap-native:1.0.0 engine-native
+# Run:
+#   docker run --rm -p 7800:7800 dap-native:local
+#
+# The build stage needs network access: engine-native/mvnw bootstraps Maven 3.9.11 and
+# the Maven Central dependencies. The offline host build is only used to verify jars.
+#
+# Platform: org.duckdb:duckdb_jdbc ships one native library per platform. The build
+# stage maps docker's TARGETARCH (amd64/arm64) to the DuckDB file name
+# (linux_amd64/linux_arm64), keeps exactly that library in the shaded jar and fails
+# the build if the jar ends up with zero or several libraries. Override with
+#   --build-arg DAP_DUCKDB_NATIVE=linux_amd64|linux_arm64
+# when TARGETARCH is not available (plain docker build without buildx, older CLIs).
+
+ARG BUILD_IMAGE=eclipse-temurin:21-jdk-jammy
+ARG RUNTIME_IMAGE=debian:bookworm-slim
+
+# ---------------------------------------------------------------- build stage
+FROM ${BUILD_IMAGE} AS build
+ARG TARGETARCH
+ARG DAP_DUCKDB_NATIVE=
+
+# curl is needed by mvnw on first use (build-only; the runtime image has no curl).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Maven distribution + local repository survive rebuilds through the cache mount.
+ENV DAP_TOOLS=/tmp/dap-tools
+WORKDIR /src
+COPY mvnw pom.xml ./
+COPY src ./src
+
+RUN --mount=type=cache,target=/tmp/dap-tools,sharing=locked \
+    case "${DAP_DUCKDB_NATIVE:-${TARGETARCH}}" in \
+      amd64|linux_amd64) native=linux_amd64 ;; \
+      arm64|linux_arm64) native=linux_arm64 ;; \
+      *) echo "Dockerfile.native: unsupported platform (TARGETARCH=${TARGETARCH}, DAP_DUCKDB_NATIVE=${DAP_DUCKDB_NATIVE}); expected amd64 or arm64" >&2; exit 1 ;; \
+    esac \
+ && ./mvnw -q -DskipTests -Ddap.duckdb.native="${native}" clean package \
+ && echo "dap-native.jar: DuckDB native ${native}" \
+ && test "$(jar tf target/dap-native.jar | grep -c '^libduckdb_java')" -eq 1 \
+ && test "$(stat -c%s target/dap-native.jar)" -lt $((50 * 1024 * 1024))
+
+# jlink runtime. The module set comes from the shaded jar itself:
+#   jdeps --multi-release 21 --ignore-missing-deps --print-module-deps target/dap-native.jar
+#   -> java.base,java.desktop,java.instrument,java.management,java.naming,
+#      java.security.jgss,java.sql,jdk.jfr,jdk.unsupported
+# java.desktop is dropped on purpose: the only references are optional Jetty
+# leak-preventers, Jackson's Java7SupportImpl and ImageIO, none of them on Javalin's
+# request path (~14 MiB saved). java.logging and java.xml are not listed because
+# java.sql already requires them transitively (the effective runtime has 12 modules;
+# logback's Joran parses logback.xml through java.xml on it).
+# This exact set was tested locally by running the jar on it:
+# tests/native_smoke.py 9/9, tests/parity.py 12/12 workflows, 1563/1563 cells (100 %),
+# cold start ~0.56-0.59 s on macOS arm64.
+RUN jlink --add-modules java.base,java.instrument,java.logging,java.management,java.naming,java.security.jgss,java.sql,jdk.jfr,jdk.unsupported \
+          --strip-debug --no-header-files --no-man-pages --compress=zip-6 \
+          --output /out/jre
+
+# HEALTHCHECK probe: a java.base-only socket check of GET /v1/health, so the runtime
+# image needs no curl (distroless/slim friendly). Compiled with the build JDK.
+RUN mkdir -p /out/health && cat > /out/health/HealthCheck.java <<'JAVA'
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+
+/** HEALTHCHECK probe for the native engine: GET /v1/health must answer 200. */
+public final class HealthCheck {
+    public static void main(String[] args) {
+        String port = System.getenv().getOrDefault("DAP_PORT", "7800").strip();
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress("127.0.0.1", Integer.parseInt(port)), 1000);
+            socket.setSoTimeout(1000);
+            OutputStream out = socket.getOutputStream();
+            out.write("GET /v1/health HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n"
+                    .getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    socket.getInputStream(), StandardCharsets.ISO_8859_1));
+            String status = reader.readLine();
+            if (status != null && status.startsWith("HTTP/1.") && status.contains(" 200 ")) {
+                return;
+            }
+            System.err.println("dap-native healthcheck: " + status);
+        } catch (Exception failure) {
+            System.err.println("dap-native healthcheck: " + failure);
+        }
+        System.exit(1);
+    }
+}
+JAVA
+RUN javac --release 21 -d /out/health /out/health/HealthCheck.java \
+ && rm /out/health/HealthCheck.java
+
+# -------------------------------------------------------------- runtime stage
+FROM ${RUNTIME_IMAGE}
+ARG DAP_UID=10001
+ARG DAP_GID=10001
+
+ENV DAP_PORT=7800 \
+    DAP_BIND=0.0.0.0 \
+    DAP_HEAP=1g \
+    PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    LANG=C.UTF-8
+
+# Unprivileged user; /tmp/dap is the future DAP_DUCKDB_TEMP_DIR and the only writable
+# path the service needs (pair with --read-only --tmpfs /tmp in production).
+RUN groupadd --gid "${DAP_GID}" dap \
+ && useradd --uid "${DAP_UID}" --gid "${DAP_GID}" --no-create-home \
+      --home-dir /home/dap --shell /usr/sbin/nologin dap \
+ && mkdir -p /tmp/dap \
+ && chown dap:dap /tmp/dap
+
+WORKDIR /opt/dap
+COPY --from=build /out/jre /opt/java/openjdk
+COPY --from=build /out/health /opt/dap/health
+COPY --from=build /src/target/dap-native.jar /opt/dap/dap-native.jar
+
+USER dap
+EXPOSE 7800
+
+# First probe runs one interval after start, so the container reports healthy in
+# ~2-4 s (measured cold start of the service: 0.56-0.59 s warm, ~2.8 s on the very
+# first run after jlink on macOS; the Docker host value is unverified, see README).
+HEALTHCHECK --interval=2s --timeout=2s --start-period=5s --retries=3 \
+  CMD ["/opt/java/openjdk/bin/java", "-cp", "/opt/dap/health", "HealthCheck"]
+
+# JAVA_OPTS wins as a whole (e.g. "-Xmx4g -XX:+UseZGC"); DAP_HEAP only sets -Xmx.
+ENTRYPOINT ["/bin/sh", "-c", "HEAP=${DAP_HEAP:-1g}; exec java ${JAVA_OPTS:--Xmx$HEAP} -jar /opt/dap/dap-native.jar"]
