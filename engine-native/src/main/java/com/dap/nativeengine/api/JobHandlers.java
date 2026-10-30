@@ -75,6 +75,11 @@ public final class JobHandlers {
             throw ApiException.notFound("unknown job: " + jobId);
         }
         boolean cancelled = state.jobs().cancel(job);
+        if (cancelled) {
+            // A /table or /profile read runs on its own connection, so the job-connection
+            // close above cannot reach it; close the reads registered for this workflow.
+            state.session(job.sessionId()).interruptReads(job.workflowId());
+        }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", cancelled);
         body.put("id", jobId);

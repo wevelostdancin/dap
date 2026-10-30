@@ -129,8 +129,8 @@ DuckDbSession (one in-memory DuckDB per session)
 | HTTP-интеграция | `NativeServiceTest` (14 тестов) | реальный Javalin на свободном порту, все 25 операций, timeout/cancel, изоляция сессий |
 | Health во время sync-run | `-Ddap.test.slowMs=10000` | health 200 за 1 мс при 10-секундном узле; sync-run завершился 200 |
 | Spike 200k, 5 прогонов | `./mvnw -B -Dtest=ArrowDuckDbSpikeTest test` | 1952–2108 мс; 94 877–102 459 строк/с; медиана 1994 мс / 100 301 строк/с |
-| Jar | `./mvnw -B -DskipTests package`; `stat -f '%z'` | 98 035 998 Б ≈ 93,5 МиБ |
-| Native libs внутри jar | `unzip -l target/dap-native.jar` | ≈257 МБ (245 МиБ) несжатыми: osx_universal 107,6 МБ, linux_amd64 60,8 МБ, linux_arm64 53,6 МБ, windows_amd64 35,1 МБ |
+| Jar (native-библиотека хоста) | `./mvnw -B -DskipTests package`; `stat -f '%z'` | 46 246 388 Б ≈ 44,1 МиБ на macOS arm64 |
+| Native libs внутри jar | `unzip -l target/dap-native.jar` | одна библиотека платформы сборки (osx_universal 107,6 МБ); linux_amd64 60,8 МБ, linux_arm64 53,6 МБ, windows_amd64 35,1 МБ вырезаются shade-фильтром |
 | Cold start финального jar, 3 прогона | `java -jar` + poll `/v1/health` | 410 / 411 / 500 мс (медиана 411 мс) |
 
 Spike: 200 000 строк, 3 колонки (`Int64`, `Utf8`, `Float64`); таймер включает
@@ -198,7 +198,7 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
 
 | Пункт | Статус | Комментарий |
 |---|---|---|
-| `make build-native` → `target/dap-native.jar` | да | jar 94 МиБ (DuckDB native libs); `make test-native` — 114 тестов |
+| `make build-native` → `target/dap-native.jar` | да | jar 44,1 МиБ: shade оставляет только native-библиотеку платформы сборки, `-Ddap.duckdb.native=all` возвращает все четыре; `make test-native` — 114 тестов |
 | `make run-native` стартует < 2 с | да | 410–500 мс от `java -jar` до health 200 |
 | `/v1/health` → `nodes=10` | да | живые счётчики registry/store/sessions; `coreNodes=10` |
 | Workflow из 3 узлов end-to-end | да | `csv_reader → missing_value → column_filter → row_filter → sorter`; 5 узлов, 3 строки |
@@ -218,8 +218,13 @@ package-private» для 1.5.6.0 неверно; zero-copy не проверен
   точный `COUNT(DISTINCT)`; порог/`APPROX_COUNT_DISTINCT` — Фаза 2 (API/PARITY обещают 100k).
 - **Исходные таблицы:** `csv_reader` заменяет одну стабильную таблицу на узел
   (`CREATE OR REPLACE`), поэтому ре-раны не копят копии; eviction по сессии всё ещё нет.
-- **Размер jar:** 93,5 МиБ; внутри ≈257 МБ native-библиотек всех платформ. Цель Фазы 3
-  < 50 МБ требует вырезать/разделить платформенные библиотеки, а не только сжатие.
+- **Размер jar:** 44,1 МиБ: shade оставляет native-библиотеку платформы сборки (macOS →
+  osx_universal, Linux amd64/arm64 и Windows amd64 аналогично), три остальных файла
+  исключаются. Профили `duckdb-native-host-*` выбирают хост по `<os>`; для
+  cross-platform упаковки выбор переопределяется
+  `-Ddap.duckdb.native=all|osx_universal|linux_amd64|linux_arm64|windows_amd64`
+  (менять выбор и пересобирать нужно с `clean package`: shade не пересобирает уже
+  shaded jar).
 - **Polars:** порог — ≥2× на конкретном узле; бенчмарка ещё нет, поэтому остаёмся на DuckDB.
 - **Отмена материализации:** `/table`/`/profile` открывают свои соединения и не покрыты
   job-cancel; чтобы отменять долгий preview/profile, нужен хэндл запроса, привязанный к job.

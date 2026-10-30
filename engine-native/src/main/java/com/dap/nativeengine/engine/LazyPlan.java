@@ -35,8 +35,18 @@ public final class LazyPlan {
         return session.preview(sql, columns, limit);
     }
 
+    /** Preview registered against its workflow/node so a job cancel can interrupt it. */
+    public TableData preview(int limit, String workflowId, String nodeId) throws SQLException {
+        return session.preview(sql, columns, limit, workflowId, nodeId);
+    }
+
     public ProfileData profile() throws SQLException {
         return session.profile(sql, columns);
+    }
+
+    /** Profile registered against its workflow/node so a job cancel can interrupt it. */
+    public ProfileData profile(String workflowId, String nodeId) throws SQLException {
+        return session.profile(sql, columns, workflowId, nodeId);
     }
 
     public long count() throws SQLException {
