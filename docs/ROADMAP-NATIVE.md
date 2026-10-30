@@ -87,6 +87,7 @@
 | `dap.joiner` | `{how: inner\|left\|right, left_keys:[], right_keys:[], merge_keys}` |
 | `dap.string_manipulation` | `{column, op: upper\|lower\|trim\|replace\|concat, mode, ...}` |
 | `dap.math_formula` | `{outputs:[{name, expression}]}` |
+| `dap.column_renamer` | `{renames:[{from, to}]}` (11-й узел, шаблон [MIGRATION.md](MIGRATION.md)) |
 
 Ключи взяты из корпуса — это уже проверенный минимум, а не гипотеза.
 
