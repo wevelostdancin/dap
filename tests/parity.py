@@ -66,6 +66,10 @@ class Unsupported(Exception):
     """The oracle cannot express this corpus node; the workflow is skipped."""
 
 
+class NativeError(RuntimeError):
+    """A native workflow could not be bound or executed; the workflow fails."""
+
+
 # --------------------------------------------------------------------- corpus
 
 
@@ -416,6 +420,60 @@ def oracle_binding(node_type, config, upstream):
     return ORACLE_BINDINGS[node_type](config, upstream)
 
 
+# -------------------------------------------------------------------- native
+
+CORPUS_DATA_DIR = CORPUS_DIR / "data"
+# The engine reports node success as EXECUTED (contract, docs/API.md); the job
+# state for the same run is succeeded. Accept both spellings here.
+NATIVE_OK_STATES = ("EXECUTED", "succeeded")
+
+
+def _dataset_entry(dataset, datasets):
+    entry = datasets.get(dataset)
+    if entry is None:
+        raise NativeError("unknown dataset %r" % (dataset,))
+    return entry
+
+
+def _dataset_file(entry, dataset, suffix=None):
+    path = CORPUS_DATA_DIR / entry["file"]
+    if suffix is not None:
+        path = path.with_suffix(suffix)
+    path = path.resolve()
+    if not path.is_file():
+        raise NativeError("dataset %r fixture missing: %s" % (dataset, path))
+    return str(path)
+
+
+def _dataset_columns(entry):
+    return [{"name": column["name"], "type": column["arrow"]} for column in entry["columns"]]
+
+
+def native_binding(node_type, config, datasets):
+    """Map one corpus node onto a dap.* node id plus its JSON settings.
+
+    table_source/csv_reader/excel_reader carry the corpus dataset shorthand;
+    the runner expands it here so the engine only ever sees a real file path.
+    """
+    if node_type in ("table_source", "csv_reader", "excel_reader"):
+        dataset = config.get("dataset")
+        entry = _dataset_entry(dataset, datasets)
+        if node_type == "excel_reader":
+            return "dap.excel_reader", {
+                "file": _dataset_file(entry, dataset, ".xlsx"),
+                "header": entry.get("header", True),
+                "columns": _dataset_columns(entry),
+            }
+        return "dap.csv_reader", {
+            "file": _dataset_file(entry, dataset),
+            "delimiter": entry.get("delimiter", ","),
+            "header": entry.get("header", True),
+            "columns": _dataset_columns(entry),
+            "emptyStringIsNull": False,
+        }
+    return "dap." + node_type, config
+
+
 # ------------------------------------------------------------------- running
 
 
@@ -480,6 +538,207 @@ def run_on_oracle(api, workflow):
                 }
     finally:
         api.delete_workflow(workflow_id)
+    return observation
+
+
+# --------------------------------------------------------------- native run
+
+
+def _native_table(body, order):
+    return {"kind": "table", "rows": body.get("rows"),
+            "columns": body.get("columns") or [], "data": body.get("data") or [],
+            "order": order}
+
+
+def _native_profile(body):
+    return {"kind": "profile", "rows": body.get("rows"),
+            "columns": body.get("columns") or []}
+
+
+def _native_run_failure(api, workflow_id, nodes, response):
+    """Describe a non-200 run with the engine error and the failing node id."""
+    body = response.body if isinstance(response.body, dict) else {}
+    error = body.get("error")
+    try:
+        states = api.workflow_nodes(workflow_id) or []
+    except (dap.ApiError, AssertionError, AttributeError):
+        states = []
+    logical = {native: node for node, native in nodes.items()}
+    failed_states = [state for state in states if state.get("state") not in NATIVE_OK_STATES]
+    errored = [state for state in failed_states if state.get("state") == "ERROR"]
+    details = []
+    for state in errored or failed_states:
+        details.append("node %s (%s) state %s: %s" % (
+            logical.get(state.get("node"), state.get("node")), state.get("node"),
+            state.get("state"), state.get("message") or error or "no message"))
+    if details:
+        return "; ".join(details)
+    node_list = ", ".join("%s (%s)" % (node, native) for node, native in nodes.items())
+    return "run failed at %s: HTTP %s %s" % (node_list, response.status,
+                                             error or _short(response.body))
+
+
+def _expected_columns(expected, actual_columns):
+    """Expected columns; a type omitted by the check is not asserted."""
+    actual_types = {column["name"]: column["type"] for column in actual_columns}
+    columns = []
+    for entry in expected:
+        if isinstance(entry, str):
+            columns.append({"name": entry, "type": actual_types.get(entry)})
+            continue
+        column = dict(entry)
+        column["type"] = entry.get("type") or actual_types.get(entry.get("name"))
+        columns.append(column)
+    return columns
+
+
+def _expect_limit(check):
+    return check.get("limit") or len(check.get("data") or []) or 50
+
+
+def _native_check(api, workflow_id, workflow, nodes, check, observation,
+                  tables, corpus, datasets, needed, running):
+    kind = check["kind"]
+    if kind not in ("table", "profile") and workflow.get("kind") != "native-only":
+        return  # oracle skips expect/expect_profile/equivalent checks
+    logical = check["node"]
+    api_node = nodes[logical]
+    key = _check_key(check)
+    label = "%s/%s" % (workflow["id"], key)
+    problems = observation["checkProblems"]
+
+    if kind == "table":
+        body = api.table(workflow_id, api_node, limit=check.get("limit", 50))
+        observation["checks"][key] = _native_table(body, check.get("order", "unordered"))
+        tables[(workflow["id"], logical)] = observation["checks"][key]
+        return
+    if kind == "profile":
+        observation["checks"][key] = _native_profile(api.profile(workflow_id, api_node))
+        return
+
+    if kind == "expect":
+        order = check.get("order", "unordered")
+        body = api.table(workflow_id, api_node, limit=_expect_limit(check))
+        actual_columns = body.get("columns") or []
+        if check.get("data") is None:
+            if check.get("rows") != body.get("rows"):
+                problems.append("%s: rows %r != %r"
+                                % (label, body.get("rows"), check.get("rows")))
+            wanted = check.get("columns") or []
+            if len(wanted) != len(actual_columns):
+                problems.append("%s: columns %r" % (label, [c.get("name") for c in actual_columns]))
+            else:
+                for entry, actual in zip(wanted, actual_columns):
+                    name = entry if isinstance(entry, str) else entry.get("name")
+                    if name != actual.get("name"):
+                        problems.append("%s: column %r != %r" % (label, actual.get("name"), name))
+                    elif isinstance(entry, dict) and entry.get("type") and entry["type"] != actual.get("type"):
+                        problems.append("%s: column %r type %r != %r"
+                                        % (label, name, actual.get("type"), entry["type"]))
+        else:
+            expected = {"rows": check.get("rows"),
+                        "columns": _expected_columns(check.get("columns") or [], actual_columns),
+                        "data": check.get("data") or [], "order": order}
+            compare_table(label, expected, _native_table(body, order), problems)
+        stats = [entry for entry in check.get("columns") or []
+                 if isinstance(entry, dict)
+                 and any(field in entry for field in ("missing", "distinct", "min", "max", "mean"))]
+        if stats:
+            body = api.profile(workflow_id, api_node)
+            expected = {"rows": check.get("rows"),
+                        "columns": _expected_columns(stats, body.get("columns") or [])}
+            compare_profile(label, expected, _native_profile(body), problems)
+        return
+
+    if kind == "expect_profile":
+        body = api.profile(workflow_id, api_node)
+        expected = {"rows": check.get("rows"),
+                    "columns": _expected_columns(check.get("columns") or [],
+                                                 body.get("columns") or [])}
+        compare_profile(label, expected, _native_profile(body), problems)
+        return
+
+    if kind == "equivalent":
+        reference_id = check["workflow"]
+        reference_node = check["node_ref"]
+        reference = corpus.get(reference_id)
+        if reference is None:
+            raise NativeError("equivalent check references unknown workflow %r" % reference_id)
+        current = _native_table(api.table(workflow_id, api_node, limit=50), "unordered")
+        tables[(workflow["id"], logical)] = current
+        reference_key = (reference_id, reference_node)
+        if reference_key not in tables:
+            if reference_id in running:
+                raise NativeError("equivalent check cycle: %s -> %s"
+                                  % (workflow["id"], reference_id))
+            needed.add(reference_key)
+            run_on_native(api, reference, corpus, datasets, tables, needed, running)
+        if reference_key not in tables:
+            raise NativeError("equivalent check: %s/%s has no table"
+                              % (reference_id, reference_node))
+        compare_table(label, tables[reference_key], current, problems)
+        return
+
+    raise NativeError("unknown native check kind %r" % kind)
+
+
+def run_on_native(api, workflow, corpus, datasets, tables=None, needed=None, running=None):
+    """Execute one corpus workflow on dap-native and collect its observations."""
+    tables = {} if tables is None else tables
+    needed = set() if needed is None else needed
+    running = set() if running is None else running
+    workflow_name = workflow["id"]
+    if workflow_name in running:
+        raise NativeError("equivalent check cycle through %r" % workflow_name)
+    running.add(workflow_name)
+    observation = {"status": "ok", "nodes": {}, "checks": {}, "durationMs": None,
+                   "checkProblems": []}
+    workflow_id = None
+    try:
+        workflow_id = api.create_workflow(workflow_name)
+        nodes = {}
+        for node in workflow["nodes"]:
+            factory, settings = native_binding(node["type"], node.get("config") or {}, datasets)
+            response = api.add_node(workflow_id, factory, settings)
+            if response.status != 200:
+                raise NativeError("node %s: add %s failed: HTTP %s %s"
+                                  % (node["id"], factory, response.status, _short(response.body)))
+            if not isinstance(response.body, dict) or "node" not in response.body:
+                raise NativeError("node %s: add %s returned %s"
+                                  % (node["id"], factory, _short(response.body)))
+            nodes[node["id"]] = response.body["node"]
+        for edge in workflow.get("edges", []):
+            api.connect_ok(workflow_id, nodes[edge["from"]], nodes[edge["to"]],
+                           edge.get("fromPort", 0), edge.get("toPort", 0))
+        response = api.run(workflow_id)
+        if response.status != 200:
+            raise NativeError(_native_run_failure(api, workflow_id, nodes, response))
+        body = response.body or {}
+        observation["durationMs"] = body.get("durationMs")
+        logical = {native: node for node, native in nodes.items()}
+        for state in body.get("nodes") or []:
+            native_node = state.get("node")
+            node_name = logical.get(native_node, native_node)
+            observation["nodes"][node_name] = state.get("state")
+            if state.get("state") not in NATIVE_OK_STATES:
+                raise NativeError("node %s (%s) state %s: %s" % (
+                    node_name, native_node, state.get("state"),
+                    state.get("message") or "no message"))
+        for check in workflow.get("checks", []):
+            _native_check(api, workflow_id, workflow, nodes, check, observation,
+                          tables, corpus, datasets, needed, running)
+        for needed_workflow, needed_node in sorted(needed):
+            if needed_workflow != workflow_name or (needed_workflow, needed_node) in tables:
+                continue
+            if needed_node not in nodes:
+                raise NativeError("equivalent check references unknown node %r in %s"
+                                  % (needed_node, workflow_name))
+            tables[(needed_workflow, needed_node)] = _native_table(
+                api.table(workflow_id, nodes[needed_node], limit=50), "unordered")
+    finally:
+        running.discard(workflow_name)
+        if workflow_id is not None:
+            api.delete_workflow(workflow_id)
     return observation
 
 
@@ -609,6 +868,154 @@ def compare_observation(workflow_id, expected, actual):
     return problems
 
 
+def _table_cells(expected, actual):
+    """Matching/total scalar comparisons of one table check, by PARITY rules."""
+    total = 1
+    matched = 0
+    if actual is not None and actual.get("rows") == expected.get("rows"):
+        matched += 1
+    expected_columns = expected.get("columns") or []
+    actual_columns = (actual or {}).get("columns") or []
+    for index in range(max(len(expected_columns), len(actual_columns))):
+        for field in ("name", "type"):
+            total += 1
+            if (index < len(expected_columns) and index < len(actual_columns)
+                    and expected_columns[index].get(field) == actual_columns[index].get(field)):
+                matched += 1
+    schema_ok = len(expected_columns) == len(actual_columns) and all(
+        expected_columns[index].get("name") == actual_columns[index].get("name")
+        and expected_columns[index].get("type") == actual_columns[index].get("type")
+        for index in range(len(expected_columns)))
+    expected_data = expected.get("data") or []
+    actual_data = (actual or {}).get("data") or []
+    total += len(expected_data) * len(expected_columns)
+    if actual is None or not schema_ok:
+        return matched, total
+    types = [column.get("type") for column in expected_columns]
+    if expected.get("order") == "ordered":
+        for got_row, want_row in zip(actual_data, expected_data):
+            for index, type_name in enumerate(types):
+                if (index < len(got_row) and index < len(want_row)
+                        and _cells_equal(got_row[index], want_row[index], type_name)):
+                    matched += 1
+    else:
+        def canon(row):
+            return tuple(_canon(cell, types[index])
+                         for index, cell in enumerate(row) if index < len(types))
+
+        try:
+            got_rows = sorted(canon(row) for row in actual_data)
+            want_rows = sorted(canon(row) for row in expected_data)
+        except (TypeError, ValueError):
+            return matched, total
+        for got_row, want_row in zip(got_rows, want_rows):
+            for got_cell, want_cell in zip(got_row, want_row):
+                if got_cell == want_cell:
+                    matched += 1
+    return matched, total
+
+
+def _profile_cells(expected, actual):
+    total = 1
+    matched = 0
+    if actual is not None and actual.get("rows") == expected.get("rows"):
+        matched += 1
+    expected_columns = {column["name"]: column for column in expected.get("columns") or []}
+    actual_columns = {column["name"]: column for column in (actual or {}).get("columns") or []}
+    for name, want in expected_columns.items():
+        got = actual_columns.get(name)
+        for field in ("type", "missing", "distinct"):
+            if want.get(field) is None:
+                continue
+            total += 1
+            if got is not None and got.get(field) == want.get(field):
+                matched += 1
+        for field in ("min", "max", "mean"):
+            if want.get(field) is None:
+                continue
+            total += 1
+            if got is not None and _numbers_close(_as_number(got.get(field)),
+                                                  _as_number(want.get(field))):
+                matched += 1
+    total += sum(1 for name in actual_columns if name not in expected_columns)
+    return matched, total
+
+
+def count_cells(expected_checks, actual_checks):
+    """Scalar comparisons the baseline prescribes: rows, columns, cells, stats."""
+    matched = total = 0
+    for key, expected in expected_checks.items():
+        actual = actual_checks.get(key)
+        if expected.get("kind") == "table":
+            workflow_cells = _table_cells(expected, actual)
+        else:
+            workflow_cells = _profile_cells(expected, actual)
+        matched += workflow_cells[0]
+        total += workflow_cells[1]
+    return matched, total
+
+
+def run_native_parity(api, workflows, verbose=False):
+    datasets = load_datasets()
+    corpus = {workflow["id"]: workflow for workflow in load_corpus()}
+    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    expected_workflows = baseline.get("workflows", {})
+    tables = {}
+    problems = []
+    matched = total = 0
+    ok_count = failed_count = 0
+    for workflow in workflows:
+        workflow_id = workflow["id"]
+        expected = expected_workflows.get(workflow_id)
+        native_only = workflow.get("kind") == "native-only"
+        observation = None
+        workflow_problems = []
+        try:
+            observation = run_on_native(api, workflow, corpus, datasets, tables)
+        except (NativeError, dap.ApiError, AssertionError) as exc:
+            workflow_problems.append("%s: %s" % (workflow_id, exc))
+        if observation is not None:
+            if native_only:
+                workflow_problems.extend("%s: %s" % (workflow_id, problem)
+                                         for problem in observation.get("checkProblems", []))
+            elif expected is None:
+                workflow_problems.append("%s: no baseline observation" % workflow_id)
+            else:
+                expected_view = dict(expected)
+                expected_view.pop("nodes", None)
+                actual_view = {"status": observation.get("status"),
+                               "checks": observation.get("checks", {}),
+                               "durationMs": observation.get("durationMs")}
+                workflow_problems.extend(
+                    compare_observation(workflow_id, expected_view, actual_view))
+                matched_cells, workflow_cells = count_cells(
+                    expected.get("checks", {}), observation.get("checks", {}))
+                matched += matched_cells
+                total += workflow_cells
+        elif not native_only and expected is not None:
+            total += count_cells(expected.get("checks", {}), {})[1]
+        if workflow_problems:
+            failed_count += 1
+            problems.extend(workflow_problems)
+            print("FAIL  %-28s %s" % (workflow_id, workflow_problems[0]))
+        else:
+            ok_count += 1
+            print("ok    %-28s %sms  checks=%d"
+                  % (workflow_id, observation.get("durationMs"), len(workflow.get("checks", []))))
+        if verbose:
+            for problem in workflow_problems:
+                print("  " + problem)
+    if problems:
+        print("\n%d parity problem(s):" % len(problems))
+        for problem in problems[:60]:
+            print("  " + problem)
+    percent = 100.0 * matched / total if total else 0.0
+    print("\nnative parity: %d workflows ok, %d failed, 0 skipped; "
+          "matching cells %d/%d (%.1f%%)"
+          % (ok_count, failed_count, matched, total, percent))
+    return 1 if failed_count else 0
+
+
 # ----------------------------------------------------------------------- CLI
 
 
@@ -640,8 +1047,13 @@ def main(argv=None):
         print("corpus: %d workflows, %d problem(s)" % (len(workflows), len(problems)))
         return 1 if problems else 0
     if args.engine == "native":
-        print("--engine native lands with dap-native in Phase 1/2", file=sys.stderr)
-        return 2
+        if args.write_baseline:
+            print("--engine native compares with tests/baseline.json; "
+                  "record a baseline with --engine oracle", file=sys.stderr)
+            return 2
+        api = dap.Api(args.base, session=args.session)
+        api.health()
+        return run_native_parity(api, workflows, args.verbose)
     if not (args.write_baseline or args.check_baseline):
         print("choose --write-baseline or --check-baseline", file=sys.stderr)
         return 2
