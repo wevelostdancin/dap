@@ -90,7 +90,7 @@ Arrow) с тем же контрактом `/v1`. Он не использует
 
 ```bash
 make build-native   # engine-native/target/dap-native.jar
-make test-native    # JUnit suite (199 тестов)
+make test-native    # JUnit suite (203 теста)
 make run-native     # 127.0.0.1:7800, блокирующий процесс
 ```
 

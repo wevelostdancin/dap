@@ -234,7 +234,7 @@ parse перекрывается, append сериализован (§2), поэ�
     cd engine-native
     export JAVA_HOME=$HOME/Projects/tools/jdk-21.0.13+9/Contents/Home
     export PATH="$JAVA_HOME/bin:$PATH"
-    ./mvnw -q -o test                 # 199 тестов, 0 падений (проверка сборки)
+    ./mvnw -q -o test                 # 203 теста, 0 падений (проверка сборки)
     ./mvnw -q -o -DskipTests package  # engine-native/target/dap-native.jar
     cd ..
 

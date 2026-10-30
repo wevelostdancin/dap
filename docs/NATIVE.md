@@ -16,7 +16,7 @@ in-memory модель workflow/job. 832 узла, auth, multi-tenancy, persiste
 
 | Что | Состояние на этой ветке |
 |---|---|
-| Сборка | `pom.xml`: javalin 6.7.0, duckdb_jdbc 1.5.6.0, arrow-vector/memory-netty 19.0.0, jackson 2.19.0, junit 5.11.4. `./mvnw -B test` — 199 тестов, 0 падений |
+| Сборка | `pom.xml`: javalin 6.7.0, duckdb_jdbc 1.5.6.0, arrow-vector/memory-netty 19.0.0, jackson 2.19.0, junit 5.11.4. `./mvnw -B test` — 203 теста, 0 падений |
 | Каталог | 11 JSON-спеков + `index.txt`; `NodeRegistry`; все 11 с `available:true` (10 пилотных + `column_renamer`); `/dialog` строится из `configSchema` |
 | HTTP | Все 25 операций frozen-контракта `/v1` зарегистрированы в `NativeService`; `X-DAP-Session`, коды ошибок и Job-модель по frozen-контракту; 16 интеграционных HTTP-тестов |
 | Исполнение | `WorkflowStore`, `Dag`, `JobManager`, 11 executor-ов; runs одного workflow сериализованы, разные — параллельны; snapshot графа на run |
@@ -129,7 +129,7 @@ DuckDbSession (one in-memory DuckDB per session)
 
 | Что | Команда | Результат |
 |---|---|---|
-| Полный suite | `./mvnw -B test` | 199 тестов, 0 failures, 0 errors; BUILD SUCCESS, ~10 с (114 на момент Фазы 1) |
+| Полный suite | `./mvnw -B test` | 203 теста, 0 failures, 0 errors; BUILD SUCCESS, ~10 с (114 на момент Фазы 1) |
 | HTTP-интеграция | `NativeServiceTest` (16 тестов) | реальный Javalin на свободном порту, все 25 операций, timeout/cancel, изоляция сессий |
 | Health во время sync-run | `-Ddap.test.slowMs=10000` | health 200 за 1 мс при 10-секундном узле; sync-run завершился 200 |
 | Spike 200k, 5 прогонов | `./mvnw -B -Dtest=ArrowDuckDbSpikeTest test` | 1952–2108 мс; 94 877–102 459 строк/с; медиана 1994 мс / 100 301 строк/с |
@@ -278,7 +278,7 @@ curl -s -H 'X-DAP-Session: verify' http://127.0.0.1:7863/v1/workflows/wf-1/debug
 | `docs/MIGRATION.md` + 11-й узел | да | `dap.column_renamer` + `wf-n3`; каталог 11 узлов, parity 13/13 |
 | MCP e2e | да | `tests/mcp_e2e.py` (`DAP_NATIVE=1`): create → add_node → connect → run → table → delete, 3,6 с |
 | Лицензии/граница | да | [NOTICE](../NOTICE) §2, [INDEPENDENCE.md](INDEPENDENCE.md) §11 |
-| Тесты | да | `mvn test` — 199 тестов; parity 13/13, `matching cells 1563/1563 (100 %)`; smoke 9/9; MCP 27+1 |
+| Тесты | да | `mvn test` — 203 теста; parity 13/13, `matching cells 1563/1563 (100 %)`; smoke 9/9; MCP 27+1 |
 ## 6. Дальше и риски
 
 - **Все 11 узлов доступны (10 пилотных + `column_renamer` как шаблон [MIGRATION.md](MIGRATION.md));

@@ -72,7 +72,7 @@
 export JAVA_HOME="$HOME/Projects/tools/jdk-21.0.13+9/Contents/Home"
 export PATH="$JAVA_HOME/bin:$PATH"
 cd engine-native
-./mvnw -q -o test                          # 199 тестов, 0 failures
+./mvnw -q -o test                          # 203 теста, 0 failures
 ./mvnw -q -o -DskipTests package           # target/dap-native.jar
 DAP_PORT=7924 "$JAVA_HOME/bin/java" -jar target/dap-native.jar &
 cd ..
