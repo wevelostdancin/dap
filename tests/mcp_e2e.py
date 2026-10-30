@@ -23,7 +23,9 @@ import json
 import os
 import pathlib
 import queue
+import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -108,6 +110,91 @@ def shutdown(base):
             return response.status == 200 and body.get("ok") is True, body
     except Exception as error:  # noqa: BLE001 - shutdown is best effort cleanup
         return False, str(error)
+
+
+NATIVE_PID_RE = re.compile(r"dap-mcp: native engine pid=(\d+)")
+
+
+def launched_engine_pids(log_path):
+    """PIDs the adapter announced on stderr; empty when it reused a service."""
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    return [int(match.group(1)) for match in NATIVE_PID_RE.finditer(text)]
+
+
+def process_command(pid):
+    """Command line from ps, or None when the platform/sandbox hides processes."""
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def process_alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def engine_gone(pid):
+    command = process_command(pid)
+    if command is not None:
+        return command == ""
+    return not process_alive(pid)
+
+
+def terminate_engine(pid, timeout=10.0):
+    """Terminate the PID the adapter announced, never an unrelated process."""
+    command = process_command(pid)
+    if command is not None and "dap-native.jar" not in command:
+        return False
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return True
+    if command is None:
+        # ps is unavailable (sandbox/container): we cannot distinguish a zombie
+        # from a live process, so signal and let the health check decide.
+        time.sleep(min(timeout, 2.0))
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        return True
+    limit = time.monotonic() + timeout
+    while time.monotonic() < limit:
+        if engine_gone(pid):
+            return True
+        time.sleep(0.1)
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return True
+    limit = time.monotonic() + 3
+    while time.monotonic() < limit:
+        if engine_gone(pid):
+            return True
+        time.sleep(0.1)
+    return False
+
+
+def wait_engine_down(base, timeout=10.0):
+    limit = time.monotonic() + timeout
+    while time.monotonic() < limit and health(base):
+        time.sleep(0.1)
+    return not health(base)
 
 
 class Mcp:
@@ -365,25 +452,48 @@ def run(port, timeout):
         finally:
             step("shutting the engine down")
             cleanup_error = None
+            log.flush()
+            launched = launched_engine_pids(log_path)
             stopped, body = shutdown(base)
             if stopped:
-                limit = time.monotonic() + 10
-                while time.monotonic() < limit and health(base):
-                    time.sleep(0.1)
-                if health(base):
-                    if failed:
-                        print("mcp-e2e: WARNING: engine is still running after cleanup",
-                              file=sys.stderr)
-                    else:
-                        cleanup_error = Failure(
-                            "engine still answers /v1/health after shutdown")
                 step("shutdown ok: %s" % (body,))
-            elif failed:
-                step("WARNING: /v1/shutdown failed: %s" % (body,))
             else:
+                step("WARNING: /v1/shutdown failed: %s" % (body,))
+
+            terminated = []
+            if not stopped:
+                for pid in launched:
+                    if terminate_engine(pid):
+                        terminated.append(pid)
+                        step("terminated launched engine pid %d" % pid)
+
+            down = wait_engine_down(base, 10)
+            if not down and launched:
+                for pid in launched:
+                    if pid not in terminated and terminate_engine(pid):
+                        terminated.append(pid)
+                        step("terminated launched engine pid %d" % pid)
+                down = wait_engine_down(base, 5)
+            if not down:
+                if failed:
+                    print("mcp-e2e: WARNING: engine is still running after cleanup",
+                          file=sys.stderr)
+                else:
+                    cleanup_error = Failure("engine still answers /v1/health after cleanup")
+            elif not stopped and not terminated and not failed:
                 cleanup_error = Failure("/v1/shutdown failed: %s" % (body,))
 
             stop_adapter(process)
+            # The adapter may have launched the child just before it was stopped.
+            if health(base):
+                shutdown(base)
+                wait_engine_down(base, 10)
+            if health(base) and failed:
+                print("mcp-e2e: WARNING: engine is still running after cleanup",
+                      file=sys.stderr)
+            elif health(base) and cleanup_error is None:
+                cleanup_error = Failure("engine still answers /v1/health after cleanup")
+
             log.flush()
             log.close()
             if failed:
