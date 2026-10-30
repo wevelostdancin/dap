@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Joins two tables on key columns using an inner, left, or right join. Key columns can be merged into one output column.",
+  "description": "Joins two tables on key columns using an inner, left, or right join. Key columns can be merged into one output column. A right-side column whose name already appears in the output is renamed with the suffix \" (Right)\" (KNIME APPEND_SUFFIX).",
   "inPorts": [
     {
       "index": 0,
