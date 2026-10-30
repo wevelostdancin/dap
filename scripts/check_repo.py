@@ -171,9 +171,6 @@ def check_native_jar() -> None:
     if not jar.exists():
         return
     size = jar.stat().st_size
-    if size >= 50 * 1024 * 1024:
-        fail("engine-native/target/dap-native.jar is %.1f MiB, the limit is 50 MiB"
-             % (size / (1024 * 1024)))
     import zipfile
 
     try:
@@ -186,7 +183,12 @@ def check_native_jar() -> None:
     if not natives:
         fail("dap-native.jar contains no DuckDB native library (check the dap.duckdb.native profiles)")
     elif len(natives) > 1:
-        warn("dap-native.jar carries %d DuckDB natives (cross-platform build?)" % len(natives))
+        # A deliberate -Ddap.duckdb.native=all build is cross-platform and large by design.
+        warn("dap-native.jar carries %d DuckDB natives (%.1f MiB cross-platform build)"
+             % (len(natives), size / (1024 * 1024)))
+    elif size >= 50 * 1024 * 1024:
+        fail("engine-native/target/dap-native.jar is %.1f MiB, the limit is 50 MiB"
+             % (size / (1024 * 1024)))
 
 
 def check_python_syntax() -> None:

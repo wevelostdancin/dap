@@ -113,6 +113,28 @@ class ProfileDistinctTest {
     }
 
     @Test
+    void exactlyOneHundredThousandDistinctValuesStayExactAboveTheRowCap() throws Exception {
+        int rows = 150_000;
+        int distinct = 100_000;
+        List<ColumnSpec> columns = List.of(ColumnSpec.of("v", "Int64"));
+        List<Object[]> data = new ArrayList<>(rows);
+        for (int i = 0; i < rows; i++) {
+            data.add(new Object[]{(long) (i % distinct)});
+        }
+        try (DuckDbSession db = new DuckDbSession();
+             ArrowTable table = ArrowTable.of(columns, data)) {
+            String name = db.load(table, "profile_cap_boundary");
+            LazyPlan plan = new LazyPlan(db, "SELECT * FROM " + DuckDbSession.quote(name), columns);
+
+            ProfileData profile = plan.profile();
+
+            assertEquals(rows, profile.rows());
+            assertEquals(distinct, profile.columns().get(0).distinct(),
+                    "the cap promises exact counts up to 100k distinct values, sketch error included");
+        }
+    }
+
+    @Test
     void lowCardinalityAboveTheRowCapIsRefinedToTheExactCount() throws Exception {
         int rows = 120_000;
         int distinct = 90_000;

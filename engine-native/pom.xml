@@ -88,6 +88,9 @@
         <version>3.5.2</version>
         <configuration>
           <argLine>--add-opens=java.base/java.nio=ALL-UNNAMED</argLine>
+          <systemPropertyVariables>
+            <dap.project.root>${project.basedir}/..</dap.project.root>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>

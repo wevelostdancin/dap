@@ -145,7 +145,7 @@
 - все 12 workflow корпуса исполняются end-to-end.
 
 **Результат (30.10.2026):** все пункты выполнены на ветке `phase2-native`.
-`make test-native` — 179 тестов, 0 падений; `tests/parity.py --engine native` —
+`make test-native` — 181 тест, 0 падений; `tests/parity.py --engine native` —
 12/12 workflow ok, `matching cells 1563/1563 (100 %)`; `tests/native_smoke.py` — 9/9;
 `tests/test_parity_native.py` — 27/27; jar 44,1 МиБ (< 50 МБ) одной платформенной
 native-библиотекой; profile `distinct` точен до 100k различных значений, выше — sketch

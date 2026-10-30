@@ -86,6 +86,9 @@ public final class XlsxTableReader {
         } catch (XMLStreamException failure) {
             throw new IllegalArgumentException("cannot read Excel workbook " + file + ": "
                     + failure.getMessage(), failure);
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException("cannot read Excel workbook " + file
+                    + ": malformed numeric value (" + failure.getMessage() + ")", failure);
         }
     }
 

@@ -109,6 +109,18 @@ def validate_corpus(workflows, datasets):
             problems.append("%s: unknown kind %r" % (workflow_id, kind))
         if kind == "native-only" and not workflow.get("oracle_skip_reason"):
             problems.append("%s: native-only workflow needs oracle_skip_reason" % workflow_id)
+        # Native-only checks are evaluated by --engine native only; on a dual-run workflow
+        # the oracle path skips them silently, so an authoring mistake would go unnoticed.
+        for check in workflow.get("checks") or []:
+            check_kind = check.get("kind")
+            if kind == "dual-run" and check_kind in ("equivalent", "expect", "expect_profile"):
+                problems.append("%s/%s: %r checks are only allowed on native-only workflows"
+                                % (workflow_id, check.get("node"), check_kind))
+            if check_kind == "expect":
+                for column in check.get("columns") or []:
+                    if not isinstance(column, dict) or not column.get("type"):
+                        problems.append("%s/%s: expect columns need name and type"
+                                        % (workflow_id, check.get("node")))
         node_ids = {}
         for node in workflow.get("nodes", []):
             node_id = node.get("id")

@@ -39,7 +39,8 @@ class MathFormulaExecutorTest {
 
     @Test
     void irisPetalAreaFromCorpusWorkflowAddsFloatColumnWithGoldenValues() throws Exception {
-        Path iris = Path.of("..", "tests", "corpus", "data", "iris.csv").toAbsolutePath().normalize();
+        Path iris = Path.of(System.getProperty("dap.project.root", ".."),
+                "tests", "corpus", "data", "iris.csv").toAbsolutePath().normalize();
         assertTrue(Files.isRegularFile(iris), "corpus fixture missing: " + iris);
         String readerConfig = "{\"file\":\"" + NodeTestSupport.path(iris) + "\"}";
 

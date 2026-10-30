@@ -75,8 +75,11 @@ public final class JobHandlers {
         if (job == null) {
             throw ApiException.notFound("unknown job: " + jobId);
         }
+        // Only a running job owns materializations: cancelling a queued job must not kill
+        // the /table or /profile read of the sibling run that is currently executing.
+        boolean wasRunning = job.state() == JobState.running;
         boolean cancelled = state.jobs().cancel(job);
-        if (cancelled) {
+        if (cancelled && wasRunning) {
             // A /table or /profile read runs on its own connection, so the job-connection
             // close above cannot reach it; close the reads registered for this workflow.
             DuckDbSession db = state.sessionIfPresent(job.sessionId());

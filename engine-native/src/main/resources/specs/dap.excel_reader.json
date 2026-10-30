@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Reads a worksheet from an Excel workbook into a data table. Cells become typed columns from the header or the explicit column schema.",
+  "description": "Reads a worksheet from an Excel workbook into a data table. Cells become typed columns from the header or the explicit column schema; blank header names get columnN placeholders and duplicate header names are rejected. Time-only cells (formats without a date part) are read as Timestamp on the workbook epoch date, because Time is not offered yet.",
   "inPorts": [],
   "outPorts": [
     {

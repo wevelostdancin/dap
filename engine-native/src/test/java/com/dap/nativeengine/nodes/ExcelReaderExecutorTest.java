@@ -27,7 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExcelReaderExecutorTest {
-    private static final Path CORPUS = Path.of("..", "tests", "corpus", "data");
+    private static final Path CORPUS =
+            Path.of(System.getProperty("dap.project.root", ".."), "tests", "corpus", "data");
 
     @TempDir
     Path dir;
@@ -476,6 +477,20 @@ class ExcelReaderExecutorTest {
             assertEquals(List.of(ColumnSpec.of("id", "Int64"), ColumnSpec.of("column2", "Int64")),
                     plan.columns());
             assertEquals(List.of("1", "2"), plan.preview(10).data().get(0));
+        }
+    }
+
+    @Test
+    void duplicateHeaderNamesAreRejectedWithTheColumnName() throws Exception {
+        Map<String, String> sheets = new LinkedHashMap<>();
+        sheets.put("Sheet1", sheet("<row r=\"1\">" + inline(1, "A", "id") + inline(1, "B", "id") + "</row>"
+                + "<row r=\"2\"><c r=\"A2\"><v>1</v></c><c r=\"B2\"><v>2</v></c></row>"));
+        Path file = writeXlsx(dir, "duplicate-header.xlsx", sheets, null, null);
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> read(db, job, "{\"file\":\"" + jsonPath(file) + "\"}"));
+            assertTrue(failure.getMessage().contains("id"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("duplicate"), failure.getMessage());
         }
     }
 
