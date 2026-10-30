@@ -655,7 +655,7 @@ def _native_check(api, workflow_id, workflow, nodes, check, observation,
         expected = {"rows": check.get("rows"),
                     "columns": _expected_columns(check.get("columns") or [],
                                                  body.get("columns") or [])}
-        compare_profile(label, expected, _native_profile(body), problems)
+        compare_profile(label, expected, _native_profile(body), problems, declared_only=True)
         return
 
     if kind == "equivalent":
@@ -820,17 +820,21 @@ def compare_table(key, expected, actual, problems):
                                 % (key, len(got_rows), len(want_rows)))
 
 
-def compare_profile(key, expected, actual, problems):
+def compare_profile(key, expected, actual, problems, declared_only=False):
     if expected["rows"] != actual["rows"]:
         problems.append("%s: rows %r != %r" % (key, actual["rows"], expected["rows"]))
     expected_columns = {column["name"]: column for column in expected["columns"]}
     actual_columns = {column["name"]: column for column in actual["columns"]}
-    if sorted(expected_columns) != sorted(actual_columns):
-        problems.append("%s: column set %r != %r"
-                        % (key, sorted(actual_columns), sorted(expected_columns)))
-        return
+    if not declared_only:
+        if sorted(expected_columns) != sorted(actual_columns):
+            problems.append("%s: column set %r != %r"
+                            % (key, sorted(actual_columns), sorted(expected_columns)))
+            return
     for name, want in expected_columns.items():
-        got = actual_columns[name]
+        got = actual_columns.get(name)
+        if got is None:
+            problems.append("%s: declared column %r missing from the response" % (key, name))
+            continue
         if got.get("type") != want.get("type"):
             problems.append("%s: column %r type %r != %r" % (key, name, got.get("type"), want.get("type")))
         for field in ("missing", "distinct"):
