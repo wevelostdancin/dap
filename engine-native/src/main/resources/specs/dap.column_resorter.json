@@ -1,0 +1,44 @@
+{
+  "id": "dap.column_resorter",
+  "name": "Column Resorter",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Reorders the columns of the input table. The configured list must be a permutation of the input columns: every column exactly once, with nothing added or dropped.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Column Resorter configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Column order",
+        "description": "All input columns in the new order; each column exactly once.",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        }
+      }
+    },
+    "required": [
+      "columns"
+    ]
+  }
+}
