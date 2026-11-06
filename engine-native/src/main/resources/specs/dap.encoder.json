@@ -1,0 +1,66 @@
+{
+  "id": "dap.encoder",
+  "name": "Encoder",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Encodes a categorical column as dense integer labels or as one-hot 0/1 columns, one per configured category.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Encoder configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Column",
+        "description": "Categorical input column to encode."
+      },
+      "output": {
+        "type": "string",
+        "title": "Output column",
+        "description": "Label column name, or the prefix for one-hot columns (<output>_<category>)."
+      },
+      "method": {
+        "type": "string",
+        "title": "Method",
+        "description": "label assigns a dense rank per distinct value; onehot appends one 0/1 column per configured category.",
+        "enum": [
+          "label",
+          "onehot"
+        ],
+        "default": "label"
+      },
+      "categories": {
+        "type": "array",
+        "title": "Categories",
+        "description": "Categories expanded into one-hot columns; required for the onehot method.",
+        "items": {
+          "title": "Category",
+          "description": "Category value matching the input column type."
+        }
+      }
+    },
+    "required": [
+      "column",
+      "output",
+      "method"
+    ]
+  }
+}
