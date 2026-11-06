@@ -1,0 +1,81 @@
+{
+  "id": "dap.top_n_per_group",
+  "name": "Top N per Group",
+  "category": "/Manipulation/Row",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Keeps the first n rows of every group, ordered by the configured keys. Implemented with QUALIFY ROW_NUMBER() OVER (PARTITION BY groupBy ORDER BY ...) <= n; rows with equal sort keys are numbered arbitrarily. Input columns are kept.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Top N per Group configuration",
+    "additionalProperties": false,
+    "properties": {
+      "groupBy": {
+        "type": "array",
+        "title": "Group columns",
+        "description": "Columns that define the groups.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "orderBy": {
+        "type": "array",
+        "title": "Order by",
+        "description": "Ordering inside each group; the first n rows are kept.",
+        "items": {
+          "type": "object",
+          "title": "Order key",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column to order by."
+            },
+            "direction": {
+              "type": "string",
+              "title": "Direction",
+              "description": "Sort direction.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            }
+          },
+          "required": [
+            "column"
+          ]
+        }
+      },
+      "n": {
+        "type": "integer",
+        "title": "N",
+        "description": "Number of rows to keep per group; must be greater than zero.",
+        "minimum": 1
+      }
+    },
+    "required": [
+      "groupBy",
+      "orderBy",
+      "n"
+    ]
+  }
+}

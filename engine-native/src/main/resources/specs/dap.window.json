@@ -1,0 +1,120 @@
+{
+  "id": "dap.window",
+  "name": "Window",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Adds SQL window function columns. Every function shares one OVER clause built from partitionBy and orderBy; rank, dense_rank, lag and lead require orderBy, while row_number, sum and mean also work over a whole partition. With orderBy, sum and mean are running aggregates (unbounded preceding to current row). Input columns are kept.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Window configuration",
+    "additionalProperties": false,
+    "properties": {
+      "partitionBy": {
+        "type": "array",
+        "title": "Partition by",
+        "description": "Columns that define the window partitions. When omitted the whole table is one partition.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "orderBy": {
+        "type": "array",
+        "title": "Order by",
+        "description": "Ordering inside each partition, applied to every window function.",
+        "items": {
+          "type": "object",
+          "title": "Order key",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column to order by."
+            },
+            "direction": {
+              "type": "string",
+              "title": "Direction",
+              "description": "Sort direction.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            }
+          },
+          "required": [
+            "column"
+          ]
+        }
+      },
+      "functions": {
+        "type": "array",
+        "title": "Functions",
+        "description": "Window functions to compute, in output order.",
+        "items": {
+          "type": "object",
+          "title": "Window function",
+          "additionalProperties": false,
+          "properties": {
+            "fn": {
+              "type": "string",
+              "title": "Function",
+              "description": "Window function to apply.",
+              "enum": [
+                "row_number",
+                "rank",
+                "dense_rank",
+                "lag",
+                "lead",
+                "sum",
+                "mean"
+              ]
+            },
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column for lag, lead, sum and mean."
+            },
+            "offset": {
+              "type": "integer",
+              "title": "Offset",
+              "description": "Row offset for lag and lead, in rows; defaults to 1.",
+              "minimum": 0,
+              "default": 1
+            },
+            "output": {
+              "type": "string",
+              "title": "Output column",
+              "description": "Name of the new column."
+            }
+          },
+          "required": [
+            "fn",
+            "output"
+          ]
+        }
+      }
+    },
+    "required": [
+      "functions"
+    ]
+  }
+}
