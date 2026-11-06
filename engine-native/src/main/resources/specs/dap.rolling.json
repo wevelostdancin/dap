@@ -1,0 +1,104 @@
+{
+  "id": "dap.rolling",
+  "name": "Rolling",
+  "category": "/Time Series",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Adds a trailing-window aggregate column: fn(column) over the current row and the previous window-1 rows of the same partition, ordered by orderBy. The first rows see a partial window, and mean returns Float64 while sum, min and max keep the input column type.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Rolling configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Column",
+        "description": "Input column whose trailing window is aggregated."
+      },
+      "output": {
+        "type": "string",
+        "title": "Output column",
+        "description": "Name of the new column."
+      },
+      "window": {
+        "type": "integer",
+        "title": "Window",
+        "description": "Number of rows in the trailing window, including the current row.",
+        "minimum": 1
+      },
+      "fn": {
+        "type": "string",
+        "title": "Function",
+        "description": "Window aggregate; mean and sum require a numeric column.",
+        "enum": [
+          "mean",
+          "sum",
+          "min",
+          "max"
+        ]
+      },
+      "orderBy": {
+        "type": "array",
+        "title": "Order by",
+        "description": "Row order inside each partition; required.",
+        "items": {
+          "type": "object",
+          "title": "Order key",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column to order by."
+            },
+            "direction": {
+              "type": "string",
+              "title": "Direction",
+              "description": "Sort direction.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            }
+          },
+          "required": [
+            "column"
+          ]
+        }
+      },
+      "partitionBy": {
+        "type": "array",
+        "title": "Partition by",
+        "description": "Columns that define the partitions. When omitted the whole table is one partition.",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "column",
+      "output",
+      "window",
+      "fn",
+      "orderBy"
+    ]
+  }
+}

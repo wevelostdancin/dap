@@ -1,0 +1,47 @@
+{
+  "id": "dap.date_range",
+  "name": "Date Range",
+  "category": "/Time Series",
+  "type": "Source",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Generates one Timestamp row per step between two inclusive bounds. The bounds accept ISO dates or timestamps, the step is a positive interval such as '1 day' or '15 minutes', and the single output column is named date.",
+  "inPorts": [],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Date Range configuration",
+    "additionalProperties": false,
+    "properties": {
+      "start": {
+        "type": "string",
+        "title": "Start",
+        "description": "First timestamp of the range, as an ISO date or timestamp; inclusive."
+      },
+      "end": {
+        "type": "string",
+        "title": "End",
+        "description": "Last timestamp of the range, as an ISO date or timestamp; inclusive, not before start."
+      },
+      "step": {
+        "type": "string",
+        "title": "Step",
+        "description": "Distance between two rows such as '1 day' or '15 minutes' (a positive count and a unit: second, minute, hour, day, week, month, year).",
+        "default": "1 day"
+      }
+    },
+    "required": [
+      "start",
+      "end",
+      "step"
+    ]
+  }
+}
