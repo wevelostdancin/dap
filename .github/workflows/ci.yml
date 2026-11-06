@@ -32,7 +32,9 @@ jobs:
       - name: Package
         run: cd engine-native && ./mvnw -B -DskipTests package
       - name: Static checks
-        run: python3 scripts/check_repo.py
+        run: |
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 scripts/check_repo.py
       - name: Golden structure
         run: python3 tests/goldens-native/runner.py --validate
       - name: Golden suite

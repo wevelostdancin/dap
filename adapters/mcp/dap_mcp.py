@@ -140,6 +140,7 @@ def ensure_service() -> None:
     """Поднять движок, если он ещё не запущен; чужой сервис не трогаем."""
     if health():
         return
+    _reap_child()
     env = dict(os.environ)
     env.update({"DAP_HOME": DAP_HOME, "DAP_PORT": str(PORT), "DAP_BIND": BIND})
     if not os.path.isfile(NATIVE_JAR):
@@ -581,6 +582,9 @@ def _reap_child() -> None:
 
 
 def tool_shutdown(_args: dict):
+    if not health():
+        _reap_child()
+        return {"ok": True, "alreadyStopped": True}
     try:
         return call("POST", "/v1/shutdown")
     finally:

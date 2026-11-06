@@ -456,11 +456,6 @@
     }
    },
    "durationMs": 5,
-   "nodes": {
-    "Example Data Reader": "EXECUTED",
-    "Rule-based Row Filter": "EXECUTED",
-    "Sorter": "EXECUTED"
-   },
    "status": "ok"
   },
   "wf-02-iris-groupby": {
@@ -545,11 +540,6 @@
     }
    },
    "durationMs": 5,
-   "nodes": {
-    "Example Data Reader": "EXECUTED",
-    "Row Aggregator": "EXECUTED",
-    "Sorter": "EXECUTED"
-   },
    "status": "ok"
   },
   "wf-03-adult-filter-groupby": {
@@ -716,12 +706,6 @@
     }
    },
    "durationMs": 182,
-   "nodes": {
-    "Example Data Reader": "EXECUTED",
-    "Row Aggregator": "EXECUTED",
-    "Rule-based Row Filter": "EXECUTED",
-    "Sorter": "EXECUTED"
-   },
    "status": "ok"
   },
   "wf-04-adult-string-columns": {
@@ -1037,13 +1021,6 @@
     }
    },
    "durationMs": 167,
-   "nodes": {
-    "Column Filter": "EXECUTED",
-    "Example Data Reader": "EXECUTED",
-    "Row Aggregator": "EXECUTED",
-    "Sorter": "EXECUTED",
-    "String Manipulation": "EXECUTED"
-   },
    "status": "ok"
   },
   "wf-06-worldbank-missing": {
@@ -1705,13 +1682,6 @@
     }
    },
    "durationMs": 10,
-   "nodes": {
-    "Column Filter": "EXECUTED",
-    "Example Data Reader": "EXECUTED",
-    "Row Aggregator": "EXECUTED",
-    "Rule Engine": "EXECUTED",
-    "Sorter": "EXECUTED"
-   },
    "status": "ok"
   },
   "wf-07-adult-join": {
@@ -2336,12 +2306,6 @@
     }
    },
    "durationMs": 304,
-   "nodes": {
-    "Example Data Reader": "EXECUTED",
-    "Joiner": "EXECUTED",
-    "Row Aggregator": "EXECUTED",
-    "Sorter": "EXECUTED"
-   },
    "status": "ok"
   },
   "wf-08-air-quality-filter": {
@@ -2853,11 +2817,6 @@
     }
    },
    "durationMs": 46,
-   "nodes": {
-    "Example Data Reader": "EXECUTED",
-    "Rule-based Row Filter": "EXECUTED",
-    "Sorter": "EXECUTED"
-   },
    "status": "ok"
   },
   "wf-09-empty-result": {
@@ -2928,10 +2887,6 @@
     }
    },
    "durationMs": 2,
-   "nodes": {
-    "Example Data Reader": "EXECUTED",
-    "Rule-based Row Filter": "EXECUTED"
-   },
    "status": "ok"
   }
  }

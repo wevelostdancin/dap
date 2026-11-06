@@ -89,7 +89,7 @@ class NativeLaunchTest(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_missing_jar_reports_build_hint(self):
-        module = load_adapter(DAP_HOME=str(self.home), DAP_ENGINE="native")
+        module = load_adapter(DAP_HOME=str(self.home))
         self.assertFalse(pathlib.Path(module.NATIVE_JAR).exists())
         with mock.patch.object(module, "health", return_value=False):
             with self.assertRaises(module.DapError) as caught:
@@ -108,7 +108,6 @@ class NativeLaunchTest(unittest.TestCase):
                if not key.startswith("DAP_")}
         env.update({
             "DAP_HOME": str(self.home),
-            "DAP_ENGINE": "native",
             "DAP_PORT": str(port),
             "DAP_SESSION": "mcp-launch-test",
         })
@@ -136,7 +135,7 @@ class NativeLaunchTest(unittest.TestCase):
         self.assertIn("mvnw -DskipTests package", error["message"])
 
     def test_launch_native_returns_popen_with_heap(self):
-        module = load_adapter(DAP_HOME=str(self.home), DAP_ENGINE="native", DAP_HEAP="3g")
+        module = load_adapter(DAP_HOME=str(self.home), DAP_HEAP="3g")
         child = FakeChild()
         log = io.BytesIO()
         with mock.patch.object(module.subprocess, "Popen", return_value=child) as popen:
@@ -152,7 +151,7 @@ class NativeLaunchTest(unittest.TestCase):
         self.assertEqual(kwargs["stdin"], subprocess.DEVNULL)
 
     def test_immediate_child_exit_fails_fast_and_is_reaped(self):
-        module = load_adapter(DAP_HOME=str(self.home), DAP_ENGINE="native")
+        module = load_adapter(DAP_HOME=str(self.home))
         make_home(self.home)
         self.assertTrue(pathlib.Path(module.NATIVE_JAR).is_file())
         real_popen = subprocess.Popen
@@ -185,7 +184,7 @@ class NativeLaunchTest(unittest.TestCase):
         self.assertIsNotNone(started[0].poll(), "exited child was not reaped")
 
     def test_timeout_terminates_child_and_reports_log_tail(self):
-        module = load_adapter(DAP_HOME=str(self.home), DAP_ENGINE="native")
+        module = load_adapter(DAP_HOME=str(self.home))
         make_home(self.home)
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         try:

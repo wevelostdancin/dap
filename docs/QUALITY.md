@@ -13,7 +13,7 @@
 | Структура goldens | `python3 tests/goldens-native/runner.py --validate` | проверка фикстур без движка |
 | Smoke | `make smoke` (`DAP_BASE`, по умолчанию `:7800`) | 9 чёрных проверок контракта и пяти узлов на запущенном движке |
 | MCP e2e | `make mcp-e2e` | адаптер поднимает движок, проходит create → add_node → connect → run → table → delete |
-| Всё | `make check` | `test-native + goldens + lint` |
+| Всё | `make check` | `test-native + goldens + goldens-validate + test-mcp + mcp-e2e + lint` |
 
 `make goldens` собирает jar, затем `tests/run_goldens.py` поднимает его на
 `127.0.0.1:7811` с отдельным каталогом `/tmp/dap-goldens`, ждёт `/v1/health`,

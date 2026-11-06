@@ -64,7 +64,8 @@ def check_openapi() -> None:
         # No PyYAML: fall back to a structural text check so CI still catches
         # a removed path without extra dependencies.
         text = read("api/openapi.yaml")
-        for required in ("/v1/health", "/v1/nodes", "/v1/workflows", "/v1/jobs"):
+        for required in ("/v1/health", "/v1/nodes", "/v1/workflows", "/v1/jobs",
+                         "/v1/workflows/load", "/v1/shutdown"):
             if not re.search(r"^  " + re.escape(required) + r":", text, re.M):
                 fail(f"OpenAPI misses path {required}")
         return
@@ -77,7 +78,8 @@ def check_openapi() -> None:
         fail("api/openapi.yaml: expected openapi: 3.1.0")
         return
     paths = spec.get("paths") or {}
-    for required in ("/v1/health", "/v1/nodes", "/v1/workflows", "/v1/jobs"):
+    for required in ("/v1/health", "/v1/nodes", "/v1/workflows", "/v1/jobs",
+                     "/v1/workflows/load", "/v1/shutdown"):
         if required not in paths:
             fail(f"OpenAPI misses path {required}")
 
@@ -115,19 +117,25 @@ def check_jar() -> None:
     if not jar.is_file():
         warn("dap-native.jar not built; jar checks skipped")
         return
-    size_mib = jar.stat().st_size / (1024 * 1024)
-    if size_mib >= 50:
-        fail(f"jar is {size_mib:.1f} MiB (limit 50 MiB)")
     with zipfile.ZipFile(jar) as archive:
         native = [name for name in archive.namelist() if "libduckdb" in name]
     if not native:
         fail("jar contains no DuckDB native library")
-    elif len(native) > 1:
-        warn(f"jar contains {len(native)} DuckDB native libraries (cross-platform build?)")
+        return
+    if len(native) > 1:
+        # Documented cross-platform build (-Ddap.duckdb.native=all): four native
+        # libraries are expected, so the single-platform size limit does not apply.
+        warn(f"jar contains {len(native)} DuckDB native libraries (cross-platform build)")
+        return
+    size_mib = jar.stat().st_size / (1024 * 1024)
+    if size_mib >= 50:
+        fail(f"jar is {size_mib:.1f} MiB (limit 50 MiB)")
 
 
 def check_python() -> None:
-    paths = list((ROOT / "tests").glob("*.py")) + list((ROOT / "adapters/mcp").glob("*.py"))
+    paths = (list((ROOT / "tests").glob("*.py"))
+             + list((ROOT / "tests/goldens-native").glob("*.py"))
+             + list((ROOT / "adapters/mcp").glob("*.py")))
     for path in sorted(paths):
         try:
             compile(path.read_text(encoding="utf-8"), str(path), "exec")

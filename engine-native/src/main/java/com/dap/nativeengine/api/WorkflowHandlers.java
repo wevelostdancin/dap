@@ -86,7 +86,7 @@ public final class WorkflowHandlers {
         }
         String requested = request.path("name").asText("");
         String name = requested.isBlank() ? document.path("name").asText(null) : requested;
-        Workflow workflow = state.workflows().create(session, name);
+        Workflow workflow = state.workflows().detached(session, name);
         try {
             Map<String, String> ids = new HashMap<>();
             Map<String, NodeSpec> specs = new HashMap<>();
@@ -122,8 +122,9 @@ public final class WorkflowHandlers {
                 validatePorts(specs.get(from), specs.get(to), fromPort, toPort);
                 workflow.connect(new Connection(from, fromPort, to, toPort));
             }
+            state.workflows().add(session, workflow);
         } catch (RuntimeException failure) {
-            state.workflows().delete(session, workflow.id());
+            // The workflow was never published, so a failed load leaves no trace.
             throw failure;
         }
         Http.ok(ctx, view(workflow));

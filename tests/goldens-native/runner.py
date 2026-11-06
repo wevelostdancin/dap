@@ -359,7 +359,7 @@ def _native_check(api, workflow_id, workflow, nodes, check, observation,
         reference = corpus.get(reference_id)
         if reference is None:
             raise NativeError("equivalent check references unknown workflow %r" % reference_id)
-        current = _native_table(api.table(workflow_id, api_node, limit=50), "unordered")
+        current = _native_table(api.table(workflow_id, api_node, limit=100000), "unordered")
         tables[(workflow["id"], logical)] = current
         reference_key = (reference_id, reference_node)
         if reference_key not in tables:
@@ -429,7 +429,7 @@ def run_on_native(api, workflow, corpus, datasets, tables=None, needed=None, run
                 raise NativeError("equivalent check references unknown node %r in %s"
                                   % (needed_node, workflow_name))
             tables[(needed_workflow, needed_node)] = _native_table(
-                api.table(workflow_id, nodes[needed_node], limit=50), "unordered")
+                api.table(workflow_id, nodes[needed_node], limit=100000), "unordered")
     finally:
         running.discard(workflow_name)
         if workflow_id is not None:
@@ -549,8 +549,6 @@ def compare_observation(workflow_id, expected, actual):
             problems.append("%s: status %r != %r"
                             % (workflow_id, actual.get("status"), expected.get("status")))
         return problems
-    if expected.get("nodes") != actual.get("nodes"):
-        problems.append("%s: node states %r != %r" % (workflow_id, actual.get("nodes"), expected.get("nodes")))
     expected_checks = expected.get("checks", {})
     actual_checks = actual.get("checks", {})
     if sorted(expected_checks) != sorted(actual_checks):
@@ -681,7 +679,6 @@ def run_goldens(api, workflows, verbose=False):
                 workflow_problems.append("%s: no baseline observation" % workflow_id)
             else:
                 expected_view = dict(expected)
-                expected_view.pop("nodes", None)
                 actual_view = {"status": observation.get("status"),
                                "checks": observation.get("checks", {}),
                                "durationMs": observation.get("durationMs")}

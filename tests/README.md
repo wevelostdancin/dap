@@ -5,7 +5,7 @@
 
 ## Быстрый старт
 
-    make check                 # JUnit + golden suite + lint
+    make check                 # JUnit + goldens + validate + MCP launch + MCP e2e + lint
 
 По отдельности:
 
@@ -53,8 +53,8 @@ int/NULL, `""` — значение, ordered/unordered.
 
 1. Положить фикстуру в `goldens-native/data/` и запись в `datasets.json`.
 2. Добавить `workflows/wf-*.json` с checks.
-3. Для baseline-сценария — записать наблюдение в `expected.json`
-   (вручную или прогоном и сохранением результата).
+3. Для baseline-сценария — добавить наблюдение в `expected.json` вручную
+   (CLI-флага `--record` нет: эталон фиксируется осознанно, а не автозаписью).
 4. `make goldens` — зелёный.
 
 Новый узел без golden и unit-теста не считается готовым.

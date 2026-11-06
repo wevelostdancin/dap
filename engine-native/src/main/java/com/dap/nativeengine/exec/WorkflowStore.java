@@ -19,16 +19,26 @@ public final class WorkflowStore {
     }
 
     public Workflow create(String session, String name) {
+        Workflow workflow = detached(session, name);
+        add(session, workflow);
+        return workflow;
+    }
+
+    /** Allocate an id and name without publishing the workflow to the session. */
+    public Workflow detached(String session, String name) {
+        String id = "wf-" + ids.incrementAndGet();
+        return new Workflow(id, name == null || name.isBlank() ? "workflow-" + ids.get() : name, session);
+    }
+
+    /** Publish a detached workflow; the per-session limit is enforced here. */
+    public void add(String session, Workflow workflow) {
         LinkedHashMap<String, Workflow> workflows =
                 sessions.computeIfAbsent(session, ignored -> new LinkedHashMap<>());
         synchronized (workflows) {
             if (workflows.size() >= maxPerSession) {
                 throw new IllegalStateException("workflow limit for session");
             }
-            String id = "wf-" + ids.incrementAndGet();
-            Workflow workflow = new Workflow(id, name == null || name.isBlank() ? "workflow-" + ids.get() : name, session);
-            workflows.put(id, workflow);
-            return workflow;
+            workflows.put(workflow.id(), workflow);
         }
     }
 
