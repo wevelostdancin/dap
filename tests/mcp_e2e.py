@@ -53,6 +53,7 @@ REQUIRED_TOOLS = {
     "dap_load_workflow",
     "dap_shutdown",
     "dap_delete_workflow",
+    "dap_ingest",
 }
 
 
@@ -304,7 +305,7 @@ def scenario(client, source, base):
 
     tools = client.request("tools/list", {}, 10).get("tools") or []
     names = {tool.get("name") for tool in tools}
-    check(len(tools) == 21, "tools/list returned %d tools, expected 21" % len(tools))
+    check(len(tools) == 22, "tools/list returned %d tools, expected 22" % len(tools))
     missing = REQUIRED_TOOLS - names
     check(not missing, "tools/list misses %s" % sorted(missing))
 

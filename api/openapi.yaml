@@ -39,6 +39,8 @@ tags:
     description: Table previews and column profiles
   - name: ops
     description: Save and diagnostics
+  - name: datasets
+    description: One-time conversion of source files into the Parquet cache
 paths:
   /v1:
     get:
@@ -704,6 +706,39 @@ paths:
                 $ref: '#/components/schemas/Ok'
         '500':
           $ref: '#/components/responses/ServerError'
+  /v1/datasets:
+    post:
+      tags: [datasets]
+      operationId: ingestDataset
+      summary: Ingest a file into the Parquet cache
+      description: |
+        Converts CSV, XLSX, JSON or Parquet once and stores the result as
+        <cache>/<sha256>.parquet, keyed by the file's absolute path, size,
+        modification time and format. An unchanged source returns the existing
+        file with cached=true instead of converting again. The cache directory is
+        DAP_CACHE_DIR, or ~/.dap/cache. CSV uses the csv_reader rules (comma,
+        header row, type inference); Excel uses the first worksheet; JSON uses
+        DuckDB read_json_auto; Parquet is copied through read_parquet.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        '200':
+          description: Cached Parquet dataset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
 components:
   parameters:
     SessionHeader:
@@ -1252,6 +1287,42 @@ components:
           type: boolean
         dir:
           type: string
+    IngestRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          description: Path to a CSV, XLSX, JSON or Parquet file
+        format:
+          type: string
+          enum: [csv, excel, json, parquet]
+          description: Defaults to the file extension (.csv/.xlsx/.json/.parquet)
+      additionalProperties: false
+    IngestResult:
+      type: object
+      required: [path, rows, columns, cached]
+      properties:
+        path:
+          type: string
+          description: Absolute path of the cached Parquet file
+        rows:
+          type: integer
+        columns:
+          type: array
+          items:
+            type: object
+            required: [name, type]
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+                description: Arrow type name, e.g. Int64 or Utf8
+        cached:
+          type: boolean
+          description: True when the cache entry already existed and was not rewritten
+      additionalProperties: false
     Ok:
       type: object
       required: [ok]
