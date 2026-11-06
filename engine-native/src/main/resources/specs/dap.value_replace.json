@@ -1,0 +1,77 @@
+{
+  "id": "dap.value_replace",
+  "name": "Value Replace",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Replaces exact values in selected columns with another scalar value. The column type is preserved, NULL can be both matched and written, and rules for one column are applied in order with the first match winning.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Value Replace configuration",
+    "additionalProperties": false,
+    "properties": {
+      "rules": {
+        "type": "array",
+        "title": "Rules",
+        "description": "Replacement rules; a rule matches a column value exactly, with NULL matched as a value.",
+        "items": {
+          "type": "object",
+          "title": "Rule",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column whose values are replaced."
+            },
+            "from": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ],
+              "title": "From",
+              "description": "Value to match; use null to match SQL NULL."
+            },
+            "to": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ],
+              "title": "To",
+              "description": "Replacement value; use null to write SQL NULL."
+            }
+          },
+          "required": [
+            "column",
+            "from",
+            "to"
+          ]
+        }
+      }
+    },
+    "required": [
+      "rules"
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "id": "dap.type_cast",
+  "name": "Type Cast",
+  "category": "/Manipulation/Column/Type",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Casts selected columns to another Arrow type with SQL CAST. Column names and order are preserved, untouched columns keep their types, and the output schema reports the new types.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Type Cast configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "Columns to cast. Columns that are not listed keep their input type.",
+        "items": {
+          "type": "object",
+          "title": "Cast",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column to cast."
+            },
+            "type": {
+              "type": "string",
+              "title": "Type",
+              "description": "Target Arrow type: Int64, Float64, Utf8, Boolean, Date32, Timestamp or Decimal128(precision,scale), for example Decimal128(18,4)."
+            }
+          },
+          "required": [
+            "column",
+            "type"
+          ]
+        }
+      }
+    },
+    "required": [
+      "columns"
+    ]
+  }
+}
