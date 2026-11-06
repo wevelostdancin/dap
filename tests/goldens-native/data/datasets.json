@@ -1,0 +1,364 @@
+{
+  "IRIS": {
+    "file": "iris.csv",
+    "rows": 150,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "sepal_length",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "sepal_width",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "petal_length",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "petal_width",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "species",
+        "arrow": "Utf8",
+        "missing": 0
+      }
+    ]
+  },
+  "ADULT": {
+    "file": "adult.csv",
+    "rows": 32561,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "age",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "workclass",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "fnlwgt",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "education",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "education-num",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "marital-status",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "occupation",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "relationship",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "race",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "sex",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "capital-gain",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "capital-loss",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "hours-per-week",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "native-country",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "income",
+        "arrow": "Utf8",
+        "missing": 0
+      }
+    ]
+  },
+  "AIR_QUALITY": {
+    "file": "air_quality.csv",
+    "rows": 9357,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "Date",
+        "arrow": "Date32",
+        "missing": 0
+      },
+      {
+        "name": "Time",
+        "arrow": "Time64",
+        "missing": 0
+      },
+      {
+        "name": "CO(GT)",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "PT08.S1(CO)",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "NMHC(GT)",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "C6H6(GT)",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "PT08.S2(NMHC)",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "NOx(GT)",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "PT08.S3(NOx)",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "NO2(GT)",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "PT08.S4(NO2)",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "PT08.S5(O3)",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "T",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "RH",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "AH",
+        "arrow": "Float64",
+        "missing": 0
+      }
+    ]
+  },
+  "WORLDBANK_COUNTRIES": {
+    "file": "worldbank_countries.csv",
+    "rows": 265,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "Country Code",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "Short Name",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "Table Name",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "Long Name",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "2-alpha code",
+        "arrow": "Utf8",
+        "missing": 1
+      },
+      {
+        "name": "Currency Unit",
+        "arrow": "Utf8",
+        "missing": 48
+      },
+      {
+        "name": "Special Notes",
+        "arrow": "Utf8",
+        "missing": 139
+      },
+      {
+        "name": "Region",
+        "arrow": "Utf8",
+        "missing": 48
+      },
+      {
+        "name": "Income Group",
+        "arrow": "Utf8",
+        "missing": 49
+      },
+      {
+        "name": "WB-2 code",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "National accounts base year",
+        "arrow": "Utf8",
+        "missing": 56
+      },
+      {
+        "name": "National accounts reference year",
+        "arrow": "Int64",
+        "missing": 191
+      },
+      {
+        "name": "SNA price valuation",
+        "arrow": "Utf8",
+        "missing": 58
+      },
+      {
+        "name": "Lending category",
+        "arrow": "Utf8",
+        "missing": 121
+      },
+      {
+        "name": "Other groups",
+        "arrow": "Utf8",
+        "missing": 206
+      },
+      {
+        "name": "System of National Accounts",
+        "arrow": "Utf8",
+        "missing": 57
+      },
+      {
+        "name": "Alternative conversion factor",
+        "arrow": "Utf8",
+        "missing": 265
+      },
+      {
+        "name": "PPP survey year",
+        "arrow": "Utf8",
+        "missing": 265
+      },
+      {
+        "name": "Balance of Payments Manual in use",
+        "arrow": "Utf8",
+        "missing": 71
+      },
+      {
+        "name": "External debt Reporting status",
+        "arrow": "Utf8",
+        "missing": 143
+      },
+      {
+        "name": "System of trade",
+        "arrow": "Utf8",
+        "missing": 93
+      },
+      {
+        "name": "Government Accounting concept",
+        "arrow": "Utf8",
+        "missing": 107
+      },
+      {
+        "name": "IMF data dissemination standard",
+        "arrow": "Utf8",
+        "missing": 77
+      },
+      {
+        "name": "Latest population census",
+        "arrow": "Utf8",
+        "missing": 51
+      },
+      {
+        "name": "Latest household survey",
+        "arrow": "Utf8",
+        "missing": 111
+      },
+      {
+        "name": "Source of most recent Income and expenditure data",
+        "arrow": "Utf8",
+        "missing": 97
+      },
+      {
+        "name": "Vital registration complete",
+        "arrow": "Utf8",
+        "missing": 145
+      },
+      {
+        "name": "Latest agricultural census",
+        "arrow": "Utf8",
+        "missing": 137
+      },
+      {
+        "name": "Latest industrial data",
+        "arrow": "Int64",
+        "missing": 118
+      },
+      {
+        "name": "Latest trade data",
+        "arrow": "Int64",
+        "missing": 74
+      },
+      {
+        "name": "Column30",
+        "arrow": "Utf8",
+        "missing": 265
+      }
+    ]
+  }
+}

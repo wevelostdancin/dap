@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """End-to-end check of the MCP adapter against the native engine (Phase 3 DoD).
 
-Launches "adapters/mcp/dap_mcp.py" with DAP_NATIVE=1 on a free loopback port and
+Launches "adapters/mcp/dap_mcp.py" on a free loopback port and
 lets the adapter start "engine-native/target/dap-native.jar" on its first tool
 call. The scenario then uses MCP tools only:
 
     dap_search_nodes -> dap_workflow_create -> dap_add_node (csv_reader, sorter)
     -> dap_connect -> dap_run -> dap_get_table -> dap_delete_workflow
+    -> dap_shutdown -> restart via the next tool call
 
-and stops the service with POST /v1/shutdown, because the adapter exposes no
-shutdown tool. The whole run is bounded by --timeout (120 s by default).
+and stops the service with POST /v1/shutdown at the end. The whole run is
+bounded by --timeout (120 s by default).
 
-The legacy KNIME service is never started. Requires the native jar and JDK 21
+Requires the native jar and JDK 21
 (discovered through JAVA_HOME, the usual local install, or java on PATH).
 
     python3 tests/mcp_e2e.py [--port 7923] [--timeout 120]
@@ -48,6 +49,9 @@ REQUIRED_TOOLS = {
     "dap_connect",
     "dap_run",
     "dap_get_table",
+    "dap_save_workflow",
+    "dap_load_workflow",
+    "dap_shutdown",
     "dap_delete_workflow",
 }
 
@@ -300,7 +304,7 @@ def scenario(client, source, base):
 
     tools = client.request("tools/list", {}, 10).get("tools") or []
     names = {tool.get("name") for tool in tools}
-    check(len(tools) == 19, "tools/list returned %d tools, expected 19" % len(tools))
+    check(len(tools) == 21, "tools/list returned %d tools, expected 21" % len(tools))
     missing = REQUIRED_TOOLS - names
     check(not missing, "tools/list misses %s" % sorted(missing))
 
@@ -381,6 +385,13 @@ def scenario(client, source, base):
           "workflow %s is still listed after delete" % (workflow,))
     step("workflow deleted")
 
+    step("dap_shutdown + restart")
+    down = client.tool("dap_shutdown", {}, 15)
+    check(down.get("ok") is True, "shutdown was not ok: %r" % (down,))
+    catalog = client.tool("dap_search_nodes", {"limit": 5}, 30)
+    check(len(catalog.get("nodes") or []) > 0, "engine did not restart after dap_shutdown")
+    step("engine restarted after dap_shutdown")
+
 
 def stop_adapter(process):
     if process.poll() is not None:
@@ -411,7 +422,7 @@ def run(port, timeout):
     chosen = pick_port(port)
     base = "http://127.0.0.1:%d" % chosen
     check(not health(base), "port %d already serves a DAP engine; refusing to reuse it" % chosen)
-    step("adapter=%s native=1 port=%d timeout=%ss"
+    step("adapter=%s port=%d timeout=%ss"
          % (ADAPTER.relative_to(ROOT), chosen, timeout))
 
     env = dict(os.environ)
@@ -420,7 +431,6 @@ def run(port, timeout):
         "DAP_PORT": str(chosen),
         "DAP_BIND": "127.0.0.1",
         "DAP_SESSION": "mcp-e2e",
-        "DAP_NATIVE": "1",
     })
     java_home = find_java_home()
     if java_home:

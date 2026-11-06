@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExcelReaderExecutorTest {
     private static final Path CORPUS =
-            Path.of(System.getProperty("dap.project.root", ".."), "tests", "corpus", "data");
+            Path.of(System.getProperty("dap.project.root", ".."), "tests", "goldens-native", "data");
 
     @TempDir
     Path dir;

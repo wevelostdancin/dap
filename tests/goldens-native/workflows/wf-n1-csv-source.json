@@ -1,0 +1,61 @@
+{
+  "id": "wf-n1-csv-source",
+  "title": "Native-only: CSV Reader on the exported iris fixture",
+  "rationale": "File-based readers are exercised directly; equivalence with the table_source path pins the dataset shorthand.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "g",
+      "type": "group_by",
+      "config": {
+        "keys": [
+          "species"
+        ],
+        "aggregations": [
+          {
+            "column": "sepal_length",
+            "fn": "mean"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "species",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "g"
+    },
+    {
+      "from": "g",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "g",
+      "kind": "equivalent",
+      "workflow": "wf-02-iris-groupby",
+      "node_ref": "g"
+    }
+  ],
+  "notes": "Only the equivalent check matters here: sorter coverage lives in wf-02, so a bare table check would assert nothing."
+}

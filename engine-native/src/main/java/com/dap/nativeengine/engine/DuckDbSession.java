@@ -310,7 +310,7 @@ public final class DuckDbSession implements AutoCloseable {
             for (ColumnSpec column : columns) {
                 String quoted = quote(column.name());
                 // KNIME counts distinct exactly up to 100k distinct values per column; above
-                // that the approximate sketch is allowed to differ (PARITY.md §6.3). Decide
+                // that the approximate sketch is allowed to differ (docs/QUALITY.md). Decide
                 // from the single COUNT(*) taken for the whole plan, not per column.
                 String distinctSql = rows > MAX_DISTINCT
                         ? "APPROX_COUNT_DISTINCT(" + quoted + ")"

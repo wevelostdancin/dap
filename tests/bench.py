@@ -597,7 +597,7 @@ def branches_section(client, args):
     adjusted = (adjusted_sequential / adjusted_parallel
                 if adjusted_parallel > 0 else None)
     reason = ("DuckDbSession.loadInto serializes CREATE TABLE + DuckDBAppender "
-              "on the shared job connection (docs/NATIVE.md 2.4), but CSV parsing "
+              "on the shared job connection (docs/ARCHITECTURE.md), but CSV parsing "
               "runs before that lock: parsing overlaps, appending does not. The "
               "raw ratio also contains one per-run overhead less on the parallel "
               "side, so adjustedRatio removes the measured empty-workflow cost "

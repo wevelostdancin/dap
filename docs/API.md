@@ -1,491 +1,370 @@
 # HTTP API DAP v1
 
-Человекочитаемый контракт. Машинное описание — [../api/openapi.yaml](../api/openapi.yaml).
-Архитектура и модель job — [../ARCHITECTURE.md](../ARCHITECTURE.md).
+Человекочитаемый контракт нативного движка. Машинное описание —
+[../api/openapi.yaml](../api/openapi.yaml), устройство движка —
+[ARCHITECTURE.md](ARCHITECTURE.md), узлы — [NODES.md](NODES.md).
 
 - База: `http://127.0.0.1:7800/v1`
-- Формат: JSON UTF-8, `Content-Type: application/json; charset=utf-8`
-- Версия API: заголовок ответа `X-DAP-Api-Version: 1`
-- Сессия: заголовок `X-DAP-Session` или `?session=`, по умолчанию `default`
+- Запросы с телом: `Content-Type: application/json`; ответы —
+  `application/json; charset=utf-8`, заголовок `X-DAP-Api-Version: 1`
 - Аутентификации нет; сервис слушает loopback
-- Пути без префикса `/v1` (включая `/health`) — legacy-алиасы; канонический контракт — `/v1/*`
+- Каталог — 11 узлов с id `dap.*`; контракт — 26 операций
 
-## 1. Соглашения
+## 1. Основы
 
-### Сессии
+### Сессия
 
-Сессия изолирует workflow и jobs. Допустимый id: `[A-Za-z0-9._-]{1,64}`. Невалидный id —
-400 `{"error":"invalid session id"}`. Валидная сессия возвращается в `X-DAP-Session`.
-Чужие объекты неотличимы от несуществующих: 404.
+Сессия изолирует workflow и задания. Берётся из заголовка `X-DAP-Session`, затем из
+`?session=`, иначе `default`. Допустимый id — `[A-Za-z0-9._-]{1,64}`; невалидный
+даёт 400 `{"error":"invalid session id"}`. Валидная сессия возвращается в ответе
+заголовком `X-DAP-Session`. Чужие объекты неотличимы от несуществующих: 404.
 
 ### Идентификаторы
 
 | Объект | Формат | Область |
 |---|---|---|
+| Узел каталога | `dap.<type>`, например `dap.csv_reader` | глобально |
 | Workflow | `wf-N` | процесс; виден только своей сессии |
-| Job | `job-N` | процесс; виден только своей сессии |
-| Узел workflow | `<container>:<index>`, например `12:1` | workflow |
-| Узел каталога | Java class factory, например `org.knime...CSVTableReaderNodeFactory` | глобально |
+| Задание | `job-N` | процесс; видно только своей сессии |
+| Узел workflow | `<номер workflow>:<индекс>`, например `1:2` для `wf-1` | workflow |
 
-### Порты
-
-Порты данных нумеруются с 0. Если у узла есть скрытый порт Flow Variable на индексе 0,
-сервис сам сдвигает индекс: агент всегда передаёт индекс **данных**.
+Порты данных нумеруются с 0. У всех узлов один табличный выход (порт 0); у
+`dap.joiner` два входа (0 — Left, 1 — Right), у остальных один.
 
 ### Ошибки
 
-Большинство ошибок:
+Обычная ошибка — объект с одним полем:
 
 ```json
-{"error": "human-readable message"}
+{"error": "unknown setting 'foo' in 'settings'; available: [file, delimiter, header, columns, emptyStringIsNull]"}
 ```
 
-Исключения: таймаут и падение синхронного `run` возвращают объект Job (см. раздел 8), а отмена
-job — объект с `ok` (см. раздел 8). Тело ошибки может содержать диагностические поля
-(например, `ports` у table).
+Исключения: таймаут и падение синхронного run возвращают объект job, отмена
+завершённого job — `CancelResult` (см. §5).
 
 | Код | Когда |
 |---|---|
 | 200 | успех |
-| 202 | job принят асинхронно |
-| 400 | неверный JSON-контракт, неизвестный узел/настройка, невалидная сессия, узел/соединение нельзя удалить, у узла нет таблицы |
-| 404 | неизвестный workflow/job/маршрут/соединение |
-| 408 | истёк `timeoutSec` синхронного `run` |
+| 202 | асинхронный запуск принят |
+| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, узел без таблицы, неизвестный узел workflow в `/table`/`/profile`, отсутствующий `dir` |
+| 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут |
+| 408 | истёк `timeoutSec` синхронного run; тело — job со `state: "timeout"` |
 | 409 | отмена уже завершённого job |
-| 500 | ошибка исполнения, внутренняя ошибка, лимиты, битый JSON |
+| 500 | ошибка исполнения, невалидное значение config, нечитаемый файл, битый JSON, лимит workflow, нецелый query-параметр |
 
-Метод, не поддержанный для маршрута, обычно даёт 404 `no route…`, а не 405.
+Метод, не поддержанный для маршрута, даёт 404 `no route: <METHOD> <path>`, а не 405.
 
 ## 2. Мета и здоровье
 
 ### `GET /v1`
 
-Имя, версия и разделы. Сессия здесь не валидируется и не возвращается.
-
 ```json
-{"name":"DAP","version":"1.0.0","api":"v1",
- "endpoints":"/v1/nodes, /v1/workflows, /v1/jobs, /v1/health"}
+{"name":"DAP","version":"1.0.0","api":"v1","endpoints":"/v1/nodes, /v1/workflows, /v1/jobs, /v1/health"}
 ```
 
 ### `GET /v1/health`
 
 ```json
-{
-  "ok": true,
-  "name": "DAP",
-  "version": "1.0.0",
-  "api": "1",
-  "nodes": 832,
-  "coreNodes": 141,
-  "workflows": 5,
-  "sessions": 1,
-  "jobs": 0,
-  "memory": {"usedMb": 102, "maxMb": 3072}
-}
+{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":11,"coreNodes":11,
+ "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
-`workflows`/`sessions` — по всему процессу, `jobs` — по текущей сессии, `nodes`/`coreNodes` —
-по каталогу. `nodes: 0` означает, что каталог не загрузился.
+`nodes` и `coreNodes` — живые счётчики каталога (сейчас 11 и 11); `workflows` —
+все workflow процесса; `sessions` — открытые сессионные БД; `jobs` — активные
+задания текущей сессии; `memory` — heap JVM.
 
 ## 3. Каталог узлов
 
 ### `GET /v1/nodes?q=&category=&limit=`
 
-Поиск по подстроке в `name + id + category` (регистронезависимо, несколько слов — AND).
-`category` — префикс категории (например, `/analytics`). `limit` по умолчанию 50.
-Порядок — по имени.
+Поиск без учёта регистра по имени, id и категории; токены `q` объединяются по AND,
+`category` — префикс; `limit` по умолчанию 50, сортировка по имени.
 
 ```json
-{
-  "count": 2,
-  "nodes": [
-    {
-      "id": "org.knime.base.node.io.filehandling.csv.reader.CSVTableReaderNodeFactory",
-      "name": "CSV Reader",
-      "category": "/IO/Read",
-      "type": "Source",
-      "deprecated": false,
-      "tier": "core",
-      "inPorts": [],
-      "outPorts": [{"index": 0, "name": "Data", "type": "BufferedDataTable"}]
-    }
-  ]
-}
+{"count":11,"nodes":[
+  {"id":"dap.csv_reader","name":"CSV Reader","category":"/IO/Read","type":"Source",
+   "deprecated":false,"tier":"core",
+   "inPorts":[],"outPorts":[{"index":0,"name":"Data","type":"BufferedDataTable"}]}
+]}
 ```
-
-200 всегда; неизвестные `q`/`category` дают пустой список. Нецелое `limit` — 500.
 
 ### `GET /v1/nodes/{id}`
 
-Полное описание узла. `{id}` — URL-encoded class name.
-
-```json
-{
-  "id": "org.knime...CSVTableReaderNodeFactory",
-  "name": "CSV Reader",
-  "category": "/IO/Read",
-  "contributor": "org.knime.base",
-  "type": "Source",
-  "configurable": false,
-  "deprecated": false,
-  "tier": "core",
-  "inPorts": [],
-  "outPorts": [{"index": 0, "name": "Data", "type": "BufferedDataTable"}],
-  "settings": ["filename", "delimiter", "..."],
-  "settingsXml": "<config key=\"settings\">...</config>"
-}
-```
-
-Если настройки по умолчанию не сериализуются, вместо `settingsXml` будет
-`settingsUnavailable` с причиной. 404 — неизвестный id.
-
-`settingsXml` — XML-схема настроек; именно по её ключам принимается JSON в
-`POST/PATCH .../nodes`.
+Полное описание: поля списка плюс `contributor`, `configurable: true`,
+`settings` (список ключей `configSchema`), `settingsXml: null`,
+`settingsUnavailable` (подсказка про `/dialog`), `description`, `available`.
+Неизвестный id — 404.
 
 ### `GET /v1/nodes/{id}/dialog`
 
-Схема настроек без привязки к workflow. Сначала отдаётся предрасчитанный файл
-`catalog/schemas/{id}.json` (`precomputed: true`), затем live-построение с кэшем в памяти.
-
-Успех (аннотированная схема):
-
-```json
-{
-  "id": "org.knime...ARFFReaderNodeFactory",
-  "available": true,
-  "schemaKind": "annotations",
-  "schema": {
-    "class": "org.knime...ARFFReaderNodeParameters",
-    "fields": [
-      {
-        "field": "m_fileUrl",
-        "configKey": "FileURL",
-        "title": "Input file location",
-        "description": "The location of the ARFF file to read.",
-        "advanced": false,
-        "type": "string",
-        "default": "",
-        "placeholder": "Row",
-        "choices": [{"value": "a", "label": "A"}],
-        "choicesSource": {"provider": "...", "kind": "columns",
-                          "note": "варианты зависят от входной таблицы"}
-      }
-    ],
-    "labelCoverage": "2/2",
-    "warnings": []
-  },
-  "tier": "core",
-  "precomputed": true
-}
-```
-
-Swing-схема: `schemaKind: "swing"`, `schema.kind: "swing"`, поля в `schema.fields`,
-а для ручных диалогов — дерево `schema.ui` (без `configKey`).
-
-Схема недоступна:
+Поля настроек из `configSchema`: `field`, `configKey`, `title`, `description`,
+`type`, `optional`, `default`, `placeholder`, `choices`, `items`.
+`type` — `string`, `integer`, `number`, `boolean`, `enum`, `array`, `object`,
+`unknown`.
 
 ```json
-{
-  "id": "org.knime...BoxPlotNodeFactory",
-  "available": false,
-  "reason": "узел не отдал ни аннотированную, ни Swing-схему; используйте settingsXml из /nodes/{id}",
-  "swing": {"kind": "swing", "fields": [], "warnings": ["createNodeDialogPane() вернул null"], "empty": true},
-  "tier": "experimental",
-  "precomputed": true
-}
+{"id":"dap.csv_reader","tier":"core","precomputed":true,"available":true,
+ "schemaKind":"annotations",
+ "schema":{"class":"dap.csv_reader",
+   "fields":[{"field":"file","configKey":"file","title":"Input file","type":"string",
+              "optional":false,"placeholder":"/data/input.csv"}],
+   "labelCoverage":"5/5","warnings":[]}}
 ```
 
-Типы полей: `string`, `integer`, `number`, `boolean`, `enum`, `array`, `object`,
-`unknown`. Дополнительно возможны `optional`, `nullable`, `defaultNote`, `items`,
-`addButtonText`, `error`, `choicesNote`, `choicesError`, `choicesResolved`.
+Неизвестный id — 400. Все 11 узлов отдают `available: true`.
 
-Неизвестный id — 400, не 404.
+### Диалог узла внутри workflow
+
+`GET /v1/workflows/{workflowId}/nodes/{node}/dialog` возвращает ту же схему плюс
+`node`; неизвестный узел — 404. Для нативных узлов варианты не зависят от входных
+таблиц, поэтому ответ совпадает с каталожным.
 
 ## 4. Workflow
 
 ### `GET /v1/workflows`
 
-Только workflow текущей сессии, без пагинации.
-
 ```json
-{"workflows":[{"id":"wf-3","name":"probe","session":"default","nodes":0}]}
+{"workflows":[{"id":"wf-1","name":"demo","session":"default","nodes":2}]}
 ```
 
 ### `POST /v1/workflows`
 
-Тело необязательно: `{"name":"my-workflow"}`. Без имени — `workflow-N`.
+Тело `{"name": "demo"}` необязательно. Ответ — объект workflow. Лимит на сессию
+(`DAP_MAX_WORKFLOWS`, по умолчанию 100) при превышении даёт 500
+`workflow limit for session`.
+
+### `POST /v1/workflows/load`
+
+Создаёт workflow из `workflow.json`, записанного `POST .../save`:
 
 ```json
-{"id":"wf-5","name":"my-workflow","session":"default"}
+{"dir": "/tmp/dap-demo", "name": "demo-copy"}
 ```
 
-200. Превышение `DAP_MAX_WORKFLOWS` (100) — 500 `workflow limit for session`.
-Пустое тело допустимо. Битый JSON — 500.
+Читается `<dir>/workflow.json`; требуется `"format": "dap-native-workflow/1"`.
+Имя берётся из запроса, иначе из файла. Узлы создаются заново (id вида `<номер>:<индекс>`), ключи настроек проверяются
+по `configSchema`, связи восстанавливаются.
+Неизвестный или недоступный `factory`, битый файл, отсутствующий `dir` или
+неподдерживаемый формат — 400; созданный при ошибке workflow удаляется.
 
-### `DELETE /v1/workflows/{id}`
+### `DELETE /v1/workflows/{workflowId}`
 
-Удаляет workflow и его узлы; активный job по нему завершится ошибкой. 200 `{"ok":true}`.
-Чужой/неизвестный — 404.
+Удаляет workflow и отменяет его активные задания. Ответ `{"ok": true}`;
+неизвестный или чужой id — 404.
 
-## 5. Узлы workflow
+### Узлы workflow
 
-### `GET /v1/workflows/{id}/nodes`
+`GET /v1/workflows/{workflowId}/nodes` — состояния узлов:
 
 ```json
-{"nodes":[{"node":"12:1","name":"Data Generator","state":"EXECUTED","message":"..."}]}
+{"nodes":[{"node":"1:1","name":"CSV Reader","state":"EXECUTED"}]}
 ```
 
-`message` присутствует, если у узла есть сообщение. `state` — состояние KNIME
-(`IDLE`, `CONFIGURED`, `EXECUTED`, `ERROR` и т. п.).
+Состояния: `IDLE`, `RUNNING`, `EXECUTED`, `ERROR` (у `ERROR` есть `message`).
 
-### `POST /v1/workflows/{id}/nodes`
+`POST /v1/workflows/{workflowId}/nodes` — добавить узел:
 
 ```json
-{"factory":"org.knime.base.node.util.sampledata.SampleDataNodeFactory",
- "settings":{"seed":42}}
+{"factory": "dap.csv_reader", "settings": {"file": "/data/iris.csv"}}
 ```
 
-`factory` обязателен; `settings` необязателен. Ответ:
+Ответ `{"node":"1:1","name":"CSV Reader"}`. Неизвестный `factory` или неизвестный
+ключ `settings` — 400. Узел добавляется до применения настроек, поэтому при 400
+из-за настроек он может остаться в workflow.
+
+`PATCH /v1/workflows/{workflowId}/nodes/{node}` — дельта настроек:
 
 ```json
-{"node":"12:1","name":"Data Generator"}
+{"settings": {"delimiter": ";"}}
 ```
 
-200. Ошибки: 400 `'factory' is required`, 400 `unknown node: …`, 400 `settings rejected: …`,
-400 `unknown setting 'x' in 'settings'; available: [...]`.
+Верхнеуровневые ключи сливаются с текущими (вложенные объекты заменяются целиком);
+неизвестный ключ — 400, отсутствующий `settings` — 400, неизвестный узел — 404.
 
-**Важно:** узел добавляется до применения настроек. При 400 из-за настроек узел уже
-существует в workflow, хотя id в ответе не пришёл. Агент должен либо откатить граф, либо
-считать операцию частичной.
+`DELETE /v1/workflows/{workflowId}/nodes/{node}` — удалить узел; связанный узел
+удалить нельзя (400), неизвестный — 404.
 
-### `PATCH /v1/workflows/{id}/nodes/{node}`
+### Связи
 
-Меняет настройки поверх текущих:
+`POST /v1/workflows/{workflowId}/connect`:
 
 ```json
-{"settings":{"seed":7}}
+{"from": "1:1", "to": "1:2", "fromPort": 0, "toPort": 0}
 ```
 
-200 `{"ok":true,"node":"12:1"}`. Работает только для узлов, созданных через этот сервис
-(иначе 400 `node was not created through this service`). 400 — настройки отвергнуты.
+Порты необязательны (0). 400 — неизвестный узел workflow, самосвязь, уже занятый
+входной порт, дубль связи, цикл, порт вне диапазона, отрицательный порт.
+`POST .../disconnect` с тем же телом разрывает связь; неизвестная связь — 404.
 
-### `DELETE /v1/workflows/{id}/nodes/{node}`
+## 5. Исполнение
 
-200 `{"ok":true,"node":"12:1"}`. 400 — узел не найден или его нельзя удалить
-(идут соединения или исполнение).
+### `POST /v1/workflows/{workflowId}/run`
 
-## 6. Соединения
+Тело `{"timeoutSec": 30}` необязательно; `async` можно передать в теле или
+запросом `?async=true`.
 
-### `POST /v1/workflows/{id}/connect`
+- Синхронно: ждёт завершения, `200` с `RunResult`; `408` при таймауте;
+  `500` при ошибке (тело — job со `state: "failed"` или `"cancelled"`).
+- `async=true`: `202` с объектом job.
+- Неизвестный workflow — 404. Таймаут считается от постановки в очередь.
 
 ```json
-{"from":"12:1","fromPort":0,"to":"12:2","toPort":0}
+{"ok":true,"durationMs":…,"workflow":"wf-1",
+ "nodes":[{"node":"1:1","name":"CSV Reader","state":"EXECUTED"},
+          {"node":"1:2","name":"Sorter","state":"EXECUTED"}]}
 ```
 
-Порты — индексы **данных**; скрытый Flow Variable учитывается автоматически.
-200 `{"ok":true}`. 400 — неизвестный узел или несовместимые порты.
+Запуски одного workflow сериализованы, разные workflow идут параллельно. Первый
+упавший узел отменяет соседей по уровню.
 
-### `POST /v1/workflows/{id}/disconnect`
+### Задания
 
-То же тело. 200 `{"ok":true}`; 404 `connection not found`; 400 `connection cannot be removed`.
+`POST /v1/workflows/{workflowId}/jobs` — всегда `202` с job.
 
-## 7. Запуск
+`GET /v1/jobs` — задания сессии, новые сверху, без `result`:
+`{"count":1,"jobs":[...]}`.
 
-### `POST /v1/workflows/{id}/run`
+`GET /v1/jobs/{jobId}` — job с `result` для `succeeded`; неизвестный или чужой —
+404.
 
-Синхронный запуск. Тело необязательно:
+`DELETE /v1/jobs/{jobId}` — отмена активного job:
+
+- `200` `{"ok":true,"id":"job-1","job":{...}}`;
+- `409` `{"ok":false,...}`, если job уже завершён;
+- `404` для неизвестного или чужого.
+
+Поля job: `id`, `workflow`, `state`, `createdAt`, `timeoutSec`,
+`startedAt`/`finishedAt`/`durationMs` (когда известны), `error`, `result`,
+`statusUrl`. Состояния: `queued`, `running`, `succeeded`, `failed`,
+`cancelled`, `timeout`.
+
+## 6. Данные
+
+### `GET /v1/workflows/{workflowId}/nodes/{node}/table?port=0&limit=1`
+
+Материализует сохранённый план узла: `COUNT(*)` и первые `limit` строк (по
+умолчанию 50). Пример ниже сокращён до одной строки.
 
 ```json
-{"async": false, "timeoutSec": 600}
+{"rows":150,
+ "columns":[{"index":0,"name":"sepal_length","type":"Number (Float)"}],
+ "data":[["5.1"]],
+ "preview":1}
 ```
 
-`?async=true` эквивалентно `{"async":true}`. Таймаут по умолчанию — `DAP_JOB_TIMEOUT`
-(600 с). Значение `<= 0` заменяется на 600. Таймаут считается **с момента постановки в
-очередь**.
+`rows` — всего строк, `data` — строки значениями-строками (`null` для NULL),
+`preview` — сколько строк вернулось. `limit < 0` даёт пустой `data`; `port`
+вне диапазона, узел без результата или неизвестный узел — 400; неизвестный
+workflow — 404.
 
-Синхронный успех — 200:
+### `GET /v1/workflows/{workflowId}/nodes/{node}/profile`
+
+Полный проход по таблице:
+
+```json
+{"rows":150,
+ "columns":[{"name":"sepal_length","type":"Number (Float)",
+             "missing":0,"distinct":35,"min":4.3,"max":7.9,"mean":5.843333333333334}]}
+```
+
+`missing` и `distinct` точные; `distinct` считается точно до 100 000 строк,
+выше — приблизительно с досчётом у границы. `min`/`max`/`mean` — только для
+числовых колонок; у колонки из одних NULL они опускаются.
+
+## 7. Сохранение, диагностика, остановка
+
+### `POST /v1/workflows/{workflowId}/save`
+
+Тело `{"dir": "/tmp/dap-demo"}`. Каталог создаётся, в него пишется
+`workflow.json`:
 
 ```json
 {
-  "ok": true,
-  "durationMs": 19,
-  "workflow": "wf-10",
+  "format": "dap-native-workflow/1",
+  "id": "wf-1",
+  "name": "demo",
   "nodes": [
-    {"node": "12:1", "name": "Data Generator", "state": "EXECUTED"},
-    {"node": "12:2", "name": "Column Filter", "state": "EXECUTED", "message": "..."}
-  ]
-}
-```
-
-Синхронный таймаут — 408, тело — Job со `state: "timeout"`.
-Синхронное падение — 500, тело — Job со `state: "failed"` (или `cancelled`) и `error`.
-
-Известная неоднозначность: из-за обёртки `InterruptedException` watchdog-таймаут может
-завершиться как `failed`, и тогда sync-запуск вернёт 500, а не 408. Тесты допускают оба
-исхода.
-
-Асинхронный режим — 202:
-
-```json
-{
-  "id": "job-5",
-  "workflow": "wf-9",
-  "state": "queued",
-  "createdAt": 1793281772614,
-  "timeoutSec": 600,
-  "statusUrl": "/v1/jobs/job-5"
-}
-```
-
-Синхронный `run` занимает HTTP-диспетчер: пока он ждёт, другие HTTP-запросы (включая
-health) не обслуживаются. Для параллельной работы используйте раздел 8 и асинхронный запуск.
-
-### `POST /v1/workflows/{id}/jobs`
-
-Всегда асинхронно — 202 и объект Job, как выше. Тело может содержать `timeoutSec`.
-
-## 8. Jobs
-
-### `GET /v1/jobs`
-
-Только jobs текущей сессии, новые первыми; результат не включается.
-
-```json
-{
-  "count": 1,
-  "jobs": [
-    {"id":"job-5","workflow":"wf-9","state":"succeeded",
-     "createdAt":1793281772614,"startedAt":1793281772614,
-     "finishedAt":1793281772665,"durationMs":51,"timeoutSec":600}
-  ]
-}
-```
-
-### `GET /v1/jobs/{id}`
-
-То же плюс `result` (результат исполнения) для завершённого job. 404 — чужой/неизвестный.
-
-```json
-{
-  "id":"job-5","workflow":"wf-9","state":"succeeded",
-  "createdAt":1793281772614,"startedAt":1793281772614,
-  "finishedAt":1793281772665,"durationMs":51,"timeoutSec":600,
-  "result":{"ok":true,"durationMs":19,"workflow":"wf-9","nodes":[...]}
-}
-```
-
-Состояния: `queued`, `running`, `succeeded`, `failed`, `cancelled`, `timeout`.
-При прерывании терминальное состояние может быть `failed` (с `error: InterruptedException`)
-вместо `cancelled`/`timeout` — это известное поведение, зафиксированное в тестах.
-
-### `DELETE /v1/jobs/{id}`
-
-Отмена активного job:
-
-- 200 `{"ok":true,"id":"job-5","job":{...}}` — отмена запрошена;
-- 409 `{"ok":false,"id":"job-5","job":{...}}` — job уже завершён;
-- 404 — неизвестный/чужой job.
-
-Отмена best effort: узел, игнорирующий прерывание, может доработать. Состояние может
-остаться `running` до фактического выхода worker и затем стать `cancelled` или `failed`.
-
-## 9. Данные
-
-### `GET /v1/workflows/{id}/nodes/{node}/table?port=0&limit=50`
-
-`port` — предпочтительный выходной порт; `limit` — максимум строк (по умолчанию 50).
-Если на порту не таблица, сервис ищет первый табличный порт (молча; индекс в ответе не
-сообщается). `rows` — общее число строк, `data` — превью.
-
-```json
-{
-  "rows": 5400,
-  "columns": [
-    {"index": 0, "name": "Universe_0_0", "type": "Number (double)"},
-    {"index": 1, "name": "Cluster Membership", "type": "String"}
+    {"id": "1:1", "factory": "dap.csv_reader", "name": "CSV Reader",
+     "settings": {"file": "/data/iris.csv"}},
+    {"id": "1:2", "factory": "dap.sorter", "name": "Sorter",
+     "settings": {"keys": [{"column": "sepal_length", "direction": "desc"}]}}
   ],
-  "data": [["0.5", "Cluster_0"], ["0.7", null]],
-  "preview": 2
-}
-```
-
-Пропуски — `null`; значения — строки. 400: `node has no table output` (с массивом
-`ports`), `node has N out ports`. 400 — неизвестный узел; 404 — неизвестный workflow.
-
-### `GET /v1/workflows/{id}/nodes/{node}/profile`
-
-Профиль первой таблицы узла (полный проход по таблице):
-
-```json
-{
-  "rows": 5400,
-  "columns": [
-    {"name":"Universe_0_0","type":"Number (double)",
-     "missing":0,"distinct":5400,"min":0.0,"max":0.99,"mean":0.5},
-    {"name":"Cluster Membership","type":"String","missing":0,"distinct":5}
+  "connections": [
+    {"from": "1:1", "fromPort": 0, "to": "1:2", "toPort": 0}
   ]
 }
 ```
 
-`distinct` точен до 100 000 различных значений на колонку; выше порога допускается
-приближённое значение (sketch, ошибка до 5 %), причём значения вблизи порога досчитываются
-точно. `min/max/mean` — только для числовых колонок KNIME. 400 — у узла нет таблицы или
-узел не найден. Долгие `table`/`profile` прерываются отменой работающего job этого
-workflow или закрытием сессии; прерванный запрос отвечает 500 (ошибка исполнения).
+Ответ `{"ok":true,"dir":"/tmp/dap-demo"}`. Нет `dir` — 400, неизвестный
+workflow — 404, ошибка записи — 500.
 
-## 10. Сохранение и диагностика
+### `GET /v1/workflows/{workflowId}/debug`
 
-### `POST /v1/workflows/{id}/save`
+Диагностика (не стабильный контракт): `workflow`, `name`, `nodes` (id, name,
+factory, state, config), `connections` строками `"1:1:0 -> 1:2:0"` и `duckdb`:
 
 ```json
-{"dir":"/absolute/path/to/workflow"}
+{"duckdb":{"memoryLimit":"1.8 GiB","threads":3,"tempDirectory":"/var/tmp/dap"}}
 ```
 
-Сохраняет workflow как каталог KNIME. 200 `{"ok":true,"dir":"..."}`. 400 — нет `dir`.
-Путь интерпретируется на стороне сервера; каталог создаётся средствами KNIME (существующий может быть перезаписан).
-
-### `GET /v1/workflows/{id}/debug`
-
-Диагностика (не является стабильным контрактом): `nodes` с числом портов и классами
-портов, `connections`. 200.
+До создания БД сессии отдаются сконфигурированные значения, после — эффективные
+(после нормализации DuckDB). Неизвестный workflow — 404.
 
 ### `POST /v1/shutdown`
 
-Штатная остановка: 200 `{"ok":true}`, затем процесс завершается. Не имеет аутентификации;
-не публикуйте наружу. Jobs отменяются, несохранённые workflow теряются.
+`{"ok":true}`, затем процесс закрывается примерно через 100 мс. Аутентификации нет;
+незавершённые workflow теряются.
 
-## 11. Сквозной пример
+## 8. Пример целиком
 
 ```bash
-BASE=http://127.0.0.1:7800/v1
-S='X-DAP-Session: agent-1'
+B=http://127.0.0.1:7800
 
-WF=$(curl -s -X POST -H "$S" -H 'Content-Type: application/json' \
-  -d '{"name":"demo"}' "$BASE/workflows" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+curl -s $B/v1/health
 
-NODE=$(curl -s -X POST -H "$S" -H 'Content-Type: application/json' \
-  -d '{"factory":"org.knime.base.node.util.sampledata.SampleDataNodeFactory","settings":{"seed":42}}' \
-  "$BASE/workflows/$WF/nodes" | python3 -c 'import sys,json;print(json.load(sys.stdin)["node"])')
+curl -s -X POST $B/v1/workflows -H 'Content-Type: application/json' -d '{"name":"demo"}'
+# {"id":"wf-1","name":"demo","session":"default","nodes":0}
 
-JOB=$(curl -s -X POST -H "$S" -H 'Content-Type: application/json' -d '{}' \
-  "$BASE/workflows/$WF/jobs" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+curl -s -X POST $B/v1/workflows/wf-1/nodes -H 'Content-Type: application/json' -d '{
+  "factory":"dap.csv_reader",
+  "settings":{"file":"/data/iris.csv","header":true,
+    "columns":[{"name":"sepal_length","type":"Float64"},
+               {"name":"sepal_width","type":"Float64"},
+               {"name":"petal_length","type":"Float64"},
+               {"name":"petal_width","type":"Float64"},
+               {"name":"species","type":"Utf8"}]}
+}'
+# {"node":"1:1","name":"CSV Reader"}
 
-until curl -s -H "$S" "$BASE/jobs/$JOB" | grep -q '"state":"succeeded"'; do sleep 1; done
-curl -s -H "$S" "$BASE/workflows/$WF/nodes/$NODE/table?limit=5"
-curl -s -H "$S" "$BASE/workflows/$WF/nodes/$NODE/profile"
-curl -s -X POST -H "$S" -H 'Content-Type: application/json' \
-  -d '{"dir":"/tmp/demo"}' "$BASE/workflows/$WF/save"
+curl -s -X POST $B/v1/workflows/wf-1/nodes -H 'Content-Type: application/json' -d '{
+  "factory":"dap.sorter",
+  "settings":{"keys":[{"column":"sepal_length","direction":"desc"}],"collation":"natural"}
+}'
+# {"node":"1:2","name":"Sorter"}
+
+curl -s -X POST $B/v1/workflows/wf-1/connect -H 'Content-Type: application/json' \
+  -d '{"from":"1:1","to":"1:2"}'
+# {"ok":true}
+
+curl -s -X POST $B/v1/workflows/wf-1/run -H 'Content-Type: application/json' -d '{}'
+curl -s "$B/v1/workflows/wf-1/nodes/1:2/table?limit=5"
+curl -s "$B/v1/workflows/wf-1/nodes/1:2/profile"
+
+curl -s -X POST $B/v1/workflows/wf-1/save -H 'Content-Type: application/json' \
+  -d '{"dir":"/tmp/dap-demo"}'
+curl -s -X POST $B/v1/workflows/load -H 'Content-Type: application/json' \
+  -d '{"dir":"/tmp/dap-demo","name":"demo-copy"}'
+
+curl -s -X POST $B/v1/shutdown
 ```
 
-## 12. Известные расхождения
+## 9. Ограничения
 
-- Ошибка разбора JSON → 500, а не 400.
-- Превышение `DAP_MAX_WORKFLOWS` и лимита 8 активных jobs → 500, а не 409/429.
-- Нет 405: неподдержанный метод маршрута → 404.
-- Нет `GET /v1/workflows/{id}`: метаданные workflow отдельным запросом не отдаются.
-- `POST .../nodes` с неверными настройками оставляет узел в workflow.
-- `table` при fallback на другой порт не сообщает фактический индекс.
-- `GET /v1/nodes/{id}/dialog` для неизвестного id → 400, а не 404.
-- Пустые list-массивы (`array-size=0`) поддерживаются; отдельные вложенные списки без
-  шаблона в XML всё ещё могут дать 400 `has no template to extend`.
-- Терминальное состояние прерванного job: `cancelled` (DELETE) или `timeout` (watchdog).
+- Один пользователь, без auth; сервис должен слушать loopback.
+- Состояние в памяти: workflow, задания и таблицы живут до остановки процесса;
+  на диск сохраняется только `workflow.json` через `/save`.
+- Workflow нельзя переименовать или получить отдельным запросом: есть список,
+  создание, загрузка, удаление и операции над узлами.
+- Файловые источники читают любой путь, доступный процессу.
+- Часть ошибок значения config проявляется только при run: sync-run отвечает 500,
+  job получает `failed`, узел — `ERROR` с сообщением.

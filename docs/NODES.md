@@ -1,249 +1,347 @@
-# Каталог узлов, схемы и tiers
+# NODES — каталог узлов
 
-DAP не содержит собственных узлов: он публикует узлы vendored-рантайма KNIME 5.12 и
-добавляет к ним машиночитаемые схемы, tier и контракт API. Этот документ объясняет, что
-именно доступно, как читать tier и как перевести узел в core.
+Каталог нативного движка: 11 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt`;
+`NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
+спеке. Все 11 узлов имеют `available: true` и `tier: core`.
 
-## 1. Цифры
+## 1. Общие правила
 
-Снимок на 2026-10-29 для `catalog/catalog.json` и `catalog/schema-report.json` версии
-1.0.0. Источник истины по tier — `catalog/curated.json`; он может меняться быстрее
-отчёта (в общем дереве наблюдался 141 core против 150 в отчёте). Фактическое число
-отдаёт `GET /v1/health` → `coreNodes`.
+- `id` узла — `dap.<type>`; он же передаётся в `factory` при
+  `POST /v1/workflows/{id}/nodes`.
+- Настройки — плоский JSON по ключам `configSchema`. Неизвестный ключ даёт 400
+  сразу; значения проверяются исполнителем при run (ошибка значения — 500).
+- `required` в `configSchema` влияет на `optional` в `/dialog`, а не на приём
+  запроса: фактическую обязательность проверяет исполнитель.
+- У всех узлов один табличный выход (порт 0). У источников нет входов, у `dap.joiner`
+  два входа (0 — Left, 1 — Right), у остальных один вход (0).
+- Типы колонок в `/table` и `/profile` — имена контракта:
 
-| Метрика | Значение |
-|---|---|
-| Узлов в каталоге | **832** |
-| core | **150** |
-| experimental | **682** |
-| Доступная схема диалога | **733** |
-| — аннотированная (`annotations`) | 385 |
-| — Swing (`swing`) | 348 |
-| Без схемы | **99** |
-| `settingsUnavailable` | **21** |
-| Полей в схемах | 3189 |
-| Полей с подписями | 220 |
-| Уникальных JSON-файлов схем | 827 |
-| Повторных регистраций фабрик | 5 |
-| Бандлов-контрибьюторов | 33 |
-| Категорий | 81 |
-| Помечено `deprecated` | 335 |
+  | Arrow | `type` в ответе |
+  |---|---|
+  | `Int64` | `Number (Integer)` |
+  | `Float64` | `Number (Float)` |
+  | `Utf8` | `String` |
+  | `Boolean` | `Boolean` |
+  | `Date32` | `Date` |
+  | `Time64` | `Time` |
+  | `Timestamp` | `Date&Time (Timestamp)` |
+  | `Decimal128(p,s)` | `Number (Decimal)` |
 
-Почему 827 файлов при 832 узлах: пять factory зарегистрированы дважды (например,
-`FilterColumnNodeFactory`, `SplitNodeFactory`, `NewJoinerNodeFactory`). Каталог хранит
-обе записи; файл схемы у них общий.
+- Ячейки `data` в `/table` — строки (числа в десятичном виде) или `null`;
+  `preview` — число возвращённых строк.
 
-Проверка:
+| id | Название | Категория | Входы |
+|---|---|---|---|
+| `dap.csv_reader` | CSV Reader | `/IO/Read` | — |
+| `dap.excel_reader` | Excel Reader | `/IO/Read` | — |
+| `dap.row_filter` | Row Filter | `/Manipulation/Row/Filter` | 1 |
+| `dap.column_filter` | Column Filter | `/Manipulation/Column/Filter` | 1 |
+| `dap.column_renamer` | Column Renamer | `/Manipulation/Column` | 1 |
+| `dap.sorter` | Sorter | `/Manipulation/Row/Sort` | 1 |
+| `dap.missing_value` | Missing Value | `/Manipulation/Column/Missing` | 1 |
+| `dap.group_by` | Group By | `/Manipulation/Row/GroupBy` | 1 |
+| `dap.joiner` | Joiner | `/Manipulation/Row/Join` | 2 |
+| `dap.string_manipulation` | String Manipulation | `/Manipulation/Column/String` | 1 |
+| `dap.math_formula` | Math Formula | `/Manipulation/Column/Math` | 1 |
 
-```bash
-python3 - <<'PY'
-import json
-c=json.load(open('catalog/catalog.json'))
-r=json.load(open('catalog/schema-report.json'))
-print('nodes', len(c['nodes']), 'unique', len({n['id'] for n in c['nodes']}))
-print('core', sum(n.get('tier')=='core' for n in c['nodes']))
-print('available', r['available'], 'swing', r['swing'], 'annotations', r['annotations'])
-print('no schema', r['nodes']-r['available'], 'settingsUnavailable',
-      sum('settingsUnavailable' in n for n in c['nodes']))
-print('reasons', r['reasons'])
-PY
-```
+## 2. dap.csv_reader
 
-## 2. Что такое tier
+Читает delimited-файл в таблицу. Схема берётся из заголовка с выводом типов или из
+явного `columns`. Файл читается и загружается в DuckDB уже на run.
 
-Tier — обещание поддержки, а не режим исполнения.
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `file` | string | — | обязателен; путь к файлу |
+| `delimiter` | string | `,` | ровно один символ; `"\t"` означает табуляцию |
+| `header` | boolean | `true` | первая строка — имена колонок |
+| `columns` | array<{name, type}> | — | явная схема; `type`: `Int64`, `Float64`, `Utf8`, `Boolean`, `Date32`, `Time64`, `Timestamp`, `Decimal128` |
+| `emptyStringIsNull` | boolean | `false` | считать кавыченную пустую строку NULL |
 
-| Tier | Значение | Количество |
-|---|---|---|
-| `core` | схема и поведение зафиксированы; изменения — осознанное ломающее изменение; предусмотрен golden-тест | 150 |
-| `experimental` | доступен через API, но схема может быть неполной, поведение — измениться | 682 |
-
-Оба tier можно искать, добавлять в workflow, настраивать и исполнять одинаково.
-`GET /v1/nodes` и `GET /v1/nodes/{id}` возвращают `tier`; он же есть в схемах диалогов.
-
-Tier задаётся списком `core` в `catalog/curated.json` и применяется при старте
-(`Tiers.apply`). Сам `catalog.json` тоже содержит `tier` после `build-catalog`, но
-источник истины — `curated.json`. Список формируется `scripts/select-curated.py` по
-именам узлов (не deprecated и со схемой); спорные имена видны в его выводе
-`core=N missing=M`.
-
-## 3. Как читать схему узла
-
-Рекомендуемый порядок для агента:
-
-1. `GET /v1/nodes?q=…` — найти id.
-2. `GET /v1/nodes/{id}` — порты, `settings`, `settingsXml`, `deprecated`, `tier`.
-3. `GET /v1/nodes/{id}/dialog` — поля, типы, умолчания, choices.
-4. Если узел уже в workflow — `GET /v1/workflows/{id}/nodes/{node}/dialog`: там choices
-   считаются по реальным входным таблицам.
-
-### Аннотированная схема
-
-`schemaKind: "annotations"`. Поле содержит:
-
-| Ключ | Смысл |
-|---|---|
-| `field` | имя Java-поля |
-| `configKey` | ключ `@Persist` (часто совпадает с XML, но не гарантировано) |
-| `title`, `description` | подпись и описание |
-| `type` | `string/integer/number/boolean/enum/array/object/unknown` |
-| `default` | умолчание или `null` |
-| `choices` | варианты `{value,label,disabled?}` |
-| `choicesSource` | провайдер и его характер (`columns/strings/enum/dynamic`) |
-| `optional`, `nullable`, `advanced` | модификаторы |
-| `items`, `addButtonText` | для массивов |
-| `choicesNote` | почему вариантов нет (например, нет входной таблицы) |
-| `choicesError` | провайдер упал; схема при этом валидна |
-| `defaultNote` | значение не сериализуется без UI |
-
-### Swing-схема
-
-`schemaKind: "swing"`. `fields` заполняется из `DialogComponent`/`SettingsModel`.
-Если диалог собран вручную, `fields` может быть пустым, а элементы — в `ui`:
-`{type,label,section,source:"dialog-ui",default,choices,…}`. У таких элементов нет
-выдуманного `configKey`: настройки всё равно задаются по ключам `settingsXml`.
-
-### Если схемы нет
-
-99 узлов возвращают `available:false` и `reason`:
-
-> узел не отдал ни аннотированную, ни Swing-схему; используйте settingsXml из /nodes/{id}
-
-Это не ошибка каталога. Для такого узла:
-
-1. возьмите `settingsXml` из `GET /v1/nodes/{id}`;
-2. найдите нужные ключи (`settings` — плоский список);
-3. передайте JSON по структуре XML в `POST/PATCH .../nodes`.
-
-21 узел дополнительно не сериализует настройки по умолчанию (`settingsUnavailable`) —
-такие настройки через API применить нельзя, даже зная ключи.
-
-### Динамические choices
-
-Статическая схема не знает входных таблиц. Поэтому:
-
-- `ColumnChoicesProvider` без таблицы → `choicesNote` «варианты появятся, когда…»;
-- провайдеры, зависящие от других полей, получают no-op initializer → `choicesError`;
-- в контексте workflow (`.../workflows/{id}/nodes/{node}/dialog`) подставляются реальные
-  spec-ы входных портов, и choices по колонкам работают.
-
-### Ключи настроек
-
-`SettingsMerge` принимает JSON по XML-структуре `settingsXml`, а не по именам полей
-диалога. `configKey` — это `@Persist`, он может отличаться от XML-ключа. При ошибке
-ответ 400 содержит список доступных ключей:
+Правила: пустое некавыченное поле — всегда NULL; `""` — пустая строка, если
+`emptyStringIsNull` не включён. Дубли и пустые имена в заголовке отклоняются. При `header: true` каждая колонка
+явной схемы должна найтись в заголовке; при `header: false` схема сопоставляется
+по позиции.
 
 ```json
-{"error":"unknown setting 'file_location' in 'settings'; available: [stddeviation, noise, patcount, seed, clustercount, unisize]"}
+{
+  "factory": "dap.csv_reader",
+  "settings": {
+    "file": "/data/iris.csv",
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {"name": "sepal_length", "type": "Float64"},
+      {"name": "sepal_width", "type": "Float64"},
+      {"name": "petal_length", "type": "Float64"},
+      {"name": "petal_width", "type": "Float64"},
+      {"name": "species", "type": "Utf8"}
+    ],
+    "emptyStringIsNull": false
+  }
+}
 ```
 
-Практика: сначала прочитайте `settings`/`settingsXml`, затем шлите минимальную дельту;
-для вложенных структур используйте объекты, для повторяющихся — массивы.
+## 3. dap.excel_reader
 
-**Массивы.** Пустые плоские списки (`array-size=0`) поддерживаются: движок создаёт
-`entry` с типом по значению (xstring/xint/xdouble/xboolean). Так настраиваются
-`Column Filter.exclude` и `GroupBy.grouByColumns.InclList`. Ограничение остаётся для
-вложенных списков, сериализованных как numeric `config` без шаблона (например,
-`Missing Value.columnSettings`) — для них возможен 400 `has no template to extend`.
+Читает один лист `.xlsx` в таблицу. Apache POI не используется: книга разбирается
+средствами JDK (`zip` + StAX); поддерживаются inline/shared strings, числа, boolean,
+ISO-даты и даты по `numFmtId`; ошибки ячеек становятся NULL. `.xls`, шифрованные
+книги и формулы без кэшированного значения не читаются.
 
-## 4. Как добавить узел в core
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `file` | string | — | обязателен; путь к `.xlsx` |
+| `sheet` | string | первый лист | имя листа или индекс строкой: `"0"` |
+| `header` | boolean | `true` | первая строка — имена колонок |
+| `columns` | array<{name, type}> | — | `type`: `Int64`, `Float64`, `Utf8`, `Boolean`, `Date32`, `Timestamp` |
+| `emptyStringIsNull` | boolean | `false` | пустые ячейки — NULL |
 
-Перевод в core — это обязательство, а не флаг в UI. Минимальная процедура:
+Пустые имена заголовка получают `columnN`, дубли отклоняются. Ячейки «только время»
+(формат без даты) читаются как `Timestamp` на дате эпохи книги.
 
-1. **Проверить пригодность.** Узел есть в каталоге, имеет `tier: experimental`, стабильный
-   id, исполняется в минимальном workflow, его схема доступна или сознательно
-   документирован fallback на `settingsXml`.
-2. **Зафиксировать контракт.** Выбрать сценарий: обязательные настройки, входные данные,
-   ожидаемая схема результата. Если схема Swing без `configKey` — зафиксировать XML-ключи.
-3. **Добавить id в `catalog/curated.json`** в массив `core`. Формат:
-
-   ```json
-   {
-     "version": 1,
-     "generatedAt": "2026-10-29",
-     "description": "...",
-     "core": ["org.knime...Factory", "..."]
-   }
-   ```
-
-   Список — множество, порядок не важен; дубликаты безвредны, но нежелательны.
-4. **Добавить golden-тест** `tests/golden/<имя>.py` с функцией `run(api, sc)`;
-   `tests/run_all.py` подхватит его автоматически. Тест должен проверять:
-   - создание узла и применение настроек (200);
-   - исполнение (200, `ok:true`);
-   - схему/строки/профиль с точностью до типов и `null`;
-   - отсутствие `ERROR` у узлов;
-   - прогон: `python3 tests/run_all.py` (порт 7810, не трогает 7800).
-5. **Пересобрать каталог и схемы:** `make build-catalog`. `schema-report.json` обновится,
-   `tier` в схемах станет `core`.
-6. **Перезапустить сервис** и проверить `GET /v1/health`: `coreNodes` должен вырасти на 1.
-7. **Обновить документацию:** цифры в этом файле и README, если изменилось общее число.
-
-Критерии отказа:
-
-- узел нестабилен или требует UI/интерактивности;
-- настройки несериализуемы (`settingsUnavailable`);
-- нет способа детерминированно проверить результат;
-- схема пуста и XML-ключи не документированы.
-
-Удаление из core — обратная операция: убрать id из `curated.json`, перезапустить сервис,
-удалить/пометить golden-тест. Пересборка каталога не обязательна для применения tier, но
-`schema-report.json` и `tier` в `schemas/*.json` обновятся только после `build-catalog`.
-
-## 5. Добавление нового узла (experimental)
-
-Специальных действий нет: `make build-catalog` обходит extension point
-`org.knime.workbench.repository.nodes` и добавляет всё, что зарегистрировано в runtime.
-Чтобы узел появился, он должен быть в одном из бандлов `runtime/knime/plugins` и
-зарегистрирован в `plugin.xml`. После пересборки — перезапуск сервиса.
-
-## 6. Ограничения каталога
-
-- **99 без схемы** — см. раздел 3; fallback на `settingsXml`.
-- **21 `settingsUnavailable`** — настройки нельзя применить через API.
-- **Зависимые choices** неполны без workflow-контекста.
-- **`configKey` ≠ XML-ключ** в общем случае; источник истины — `settingsXml`.
-- **Вложенные списки без шаблона** (numeric `config`) не синтезируются: 400
-  `has no template to extend` (например, `Missing Value.columnSettings`).
-  Пустые плоские `entry`-массивы уже поддерживаются (Column Filter, GroupBy).
-- **5 дубликатов** регистраций: в поиске узел может встретиться дважды.
-- **335 `deprecated`** — доступны, но не рекомендуются.
-- **Каталог — снимок runtime.** Обновили runtime/бандлы — пересоберите каталог и схемы;
-  старые `schemas/*.json` могут описывать исчезнувший узел.
-- **Схемы предрасчитаны.** После `build-catalog` нужен перезапуск: `dialogCache` и файлы
-  читаются на старте/по запросу.
-
-## 7. Полезные срезы
-
-Все узлы без схемы:
-
-```bash
-python3 - <<'PY'
-import json
-r=json.load(open('catalog/schema-report.json'))
-for d in r['details']:
-    if not d.get('available'):
-        print(d['id'])
-PY
+```json
+{
+  "factory": "dap.excel_reader",
+  "settings": {
+    "file": "/data/iris.xlsx",
+    "sheet": "0",
+    "header": true,
+    "emptyStringIsNull": false
+  }
+}
 ```
 
-Все `settingsUnavailable`:
+## 4. dap.row_filter
 
-```bash
-python3 - <<'PY'
-import json
-for n in json.load(open('catalog/catalog.json'))['nodes']:
-    if 'settingsUnavailable' in n:
-        print(n['id'], '->', n['settingsUnavailable'])
-PY
+Оставляет строки, удовлетворяющие условиям; условия объединяются `and` или `or`.
+Пустой или отсутствующий `where` — pass-through.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `logic` | `and` \| `or` | `and` | способ объединения |
+| `where` | array<{column, op, value}> | — | обязателен по спеке |
+| `where[].column` | string | — | колонка входа |
+| `where[].op` | `eq` \| `ne` \| `lt` \| `le` \| `gt` \| `ge` \| `is_null` \| `not_null` | — | для `is_null`/`not_null` значение не нужно |
+| `where[].value` | любой JSON-скаляр | — | сравнивается по типу колонки |
+
+Сравнения — SQL: `NULL` не проходит `eq`/`ne`/`lt`/…; для пропусков используйте
+`is_null`/`not_null`.
+
+```json
+{
+  "factory": "dap.row_filter",
+  "settings": {
+    "logic": "and",
+    "where": [
+      {"column": "species", "op": "eq", "value": "setosa"},
+      {"column": "sepal_length", "op": "ge", "value": 5.0}
+    ]
+  }
+}
 ```
 
-Core-узлы по категориям:
+## 5. dap.column_filter
 
-```bash
-python3 - <<'PY'
-import json, collections
-c=json.load(open('catalog/catalog.json'))['nodes']
-print(collections.Counter(n['category'] for n in c if n.get('tier')=='core'))
-PY
+Оставляет или удаляет колонки по именам, сохраняя порядок входа. Ровно один из
+`include`/`exclude` должен быть задан; пустой результат — ошибка.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `include` | array<string> | оставить только перечисленные |
+| `exclude` | array<string> | удалить перечисленные |
+
+```json
+{"factory": "dap.column_filter", "settings": {"exclude": ["petal_width"]}}
 ```
+
+## 6. dap.column_renamer
+
+Переименовывает колонки проекцией, без копирования данных. Переименования применяются
+одновременно и сохраняют порядок и типы; `from` и `to` не должны дублироваться, а
+`to` не должен совпадать с непереименованной колонкой.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `renames` | array<{from, to}> | обязателен; пустой массив — pass-through |
+| `renames[].from` | string | существующая колонка |
+| `renames[].to` | string | новое имя |
+
+```json
+{
+  "factory": "dap.column_renamer",
+  "settings": {
+    "renames": [
+      {"from": "sepal_length", "to": "sl"},
+      {"from": "sepal_width", "to": "sw"}
+    ]
+  }
+}
+```
+
+## 7. dap.sorter
+
+Сортирует строки по нескольким ключам; ключи применяются по порядку. Пустой
+`keys` — pass-through. NULL идут первыми при `asc` и последними при `desc`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `keys` | array<{column, direction}> | — | обязателен по спеке |
+| `keys[].column` | string | — | колонка входа |
+| `keys[].direction` | `asc` \| `desc` | `asc` | направление |
+| `collation` | `natural` \| `binary` \| `nocase` | `natural` | сравнение строк |
+
+`natural` сравнивает цифровые серии численно (`1st-4th` < `10th`), текст — побайтово,
+исходная строка — финальный tie-breaker; `binary` — чисто байтовый порядок;
+`nocase` — байтовый без учёта регистра.
+
+```json
+{
+  "factory": "dap.sorter",
+  "settings": {
+    "keys": [
+      {"column": "sepal_length", "direction": "desc"},
+      {"column": "species", "direction": "asc"}
+    ],
+    "collation": "natural"
+  }
+}
+```
+
+## 8. dap.missing_value
+
+Заменяет NULL в указанных колонках правилом за правилом; правила применяются
+последовательно. Отсутствующий `rules` — pass-through.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `rules` | array<{column, method, value}> | — | обязателен по спеке |
+| `rules[].column` | string | — | колонка входа |
+| `rules[].method` | `constant` \| `mean` \| `mode` | `constant` | источник замены |
+| `rules[].value` | любой JSON-скаляр | — | константа для `constant` |
+
+`mean` работает только с `Float64` (тип колонки не меняется); `mode` берёт самое
+частое значение, при равенстве частот — наименьшее.
+
+```json
+{
+  "factory": "dap.missing_value",
+  "settings": {
+    "rules": [
+      {"column": "petal_width", "method": "mean"},
+      {"column": "species", "method": "constant", "value": "unknown"}
+    ]
+  }
+}
+```
+
+## 9. dap.group_by
+
+Группирует строки по ключам и считает агрегаты. Имена выходных колонок —
+`Mean(x)`, `Sum(x)`, `Count(x)`, `Min(x)`, `Max(x)`.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `keys` | array<string> | обязателен; минимум одна колонка |
+| `aggregations` | array<{column, fn}> | обязателен |
+| `aggregations[].column` | string | колонка входа |
+| `aggregations[].fn` | `mean` \| `sum` \| `count` \| `min` \| `max` | — |
+
+`mean` и `sum` требуют числовую колонку. `mean` возвращает `Float64`, `count` —
+`Int64`, `sum`/`min`/`max` — тип входной колонки.
+
+```json
+{
+  "factory": "dap.group_by",
+  "settings": {
+    "keys": ["species"],
+    "aggregations": [
+      {"column": "sepal_length", "fn": "mean"},
+      {"column": "sepal_width", "fn": "count"}
+    ]
+  }
+}
+```
+
+## 10. dap.joiner
+
+Соединяет два входа по ключам: `inner`, `left` или `right`. Ключи сопоставляются
+позиционно; `left_keys` и `right_keys` должны быть одной длины. При `merge_keys`
+ключевые колонки сливаются в одну (`COALESCE(left, right)`, чтобы right-only строка
+не теряла ключ). Колонка правого входа, имя которой уже есть в выходе, получает
+суффикс `" (Right)"`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `how` | `inner` \| `left` \| `right` | `inner` | режим соединения |
+| `left_keys` | array<string> | — | обязателен, непустой |
+| `right_keys` | array<string> | — | обязателен, та же длина |
+| `merge_keys` | boolean | `true` | слить ключи в одну колонку |
+
+Ключи сравниваются SQL-равенством: NULL-ключи не совпадают ни в одном режиме.
+
+```json
+{
+  "factory": "dap.joiner",
+  "settings": {
+    "how": "left",
+    "left_keys": ["species"],
+    "right_keys": ["species"],
+    "merge_keys": true
+  }
+}
+```
+
+## 11. dap.string_manipulation
+
+Преобразует значения одной строковой колонки. В режиме `replace` колонка
+перезаписывается, в режиме `append` результат добавляется последней колонкой
+`new column` (если такая колонка уже есть — ошибка).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `column` | string | — | обязателен; только `Utf8` |
+| `op` | `upper` \| `lower` \| `trim` \| `replace` \| `concat` | — | обязателен |
+| `mode` | `replace` \| `append` | `replace` | куда писать результат |
+| `search` | string | — | для `replace`: что искать |
+| `value` | string | `""` | для `replace`: замена (пустая — удалить); для `concat`: суффикс |
+
+`trim` удаляет ASCII-пробелы (пробел, `\t`, `\n`, `\v`, `\f`, `\r`).
+
+```json
+{"factory": "dap.string_manipulation", "settings": {"column": "species", "op": "upper", "mode": "append"}}
+```
+
+## 12. dap.math_formula
+
+Добавляет колонки, вычисленные SQL-выражениями по входным колонкам. Имя выхода не
+должно совпадать с входной колонкой или другим выходом. Тип выхода выводится
+bind-only запросом `DESCRIBE ... LIMIT 0`.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `outputs` | array<{name, expression}> | обязателен, непустой |
+| `outputs[].name` | string | имя новой колонки |
+| `outputs[].expression` | string | SQL-выражение по колонкам входа |
+
+```json
+{
+  "factory": "dap.math_formula",
+  "settings": {
+    "outputs": [
+      {"name": "petal_area", "expression": "petal_length * petal_width"},
+      {"name": "sepal_total", "expression": "sepal_length + sepal_width"}
+    ]
+  }
+}
+```
+
+## 13. Порядок для агента
+
+1. `GET /v1/nodes?q=…` — найти `id`.
+2. `GET /v1/nodes/{id}/dialog` — поля, типы, умолчания, допустимые значения.
+3. `POST /v1/workflows/{id}/nodes` с `factory` и `settings`.
+4. `POST /v1/workflows/{id}/connect` — связи (порты данных с 0).
+5. `POST /v1/workflows/{id}/run` (или `/jobs`) → `GET .../table`, `.../profile`.
+
+Примеры выше — тело запроса `POST /v1/workflows/{id}/nodes`.

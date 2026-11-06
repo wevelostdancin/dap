@@ -59,7 +59,7 @@ RUN --mount=type=cache,target=/tmp/dap-tools,sharing=locked \
 # java.sql already requires them transitively (the effective runtime has 12 modules;
 # logback's Joran parses logback.xml through java.xml on it).
 # This exact set was tested locally by running the jar on it:
-# tests/native_smoke.py 9/9, tests/parity.py 12/12 workflows, 1563/1563 cells (100 %),
+# tests/native_smoke.py 9/9, tests/run_goldens.py 13/13 workflows, 1563/1563 cells (100 %),
 # cold start ~0.56-0.59 s on macOS arm64.
 RUN jlink --add-modules java.base,java.instrument,java.logging,java.management,java.naming,java.security.jgss,java.sql,jdk.jfr,jdk.unsupported \
           --strip-debug --no-header-files --no-man-pages --compress=zip-6 \

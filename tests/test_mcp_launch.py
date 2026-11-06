@@ -45,16 +45,12 @@ def load_adapter(**environment):
         os.environ.update(saved)
 
 
-def make_home(directory, native=True, jar=True, legacy=False):
+def make_home(directory, jar=True):
     home = pathlib.Path(directory)
-    if native and jar:
+    if jar:
         jar_path = home / "engine-native" / "target" / "dap-native.jar"
         jar_path.parent.mkdir(parents=True, exist_ok=True)
         jar_path.write_bytes(b"")
-    if legacy:
-        script = home / "scripts" / "run.sh"
-        script.parent.mkdir(parents=True, exist_ok=True)
-        script.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
     return home
 
 
@@ -208,8 +204,8 @@ class NativeLaunchTest(unittest.TestCase):
                 child.kill()
                 child.wait(timeout=5)
 
-    def test_native_engine_env_selects_native_launch(self):
-        module = load_adapter(DAP_HOME=str(self.home), DAP_ENGINE="native")
+    def test_native_launch_uses_jar_and_heap(self):
+        module = load_adapter(DAP_HOME=str(self.home))
         make_home(self.home)
         child = FakeChild()
         with contextlib.redirect_stderr(io.StringIO()), \
@@ -221,20 +217,6 @@ class NativeLaunchTest(unittest.TestCase):
         launch.assert_called_once()
         self.assertEqual(launch.call_args.args[1].name, module.LOG)
 
-    def test_legacy_default_selects_run_sh(self):
-        module = load_adapter(DAP_HOME=str(self.home), DAP_PORT="7999")
-        make_home(self.home, native=False, legacy=True)
-        self.assertFalse(module.NATIVE)
-        child = FakeChild()
-        with mock.patch.object(module, "health", return_value=False), \
-                mock.patch.object(module, "START_WAIT", 0), \
-                mock.patch.object(module.subprocess, "Popen", return_value=child) as popen:
-            with self.assertRaises(module.DapError):
-                module.ensure_service()
-        command, kwargs = popen.call_args
-        self.assertEqual(command[0], ["bash", str(self.home / "scripts" / "run.sh")])
-        self.assertEqual(kwargs["env"]["DAP_PORT"], "7999")
-        self.assertNotIn("-Xmx2g", command[0])
 
 
 if __name__ == "__main__":

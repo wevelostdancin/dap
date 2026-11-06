@@ -1,14 +1,18 @@
 # BENCH — замеры dap-native
 
-Фаза 3. Харнесс — `tests/bench.py` (Python 3, только stdlib). Пилотные числа
+Харнесс — `tests/bench.py` (Python 3, только stdlib). Пилотные числа
 (10 млн строк) сняты на merged jar 30.10.2026, отчёт — §4.1.
+
+> **Историческая справка.** Замеры сняты в пилоте, когда oracle (KNIME) ещё входил
+> в проект. Сейчас KNIME удалён: колонки «KNIME» в таблицах — исторические и не
+> воспроизводятся; актуальны числа native.
 
 ## 1. Статус
 
 - Харнесс готов и покрывает три секции: `cold`, `csv`, `branches`.
 - Пилот на 10M строк снят (§4.1): cold 473 мс, ingest 11,7 с, `/table` 69 мс,
   heap peak 4,65 ГБ; ветви измерены на 5M (ratio 1,18×) из-за лимита 8 ГиБ RAM.
-- Размер jar: 46 298 055 Б = 44,2 МиБ (лимит 50 МБ, ROADMAP §9).
+- Размер jar: 46 298 055 Б = 44,2 МиБ (лимит 50 МБ).
 - Образ (< 200 МБ, healthy < 5 с) в этой среде не измерим: Docker-демона нет
   (см. §3); Dockerfile и арифметика размера — [deploy/README-native.md](../deploy/README-native.md),
   строка `TBD` до прогона на Docker-хосте.
@@ -62,7 +66,7 @@ RSS всего JVM) и, независимо, `GET /v1/health` → `memory.usedM
 включает всё, но с разрешением 200 мс.
 
 Ветви: `DuckDbSession.loadInto` синхронизирован на job-соединении
-([NATIVE.md](NATIVE.md) §2.4), поэтому `CREATE TABLE`+`Appender` двух
+([ARCHITECTURE.md](ARCHITECTURE.md)), поэтому `CREATE TABLE`+`Appender` двух
 `csv_reader`-ов не интерливаются, а `CsvTableReader.read` (parse) выполняется **до**
 lock и перекрывается. Отсюда честное ожидание: `1.0x` (полная сериализация) …
 `2.0x` (полный параллелизм), фактическое значение зависит от размера файла: на малых
@@ -76,7 +80,7 @@ SQL-ветви ленивые и исполняются на `/table`, поэт�
 - **Нет Docker-демона в этой среде.** Размер образа и `docker run` healthy < 5 с здесь
   не измеряются; строка `TBD`, команды — §4.1.
 - **KNIME-oracle не умеет CSV через `/v1`.** `CSV Reader` падает с
-  `Execute failed: Workflow context required.` ([PARITY.md](PARITY.md) §6.6.1), поэтому
+  `Execute failed: Workflow context required.` (историческое ограничение oracle), поэтому
   сравнение «≥ 3× быстрее KNIME» для этого workflow **native-only**. Поддерживаемого
   эквивалента нет: `table_source` читает только shipped-датасеты KNIME (максимум ADULT,
   ~32k строк), а `GroupBy`-агрегации через `/v1` не конфигурируются (§6.6.3). Значит,
@@ -98,7 +102,7 @@ SQL-ветви ленивые и исполняются на `/table`, поэт�
   при `-Xmx4g` прогон ветвей упал с `Java heap space` (это и есть причина мерить ветви на
   5M при `-Xmx6g`). Для 10M-ветвей нужен heap ≥ 8 ГиБ, то есть машина крупнее этой.
 - **DuckDB-настройки.** `DAP_DUCKDB_MEMORY_LIMIT`/`DAP_DUCKDB_THREADS`/
-  `DAP_DUCKDB_TEMP_DIR` движок читает ([NATIVE.md](NATIVE.md) §3.4); харнесс определяет это
+  `DAP_DUCKDB_TEMP_DIR` движок читает ([ARCHITECTURE.md](ARCHITECTURE.md)); харнесс определяет это
   по классам движка (`engineReadsDapDuckdbEnv: true`) и пишет фактические значения в
   `environment.duckdb.settings`.
 
@@ -122,9 +126,9 @@ SQL-ветви ленивые и исполняются на `/table`, поэт�
 |---|---|---|---|---|
 | Cold start, медиана 3 прогонов | < 2 с | **473 мс** | n/a (KNIME — desktop) | `cold.medianMs` |
 | Cold start, min / max | — | 473 / 480 мс | n/a | `cold.minMs` / `cold.maxMs` |
-| 10M sync-run (ingest) | — | **11 667 мс** (~857k строк/с) | n/a (PARITY §6.6.1) | `csv.runMs` |
-| 10M `/table` (filter+group_by+sorter) | — | **69 мс** | n/a (PARITY §6.6.1) | `csv.tableMs` |
-| 10M end-to-end = run + `/table` | ≥ 3× быстрее KNIME | **11 736 мс** | n/a (PARITY §6.6.1) | `csv.totalMs` |
+| 10M sync-run (ingest) | — | **11 667 мс** (~857k строк/с) | n/a (историческое ограничение oracle) | `csv.runMs` |
+| 10M `/table` (filter+group_by+sorter) | — | **69 мс** | n/a (историческое ограничение oracle) | `csv.tableMs` |
+| 10M end-to-end = run + `/table` | ≥ 3× быстрее KNIME | **11 736 мс** | n/a (историческое ограничение oracle) | `csv.totalMs` |
 | 10M `/profile` финального узла | — | **118 мс** (8 строк) | n/a | `csv.profileMs` |
 | 10M `/profile` источника (полный проход) | — | **176 мс** | n/a | `csv.profileSourceMs` |
 | JVM heap peak на 10M (формула ROADMAP) | ≤ KNIME | **4 653 МиБ** при `-Xmx6g` (макс. 6 144) | n/a | `csv.heapPeakMb` |
@@ -166,7 +170,7 @@ job-соединении, поэтому parse перекрывается, а `C
 
 Почему `n/a` в колонке KNIME: oracle исполняет только in-memory workflow через `/v1`;
 файловые ридеры требуют workflow-context и падают, а shipped-датасетов на 10M строк нет. Это
-зафиксированное ограничение ([PARITY.md](PARITY.md) §6.6.1), а не отсутствие замера.
+зафиксированное ограничение oracle, а не отсутствие замера.
 
 Строки образа заполняет задача образа (Docker-демона здесь нет):
 
@@ -214,7 +218,7 @@ job-соединении, поэтому parse перекрывается, а `C
 2. **Стоимость — в ingest и памяти, и она наша.** 10M ingest = 11,7 с и 4,65 ГБ heap
    (`CsvParser` → `ArrowTable` → построчный `Appender`), то есть узкое место — не
    SQL-движок, а путь данных. Polars не заменяет этот путь: между узлами нет Arrow-шины
-   ([NATIVE.md](NATIVE.md) §4), поэтому Polars потребовал бы отдельной границы данных,
+   ([ARCHITECTURE.md](ARCHITECTURE.md)), поэтому Polars потребовал бы отдельной границы данных,
    а не «замены движка».
 3. **Per-node ≥ 2× не измерен ни на одном узле.** Харнесс меряет workflow; отдельный
    per-node microbench, который мог бы дать порог, не проводился — при этом п.1 показывает,

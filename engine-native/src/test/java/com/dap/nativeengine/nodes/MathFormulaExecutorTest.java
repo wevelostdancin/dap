@@ -40,7 +40,7 @@ class MathFormulaExecutorTest {
     @Test
     void irisPetalAreaFromCorpusWorkflowAddsFloatColumnWithGoldenValues() throws Exception {
         Path iris = Path.of(System.getProperty("dap.project.root", ".."),
-                "tests", "corpus", "data", "iris.csv").toAbsolutePath().normalize();
+                "tests", "goldens-native", "data", "iris.csv").toAbsolutePath().normalize();
         assertTrue(Files.isRegularFile(iris), "corpus fixture missing: " + iris);
         String readerConfig = "{\"file\":\"" + NodeTestSupport.path(iris) + "\"}";
 
@@ -63,7 +63,7 @@ class MathFormulaExecutorTest {
             assertEquals(6, data.data().get(0).size());
             assertEquals(List.of("5.1", "3.5", "1.4", "0.2", "setosa"),
                     data.data().get(0).subList(0, 5));
-            // petal_area values computed independently from tests/corpus/data/iris.csv
+            // petal_area values computed independently from tests/goldens-native/data/iris.csv
             assertEquals(0.28, Double.parseDouble(data.data().get(0).get(5)), 1e-12);
             assertEquals(0.28, Double.parseDouble(data.data().get(1).get(5)), 1e-12);
             assertEquals(0.26, Double.parseDouble(data.data().get(2).get(5)), 1e-12);

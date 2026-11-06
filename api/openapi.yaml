@@ -10,8 +10,7 @@ info:
     and job objects are isolated by session; foreign objects return 404.
 
     There is no authentication. Keep the service on loopback or behind an
-    authenticating proxy. Legacy paths without the /v1 prefix are also accepted
-    by the server but are not part of this contract.
+    authenticating proxy. Only /v1 paths are served.
 
     Data port indices are 0-based and refer to data ports only; the hidden Flow
     Variable port is handled by the server. Job timeouts count from submission,
@@ -199,6 +198,32 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '500':
           $ref: '#/components/responses/ServerError'
+  /v1/workflows/load:
+    post:
+      tags: [workflows]
+      operationId: loadWorkflow
+      summary: Create a workflow from a saved workflow.json
+      description: Reads dir/workflow.json written by POST /v1/workflows/{id}/save.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoadRequest'
+      responses:
+        '200':
+          description: Loaded workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /v1/workflows/{workflowId}:
     delete:
       tags: [workflows]
@@ -273,7 +298,7 @@ paths:
       tags: [nodes]
       operationId: configureNode
       summary: Apply a settings delta
-      description: Only nodes created through this service are accepted. Settings JSON follows the settings XML structure.
+      description: Only nodes created through this service are accepted. Settings JSON follows the node configSchema; unknown keys are rejected with 400.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
         - $ref: '#/components/parameters/WorkflowNodeId'
@@ -702,10 +727,10 @@ components:
       name: nodeTypeId
       in: path
       required: true
-      description: Java factory class name
+      description: Native node id
       schema:
         type: string
-      example: org.knime.base.node.util.sampledata.SampleDataNodeFactory
+      example: dap.csv_reader
     WorkflowId:
       name: workflowId
       in: path
@@ -951,7 +976,7 @@ components:
           type: boolean
         schemaKind:
           type: string
-          enum: [annotations, swing]
+          enum: [annotations]
         precomputed:
           type: boolean
         schema:
@@ -982,11 +1007,6 @@ components:
             empty:
               type: boolean
           additionalProperties: true
-        swing:
-          type: object
-          additionalProperties: true
-        swingError:
-          type: string
         reason:
           type: string
       additionalProperties: true
@@ -1215,6 +1235,14 @@ components:
       required: [dir]
       properties:
         dir:
+          type: string
+    LoadRequest:
+      type: object
+      required: [dir]
+      properties:
+        dir:
+          type: string
+        name:
           type: string
     SaveResult:
       type: object

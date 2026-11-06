@@ -1,0 +1,117 @@
+{
+  "id": "wf-05-iris-math",
+  "title": "Iris: petal area from a formula, mean per species",
+  "rationale": "Derived numeric column feeding an aggregate; formulas are evaluated natively.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "table_source",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "math",
+      "type": "math_formula",
+      "config": {
+        "outputs": [
+          {
+            "name": "petal_area",
+            "expression": "petal_length * petal_width"
+          }
+        ]
+      }
+    },
+    {
+      "id": "g",
+      "type": "group_by",
+      "config": {
+        "keys": [
+          "species"
+        ],
+        "aggregations": [
+          {
+            "column": "petal_area",
+            "fn": "mean"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "species",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "math"
+    },
+    {
+      "from": "math",
+      "to": "g"
+    },
+    {
+      "from": "g",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "math",
+      "kind": "expect_profile",
+      "rows": 150,
+      "columns": [
+        {
+          "name": "petal_area",
+          "type": "Number (Float)",
+          "missing": 0,
+          "distinct": 101,
+          "min": 0.11,
+          "max": 15.87,
+          "mean": 5.7931333333333335
+        }
+      ]
+    },
+    {
+      "node": "sort",
+      "kind": "expect",
+      "rows": 3,
+      "columns": [
+        {
+          "name": "species",
+          "type": "String"
+        },
+        {
+          "name": "Mean(petal_area)",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          "setosa",
+          0.3628
+        ],
+        [
+          "versicolor",
+          5.7204
+        ],
+        [
+          "virginica",
+          11.2962
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "Reference values computed independently with pandas from tests/goldens-native/data/iris.csv (see docs/QUALITY.md)."
+}

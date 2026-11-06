@@ -8,47 +8,23 @@ either version 3 of the License, or (at your option) any later version.
 
 DAP is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-PURPOSE. See the GNU General Public License for more details.
+PURPOSE. See the GNU General Public License for more details. The full text is in
+LICENSE.
 
 ================================================================================
-1. COMPOSITION OF THE DISTRIBUTION
+1. WHAT THE DISTRIBUTION CONTAINS
 ================================================================================
 
-The DAP distribution contains:
-
-  a) DAP Engine 1.0.0 (bundle com.dap.engine) — original DAP code, licensed GPLv3.
-     Source: engine/, scripts/, catalog/, adapters/, tests/, docs/ in the DAP
-     source distribution.
-
-  b) KNIME Analytics Platform 5.12.0 runtime, vendored under runtime/knime/:
-     610 OSGi bundles, including org.knime.core 5.12.0.v202606180846,
-     org.knime.base 5.12.0, org.knime.core.ui, org.knime.workbench.repository
-     and their dependencies. The KNIME core plug-ins are licensed under
-     GNU GPL Version 3 with Additional Permissions under Section 7 of the GPL.
-     The full license text, including those Additional Permissions, is in
-     LICENSE.
-
-  c) Eclipse Foundation components distributed with KNIME, licensed under the
-     Eclipse Public License (EPL) and other licenses as stated in the respective
-     bundle LICENSE files.
-
-  d) Third-party libraries bundled by KNIME (Apache-2.0, MIT, BSD, EPL and
-     others), each under its own license terms as recorded in its bundle.
-
-DAP does not modify KNIME source code. The engine links against KNIME APIs and
-uses KNIME classes at runtime.
+DAP is a standalone analytics engine: engine-native/ (Java 21, DuckDB, Arrow,
+Javalin) and adapters/mcp/ (a stdio MCP adapter, Python standard library only).
+It contains no KNIME code, does not link org.knime and does not ship the KNIME
+runtime or catalog.
 
 ================================================================================
-2. DAP-NATIVE ENGINE (SEPARATE ARTIFACT)
+2. THIRD-PARTY COMPONENTS
 ================================================================================
 
-The DAP source repository also builds dap-native (engine-native/, version
-0.1.0-SNAPSHOT), a standalone analytics engine. It is a separate artifact,
-engine-native/target/dap-native.jar (about 44 MiB), not part of the KNIME-based
-DAP Engine in section 1. It contains no KNIME code, does not link org.knime and
-does not use runtime/knime/.
-
-dap-native bundles the following third-party components:
+engine-native/target/dap-native.jar bundles:
 
   Component                    License                Upstream
   ---------------------------------------------------------------------------
@@ -60,76 +36,16 @@ dap-native bundles the following third-party components:
   SLF4J 2.0.17                 MIT                    https://www.slf4j.org/
   Logback 1.5.18               EPL-1.0 or LGPL-2.1    https://logback.qos.ch/
 
-Transitive libraries in the same jar: Kotlin stdlib, Netty, flatbuffers-java,
-jctools, JetBrains annotations and commons-codec (Apache-2.0); Eclipse Jakarta
-Servlet API (EPL-2.0); FastDoubleParser (MIT). JUnit 5 (EPL-2.0) is a test-only
-dependency and is not bundled.
+Test-only dependencies (not shipped): JUnit 5 (EPL-2.0), Maven Wrapper.
 
-License texts are kept in the jar under META-INF/ where the upstream artifact
-provides them; the DuckDB JDBC POM declares MIT. This section covers dap-native
-only and does not modify the KNIME/Eclipse notices elsewhere in this file.
+The jar contains one DuckDB native library for the build platform
+(osx_universal, linux_amd64, linux_arm64 or windows_amd64); the shade profiles
+exclude the others. Cross-platform packaging can include all four on request.
 
 ================================================================================
-3. CHANGES MADE BY DAP
+3. DATA FIXTURES
 ================================================================================
 
-Relative to a stock KNIME Analytics Platform 5.12.0 installation, the DAP
-distribution:
-
-  - adds the com.dap.engine 1.0.0 bundle (HTTP /v1 service, catalog, dialog
-    schemas, jobs, sessions);
-  - omits UI, CEF/Chromium, product, workbench editor/docs/search/coach,
-    enterprise, server, cloud, JS and bundled-JRE bundles when the runtime is
-    assembled by scripts/vendor-runtime.sh;
-  - includes a generated runtime/knime/configuration/config.ini and
-    bundles.info (absolute paths are generated for the installation root);
-  - adds generated catalog/catalog.json, catalog/schemas/*.json and
-    catalog/schema-report.json;
-  - adds adapters/mcp/dap_mcp.py, documentation, build scripts and tests.
-
-No KNIME source files are patched. No KNIME copyright notices are removed.
-
-================================================================================
-4. CORRESPONDING SOURCE CODE
-================================================================================
-
-The complete corresponding source code for the GPLv3-covered components is
-available as follows:
-
-  - DAP Engine and all DAP-specific files: the DAP source distribution that
-    accompanies this binary, or the source repository from which this
-    distribution was obtained.
-
-  - KNIME Analytics Platform 5.12.0 bundles: KNIME publishes source code in its
-    public repositories at https://github.com/knime and provides corresponding
-    source through its distribution channels at https://www.knime.com/downloads.
-    The exact bundle versions included here are listed in
-    runtime/knime/configuration/bundles.info.
-
-Written offer: the distributor of this DAP distribution will provide, for at
-least three years from the date of distribution, the complete corresponding
-source code for the GPLv3-covered components on a physical or electronic medium,
-at no charge beyond the cost of the medium, to anyone who requests it through
-the same channel by which this distribution was received.
-
-If you received this distribution without the accompanying source, request the
-source through that channel before redistributing the binaries.
-
-================================================================================
-5. HOW TO VERIFY
-================================================================================
-
-  - Full GPLv3 text and KNIME Section 7 Additional Permissions: LICENSE.
-  - Bundle list and versions: runtime/knime/configuration/bundles.info.
-  - DAP changes: this NOTICE and the DAP source distribution.
-  - Runtime assembly rules: scripts/vendor-runtime.sh.
-  - License of a specific bundle: its LICENSE file inside the bundle jar.
-
-================================================================================
-6. NO WARRANTY
-================================================================================
-
-DAP and the bundled components are provided "as is", without warranty of any
-kind, express or implied, including but not limited to the warranties of
-merchantability, fitness for a particular purpose and noninfringement. See the
-GNU General Public License for details.
+tests/goldens-native/data/ contains small public example datasets (iris, adult,
+worldbank countries, air quality) used by the golden suite. They are test data,
+not part of the engine.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """DAP /v1 API client + check harness (Python 3 stdlib only).
 
-Shared by tests/run_all.py, tests/golden/*.py and tests/contract/test_api.py.
+Shared by the native test suite (goldens, smoke, MCP e2e, bench).
 
 The client is deliberately thin: it never interprets responses, it only turns
 HTTP errors into Response objects so scenarios can assert exact status codes.

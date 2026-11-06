@@ -9,7 +9,7 @@
 | `../engine-native/.dockerignore` | контекст = `engine-native/`: без `target/` и `.tools/` |
 | `README-native.md` | этот файл: сборка, запуск, переменные, проверка и её текущий статус |
 
-Образ KNIME-oracle (`deploy/Dockerfile`, ~1,7 ГБ) этим файлом не затрагивается.
+KNIME-рантайм не нужен: образ самодостаточен.
 
 ## Требования
 
@@ -106,7 +106,7 @@ docker run --rm --read-only --tmpfs /tmp:size=256m --cap-drop ALL \
 поэтому в контейнере задавайте его явно (`-e DAP_DUCKDB_MEMORY_LIMIT=2GB`) и
 учитывайте, что CSV-ингест живёт в JVM heap (`-Xmx`/`DAP_HEAP`), а не в этом лимите.
 `DAP_DUCKDB_TEMP_DIR=/tmp/dap` уже выставлен в образе; под `--read-only` смонтируйте
-записываемый `/tmp` (`--tmpfs /tmp`). Детали и SQL — docs/NATIVE.md §3.4.
+записываемый `/tmp` (`--tmpfs /tmp`). Детали и SQL — docs/ARCHITECTURE.md.
 
 HEALTHCHECK: `--interval=2s --timeout=2s --start-period=5s --retries=3`,
 команда — `/opt/java/openjdk/bin/java -cp /opt/dap/health HealthCheck` (`java.base`-сокет, без curl).
@@ -142,7 +142,7 @@ HEALTHCHECK: `--interval=2s --timeout=2s --start-period=5s --retries=3`,
 | `jdeps --multi-release 21 --ignore-missing-deps --print-module-deps target/dap-native.jar` | `java.base,java.desktop,java.instrument,java.management,java.naming,java.security.jgss,java.sql,jdk.jfr,jdk.unsupported` | ✅ |
 | `jlink --add-modules ... --strip-debug --no-header-files --no-man-pages --compress=zip-6` | 39 096 КиБ | ✅ |
 | запуск jar на этом jlink-рантайме + `python3 tests/native_smoke.py --base http://127.0.0.1:7882` | `native smoke (9 pass, 0 fail, 0 skip)` | ✅ |
-| `python3 tests/parity.py --engine native --base http://127.0.0.1:7885` на том же jlink-рантайме | 13/13 workflow ok, `matching cells 1563/1563 (100.0 %)` — все 11 узлов (10 пилотных + `column_renamer`), включая `excel_reader`, `joiner`, `math_formula` | ✅ |
+| `python3 tests/run_goldens.py` на том же jlink-рантайме | 13/13 workflow ok, `matching cells 1563/1563 (100.0 %)` — все 11 узлов, включая `excel_reader`, `joiner`, `math_formula` | ✅ |
 | `java -cp /tmp/hc HealthCheck` против живого сервиса / против закрытого порта | код 0 / код 1 + `Connection refused` | ✅ |
 | entrypoint-развёртывание heap: `HEAP=${DAP_HEAP:-1g}; ${JAVA_OPTS:--Xmx$HEAP}` | нет env → `-Xmx1g`; `DAP_HEAP=2g` → `-Xmx2g`; `JAVA_OPTS=-Xmx4g -XX:+UseZGC` → как задано; оба → `JAVA_OPTS` | ✅ (sh/POSIX) |
 | cold start на jlink-рантайме (fork → health 200, опрос каждые 5 мс) | 556, 575, 574, 560, 587 мс (5 прогонов); первый прогон сразу после `jlink` — 2820 мс (macOS валидация бинарей) | ✅ |

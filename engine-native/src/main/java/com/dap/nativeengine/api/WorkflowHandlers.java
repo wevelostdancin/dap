@@ -9,7 +9,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.javalin.http.Context;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,6 +46,86 @@ public final class WorkflowHandlers {
         JsonNode nameNode = request.get("name");
         String name = nameNode == null || nameNode.isNull() ? null : nameNode.asText(null);
         Workflow workflow = state.workflows().create(session, name);
+        Http.ok(ctx, view(workflow));
+    }
+
+    /** Create a workflow from a workflow.json written by POST /save. */
+    public void load(Context ctx) throws Exception {
+        String session = Http.session(ctx);
+        JsonNode request = Json.parseBody(ctx.body());
+        JsonNode dirNode = request.get("dir");
+        if (dirNode == null || !dirNode.isTextual() || dirNode.asText().isBlank()) {
+            throw ApiException.badRequest("'dir' is required");
+        }
+        Path file;
+        try {
+            file = Path.of(dirNode.asText()).resolve("workflow.json");
+        } catch (InvalidPathException failure) {
+            throw ApiException.badRequest("invalid dir: " + failure.getMessage());
+        }
+        if (!Files.isRegularFile(file)) {
+            throw ApiException.badRequest("workflow.json not found: " + file);
+        }
+        JsonNode document;
+        try {
+            document = Json.parse(Files.readString(file, StandardCharsets.UTF_8));
+        } catch (IOException failure) {
+            throw ApiException.badRequest("cannot read workflow: " + failure.getMessage());
+        }
+        if (!document.isObject()) {
+            throw ApiException.badRequest("workflow.json must be an object");
+        }
+        String format = document.path("format").asText("");
+        if (!"dap-native-workflow/1".equals(format)) {
+            throw ApiException.badRequest("unsupported workflow format: " + format);
+        }
+        JsonNode nodes = document.path("nodes");
+        JsonNode connections = document.path("connections");
+        if (!nodes.isArray() || !connections.isArray()) {
+            throw ApiException.badRequest("workflow.json needs nodes[] and connections[]");
+        }
+        String requested = request.path("name").asText("");
+        String name = requested.isBlank() ? document.path("name").asText(null) : requested;
+        Workflow workflow = state.workflows().create(session, name);
+        try {
+            Map<String, String> ids = new HashMap<>();
+            Map<String, NodeSpec> specs = new HashMap<>();
+            for (JsonNode node : nodes) {
+                String id = node.path("id").asText("");
+                if (id.isBlank()) {
+                    throw ApiException.badRequest("node without id");
+                }
+                if (ids.containsKey(id)) {
+                    throw ApiException.badRequest("duplicate node id: " + id);
+                }
+                String factory = node.path("factory").asText("");
+                NodeSpec spec = state.registry().find(factory);
+                if (spec == null || !spec.available()) {
+                    throw ApiException.badRequest("unknown or unavailable node: " + factory);
+                }
+                WorkflowNode created = workflow.addNode(factory, spec.name(), Json.object());
+                JsonNode settings = node.get("settings");
+                if (settings != null && !settings.isNull()) {
+                    applySettings(workflow, created, settings);
+                }
+                ids.put(id, created.id());
+                specs.put(created.id(), spec);
+            }
+            for (JsonNode edge : connections) {
+                String from = ids.get(edge.path("from").asText());
+                String to = ids.get(edge.path("to").asText());
+                if (from == null || to == null) {
+                    throw ApiException.badRequest("connection references an unknown node");
+                }
+                int fromPort = port(edge, "fromPort");
+                int toPort = port(edge, "toPort");
+                validatePorts(specs.get(from), specs.get(to), fromPort, toPort);
+                workflow.connect(new Connection(from, fromPort, to, toPort));
+            }
+        } catch (RuntimeException failure) {
+            state.workflows().delete(session, workflow.id());
+            throw failure;
+        }
         Http.ok(ctx, view(workflow));
     }
 
@@ -138,12 +224,7 @@ public final class WorkflowHandlers {
         Connection connection = connection(Json.parseBody(ctx.body()));
         NodeSpec source = spec(workflow, connection.from());
         NodeSpec target = spec(workflow, connection.to());
-        if (connection.fromPort() >= source.outPorts().size()) {
-            throw ApiException.badRequest("node has " + source.outPorts().size() + " out ports");
-        }
-        if (connection.toPort() >= target.inPorts().size()) {
-            throw ApiException.badRequest("node has " + target.inPorts().size() + " in ports");
-        }
+        validatePorts(source, target, connection.fromPort(), connection.toPort());
         workflow.connect(connection);
         Http.ok(ctx, Map.of("ok", true));
     }
@@ -226,6 +307,15 @@ public final class WorkflowHandlers {
             throw ApiException.badRequest("'from' and 'to' are required");
         }
         return new Connection(from.asText(), port(request, "fromPort"), to.asText(), port(request, "toPort"));
+    }
+
+    private static void validatePorts(NodeSpec source, NodeSpec target, int fromPort, int toPort) {
+        if (fromPort >= source.outPorts().size()) {
+            throw ApiException.badRequest("node has " + source.outPorts().size() + " out ports");
+        }
+        if (toPort >= target.inPorts().size()) {
+            throw ApiException.badRequest("node has " + target.inPorts().size() + " in ports");
+        }
     }
 
     private static int port(JsonNode request, String field) {

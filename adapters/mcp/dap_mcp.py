@@ -5,14 +5,13 @@
 адаптер ищет узлы, собирает workflow, запускает задания и читает таблицы.
 
 Если движок не отвечает на /v1/health, адаптер один раз запускает
-"$DAP_HOME/scripts/run.sh" (legacy KNIME) либо, при DAP_NATIVE=1 или
-DAP_ENGINE=native, "java -Xmx${DAP_HEAP:-2g} -jar engine-native/target/dap-native.jar",
-и ждёт health до 60 с. Запущенный дочерний процесс опрашивается: если он умер или
-health не наступил, адаптер гасит его и возвращает ошибку с хвостом service.log.
-Уже запущенный сервис не перезапускается и не останавливается.
+"java -Xmx${DAP_HEAP:-2g} -jar engine-native/target/dap-native.jar" и ждёт health
+до 60 с. Запущенный дочерний процесс опрашивается: если он умер или health не
+наступил, адаптер гасит его и возвращает ошибку с хвостом service.log.
+Уже запущенный сервис не перезапускается и не останавливается; dap_shutdown
+останавливает движок явно.
 
-Переменные окружения: DAP_HOME, DAP_PORT, DAP_SESSION, DAP_BIND, DAP_NATIVE,
-DAP_ENGINE, DAP_HEAP.
+Переменные окружения: DAP_HOME, DAP_PORT, DAP_SESSION, DAP_BIND, DAP_HEAP.
 
 Транспорт: по одному JSON-объекту на строку в stdin, ответы — строки в stdout.
 Логи и трассировки — только в stderr, чтобы не ломать поток протокола.
@@ -40,10 +39,9 @@ SESSION = (os.environ.get("DAP_SESSION") or "default").strip() or "default"
 LOG = os.path.join(DAP_HOME, "service.log")
 TIMEOUT = 600
 START_WAIT = 60
-NATIVE = (os.environ.get("DAP_NATIVE") or "").strip() == "1" or \
-    (os.environ.get("DAP_ENGINE") or "").strip().lower() == "native"
 NATIVE_JAR = os.path.join(DAP_HOME, "engine-native", "target", "dap-native.jar")
 HEAP = (os.environ.get("DAP_HEAP") or "").strip() or "2g"
+_CHILD: subprocess.Popen | None = None
 
 
 class DapError(Exception):
@@ -144,44 +142,25 @@ def ensure_service() -> None:
         return
     env = dict(os.environ)
     env.update({"DAP_HOME": DAP_HOME, "DAP_PORT": str(PORT), "DAP_BIND": BIND})
-    if NATIVE:
-        if not os.path.isfile(NATIVE_JAR):
-            raise DapError(
-                f"движок DAP не отвечает на {BASE}/v1/health, а {NATIVE_JAR} не найден; "
-                "соберите jar: cd engine-native && ./mvnw -DskipTests package",
-                code=-32001,
-                data={"base": BASE, "jar": NATIVE_JAR, "dapHome": DAP_HOME},
-            )
-    else:
-        script = os.path.join(DAP_HOME, "scripts", "run.sh")
-        if not os.path.isfile(script):
-            raise DapError(
-                f"движок DAP не отвечает на {BASE}/v1/health, а {script} не найден",
-                code=-32001,
-                data={"base": BASE, "dapHome": DAP_HOME},
-            )
+    if not os.path.isfile(NATIVE_JAR):
+        raise DapError(
+            f"движок DAP не отвечает на {BASE}/v1/health, а {NATIVE_JAR} не найден; "
+            "соберите jar: cd engine-native && ./mvnw -DskipTests package",
+            code=-32001,
+            data={"base": BASE, "jar": NATIVE_JAR, "dapHome": DAP_HOME},
+        )
     with open(LOG, "ab") as log:
-        if NATIVE:
-            child = _launch_native(env, log)
-            try:
-                print(f"dap-mcp: native engine pid={child.pid}",
-                      file=sys.stderr, flush=True)
-            except OSError:
-                pass
-        else:
-            child = subprocess.Popen(
-                ["bash", script],
-                cwd=DAP_HOME,
-                stdin=subprocess.DEVNULL,
-                stdout=log,
-                stderr=log,
-                start_new_session=True,
-                env=env,
-            )
+        child = _launch_native(env, log)
+        try:
+            print(f"dap-mcp: engine pid={child.pid}", file=sys.stderr, flush=True)
+        except OSError:
+            pass
     try:
         deadline = time.monotonic() + START_WAIT
         while time.monotonic() < deadline:
             if health():
+                global _CHILD
+                _CHILD = child
                 return
             code = child.poll()
             if code is not None:
@@ -427,11 +406,24 @@ TOOLS = [
     },
     {
         "name": "dap_save_workflow",
-        "description": "Сохранить workflow на диск как каталог KNIME.",
+        "description": "Сохранить workflow в каталог на диске (файл workflow.json).",
         "inputSchema": _obj(
             {"workflow": _str(_WF), "dir": _str("каталог назначения на диске")},
             ["workflow", "dir"],
         ),
+    },
+    {
+        "name": "dap_load_workflow",
+        "description": "Создать workflow из сохранённого каталога (workflow.json).",
+        "inputSchema": _obj(
+            {"dir": _str("каталог с workflow.json"), "name": _str("необязательное имя")},
+            ["dir"],
+        ),
+    },
+    {
+        "name": "dap_shutdown",
+        "description": "Остановить движок DAP на этом порту. Следующий вызов инструмента поднимет его заново.",
+        "inputSchema": _obj({}),
     },
 ]
 
@@ -569,6 +561,35 @@ def tool_save_workflow(args: dict):
     return call("POST", f"/v1/workflows/{_wf(args)}/save", {"dir": _need(args, "dir")})
 
 
+def tool_load_workflow(args: dict):
+    body = {"dir": _need(args, "dir")}
+    if args.get("name"):
+        body["name"] = args["name"]
+    return call("POST", "/v1/workflows/load", body)
+
+
+def _reap_child() -> None:
+    """Дождаться собственного дочернего процесса после shutdown (без зомби)."""
+    global _CHILD
+    if _CHILD is None:
+        return
+    try:
+        _CHILD.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        _stop_child(_CHILD)
+    _CHILD = None
+
+
+def tool_shutdown(_args: dict):
+    try:
+        return call("POST", "/v1/shutdown")
+    finally:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and health():
+            time.sleep(0.05)
+        _reap_child()
+
+
 HANDLERS = {
     "dap_search_nodes": tool_search_nodes,
     "dap_node_details": tool_node_details,
@@ -589,6 +610,8 @@ HANDLERS = {
     "dap_get_table": tool_get_table,
     "dap_profile_table": tool_profile_table,
     "dap_save_workflow": tool_save_workflow,
+    "dap_load_workflow": tool_load_workflow,
+    "dap_shutdown": tool_shutdown,
 }
 
 PROTOCOL_VERSION = "2024-11-05"
@@ -652,7 +675,8 @@ def handle(msg: dict) -> None:
             fail(msg_id, -32602, "arguments должен быть объектом")
             return
         try:
-            ensure_service()
+            if name != "dap_shutdown":
+                ensure_service()
             result = handler(args)
         except DapError as e:
             fail(msg_id, e.code, str(e), e.data)

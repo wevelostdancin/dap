@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -251,6 +252,25 @@ class NativeServiceTest {
         assertEquals(workflow, savedJson.path("id").asText());
         assertEquals(2, savedJson.path("nodes").size());
         assertEquals(1, savedJson.path("connections").size());
+
+        // Load recreates the graph in a new workflow, settings and edges included.
+        Resp loaded = post("/v1/workflows/load", Map.of("dir", saveDir.toString()));
+        assertEquals(200, loaded.status(), loaded.raw().body());
+        String loadedWorkflow = loaded.body().path("id").asText();
+        assertNotEquals(workflow, loadedWorkflow);
+        assertEquals(2, loaded.body().path("nodes").asInt());
+        Resp loadedDebug = get("/v1/workflows/" + loadedWorkflow + "/debug");
+        assertEquals(1, loadedDebug.body().path("connections").size());
+        Resp loadedNodes = get("/v1/workflows/" + loadedWorkflow + "/nodes");
+        assertEquals(2, loadedNodes.body().path("nodes").size());
+        String loadedTail = loadedNodes.body().path("nodes").get(1).path("node").asText();
+        assertEquals(200, post("/v1/workflows/" + loadedWorkflow + "/run", Map.of()).status());
+        JsonNode loadedRow = get("/v1/workflows/" + loadedWorkflow + "/nodes/" + loadedTail
+                + "/table?limit=1").body().path("data").get(0);
+        assertEquals("bob", loadedRow.get(0).asText(), "loaded settings must survive the round-trip");
+        assertEquals(400, post("/v1/workflows/load", Map.of()).status());
+        assertEquals(400, post("/v1/workflows/load",
+                Map.of("dir", tempDir.resolve("missing").toString())).status());
 
         // PATCH merges settings; the next run uses them (descending age now).
         Resp patched = patch("/v1/workflows/" + workflow + "/nodes/" + firstSorter,
@@ -851,6 +871,44 @@ class NativeServiceTest {
             Thread.sleep(20);
         }
         throw new AssertionError("no job reached the running state");
+    }
+
+    @Test
+    void workflowLoadRejectsBrokenDocumentsAndLeavesNoWorkflow() throws Exception {
+        Path dir = tempDir.resolve("broken-workflows");
+        Files.createDirectories(dir);
+        Path file = dir.resolve("workflow.json");
+        String reader = "{\"id\":\"a\",\"factory\":\"dap.csv_reader\","
+                + "\"settings\":{\"file\":\"/tmp/data.csv\"}}";
+        String sorter = "{\"id\":\"b\",\"factory\":\"dap.sorter\",\"settings\":{}}";
+
+        Files.writeString(file, "{\"format\":\"dap-native-workflow/1\",\"nodes\":["
+                + reader + "," + reader + "],\"connections\":[]}");
+        assertEquals(400, post("/v1/workflows/load", Map.of("dir", dir.toString())).status(),
+                "duplicate node ids must be rejected");
+
+        Files.writeString(file, "{\"format\":\"knime/1\",\"nodes\":[],\"connections\":[]}");
+        assertEquals(400, post("/v1/workflows/load", Map.of("dir", dir.toString())).status());
+
+        Files.writeString(file, "{\"format\":\"dap-native-workflow/1\",\"nodes\":["
+                + "{\"id\":\"a\",\"factory\":\"dap.unknown\"}],\"connections\":[]}");
+        assertEquals(400, post("/v1/workflows/load", Map.of("dir", dir.toString())).status());
+
+        Files.writeString(file, "{\"format\":\"dap-native-workflow/1\",\"nodes\":["
+                + reader + "," + sorter + "],"
+                + "\"connections\":[{\"from\":\"a\",\"to\":\"b\",\"toPort\":9}]}");
+        assertEquals(400, post("/v1/workflows/load", Map.of("dir", dir.toString())).status());
+
+        Files.writeString(file, "{\"format\":\"dap-native-workflow/1\",\"nodes\":["
+                + reader + "," + sorter + "],"
+                + "\"connections\":[{\"from\":\"a\",\"to\":\"b\",\"toPort\":-1}]}");
+        assertEquals(400, post("/v1/workflows/load", Map.of("dir", dir.toString())).status());
+
+        Files.writeString(file, "{\"format\":\"dap-native-workflow/1\",\"nodes\":{},\"connections\":[]}");
+        assertEquals(400, post("/v1/workflows/load", Map.of("dir", dir.toString())).status());
+
+        assertEquals(0, get("/v1/workflows").body().path("workflows").size(),
+                "failed loads must not leak workflows");
     }
 
     private JsonNode awaitJobState(String jobId, Set<String> states, Duration timeout) throws Exception {

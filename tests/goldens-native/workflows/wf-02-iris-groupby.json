@@ -1,0 +1,70 @@
+{
+  "id": "wf-02-iris-groupby",
+  "title": "Iris: mean sepal length per species",
+  "rationale": "Canonical single-key GroupBy with one mean aggregate.",
+  "kind": "baseline",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "table_source",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "g",
+      "type": "group_by",
+      "config": {
+        "keys": [
+          "species"
+        ],
+        "aggregations": [
+          {
+            "column": "sepal_length",
+            "fn": "mean"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "species",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "g"
+    },
+    {
+      "from": "g",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "g",
+      "kind": "table",
+      "limit": 10,
+      "order": "unordered"
+    },
+    {
+      "node": "sort",
+      "kind": "table",
+      "limit": 10,
+      "order": "ordered"
+    },
+    {
+      "node": "sort",
+      "kind": "profile"
+    }
+  ]
+}

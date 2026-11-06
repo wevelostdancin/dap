@@ -163,6 +163,7 @@ public final class NativeService implements AutoCloseable {
 
         app.get("/v1/workflows", workflows::list);
         app.post("/v1/workflows", workflows::create);
+        app.post("/v1/workflows/load", workflows::load);
         app.delete("/v1/workflows/{workflowId}", workflows::delete);
         app.get("/v1/workflows/{workflowId}/nodes", workflows::nodes);
         app.post("/v1/workflows/{workflowId}/nodes", workflows::addNode);

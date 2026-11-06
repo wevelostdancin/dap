@@ -1,40 +1,32 @@
 SHELL := /bin/bash
 
-# JDK 21. Override with: make run DAP_JDK=/path/to/jdk-21
+# JDK 21. Override with: make build-native DAP_JDK=/path/to/jdk-21
 DAP_JDK ?= $(HOME)/Projects/tools/jdk-21.0.13+9/Contents/Home
 export DAP_JDK
 
-.PHONY: help build-engine build-catalog build-native test-native run-native clean-native run test image lint fetch-runtime runtime-archive clean \
-        bench bench-full mcp-e2e image-native run-native-image
+JAR := engine-native/target/dap-native.jar
+
+.PHONY: help build-native test-native run-native goldens goldens-validate test-mcp smoke \
+        mcp-e2e bench bench-full image-native run-native-image lint check clean-native
 
 help:
-	@echo "DAP 1.0.0"
+	@echo "DAP 1.0.0 — native analytics backend for agents"
 	@echo ""
-	@echo "  make build-engine   compile com.dap.engine against runtime/knime"
-	@echo "  make build-native   build engine-native/target/dap-native.jar (DuckDB + Arrow + Javalin)"
-	@echo "  make test-native    run the dap-native JUnit suite"
-	@echo "  make run-native     start dap-native on 127.0.0.1:7800 (blocking)"
-	@echo "  make bench          dap-native 100k-row benchmark"
-	@echo "  make bench-full     dap-native 10M-row benchmark -> build/bench.json"
-	@echo "  make mcp-e2e        MCP create/add/run/table e2e against dap-native"
+	@echo "  make build-native   build $(JAR) (DuckDB + Arrow + Javalin)"
+	@echo "  make test-native    run the JUnit suite"
+	@echo "  make run-native     start the engine on 127.0.0.1:7800 (blocking)"
+	@echo "  make goldens        run the native golden suite (starts/stops its own engine)"
+	@echo "  make goldens-validate  structural check of the golden fixtures (no engine)"
+	@echo "  make smoke          black-box smoke against a running engine (DAP_BASE)"
+	@echo "  make mcp-e2e        MCP create/add/run/table e2e"
+	@echo "  make bench          native 100k-row benchmark"
+	@echo "  make bench-full     native 10M-row benchmark -> build/bench.json"
 	@echo "  make image-native   build the dap-native image (Docker host required)"
-	@echo "  make build-catalog  rebuild catalog/catalog.json and catalog/schemas/*.json"
-	@echo "  make run            start HTTP /v1 on 127.0.0.1:7800 (blocking)"
-	@echo "  make test           run python3 tests/run_all.py"
 	@echo "  make lint           static checks (scripts/check_repo.py)"
-	@echo "  make fetch-runtime  download runtime from DAP_RUNTIME_URL"
-	@echo "  make runtime-archive create build/dap-runtime-1.0.0.tar.zst"
-	@echo "  make image          build OCI image via scripts/package-oci.sh"
-	@echo "  make clean          remove build/classes and build/*.tar"
+	@echo "  make check          test-native + goldens + lint"
 	@echo ""
-	@echo "Env: DAP_PORT DAP_BIND DAP_DATA DAP_HEAP DAP_JOB_TIMEOUT DAP_MAX_WORKFLOWS DAP_JDK"
-	@echo "Docs: README.md, docs/OPERATIONS.md, docs/API.md"
-
-build-engine:
-	./scripts/build-engine.sh
-
-build-catalog:
-	./scripts/build-catalog.sh
+	@echo "Env: DAP_PORT DAP_BIND DAP_HEAP DAP_JDK DAP_DUCKDB_MEMORY_LIMIT DAP_DUCKDB_TEMP_DIR"
+	@echo "Docs: README.md, docs/ROADMAP.md, docs/ARCHITECTURE.md, docs/NODES.md"
 
 build-native:
 	cd engine-native && ./mvnw -q -DskipTests package
@@ -45,20 +37,26 @@ test-native:
 run-native: build-native
 	cd engine-native && "$(DAP_JDK)/bin/java" -jar target/dap-native.jar
 
-clean-native:
-	rm -rf engine-native/target
-	@echo "cleaned engine-native/target"
+goldens: build-native
+	python3 tests/run_goldens.py
 
-# --- native Phase 3 targets -------------------------------------------------
-bench: build-native
-	python3 tests/bench.py --jar engine-native/target/dap-native.jar --rows 100000
+goldens-validate:
+	python3 tests/goldens-native/runner.py --validate
 
-bench-full: build-native
-	python3 tests/bench.py --jar engine-native/target/dap-native.jar \
-		--json build/bench.json --keep-data
+test-mcp:
+	python3 tests/test_mcp_launch.py
+
+smoke:
+	python3 tests/native_smoke.py --base ${DAP_BASE:-http://127.0.0.1:7800}
 
 mcp-e2e: build-native
 	python3 tests/mcp_e2e.py
+
+bench: build-native
+	python3 tests/bench.py --jar $(JAR) --rows 100000
+
+bench-full: build-native
+	python3 tests/bench.py --jar $(JAR) --json build/bench.json --keep-data
 
 DAP_NATIVE_IMAGE ?= dap-native:local
 
@@ -68,25 +66,11 @@ image-native:
 run-native-image: image-native
 	docker run --rm -p 7800:7800 $(DAP_NATIVE_IMAGE)
 
-run:
-	./scripts/run.sh
-
-test:
-	python3 tests/run_all.py
-
 lint:
 	python3 scripts/check_repo.py
 
-fetch-runtime:
-	./scripts/fetch-runtime.sh
+check: test-native goldens goldens-validate test-mcp mcp-e2e lint
 
-runtime-archive:
-	./scripts/make-runtime-archive.sh
-
-image:
-	./scripts/package-oci.sh
-
-clean:
-	rm -rf build/classes
-	rm -f build/*.tar
-	@echo "cleaned build/classes and build/*.tar; runtime/ and catalog/ untouched"
+clean-native:
+	rm -rf engine-native/target
+	@echo "cleaned engine-native/target"

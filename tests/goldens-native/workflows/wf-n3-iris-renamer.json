@@ -1,0 +1,149 @@
+{
+  "id": "wf-n3-iris-renamer",
+  "title": "Native-only: Column Renamer feeds mean sepal length per species",
+  "rationale": "Pins the node template end to end: a pure projection rename followed by a real aggregate; values are literal goldens.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "table_source",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "ren",
+      "type": "column_renamer",
+      "config": {
+        "renames": [
+          {
+            "from": "sepal_length",
+            "to": "sl"
+          },
+          {
+            "from": "sepal_width",
+            "to": "sw"
+          }
+        ]
+      }
+    },
+    {
+      "id": "g",
+      "type": "group_by",
+      "config": {
+        "keys": [
+          "species"
+        ],
+        "aggregations": [
+          {
+            "column": "sl",
+            "fn": "mean"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "species",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "ren"
+    },
+    {
+      "from": "ren",
+      "to": "g"
+    },
+    {
+      "from": "g",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "ren",
+      "kind": "expect",
+      "rows": 150,
+      "columns": [
+        {
+          "name": "sl",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "sw",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "petal_length",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "petal_width",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "species",
+          "type": "String"
+        }
+      ],
+      "data": [
+        [
+          5.1,
+          3.5,
+          1.4,
+          0.2,
+          "setosa"
+        ],
+        [
+          4.9,
+          3.0,
+          1.4,
+          0.2,
+          "setosa"
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "sort",
+      "kind": "expect",
+      "rows": 3,
+      "columns": [
+        {
+          "name": "species",
+          "type": "String"
+        },
+        {
+          "name": "Mean(sl)",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          "setosa",
+          5.006
+        ],
+        [
+          "versicolor",
+          5.936
+        ],
+        [
+          "virginica",
+          6.588
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "Goldens computed independently with Python statistics.mean over tests/goldens-native/data/iris.csv: setosa 250.3/50, versicolor 296.8/50, virginica 329.4/50. The renamer check also pins column order and types after the projection."
+}
