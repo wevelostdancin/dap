@@ -1,0 +1,77 @@
+{
+  "id": "dap.pivot",
+  "name": "Pivot",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Pivots rows into columns: for every configured pivot value one column is created with a conditional aggregate over the value column, grouped by the index columns. The values list is required and fixes the output schema, so a pivot value missing from the data still produces a column.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Pivot configuration",
+    "additionalProperties": false,
+    "properties": {
+      "index": {
+        "type": "array",
+        "title": "Index columns",
+        "description": "Columns that identify one output row.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "pivotColumn": {
+        "type": "string",
+        "title": "Pivot column",
+        "description": "Column whose values become output columns."
+      },
+      "valueColumn": {
+        "type": "string",
+        "title": "Value column",
+        "description": "Column aggregated into the pivoted cells."
+      },
+      "values": {
+        "type": "array",
+        "title": "Pivot values",
+        "description": "Pivot values to create columns for, in output order.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "agg": {
+        "type": "string",
+        "title": "Aggregation",
+        "description": "Aggregate applied to the value column per index group and pivot value.",
+        "enum": [
+          "sum",
+          "mean",
+          "count",
+          "min",
+          "max"
+        ]
+      }
+    },
+    "required": [
+      "index",
+      "pivotColumn",
+      "valueColumn",
+      "values",
+      "agg"
+    ]
+  }
+}

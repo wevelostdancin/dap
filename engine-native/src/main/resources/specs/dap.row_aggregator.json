@@ -1,0 +1,75 @@
+{
+  "id": "dap.row_aggregator",
+  "name": "Row Aggregator",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Adds row-wise aggregates over the selected numeric columns. sum adds the columns, mean divides their sum by the number of selected columns, min/max use LEAST/GREATEST, and count counts the non-NULL values. Input columns are kept. A NULL in any selected column makes sum, mean, min and max NULL for that row; count ignores NULLs.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Row Aggregator configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "Numeric columns to aggregate. When omitted or empty, every numeric input column is used.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "aggregations": {
+        "type": "array",
+        "title": "Aggregations",
+        "description": "Aggregations computed for every row; each one produces one new column.",
+        "items": {
+          "type": "object",
+          "title": "Aggregation",
+          "additionalProperties": false,
+          "properties": {
+            "fn": {
+              "type": "string",
+              "title": "Function",
+              "description": "Aggregate function applied across the selected columns.",
+              "enum": [
+                "sum",
+                "mean",
+                "min",
+                "max",
+                "count"
+              ]
+            },
+            "output": {
+              "type": "string",
+              "title": "Output column",
+              "description": "Name of the new column; defaults to the function name."
+            }
+          },
+          "required": [
+            "fn"
+          ]
+        }
+      }
+    },
+    "required": [
+      "aggregations"
+    ]
+  }
+}
