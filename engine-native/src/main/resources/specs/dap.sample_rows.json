@@ -1,0 +1,57 @@
+{
+  "id": "dap.sample_rows",
+  "name": "Sample Rows",
+  "category": "/Manipulation/Row",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Keeps the first n rows or draws a reproducible random reservoir sample of n rows without changing the schema.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Sample Rows configuration",
+    "additionalProperties": false,
+    "properties": {
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "head keeps the first n rows; random draws a reservoir sample.",
+        "enum": [
+          "head",
+          "random"
+        ],
+        "default": "head"
+      },
+      "n": {
+        "type": "integer",
+        "title": "Rows",
+        "description": "Number of rows to keep; must be positive.",
+        "default": 100
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "description": "Optional seed making the random sample reproducible."
+      }
+    },
+    "required": [
+      "mode",
+      "n"
+    ]
+  }
+}

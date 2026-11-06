@@ -1,0 +1,79 @@
+{
+  "id": "dap.date_time",
+  "name": "Date & Time",
+  "category": "/Manipulation/Column/Date",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Parses text into timestamps, formats timestamps as text, or extracts a date part. The source column is kept and the result is appended as a new column.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Date & Time configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Column",
+        "description": "Input date/time column. Parse expects text; format and extract expect a timestamp or date."
+      },
+      "output": {
+        "type": "string",
+        "title": "Output column",
+        "description": "Name of the appended result column."
+      },
+      "op": {
+        "type": "string",
+        "title": "Operation",
+        "description": "parse turns text into a timestamp, format turns a timestamp into text, extract returns one date part as an integer.",
+        "enum": [
+          "parse",
+          "format",
+          "extract"
+        ],
+        "default": "parse"
+      },
+      "format": {
+        "type": "string",
+        "title": "Format",
+        "description": "strptime/strftime pattern such as %Y-%m-%d. Required for parse and format.",
+        "default": "%Y-%m-%d"
+      },
+      "unit": {
+        "type": "string",
+        "title": "Unit",
+        "description": "Date part extracted when the operation is extract.",
+        "enum": [
+          "year",
+          "month",
+          "day",
+          "hour",
+          "dow",
+          "quarter",
+          "week"
+        ],
+        "default": "year"
+      }
+    },
+    "required": [
+      "column",
+      "output",
+      "op"
+    ]
+  }
+}

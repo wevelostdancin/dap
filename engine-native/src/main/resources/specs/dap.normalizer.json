@@ -1,0 +1,71 @@
+{
+  "id": "dap.normalizer",
+  "name": "Normalizer",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Scales numeric columns to the unit range (min-max) or to zero mean and unit deviation (z-score), appending Float64 columns.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Normalizer configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "Numeric columns to normalize and the names of their appended outputs.",
+        "items": {
+          "type": "object",
+          "title": "Column",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Numeric input column."
+            },
+            "output": {
+              "type": "string",
+              "title": "Output column",
+              "description": "Appended column name; defaults to the input name plus _norm."
+            }
+          },
+          "required": [
+            "column"
+          ]
+        }
+      },
+      "method": {
+        "type": "string",
+        "title": "Method",
+        "description": "minmax maps min to 0 and max to 1; zscore subtracts the mean and divides by the standard deviation.",
+        "enum": [
+          "minmax",
+          "zscore"
+        ],
+        "default": "minmax"
+      }
+    },
+    "required": [
+      "columns",
+      "method"
+    ]
+  }
+}

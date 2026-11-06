@@ -1,0 +1,70 @@
+{
+  "id": "dap.rule_engine",
+  "name": "Rule Engine",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Assigns values from the first matching boolean rule, like a CASE expression, and appends the result as a new column. The output type is inferred from the rule values.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Rule Engine configuration",
+    "additionalProperties": false,
+    "properties": {
+      "output": {
+        "type": "string",
+        "title": "Output column",
+        "description": "Name of the appended result column."
+      },
+      "rules": {
+        "type": "array",
+        "title": "Rules",
+        "description": "Ordered rules; the first rule whose condition is true wins.",
+        "items": {
+          "type": "object",
+          "title": "Rule",
+          "additionalProperties": false,
+          "properties": {
+            "condition": {
+              "type": "string",
+              "title": "Condition",
+              "description": "SQL boolean expression over the input columns."
+            },
+            "value": {
+              "title": "Value",
+              "description": "Scalar assigned when the condition is true; its SQL literal type follows the JSON type."
+            }
+          },
+          "required": [
+            "condition",
+            "value"
+          ]
+        }
+      },
+      "elseValue": {
+        "title": "Else value",
+        "description": "Scalar assigned when no rule matches; missing means NULL."
+      }
+    },
+    "required": [
+      "output",
+      "rules"
+    ]
+  }
+}

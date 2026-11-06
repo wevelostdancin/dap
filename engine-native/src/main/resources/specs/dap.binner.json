@@ -1,0 +1,72 @@
+{
+  "id": "dap.binner",
+  "name": "Binner",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Groups a numeric column into integer bins by equal width, explicit custom edges, or equal-frequency NTILE buckets.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Binner configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Column",
+        "description": "Numeric input column to bin."
+      },
+      "output": {
+        "type": "string",
+        "title": "Output column",
+        "description": "Name of the appended integer bin column."
+      },
+      "method": {
+        "type": "string",
+        "title": "Method",
+        "description": "width uses equal intervals between min and max, custom uses explicit edges, frequency uses NTILE buckets.",
+        "enum": [
+          "width",
+          "custom",
+          "frequency"
+        ],
+        "default": "width"
+      },
+      "bins": {
+        "type": "integer",
+        "title": "Bins",
+        "description": "Number of bins for the width and frequency methods.",
+        "default": 10
+      },
+      "edges": {
+        "type": "array",
+        "title": "Edges",
+        "description": "Ascending bin boundaries for the custom method; n+1 edges define n bins.",
+        "items": {
+          "type": "number"
+        }
+      }
+    },
+    "required": [
+      "column",
+      "output",
+      "method"
+    ]
+  }
+}
