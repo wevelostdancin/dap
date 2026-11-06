@@ -123,6 +123,17 @@ public final class JobManager implements AutoCloseable {
         return active;
     }
 
+    /** Non-terminal jobs across every session; the idle watchdog keeps a busy engine alive. */
+    public int activeCount() {
+        int active = 0;
+        for (Job job : jobs.values()) {
+            if (!job.state().terminal()) {
+                active++;
+            }
+        }
+        return active;
+    }
+
     public int activeCount(String session) {
         int active = 0;
         for (Job job : jobs.values()) {

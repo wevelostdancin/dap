@@ -27,7 +27,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * HTTP entry point of the native engine: the frozen /v1 surface over the in-memory
@@ -40,7 +43,10 @@ public final class NativeService implements AutoCloseable {
 
     /** Service configuration; production defaults come from the DAP_* environment. */
     public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
-                           String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory) {
+                           String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
+                           int idleTimeoutSec) {
+        private static final int DEFAULT_IDLE_TIMEOUT_SEC = 900;
+
         public Settings {
             duckdbMemoryLimit = blankToNull(duckdbMemoryLimit);
             duckdbTempDirectory = blankToNull(duckdbTempDirectory);
@@ -48,11 +54,23 @@ public final class NativeService implements AutoCloseable {
                 throw new IllegalArgumentException(
                         "DAP_DUCKDB_THREADS must be a positive integer, got " + duckdbThreads);
             }
+            if (idleTimeoutSec < 0) {
+                throw new IllegalArgumentException(
+                        "DAP_IDLE_TIMEOUT_SEC must be a non-negative integer, got " + idleTimeoutSec);
+            }
         }
 
         /** Phase-1/2 tests build the HTTP settings only; DuckDB resources stay at their defaults. */
         public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port) {
-            this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, null, null, null);
+            this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, null, null, null,
+                    DEFAULT_IDLE_TIMEOUT_SEC);
+        }
+
+        /** Phase-3 settings without an idle timeout keep the 900 s default. */
+        public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
+                        String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory) {
+            this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
+                    duckdbTempDirectory, DEFAULT_IDLE_TIMEOUT_SEC);
         }
 
         public static Settings fromEnv() {
@@ -68,7 +86,8 @@ public final class NativeService implements AutoCloseable {
                     intEnv(env, "DAP_PORT", 7800),
                     env.get("DAP_DUCKDB_MEMORY_LIMIT"),
                     positiveIntEnv(env, "DAP_DUCKDB_THREADS"),
-                    env.get("DAP_DUCKDB_TEMP_DIR"));
+                    env.get("DAP_DUCKDB_TEMP_DIR"),
+                    nonNegativeIntEnv(env, "DAP_IDLE_TIMEOUT_SEC", DEFAULT_IDLE_TIMEOUT_SEC));
         }
 
         private static int intEnv(Map<String, String> env, String name, int fallback) {
@@ -96,6 +115,26 @@ public final class NativeService implements AutoCloseable {
             }
         }
 
+        /** Zero disables the idle watchdog; negative and non-numeric values are configuration errors. */
+        private static int nonNegativeIntEnv(Map<String, String> env, String name, int fallback) {
+            String raw = env.get(name);
+            if (raw == null || raw.isBlank()) {
+                return fallback;
+            }
+            int value;
+            try {
+                value = Integer.parseInt(raw.strip());
+            } catch (NumberFormatException failure) {
+                throw new IllegalArgumentException(
+                        name + " must be a non-negative integer, got '" + raw.strip() + "'", failure);
+            }
+            if (value < 0) {
+                throw new IllegalArgumentException(
+                        name + " must be a non-negative integer, got " + value);
+            }
+            return value;
+        }
+
         private static String blankToNull(String value) {
             return value == null || value.isBlank() ? null : value.strip();
         }
@@ -107,6 +146,8 @@ public final class NativeService implements AutoCloseable {
     private final CountDownLatch stopped = new CountDownLatch(1);
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean shuttingDown = new AtomicBoolean();
+    private final AtomicLong lastActivity = new AtomicLong(System.currentTimeMillis());
+    private final ScheduledExecutorService idleWatchdog;
     private volatile int port;
 
     /** Production service: environment settings, classpath catalog, five Phase-1 executors. */
@@ -126,6 +167,15 @@ public final class NativeService implements AutoCloseable {
             config.jetty.defaultHost = this.settings.bindHost();
             config.http.defaultContentType = "application/json; charset=utf-8";
         });
+        // Every request, matched route or not, postpones the idle shutdown.
+        app.before(context -> lastActivity.set(System.currentTimeMillis()));
+        this.idleWatchdog = settings.idleTimeoutSec() > 0
+                ? java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
+                    Thread thread = new Thread(runnable, "dap-idle-watchdog");
+                    thread.setDaemon(true);
+                    return thread;
+                })
+                : null;
         app.exception(ApiException.class, (exception, context) -> {
             context.attribute(ERROR_BODY_ATTRIBUTE, true);
             Http.error(context, exception.status(), exception.getMessage());
@@ -218,7 +268,31 @@ public final class NativeService implements AutoCloseable {
         // Port 0 lets the OS pick a free port (used by tests); ask Jetty for the real one.
         int bound = app.jettyServer().port();
         this.port = bound > 0 ? bound : app.port();
+        scheduleIdleWatchdog();
         return this;
+    }
+
+    private void scheduleIdleWatchdog() {
+        if (idleWatchdog == null) {
+            return;
+        }
+        long timeoutMs = settings.idleTimeoutSec() * 1000L;
+        long periodMs = Math.min(30_000L, Math.max(1_000L, timeoutMs / 2));
+        idleWatchdog.scheduleAtFixedRate(this::checkIdle, periodMs, periodMs, TimeUnit.MILLISECONDS);
+    }
+
+    /** Idle shutdown is deferred while a job is running, so a long run is never cut short. */
+    private void checkIdle() {
+        if (closed.get() || shuttingDown.get()) {
+            return;
+        }
+        if (System.currentTimeMillis() - lastActivity.get() < settings.idleTimeoutSec() * 1000L) {
+            return;
+        }
+        if (state.jobs().activeCount() > 0) {
+            return;
+        }
+        shutdownAsync();
     }
 
     public int port() {
@@ -265,6 +339,9 @@ public final class NativeService implements AutoCloseable {
             return;
         }
         try {
+            if (idleWatchdog != null) {
+                idleWatchdog.shutdownNow();
+            }
             state.jobs().close();
         } finally {
             try {
@@ -316,7 +393,8 @@ public final class NativeService implements AutoCloseable {
             System.exit(2);
         }
         Settings settings = new Settings(defaults.maxWorkflows(), defaults.defaultJobTimeoutSec(), bind, port,
-                defaults.duckdbMemoryLimit(), defaults.duckdbThreads(), defaults.duckdbTempDirectory());
+                defaults.duckdbMemoryLimit(), defaults.duckdbThreads(), defaults.duckdbTempDirectory(),
+                defaults.idleTimeoutSec());
         NativeService service = new NativeService(settings, new NodeRegistry(), defaultExecutors());
         Runtime.getRuntime().addShutdownHook(new Thread(service::close, "dap-shutdown-hook"));
         service.start(port);

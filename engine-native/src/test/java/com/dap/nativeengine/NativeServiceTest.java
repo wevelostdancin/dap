@@ -731,9 +731,71 @@ class NativeServiceTest {
         assertTrue(service.shuttingDown(), "shutdownAsync must flip the shuttingDown flag");
     }
 
+    // ------------------------------------------------------------ idle timeout
+
+    @Test
+    void idleServiceStopsItselfWithoutTraffic() throws Exception {
+        String previousBase = base;
+        NativeService idle = startService(new NativeService.Settings(100, 600, "127.0.0.1", 0,
+                null, null, null, 1), new NodeRegistry(), NativeService.defaultExecutors());
+        extras.add(idle);
+        try {
+            long started = System.nanoTime();
+            awaitStopped(idle, Duration.ofSeconds(5));
+            long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            assertTrue(idle.shuttingDown(), "the idle watchdog must request shutdown");
+            assertTrue(elapsedMs <= 5000, "idle shutdown took " + elapsedMs + "ms");
+        } finally {
+            base = previousBase;
+        }
+    }
+
+    @Test
+    void idleWatchdogWaitsForAnActiveJob() throws Exception {
+        String previousBase = base;
+        NativeService slow = startSlowService(1);
+        try {
+            String workflow = createWorkflow("idle-job");
+            addNode(workflow, "dap.test_sleep", Map.of("millis", 4000));
+            Resp submitted = post("/v1/workflows/" + workflow + "/jobs", Map.of("timeoutSec", 30));
+            assertEquals(202, submitted.status(), submitted.raw().body());
+            String jobId = submitted.body().path("id").asText();
+            assertEquals(jobId, awaitRunningJob(Duration.ofSeconds(5)));
+
+            Thread.sleep(2500);
+            assertFalse(slow.shuttingDown(), "an active job must keep the engine alive");
+            assertEquals(200, get("/v1/health").status(), "the idle engine still serves requests");
+
+            awaitJobState(jobId, Set.of("succeeded"), Duration.ofSeconds(15));
+            awaitStopped(slow, Duration.ofSeconds(5));
+            assertTrue(slow.shuttingDown());
+        } finally {
+            base = previousBase;
+        }
+    }
+
+    @Test
+    void zeroIdleTimeoutDisablesTheWatchdog() throws Exception {
+        String previousBase = base;
+        NativeService persistent = startService(new NativeService.Settings(100, 600, "127.0.0.1", 0,
+                null, null, null, 0), new NodeRegistry(), NativeService.defaultExecutors());
+        extras.add(persistent);
+        try {
+            Thread.sleep(2000);
+            assertFalse(persistent.shuttingDown(), "DAP_IDLE_TIMEOUT_SEC=0 must disable idle shutdown");
+            assertEquals(200, get("/v1/health").status());
+        } finally {
+            base = previousBase;
+        }
+    }
+
     // --------------------------------------------------------------- helpers
 
     private NativeService startSlowService() throws Exception {
+        return startSlowService(0);
+    }
+
+    private NativeService startSlowService(int idleTimeoutSec) throws Exception {
         Path root = Files.createTempDirectory("dap-slow-specs");
         Path specs = Files.createDirectories(root.resolve("specs"));
         String index = readResource("specs/index.txt");
@@ -754,8 +816,8 @@ class NativeServiceTest {
                 return new LazyPlan(context.db(), "SELECT 1 AS x", List.of(ColumnSpec.of("x", "Int64")));
             }
         });
-        NativeService slow = new NativeService(new NativeService.Settings(100, 600, "127.0.0.1", 0),
-                registry, executors);
+        NativeService slow = new NativeService(new NativeService.Settings(100, 600, "127.0.0.1", 0,
+                null, null, null, idleTimeoutSec), registry, executors);
         slow.start(0);
         extras.add(slow);
         base = "http://127.0.0.1:" + slow.port();
@@ -856,6 +918,14 @@ class NativeServiceTest {
             }
         }
         throw new AssertionError("profile misses column " + name);
+    }
+
+    private static void awaitStopped(NativeService stopped, Duration timeout) throws InterruptedException {
+        Thread waiter = new Thread(stopped::awaitStop, "test-await-stop");
+        waiter.setDaemon(true);
+        waiter.start();
+        waiter.join(timeout.toMillis());
+        assertFalse(waiter.isAlive(), "service did not stop within " + timeout);
     }
 
     private String awaitRunningJob(Duration timeout) throws Exception {
