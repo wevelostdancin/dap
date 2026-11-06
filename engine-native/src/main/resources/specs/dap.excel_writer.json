@@ -1,0 +1,47 @@
+{
+  "id": "dap.excel_writer",
+  "name": "Excel Writer",
+  "category": "/IO/Write",
+  "type": "Sink",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Writes the input table to an .xlsx workbook: the first row holds the column names, numbers stay numeric, booleans become boolean cells, dates and times are written as ISO text and NULL becomes an empty cell. The input table is passed through unchanged.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Excel Writer configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Output file",
+        "description": "Absolute path of the .xlsx workbook to write; parent directories are created.",
+        "placeholder": "/data/output.xlsx"
+      },
+      "sheet": {
+        "type": "string",
+        "title": "Sheet name",
+        "description": "Name of the single worksheet written to the workbook; the characters []:*?/\\ are not allowed.",
+        "default": "Sheet1"
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}
