@@ -6,18 +6,21 @@
 машину.
 
 Движок: Javalin 6.7 + DuckDB 1.5.6 (in-memory) + Arrow 19.0, Java 21. Каталог —
-11 узлов `dap.*`, контракт — 26 операций `/v1`. Версия: **1.0.0**.
+16 узлов `dap.*`, контракт — 27 операций `/v1`. Версия: **1.0.0**.
 
 ## Что это
 
 - **Аналитика по запросу.** Адаптер поднимает движок при первом вызове; отдельного
   демона, Docker и внешней БД в ежедневном пути нет.
-- **Два интерфейса.** MCP (stdio, 21 инструмент `dap_*`) для агента и HTTP `/v1`
+- **Два интерфейса.** MCP (stdio, 22 инструмента `dap_*`) для агента и HTTP `/v1`
   для скриптов и тестов.
 - **Узлы как данные.** Узел описывается JSON-спекой: id, порты, `configSchema`.
   Агент читает схему настроек и собирает граф без XML и без GUI.
 - **DuckDB внутри.** Преобразования — ленивые SQL-отношения; данные материализуются
   только при чтении таблицы или профиля.
+- **Parquet-кэш.** `POST /v1/datasets` (инструмент `dap_ingest`) один раз конвертирует
+  CSV/Excel/JSON/Parquet в `$DAP_HOME/build/cache` (или `~/.dap/cache`); повторный
+  анализ читает Parquet.
 
 DAP не является GUI, многопользовательским сервисом или облачным решением.
 Пользователь один, данные локальные, интерфейс — чат агента.
@@ -46,18 +49,21 @@ curl -s http://127.0.0.1:7800/v1/health
 ```
 
 ```json
-{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":11,"coreNodes":11,
+{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":16,"coreNodes":16,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
 (`memory` — текущие `usedMb`/`maxMb` JVM.)
 
 Cold start — около 0.4–0.5 с от `java -jar` до первого `200`. Остановка —
-`POST /v1/shutdown` или сигнал процессу.
+`POST /v1/shutdown`, сигнал процессу или простой дольше `DAP_IDLE_TIMEOUT_SEC`.
 
 Переменные: `DAP_PORT` (7800), `DAP_BIND` (`127.0.0.1`; также `localhost` и
 `0.0.0.0`), `DAP_MAX_WORKFLOWS` (100 на сессию), `DAP_JOB_TIMEOUT` (600 с),
-`DAP_DUCKDB_MEMORY_LIMIT`, `DAP_DUCKDB_THREADS`, `DAP_DUCKDB_TEMP_DIR`.
+`DAP_IDLE_TIMEOUT_SEC` (900 с; `0` выключает автозавершение),
+`DAP_DUCKDB_MEMORY_LIMIT`, `DAP_DUCKDB_THREADS`, `DAP_DUCKDB_TEMP_DIR`,
+`DAP_CACHE_DIR` (Parquet-кэш; по умолчанию `$DAP_HOME/build/cache` при заданном
+`DAP_HOME`, иначе `~/.dap/cache`; в sandbox — `$TMPDIR/dap-cache`).
 
 ## Пример вызова
 
@@ -127,14 +133,14 @@ python3 adapters/mcp/dap_mcp.py
 
 Инструменты: `dap_search_nodes`, `dap_node_dialog_schema`, `dap_workflow_create`,
 `dap_add_node`, `dap_connect`, `dap_run`, `dap_get_table`, `dap_profile_table`,
-`dap_save_workflow`, `dap_load_workflow`, `dap_shutdown` и остальные `dap_*` —
-21 штука. Полный список с аргументами —
+`dap_ingest`, `dap_save_workflow`, `dap_load_workflow`, `dap_shutdown` и остальные
+`dap_*` — 22 штуки. Полный список с аргументами —
 [adapters/mcp/README.md](adapters/mcp/README.md).
 
 ## Проверки
 
 ```bash
-make test-native    # JUnit: 204 теста
+make test-native    # JUnit: 247 тестов
 make goldens        # 13 golden-workflow на отдельном экземпляре :7811
 make smoke          # чёрный smoke по HTTP против запущенного движка (DAP_BASE)
 make mcp-e2e        # create → add_node → connect → run → table → delete через MCP
@@ -158,7 +164,7 @@ Makefile         build-native, test-native, run-native, goldens, check
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — компоненты, жизненный цикл запроса,
   память и ресурсы DuckDB, отмена, MCP-адаптер.
-- [docs/NODES.md](docs/NODES.md) — 11 узлов: назначение, config, примеры JSON.
+- [docs/NODES.md](docs/NODES.md) — 16 узлов: назначение, config, примеры JSON.
 - [docs/QUALITY.md](docs/QUALITY.md) — unit-тесты, goldens, правила сравнения,
   контракт ошибок, критерий готовности узла.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — план продукта и пул узлов.
@@ -173,9 +179,11 @@ Makefile         build-native, test-native, run-native, goldens, check
   выставляться в сеть без прокси.
 - Состояние в памяти: workflow, задания и таблицы исчезают при остановке процесса;
   `POST .../save` пишет `workflow.json`, `POST /v1/workflows/load` читает его обратно.
-- Остановка явная (`POST /v1/shutdown`); автозавершение по простою пока не
-  реализовано.
-- Каталог — 11 узлов; файловые источники читают любой путь, доступный процессу.
+  На диске остаётся только явно сохранённый `workflow.json` и Parquet-кэш ingest.
+- Остановка — явная (`POST /v1/shutdown`, сигнал процессу) или автоматическая по
+  простою: `DAP_IDLE_TIMEOUT_SEC` (900 с по умолчанию, `0` выключает), если нет
+  активных jobs.
+- Каталог — 16 узлов; файловые источники читают любой путь, доступный процессу.
 - Память ingest живёт в JVM heap: для 10 млн строк нужно ~4,65 ГБ heap, и
   `DAP_DUCKDB_MEMORY_LIMIT` его не ограничивает.
 

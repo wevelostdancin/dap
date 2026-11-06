@@ -8,7 +8,7 @@
 - Запросы с телом: `Content-Type: application/json`; ответы —
   `application/json; charset=utf-8`, заголовок `X-DAP-Api-Version: 1`
 - Аутентификации нет; сервис слушает loopback
-- Каталог — 11 узлов с id `dap.*`; контракт — 26 операций
+- Каталог — 16 узлов с id `dap.*`; контракт — 27 операций
 
 ## 1. Основы
 
@@ -29,7 +29,9 @@
 | Узел workflow | `<номер workflow>:<индекс>`, например `1:2` для `wf-1` | workflow |
 
 Порты данных нумеруются с 0. У всех узлов один табличный выход (порт 0); у
-`dap.joiner` два входа (0 — Left, 1 — Right), у остальных один.
+`dap.joiner` два входа (0 — Left, 1 — Right), у остальных один. Писатели
+(`dap.csv_writer`, `dap.parquet_writer`, `dap.json_writer`) возвращают входную
+таблицу без изменений (pass-through).
 
 ### Ошибки
 
@@ -65,11 +67,11 @@
 ### `GET /v1/health`
 
 ```json
-{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":11,"coreNodes":11,
+{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":16,"coreNodes":16,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
-`nodes` и `coreNodes` — живые счётчики каталога (сейчас 11 и 11); `workflows` —
+`nodes` и `coreNodes` — живые счётчики каталога (сейчас 16 и 16); `workflows` —
 все workflow процесса; `sessions` — открытые сессионные БД; `jobs` — активные
 задания текущей сессии; `memory` — heap JVM.
 
@@ -81,7 +83,7 @@
 `category` — префикс; `limit` по умолчанию 50, сортировка по имени.
 
 ```json
-{"count":11,"nodes":[
+{"count":16,"nodes":[
   {"id":"dap.csv_reader","name":"CSV Reader","category":"/IO/Read","type":"Source",
    "deprecated":false,"tier":"core",
    "inPorts":[],"outPorts":[{"index":0,"name":"Data","type":"BufferedDataTable"}]}
@@ -111,7 +113,7 @@
    "labelCoverage":"5/5","warnings":[]}}
 ```
 
-Неизвестный id — 400. Все 11 узлов отдают `available: true`.
+Неизвестный id — 400. Все 16 узлов отдают `available: true`.
 
 ### Диалог узла внутри workflow
 
@@ -281,18 +283,24 @@ workflow — 404.
 ```
 
 `format` необязателен: выводится из расширения (`.csv`, `.xlsx`, `.json`,
-`.parquet`). Ответ:
+`.parquet`). Явно допустимы `csv`, `excel` (или `xlsx`), `json`, `parquet`.
+Ответ:
 
 ```json
-{"path": "/Users/me/.dap/cache/<sha256>.parquet", "rows": 150,
+{"path": "<cache>/<sha256>.parquet", "rows": 150,
  "columns": [{"name": "sepal_length", "type": "Float64"}], "cached": false}
 ```
 
 Типы — Arrow-имена (`Int64`, `Float64`, `Utf8`, `Boolean`, `Date32`, `Time64`,
-`Timestamp`, `Decimal128`). Кэш: `DAP_CACHE_DIR` или `~/.dap/cache`; ключ —
-путь + размер + mtime + формат, поэтому изменённый файл инвалидирует запись.
-400 — нет `file`, неизвестное расширение/формат, файл не найден. Полученный
-`path` можно передать в `dap.parquet_reader` как `file`.
+`Timestamp`, `Decimal128`); тип, которого нет в контракте, отдаётся как его
+называет DuckDB. Кэш: `DAP_CACHE_DIR` (используется как есть); без него —
+`$DAP_HOME/build/cache` (когда `DAP_HOME` задан, например адаптером), иначе
+`~/.dap/cache`, а если этот каталог нельзя создать (sandbox) — `$TMPDIR/dap-cache`.
+Ключ — SHA-256 от абсолютного пути, размера, mtime и формата, поэтому изменённый
+файл инвалидирует запись, а неизменённый возвращается с `cached: true`. 400 — нет
+`file`, пустой или нестроковый `format`, неизвестное расширение/формат, файл не
+найден; 500 — ошибка записи.
+Полученный `path` можно передать в `dap.parquet_reader` как `file`.
 
 ## 7. Сохранение, диагностика, остановка
 
@@ -338,6 +346,10 @@ factory, state, config), `connections` строками `"1:1:0 -> 1:2:0"` и `d
 `{"ok":true}`, затем процесс закрывается примерно через 100 мс. Аутентификации нет;
 незавершённые workflow теряются.
 
+Кроме явной остановки, движок завершается сам после простоя дольше
+`DAP_IDLE_TIMEOUT_SEC` (по умолчанию 900 с; `0` выключает автозавершение), если
+нет активных jobs. Любой запрос, включая `GET /v1/health`, продлевает простой.
+
 ## 8. Пример целиком
 
 ```bash
@@ -373,6 +385,10 @@ curl -s -X POST $B/v1/workflows/wf-1/run -H 'Content-Type: application/json' -d 
 curl -s "$B/v1/workflows/wf-1/nodes/1:2/table?limit=5"
 curl -s "$B/v1/workflows/wf-1/nodes/1:2/profile"
 
+curl -s -X POST $B/v1/datasets -H 'Content-Type: application/json' \
+  -d '{"file":"/data/iris.csv"}'
+# {"path":"<cache>/<sha256>.parquet","rows":150,"columns":[...],"cached":false}
+
 curl -s -X POST $B/v1/workflows/wf-1/save -H 'Content-Type: application/json' \
   -d '{"dir":"/tmp/dap-demo"}'
 curl -s -X POST $B/v1/workflows/load -H 'Content-Type: application/json' \
@@ -385,7 +401,8 @@ curl -s -X POST $B/v1/shutdown
 
 - Один пользователь, без auth; сервис должен слушать loopback.
 - Состояние в памяти: workflow, задания и таблицы живут до остановки процесса;
-  на диск сохраняется только `workflow.json` через `/save`.
+  на диск сохраняются только `workflow.json` через `/save` и Parquet-кэш
+  `POST /v1/datasets`.
 - Workflow нельзя переименовать или получить отдельным запросом: есть список,
   создание, загрузка, удаление и операции над узлами.
 - Файловые источники читают любой путь, доступный процессу.

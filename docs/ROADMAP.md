@@ -2,7 +2,8 @@
 
 **Статус:** фазы 0–3 пилота (KNIME-oracle) закрыты 30.10.2026. **P0 «Отвязка» закрыт
 06.11.2026:** KNIME удалён, goldens-native зелёные (13/13), workflow сохраняется и
-загружается. Дальше — P1 (lifecycle + IO).
+загружается. **P1 «Lifecycle + IO» закрыт 06.11.2026:** idle-watchdog, 5 IO-узлов,
+Parquet-ingest, 16 узлов, 247 тестов. Дальше — P2 (ядро аналитики).
 **Цель:** лёгкий, быстрый и точный аналитический бэкенд для агента: локальный, по требованию,
 без KNIME.
 **Связанные документы:** [ARCHITECTURE.md](ARCHITECTURE.md), [NODES.md](NODES.md),
@@ -104,7 +105,7 @@ Parquet.
 | Фаза | Что | Критерий «готово» | Время |
 |---|---|---|---|
 | **P0. Отвязка** ✅ | goldens-native, удаление KNIME, свой `workflow.json` (save/load), docs | закрыто 06.11.2026: `make check` зелёный, 13/13 goldens, save→load round-trip | 3 дня |
-| **P1. Lifecycle + IO** | idle-timeout (`dap_shutdown` уже есть), `csv_writer`/`json_*`/`parquet_*`/`excel_writer`, `dap_ingest`, DSH wiring | агент в DSH: CSV/Excel → анализ → Parquet/CSV; движок гаснет сам | 4 дня |
+| **P1. Lifecycle + IO** ✅ | idle-timeout, `dap_shutdown`, 5 IO-узлов (parquet/json readers, csv/parquet/json writers), `dap_ingest` | закрыто 06.11.2026: 16 узлов, 247 тестов, `make check` зелёный, ingest→parquet_reader→table проверен; DSH-плагин делает пользователь | 4 дня |
 | **P2. Ядро аналитики** | 21 новый узел: очистка, преобразование, pivot/unpivot, window, top-N | 32 узла, goldens зелёные, примеры в docs | 5 дней |
 | **P3. Статистика и время** | 13 узлов: describe, корреляции, гистограммы, квантили, resample, rolling | 45 узлов | 5 дней |
 | **P4. Hardening** | bench, эвикция jobs/таблиц, install-скрипт, DSH-конфиг, docs | неделя ежедневной работы без сбоев и потери данных | 3 дня |

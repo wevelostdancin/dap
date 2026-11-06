@@ -65,7 +65,7 @@ def check_openapi() -> None:
         # a removed path without extra dependencies.
         text = read("api/openapi.yaml")
         for required in ("/v1/health", "/v1/nodes", "/v1/workflows", "/v1/jobs",
-                         "/v1/workflows/load", "/v1/shutdown"):
+                         "/v1/workflows/load", "/v1/datasets", "/v1/shutdown"):
             if not re.search(r"^  " + re.escape(required) + r":", text, re.M):
                 fail(f"OpenAPI misses path {required}")
         return
@@ -79,7 +79,7 @@ def check_openapi() -> None:
         return
     paths = spec.get("paths") or {}
     for required in ("/v1/health", "/v1/nodes", "/v1/workflows", "/v1/jobs",
-                     "/v1/workflows/load", "/v1/shutdown"):
+                     "/v1/workflows/load", "/v1/datasets", "/v1/shutdown"):
         if required not in paths:
             fail(f"OpenAPI misses path {required}")
 

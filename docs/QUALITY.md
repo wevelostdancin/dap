@@ -8,7 +8,7 @@
 
 | Уровень | Команда | Что покрывает |
 |---|---|---|
-| JUnit | `make test-native` | 204 теста: исполнители, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
+| JUnit | `make test-native` | 247 тестов: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
 | Goldens | `make goldens` | 13 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
 | Структура goldens | `python3 tests/goldens-native/runner.py --validate` | проверка фикстур без движка |
 | Smoke | `make smoke` (`DAP_BASE`, по умолчанию `:7800`) | 9 чёрных проверок контракта и пяти узлов на запущенном движке |
@@ -23,13 +23,18 @@
 ## 2. Unit-тесты
 
 JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java.base/java.nio`).
-204 теста в 25 классах:
+247 тестов в 31 классе:
 
-- **Исполнители** — по классу на узел (`CsvReaderExecutorTest`, `RowFilterExecutorTest`,
+- **Исполнители** — по классу на узел (`CsvReaderExecutorTest`, `ExcelReaderExecutorTest`,
+  `ParquetReaderExecutorTest`, `JsonReaderExecutorTest`, `CsvWriterExecutorTest`,
+  `ParquetWriterExecutorTest`, `JsonWriterExecutorTest`, `RowFilterExecutorTest`,
   `ColumnFilterExecutorTest`, `ColumnRenamerExecutorTest`, `SorterExecutorTest`,
-  `MissingValueExecutorTest`, `ExcelReaderExecutorTest`, `GroupByExecutorTest`,
-  `JoinerExecutorTest`, `StringManipulationExecutorTest`, `MathFormulaExecutorTest`):
+  `MissingValueExecutorTest`, `GroupByExecutorTest`, `JoinerExecutorTest`,
+  `StringManipulationExecutorTest`, `MathFormulaExecutorTest`):
   валидация config, типы и имена выходных колонок, NULL/`""`, порядок строк.
+- **IO и кэш** — `IngestServiceTest`: CSV/JSON/Parquet → Parquet, повторный вызов
+  возвращает тот же файл (`cached`), неизвестный формат и отсутствующий файл
+  отклоняются.
 - **Движок** — `DuckDbSessionSettingsTest` (env-лимиты, нормализация, spill),
   `DuckDbSessionLoadIntoTest`, `MaterializationInterruptTest`, `ProfileDistinctTest`,
   `TypeMapTest`, `ArrowDuckDbSpikeTest`.
@@ -37,8 +42,9 @@ JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java
   `JobManagerTest` (сериализация одного workflow, параллельность разных, timeout,
   cancel, закрытие).
 - **Каталог и HTTP** — `NodeRegistryTest`, `NodeSpecTest`, `CatalogHandlersTest`,
-  `NativeServiceTest` (18 интеграционных тестов на реальном Javalin: все маршруты,
-  400/404/408/409/500, изоляция сессий, health во время sync-run, shutdown).
+  `NativeServiceTest` (22 интеграционных теста на реальном Javalin: маршруты,
+  400/404/408/409/500, изоляция сессий, health во время sync-run, shutdown,
+  idle-timeout, `POST /v1/datasets` → `dap.parquet_reader`).
 
 Минимум для нового узла — 3 теста: валидация config, успешный путь, граничный случай
 (NULL, пустой результат, неверный тип).
@@ -169,8 +175,10 @@ goldens-native/
 2. Исполнитель в `nodes/`, зарегистрированный в `NativeService.defaultExecutors`,
    возвращает `LazyPlan` и валидирует config с понятными сообщениями.
 3. Не менее трёх unit-тестов: валидация, успешный путь, граничный случай.
-4. Golden-workflow, покрывающий узел, и `runner.py --validate` без замечаний;
-   ожидания посчитаны независимо.
+4. Golden-workflow для узлов, работающих с таблицей, и `runner.py --validate` без
+   замечаний; ожидания посчитаны независимо. Для IO-узлов (читатели/писатели) вместо
+   golden — unit-тесты плюс интеграционный round-trip (ingest → `parquet_reader` →
+   `table`), потому что golden-раннер не проверяет файлы.
 5. Строка в [NODES.md](NODES.md): назначение, таблица config, пример JSON.
 6. В `engine-native/` нет ссылок на внешний аналитический рантайм (проверяет
    `make lint`); jar содержит ровно одну DuckDB-native библиотеку и меньше 50 МиБ.

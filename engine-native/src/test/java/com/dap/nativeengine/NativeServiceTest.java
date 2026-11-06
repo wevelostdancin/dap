@@ -981,6 +981,30 @@ class NativeServiceTest {
                 "failed loads must not leak workflows");
     }
 
+    @Test
+    void ingestFeedsParquetReader() throws Exception {
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+        assertTrue(Files.isRegularFile(csv), "fixture missing: " + csv);
+
+        Resp ingested = post("/v1/datasets", Map.of("file", csv.toString(), "format", "csv"));
+        assertEquals(200, ingested.status(), ingested.raw().body());
+        String parquet = ingested.body().path("path").asText();
+        assertEquals(150, ingested.body().path("rows").asInt());
+        assertTrue(Files.isRegularFile(Path.of(parquet)), "ingest must write a parquet file");
+
+        Resp cached = post("/v1/datasets", Map.of("file", csv.toString(), "format", "csv"));
+        assertTrue(cached.body().path("cached").asBoolean(), "second ingest must hit the cache");
+
+        String workflow = createWorkflow("ingest");
+        String reader = addNode(workflow, "dap.parquet_reader", Map.of("file", parquet));
+        assertEquals(200, post("/v1/workflows/" + workflow + "/run", Map.of()).status());
+        Resp table = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/table?limit=3");
+        assertEquals(200, table.status(), table.raw().body());
+        assertEquals(150, table.body().path("rows").asInt());
+        assertEquals("sepal_length", table.body().path("columns").get(0).path("name").asText());
+    }
+
     private JsonNode awaitJobState(String jobId, Set<String> states, Duration timeout) throws Exception {
         long deadline = System.nanoTime() + timeout.toNanos();
         JsonNode last = null;

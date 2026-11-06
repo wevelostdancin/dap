@@ -30,25 +30,24 @@ public final class DatasetHandlers {
         if (fileNode == null || !fileNode.isTextual() || fileNode.asText().isBlank()) {
             throw ApiException.badRequest("'file' is required");
         }
-        Path file = Path.of(fileNode.asText().trim());
-
+        Path file;
         String format;
-        JsonNode formatNode = request.get("format");
-        if (formatNode != null && !formatNode.isNull()) {
-            if (!formatNode.isTextual() || formatNode.asText().isBlank()) {
-                throw ApiException.badRequest("'format' must be a non-empty string");
-            }
-            format = formatNode.asText().trim();
-        } else {
-            format = formatOf(file);
-            if (format == null) {
-                throw ApiException.badRequest(
-                        "cannot infer format from the file name, pass 'format': " + file);
-            }
-        }
-
         IngestService.Result result;
         try {
+            file = Path.of(fileNode.asText().trim());
+            JsonNode formatNode = request.get("format");
+            if (formatNode != null && !formatNode.isNull()) {
+                if (!formatNode.isTextual() || formatNode.asText().isBlank()) {
+                    throw ApiException.badRequest("'format' must be a non-empty string");
+                }
+                format = formatNode.asText().trim();
+            } else {
+                format = formatOf(file);
+                if (format == null) {
+                    throw ApiException.badRequest(
+                            "cannot infer format from the file name, pass 'format': " + file);
+                }
+            }
             result = ingest.ingest(file, format);
         } catch (IllegalArgumentException invalid) {
             throw ApiException.badRequest(invalid.getMessage());

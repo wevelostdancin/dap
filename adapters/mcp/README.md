@@ -64,7 +64,7 @@ Java ищется в `$JAVA_HOME/bin/java`, иначе в `PATH`; jar — все
 
 Что важно для агента:
 
-- каталог — 11 узлов с id `dap.*`, у каждого `configSchema` с `configKey`;
+- каталог — 16 узлов с id `dap.*`, у каждого `configSchema` с `configKey`;
 - настройки — плоский JSON по `configKey` из `dap_node_dialog_schema`, без XML;
 - `/v1` — единственный контракт: legacy-алиасы без `/v1` не зарегистрированы;
 - sync `dap_run` не блокирует HTTP-диспетчер (виртуальный поток), но

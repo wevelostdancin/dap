@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * One-time conversion of a source file into the Parquet cache, so repeated
@@ -136,8 +137,25 @@ public final class IngestService {
     private static void copy(DuckDbSession db, String source, Path target) throws SQLException {
         try (Connection connection = db.newConnection();
              Statement statement = connection.createStatement()) {
+            validateTypes(statement, source);
             statement.execute("COPY (SELECT * FROM " + source + ") TO " + literal(target.toString())
                     + " (FORMAT PARQUET)");
+        }
+    }
+
+    /** Reject nested/exotic types before writing, so ingest and readers share one contract. */
+    private static void validateTypes(Statement statement, String source) throws SQLException {
+        try (ResultSet result = statement.executeQuery("DESCRIBE SELECT * FROM " + source)) {
+            while (result.next()) {
+                String type = result.getString("column_type");
+                try {
+                    TypeMap.fromDuckDb(type);
+                } catch (IllegalArgumentException unsupported) {
+                    throw new IllegalArgumentException("ingest: column '"
+                            + result.getString("column_name") + "' has unsupported type '" + type
+                            + "'; flatten nested data first");
+                }
+            }
         }
     }
 
@@ -182,7 +200,7 @@ public final class IngestService {
 
     private static String key(Path source, Format format) throws IOException {
         String descriptor = source + "\n" + Files.size(source) + "\n"
-                + Files.getLastModifiedTime(source).toMillis() + "\n"
+                + Files.getLastModifiedTime(source).to(TimeUnit.NANOSECONDS) + "\n"
                 + format.name().toLowerCase(Locale.ROOT);
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -201,6 +219,16 @@ public final class IngestService {
         if (configured != null && !configured.isBlank()) {
             return Path.of(configured.trim());
         }
-        return Path.of(System.getProperty("user.home"), ".dap", "cache");
+        String home = System.getenv("DAP_HOME");
+        Path preferred = home != null && !home.isBlank()
+                ? Path.of(home).resolve("build").resolve("cache")
+                : Path.of(System.getProperty("user.home"), ".dap", "cache");
+        try {
+            Files.createDirectories(preferred);
+            return preferred;
+        } catch (IOException denied) {
+            // A sandboxed client may forbid ~/.dap; the temp directory is writable.
+            return Path.of(System.getProperty("java.io.tmpdir"), "dap-cache");
+        }
     }
 }

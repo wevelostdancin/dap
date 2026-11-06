@@ -3,21 +3,28 @@ package com.dap.nativeengine;
 import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.api.CatalogHandlers;
 import com.dap.nativeengine.api.DataHandlers;
+import com.dap.nativeengine.api.DatasetHandlers;
 import com.dap.nativeengine.api.Http;
 import com.dap.nativeengine.api.JobHandlers;
 import com.dap.nativeengine.api.OpsHandlers;
 import com.dap.nativeengine.api.ServiceState;
 import com.dap.nativeengine.api.WorkflowHandlers;
+import io.javalin.http.Context;
 import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.nodes.ColumnFilterExecutor;
 import com.dap.nativeengine.nodes.ColumnRenamerExecutor;
 import com.dap.nativeengine.nodes.CsvReaderExecutor;
+import com.dap.nativeengine.nodes.CsvWriterExecutor;
 import com.dap.nativeengine.nodes.ExcelReaderExecutor;
 import com.dap.nativeengine.nodes.GroupByExecutor;
+import com.dap.nativeengine.nodes.JsonReaderExecutor;
+import com.dap.nativeengine.nodes.JsonWriterExecutor;
 import com.dap.nativeengine.nodes.JoinerExecutor;
 import com.dap.nativeengine.nodes.MathFormulaExecutor;
 import com.dap.nativeengine.nodes.MissingValueExecutor;
+import com.dap.nativeengine.nodes.ParquetReaderExecutor;
+import com.dap.nativeengine.nodes.ParquetWriterExecutor;
 import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
@@ -30,6 +37,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -40,6 +48,7 @@ public final class NativeService implements AutoCloseable {
     public static final String NAME = "DAP";
     public static final String VERSION = "1.0.0";
     private static final String ERROR_BODY_ATTRIBUTE = "dap.errorBody";
+    private static final String IN_FLIGHT_ATTRIBUTE = "dap.inFlight";
 
     /** Service configuration; production defaults come from the DAP_* environment. */
     public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
@@ -147,6 +156,7 @@ public final class NativeService implements AutoCloseable {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean shuttingDown = new AtomicBoolean();
     private final AtomicLong lastActivity = new AtomicLong(System.currentTimeMillis());
+    private final AtomicInteger inFlight = new AtomicInteger();
     private final ScheduledExecutorService idleWatchdog;
     private volatile int port;
 
@@ -167,8 +177,14 @@ public final class NativeService implements AutoCloseable {
             config.jetty.defaultHost = this.settings.bindHost();
             config.http.defaultContentType = "application/json; charset=utf-8";
         });
-        // Every request, matched route or not, postpones the idle shutdown.
-        app.before(context -> lastActivity.set(System.currentTimeMillis()));
+        // Every request, matched route or not, postpones the idle shutdown and counts as
+        // in-flight work: a long /table, /profile or /v1/datasets call must not be cut off.
+        app.before(context -> {
+            lastActivity.set(System.currentTimeMillis());
+            inFlight.incrementAndGet();
+            context.attribute(IN_FLIGHT_ATTRIBUTE, Boolean.TRUE);
+        });
+        app.after(this::releaseInFlight);
         this.idleWatchdog = settings.idleTimeoutSec() > 0
                 ? java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
                     Thread thread = new Thread(runnable, "dap-idle-watchdog");
@@ -177,10 +193,12 @@ public final class NativeService implements AutoCloseable {
                 })
                 : null;
         app.exception(ApiException.class, (exception, context) -> {
+            releaseInFlight(context);
             context.attribute(ERROR_BODY_ATTRIBUTE, true);
             Http.error(context, exception.status(), exception.getMessage());
         });
         app.exception(Exception.class, (exception, context) -> {
+            releaseInFlight(context);
             context.attribute(ERROR_BODY_ATTRIBUTE, true);
             Http.error(context, 500, exception.getMessage() == null
                     ? exception.getClass().getSimpleName()
@@ -189,6 +207,7 @@ public final class NativeService implements AutoCloseable {
         // Unmatched routes are answered by Javalin before any handler ran, so the attribute
         // distinguishes them from a deliberate ApiException 404 with its own body.
         app.error(404, context -> {
+            releaseInFlight(context);
             if (context.attribute(ERROR_BODY_ATTRIBUTE) != null) {
                 return;
             }
@@ -202,6 +221,7 @@ public final class NativeService implements AutoCloseable {
         WorkflowHandlers workflows = new WorkflowHandlers(state);
         JobHandlers jobs = new JobHandlers(state);
         DataHandlers data = new DataHandlers(state);
+        DatasetHandlers datasets = new DatasetHandlers();
         OpsHandlers ops = new OpsHandlers(state, this::shutdownAsync);
 
         app.get("/v1", context -> Http.ok(context, meta()));
@@ -229,6 +249,7 @@ public final class NativeService implements AutoCloseable {
         app.delete("/v1/jobs/{jobId}", jobs::cancel);
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/table", data::table);
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/profile", data::profile);
+        app.post("/v1/datasets", datasets::ingest);
         app.post("/v1/workflows/{workflowId}/save", ops::save);
         app.get("/v1/workflows/{workflowId}/debug", ops::debug);
         app.post("/v1/shutdown", ops::shutdown);
@@ -289,10 +310,43 @@ public final class NativeService implements AutoCloseable {
         if (System.currentTimeMillis() - lastActivity.get() < settings.idleTimeoutSec() * 1000L) {
             return;
         }
-        if (state.jobs().activeCount() > 0) {
+        if (inFlight.get() > 0 || state.jobs().activeCount() > 0) {
             return;
         }
-        shutdownAsync();
+        idleShutdown();
+    }
+
+    /**
+     * Idle shutdown with a grace window: a request that arrives between the idle check and the
+     * CAS keeps the engine alive instead of being cut off by close().
+     */
+    private void idleShutdown() {
+        if (!shuttingDown.compareAndSet(false, true)) {
+            return;
+        }
+        Thread thread = new Thread(() -> {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            long idleMs = System.currentTimeMillis() - lastActivity.get();
+            if (inFlight.get() > 0 || state.jobs().activeCount() > 0
+                    || idleMs < settings.idleTimeoutSec() * 1000L) {
+                shuttingDown.set(false);
+                return;
+            }
+            close();
+        }, "dap-idle-shutdown");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void releaseInFlight(Context context) {
+        if (Boolean.TRUE.equals(context.attribute(IN_FLIGHT_ATTRIBUTE))) {
+            context.attribute(IN_FLIGHT_ATTRIBUTE, null);
+            inFlight.decrementAndGet();
+        }
     }
 
     public int port() {
@@ -356,10 +410,15 @@ public final class NativeService implements AutoCloseable {
         }
     }
 
-    /** All eleven node executors. */
+    /** All sixteen node executors. */
     public static Executors defaultExecutors() {
         return new Executors()
                 .register(new CsvReaderExecutor())
+                .register(new CsvWriterExecutor())
+                .register(new JsonReaderExecutor())
+                .register(new JsonWriterExecutor())
+                .register(new ParquetReaderExecutor())
+                .register(new ParquetWriterExecutor())
                 .register(new RowFilterExecutor())
                 .register(new ColumnFilterExecutor())
                 .register(new ColumnRenamerExecutor())

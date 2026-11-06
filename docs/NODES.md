@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 11 узлов `dap.*`. Источник истины — JSON-спеки
+Каталог нативного движка: 16 узлов `dap.*`. Источник истины — JSON-спеки
 `engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt`;
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 11 узлов имеют `available: true` и `tier: core`.
+спеке. Все 16 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -15,6 +15,12 @@
   запроса: фактическую обязательность проверяет исполнитель.
 - У всех узлов один табличный выход (порт 0). У источников нет входов, у `dap.joiner`
   два входа (0 — Left, 1 — Right), у остальных один вход (0).
+- Писатели (`dap.csv_writer`, `dap.parquet_writer`, `dap.json_writer`) — Sink:
+  один вход и один выход, входная таблица возвращается неизменной (pass-through),
+  поэтому граф можно продолжать за писателем. Файл пишется на run, на
+  job-соединении; родительские каталоги создаются.
+- Ошибки config и файловые ошибки видны на run: sync-запуск отвечает 500, job
+  получает `failed`, узел — `ERROR` с сообщением.
 - Типы колонок в `/table` и `/profile` — имена контракта:
 
   | Arrow | `type` в ответе |
@@ -35,6 +41,8 @@
 |---|---|---|---|
 | `dap.csv_reader` | CSV Reader | `/IO/Read` | — |
 | `dap.excel_reader` | Excel Reader | `/IO/Read` | — |
+| `dap.parquet_reader` | Parquet Reader | `/IO/Read` | — |
+| `dap.json_reader` | JSON Reader | `/IO/Read` | — |
 | `dap.row_filter` | Row Filter | `/Manipulation/Row/Filter` | 1 |
 | `dap.column_filter` | Column Filter | `/Manipulation/Column/Filter` | 1 |
 | `dap.column_renamer` | Column Renamer | `/Manipulation/Column` | 1 |
@@ -44,6 +52,9 @@
 | `dap.joiner` | Joiner | `/Manipulation/Row/Join` | 2 |
 | `dap.string_manipulation` | String Manipulation | `/Manipulation/Column/String` | 1 |
 | `dap.math_formula` | Math Formula | `/Manipulation/Column/Math` | 1 |
+| `dap.csv_writer` | CSV Writer | `/IO/Write` | 1 (pass-through) |
+| `dap.parquet_writer` | Parquet Writer | `/IO/Write` | 1 (pass-through) |
+| `dap.json_writer` | JSON Writer | `/IO/Write` | 1 (pass-through) |
 
 ## 2. dap.csv_reader
 
@@ -336,12 +347,118 @@ bind-only запросом `DESCRIBE ... LIMIT 0`.
 }
 ```
 
-## 13. Порядок для агента
+## 13. dap.parquet_reader
 
-1. `GET /v1/nodes?q=…` — найти `id`.
-2. `GET /v1/nodes/{id}/dialog` — поля, типы, умолчания, допустимые значения.
-3. `POST /v1/workflows/{id}/nodes` с `factory` и `settings`.
-4. `POST /v1/workflows/{id}/connect` — связи (порты данных с 0).
-5. `POST /v1/workflows/{id}/run` (или `/jobs`) → `GET .../table`, `.../profile`.
+Читает Parquet-файл в таблицу. Имена и типы колонок берутся из схемы Parquet:
+исполнитель выполняет `DESCRIBE read_parquet(...)` и переводит типы DuckDB в
+Arrow-имена. Строки читаются лениво, при `/table` или `/profile`.
+Порты: входов нет; выход 0 — `Data` (`BufferedDataTable`).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `file` | string | — | обязателен; абсолютный путь к `.parquet` |
+
+Отсутствующий или нечитаемый файл и тип колонки вне контракта Arrow — ошибка run.
+`file` может быть путём, который вернул `POST /v1/datasets`.
+
+```json
+{
+  "factory": "dap.parquet_reader",
+  "settings": {"file": "/data/iris.parquet"}
+}
+```
+
+## 14. dap.json_reader
+
+Читает JSON-документ в таблицу через `read_json_auto`: поддерживаются массив
+объектов верхнего уровня и newline-delimited JSON (NDJSON). Схему и типы колонок
+выводит DuckDB по документу; строки читаются лениво.
+Порты: входов нет; выход 0 — `Data` (`BufferedDataTable`).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `file` | string | — | обязателен; абсолютный путь к `.json`/`.ndjson` |
+
+Отсутствующий или нечитаемый файл, битый JSON и тип колонки вне контракта Arrow —
+ошибка run.
+
+```json
+{
+  "factory": "dap.json_reader",
+  "settings": {"file": "/data/events.json"}
+}
+```
+
+## 15. dap.csv_writer
+
+Пишет входную таблицу в delimited-файл и возвращает её же без изменений
+(pass-through). Запись — `COPY ... TO` на job-соединении во время run;
+родительские каталоги создаются, существующий файл перезаписывается.
+Порты: вход 0 — `Data`, выход 0 — `Data` (та же таблица).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `file` | string | — | обязателен; путь к выходному `.csv` |
+| `delimiter` | string | `,` | ровно один символ; `"\t"` означает табуляцию |
+| `header` | boolean | `true` | писать строку с именами колонок |
+
+`delimiter` проверяется: пустая строка, больше одного символа, кавычка, `\r`
+и `\n` отклоняются. Ошибка пути или настроек видна на run.
+
+```json
+{
+  "factory": "dap.csv_writer",
+  "settings": {"file": "/data/out.csv", "delimiter": ";", "header": true}
+}
+```
+
+## 16. dap.parquet_writer
+
+Пишет входную таблицу в Parquet и возвращает её же (pass-through). Кодек задаётся
+`compression`; неизвестное значение — ошибка run. Родительские каталоги
+создаются, существующий файл перезаписывается.
+Порты: вход 0 — `Data`, выход 0 — `Data` (та же таблица).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `file` | string | — | обязателен; путь к выходному `.parquet` |
+| `compression` | `snappy` \| `zstd` \| `gzip` \| `uncompressed` | `zstd` | кодек Parquet |
+
+```json
+{
+  "factory": "dap.parquet_writer",
+  "settings": {"file": "/data/out.parquet", "compression": "zstd"}
+}
+```
+
+## 17. dap.json_writer
+
+Пишет входную таблицу как JSON и возвращает её же (pass-through). При
+`array: true` получается один JSON-массив, при `false` — newline-delimited JSON
+(по объекту на строку). Родительские каталоги создаются, существующий файл
+перезаписывается.
+Порты: вход 0 — `Data`, выход 0 — `Data` (та же таблица).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `file` | string | — | обязателен; путь к выходному `.json` |
+| `array` | boolean | `true` | `true` — массив; `false` — NDJSON |
+
+```json
+{
+  "factory": "dap.json_writer",
+  "settings": {"file": "/data/out.json", "array": false}
+}
+```
+
+## 18. Порядок для агента
+
+1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
+   к Parquet-кэшу, если файл читается многократно.
+2. `GET /v1/nodes?q=…` — найти `id`.
+3. `GET /v1/nodes/{id}/dialog` — поля, типы, умолчания, допустимые значения.
+4. `POST /v1/workflows/{id}/nodes` с `factory` и `settings`.
+5. `POST /v1/workflows/{id}/connect` — связи (порты данных с 0).
+6. `POST /v1/workflows/{id}/run` (или `/jobs`) → `GET .../table`, `.../profile`.
 
 Примеры выше — тело запроса `POST /v1/workflows/{id}/nodes`.

@@ -30,7 +30,12 @@ scripts/dap-mcp
 | `DAP_BIND` | `127.0.0.1` | адрес движка; `0.0.0.0`/`::` для запросов заменяются на loopback |
 | `DAP_HEAP` | `2g` | `-Xmx` для jar |
 | `DAP_IDLE_TIMEOUT_SEC` | `900` | простой, после которого движок завершается; `0` — выключено |
+| `DAP_CACHE_DIR` | `$DAP_HOME/build/cache` | каталог Parquet-кэша `dap_ingest` |
 | `JAVA_HOME` | — | откуда брать `bin/java` |
+
+Адаптер выставляет `DAP_HOME`, поэтому кэш ingest по умолчанию лежит в
+`$DAP_HOME/build/cache`. Без `DAP_HOME` используется `~/.dap/cache`, а если
+каталог нельзя создать (sandbox) — `$TMPDIR/dap-cache`.
 
 ## Жизненный цикл
 
@@ -71,9 +76,14 @@ scripts/dap-mcp
 | данные | `dap_get_table`, `dap_profile_table`, `dap_ingest` |
 | сервис | `dap_shutdown` |
 
+Всего 22 инструмента. `dap_ingest` один раз конвертирует CSV/Excel/JSON/Parquet
+в Parquet-кэш и возвращает `path`, `rows`, `columns` и `cached`; `path` можно
+сразу передать в `dap.parquet_reader` через `dap_add_node`.
+
 Типовой проход агента: `dap_search_nodes` → `dap_node_dialog_schema` →
 `dap_workflow_create` → `dap_add_node` → `dap_connect` → `dap_run` →
-`dap_get_table`/`dap_profile_table` → `dap_save_workflow`.
+`dap_get_table`/`dap_profile_table` → `dap_save_workflow`. Для повторяющегося
+файла перед `dap_add_node` вызывается `dap_ingest`.
 
 ## Как подключить в DSH
 
