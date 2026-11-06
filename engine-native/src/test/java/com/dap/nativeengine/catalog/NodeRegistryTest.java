@@ -14,31 +14,57 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The catalog is the source of truth for node metadata. */
 class NodeRegistryTest {
+    private static final Set<String> ALL_IDS = Set.of(
+            "dap.csv_reader",
+            "dap.row_filter",
+            "dap.column_filter",
+            "dap.sorter",
+            "dap.missing_value",
+            "dap.excel_reader",
+            "dap.group_by",
+            "dap.joiner",
+            "dap.string_manipulation",
+            "dap.math_formula",
+            "dap.column_renamer",
+            "dap.parquet_reader",
+            "dap.json_reader",
+            "dap.csv_writer",
+            "dap.parquet_writer",
+            "dap.json_writer",
+            "dap.type_cast",
+            "dap.duplicate_filter",
+            "dap.value_replace",
+            "dap.column_resorter",
+            "dap.outlier_filter",
+            "dap.date_time",
+            "dap.rule_engine",
+            "dap.binner",
+            "dap.normalizer",
+            "dap.encoder",
+            "dap.sample_rows",
+            "dap.row_aggregator",
+            "dap.pivot",
+            "dap.unpivot",
+            "dap.window",
+            "dap.top_n_per_group",
+            "dap.concatenate");
+
     private final NodeRegistry registry = new NodeRegistry();
 
     @Test
-    void loadsExactlySixteenUniqueSpecs() {
-        assertEquals(16, registry.size());
+    void loadsEverySpecOnce() {
+        assertEquals(ALL_IDS.size(), registry.size());
         List<String> ids = registry.all().stream().map(NodeSpec::id).toList();
-        assertEquals(16, new HashSet<>(ids).size(), "node ids must be unique");
-        assertEquals(Set.of("dap.csv_reader", "dap.row_filter", "dap.column_filter", "dap.sorter",
-                        "dap.missing_value", "dap.excel_reader", "dap.group_by", "dap.joiner",
-                        "dap.string_manipulation", "dap.math_formula", "dap.column_renamer",
-                        "dap.parquet_reader", "dap.json_reader", "dap.csv_writer",
-                        "dap.parquet_writer", "dap.json_writer"),
-                new HashSet<>(ids));
+        assertEquals(ALL_IDS.size(), new HashSet<>(ids).size(), "node ids must be unique");
+        assertEquals(ALL_IDS, new HashSet<>(ids));
     }
 
     @Test
     void everySpecIsAvailable() {
-        assertEquals(16, registry.availableCount());
+        assertEquals(ALL_IDS.size(), registry.availableCount());
         Set<String> available = new HashSet<>();
         registry.all().stream().filter(NodeSpec::available).forEach(spec -> available.add(spec.id()));
-        assertEquals(Set.of("dap.csv_reader", "dap.row_filter", "dap.column_filter",
-                "dap.sorter", "dap.missing_value", "dap.excel_reader", "dap.group_by",
-                "dap.joiner", "dap.string_manipulation", "dap.math_formula",
-                "dap.column_renamer", "dap.parquet_reader", "dap.json_reader",
-                "dap.csv_writer", "dap.parquet_writer", "dap.json_writer"), available);
+        assertEquals(ALL_IDS, available);
     }
 
     @Test
@@ -73,7 +99,7 @@ class NodeRegistryTest {
     @Test
     void sourcesHaveNoInputsAndManipulatorsHaveOne() {
         for (NodeSpec spec : registry.all()) {
-            if (spec.id().equals("dap.joiner")) {
+            if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")) {
                 continue;
             }
             if (spec.type().equals("Source")) {
@@ -218,8 +244,8 @@ class NodeRegistryTest {
 
     @Test
     void limitCapsTheResultInNameOrder() {
-        assertEquals(16, registry.search(null, null, -1).size());
-        assertEquals(List.of("Column Filter", "Column Renamer", "CSV Reader"),
+        assertEquals(ALL_IDS.size(), registry.search(null, null, -1).size());
+        assertEquals(List.of("Binner", "Column Filter", "Column Renamer"),
                 registry.search(null, null, 3).stream().map(NodeSpec::name).toList());
         assertTrue(registry.search(null, null, 0).isEmpty());
     }

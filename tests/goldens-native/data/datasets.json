@@ -360,5 +360,33 @@
         "missing": 265
       }
     ]
+  },
+  "P2": {
+    "file": "p2.csv",
+    "rows": 6,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "id",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "name",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "score",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "category",
+        "arrow": "Utf8",
+        "missing": 0
+      }
+    ]
   }
 }

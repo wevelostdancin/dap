@@ -12,6 +12,23 @@ import com.dap.nativeengine.api.WorkflowHandlers;
 import io.javalin.http.Context;
 import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.exec.Executors;
+import com.dap.nativeengine.nodes.BinnerExecutor;
+import com.dap.nativeengine.nodes.ColumnResorterExecutor;
+import com.dap.nativeengine.nodes.ConcatenateExecutor;
+import com.dap.nativeengine.nodes.DateTimeExecutor;
+import com.dap.nativeengine.nodes.DuplicateFilterExecutor;
+import com.dap.nativeengine.nodes.EncoderExecutor;
+import com.dap.nativeengine.nodes.NormalizerExecutor;
+import com.dap.nativeengine.nodes.OutlierFilterExecutor;
+import com.dap.nativeengine.nodes.PivotExecutor;
+import com.dap.nativeengine.nodes.RowAggregatorExecutor;
+import com.dap.nativeengine.nodes.RuleEngineExecutor;
+import com.dap.nativeengine.nodes.SampleRowsExecutor;
+import com.dap.nativeengine.nodes.TopNPerGroupExecutor;
+import com.dap.nativeengine.nodes.TypeCastExecutor;
+import com.dap.nativeengine.nodes.UnpivotExecutor;
+import com.dap.nativeengine.nodes.ValueReplaceExecutor;
+import com.dap.nativeengine.nodes.WindowExecutor;
 import com.dap.nativeengine.nodes.ColumnFilterExecutor;
 import com.dap.nativeengine.nodes.ColumnRenamerExecutor;
 import com.dap.nativeengine.nodes.CsvReaderExecutor;
@@ -413,6 +430,23 @@ public final class NativeService implements AutoCloseable {
     /** All sixteen node executors. */
     public static Executors defaultExecutors() {
         return new Executors()
+                .register(new BinnerExecutor())
+                .register(new ColumnResorterExecutor())
+                .register(new ConcatenateExecutor())
+                .register(new DateTimeExecutor())
+                .register(new DuplicateFilterExecutor())
+                .register(new EncoderExecutor())
+                .register(new NormalizerExecutor())
+                .register(new OutlierFilterExecutor())
+                .register(new PivotExecutor())
+                .register(new RowAggregatorExecutor())
+                .register(new RuleEngineExecutor())
+                .register(new SampleRowsExecutor())
+                .register(new TopNPerGroupExecutor())
+                .register(new TypeCastExecutor())
+                .register(new UnpivotExecutor())
+                .register(new ValueReplaceExecutor())
+                .register(new WindowExecutor())
                 .register(new CsvReaderExecutor())
                 .register(new CsvWriterExecutor())
                 .register(new JsonReaderExecutor())
