@@ -1,0 +1,47 @@
+{
+  "id": "dap.value_counts",
+  "name": "Value Counts",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Counts occurrences of every distinct value of one column, most frequent first, with ties ordered by value. Missing values are excluded.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Value Counts configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Column",
+        "description": "Input column whose distinct values are counted."
+      },
+      "limit": {
+        "type": "integer",
+        "title": "Limit",
+        "description": "Maximum number of value rows to return; must be greater than zero.",
+        "default": 20,
+        "minimum": 1
+      }
+    },
+    "required": [
+      "column"
+    ]
+  }
+}

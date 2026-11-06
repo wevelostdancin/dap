@@ -1,0 +1,55 @@
+{
+  "id": "dap.correlation",
+  "name": "Correlation",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Pairwise correlation of two or more numeric columns in long format, one row per pair. Pearson uses the raw values, Spearman correlates ranks.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Correlation configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "At least two distinct numeric columns; every unordered pair is emitted.",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        }
+      },
+      "method": {
+        "type": "string",
+        "title": "Method",
+        "description": "pearson correlates raw values, spearman correlates ranks with ties sharing a rank.",
+        "enum": [
+          "pearson",
+          "spearman"
+        ],
+        "default": "pearson"
+      }
+    },
+    "required": [
+      "columns",
+      "method"
+    ]
+  }
+}

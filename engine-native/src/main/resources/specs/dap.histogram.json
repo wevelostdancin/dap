@@ -1,0 +1,48 @@
+{
+  "id": "dap.histogram",
+  "name": "Histogram",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Equal-width histogram of one numeric column between its minimum and maximum. Every bin is emitted, including empty ones; a constant column puts all values into the first bin.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Histogram configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Column",
+        "description": "Numeric input column to bin."
+      },
+      "bins": {
+        "type": "integer",
+        "title": "Bins",
+        "description": "Number of equal-width bins; must be greater than zero.",
+        "default": 10,
+        "minimum": 1
+      }
+    },
+    "required": [
+      "column",
+      "bins"
+    ]
+  }
+}

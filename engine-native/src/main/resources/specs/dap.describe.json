@@ -1,0 +1,42 @@
+{
+  "id": "dap.describe",
+  "name": "Describe",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Summarises every input column as one row: logical type, non-null count, missing count, distinct count, and for numeric columns min, max, mean and sample standard deviation. Non-numeric columns leave the numeric statistics empty.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Describe configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "Columns to describe, in output order. Leave empty or omit to describe every input column.",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        }
+      }
+    },
+    "required": []
+  }
+}
