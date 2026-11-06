@@ -1,0 +1,35 @@
+{
+  "id": "dap.json_reader",
+  "name": "JSON Reader",
+  "category": "/IO/Read",
+  "type": "Source",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Reads a JSON document into a data table. A top-level JSON array and newline-delimited JSON are both supported.",
+  "inPorts": [],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "JSON Reader configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Input file",
+        "description": "Absolute path to the JSON or NDJSON file to read.",
+        "placeholder": "/data/input.json"
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}

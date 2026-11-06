@@ -17,25 +17,28 @@ class NodeRegistryTest {
     private final NodeRegistry registry = new NodeRegistry();
 
     @Test
-    void loadsExactlyElevenUniqueSpecs() {
-        assertEquals(11, registry.size());
+    void loadsExactlySixteenUniqueSpecs() {
+        assertEquals(16, registry.size());
         List<String> ids = registry.all().stream().map(NodeSpec::id).toList();
-        assertEquals(11, new HashSet<>(ids).size(), "node ids must be unique");
+        assertEquals(16, new HashSet<>(ids).size(), "node ids must be unique");
         assertEquals(Set.of("dap.csv_reader", "dap.row_filter", "dap.column_filter", "dap.sorter",
                         "dap.missing_value", "dap.excel_reader", "dap.group_by", "dap.joiner",
-                        "dap.string_manipulation", "dap.math_formula", "dap.column_renamer"),
+                        "dap.string_manipulation", "dap.math_formula", "dap.column_renamer",
+                        "dap.parquet_reader", "dap.json_reader", "dap.csv_writer",
+                        "dap.parquet_writer", "dap.json_writer"),
                 new HashSet<>(ids));
     }
 
     @Test
     void everySpecIsAvailable() {
-        assertEquals(11, registry.availableCount());
+        assertEquals(16, registry.availableCount());
         Set<String> available = new HashSet<>();
         registry.all().stream().filter(NodeSpec::available).forEach(spec -> available.add(spec.id()));
         assertEquals(Set.of("dap.csv_reader", "dap.row_filter", "dap.column_filter",
                 "dap.sorter", "dap.missing_value", "dap.excel_reader", "dap.group_by",
                 "dap.joiner", "dap.string_manipulation", "dap.math_formula",
-                "dap.column_renamer"), available);
+                "dap.column_renamer", "dap.parquet_reader", "dap.json_reader",
+                "dap.csv_writer", "dap.parquet_writer", "dap.json_writer"), available);
     }
 
     @Test
@@ -49,7 +52,7 @@ class NodeRegistryTest {
             assertTrue(spec.description().length() >= 20, spec.id());
             assertFalse(spec.name().isBlank(), spec.id());
             assertTrue(spec.category().startsWith("/"), spec.id());
-            assertTrue(Set.of("Source", "Manipulator").contains(spec.type()), spec.id());
+            assertTrue(Set.of("Source", "Manipulator", "Sink").contains(spec.type()), spec.id());
             assertEquals("object", spec.configSchema().path("type").asText(), spec.id());
             assertTrue(spec.configSchema().path("properties").isObject(), spec.id());
             assertFalse(spec.configSchema().path("properties").isEmpty(), spec.id());
@@ -107,6 +110,11 @@ class NodeRegistryTest {
         assertEquals(Set.of("column", "op", "mode", "search", "value"),
                 registry.require("dap.string_manipulation").settingKeys());
         assertEquals(Set.of("outputs"), registry.require("dap.math_formula").settingKeys());
+        assertEquals(Set.of("file"), registry.require("dap.parquet_reader").settingKeys());
+        assertEquals(Set.of("file"), registry.require("dap.json_reader").settingKeys());
+        assertEquals(Set.of("file", "delimiter", "header"), registry.require("dap.csv_writer").settingKeys());
+        assertEquals(Set.of("file", "compression"), registry.require("dap.parquet_writer").settingKeys());
+        assertEquals(Set.of("file", "array"), registry.require("dap.json_writer").settingKeys());
     }
 
     @Test
@@ -183,30 +191,34 @@ class NodeRegistryTest {
     }
 
     @Test
-    void searchFindsCsvReaderBySubstring() {
+    void searchFindsCsvNodesBySubstring() {
         List<NodeSpec> hits = registry.search("csv", null, 50);
-        assertEquals(1, hits.size());
+        assertEquals(2, hits.size());
         assertEquals("dap.csv_reader", hits.get(0).id());
-        assertEquals(1, registry.search("CSV", null, 50).size(), "search is case-insensitive");
+        assertEquals("dap.csv_writer", hits.get(1).id());
+        assertEquals(2, registry.search("CSV", null, 50).size(), "search is case-insensitive");
     }
 
     @Test
-    void categoryPrefixFindsBothReaders() {
+    void categoryPrefixFindsAllIoNodes() {
         List<NodeSpec> hits = registry.search(null, "/IO", 50);
-        assertEquals(2, hits.size());
-        assertEquals(List.of("CSV Reader", "Excel Reader"), hits.stream().map(NodeSpec::name).toList());
+        assertEquals(7, hits.size());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Excel Reader", "JSON Reader", "JSON Writer",
+                "Parquet Reader", "Parquet Writer"), hits.stream().map(NodeSpec::name).toList());
+        assertEquals(4, registry.search(null, "/IO/Read", 50).size());
+        assertEquals(3, registry.search(null, "/IO/Write", 50).size());
     }
 
     @Test
     void searchTokensAreCombinedWithAnd() {
         assertEquals(1, registry.search("reader csv", null, 50).size());
         assertEquals(0, registry.search("reader zzz", null, 50).size());
-        assertEquals(2, registry.search("reader", "/IO", 50).size());
+        assertEquals(4, registry.search("reader", "/IO", 50).size());
     }
 
     @Test
     void limitCapsTheResultInNameOrder() {
-        assertEquals(11, registry.search(null, null, -1).size());
+        assertEquals(16, registry.search(null, null, -1).size());
         assertEquals(List.of("Column Filter", "Column Renamer", "CSV Reader"),
                 registry.search(null, null, 3).stream().map(NodeSpec::name).toList());
         assertTrue(registry.search(null, null, 0).isEmpty());

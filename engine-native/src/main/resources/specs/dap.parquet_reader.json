@@ -1,0 +1,35 @@
+{
+  "id": "dap.parquet_reader",
+  "name": "Parquet Reader",
+  "category": "/IO/Read",
+  "type": "Source",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Reads a Parquet file into a data table. Column names and types are taken from the Parquet schema.",
+  "inPorts": [],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Parquet Reader configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Input file",
+        "description": "Absolute path to the Parquet file to read.",
+        "placeholder": "/data/input.parquet"
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}

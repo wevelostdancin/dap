@@ -1,0 +1,53 @@
+{
+  "id": "dap.parquet_writer",
+  "name": "Parquet Writer",
+  "category": "/IO/Write",
+  "type": "Sink",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Writes the input table to a Parquet file with the chosen compression. The input table is passed through unchanged.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Parquet Writer configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Output file",
+        "description": "Absolute path of the Parquet file to write; parent directories are created.",
+        "placeholder": "/data/output.parquet"
+      },
+      "compression": {
+        "type": "string",
+        "title": "Compression",
+        "description": "Parquet compression codec.",
+        "enum": [
+          "snappy",
+          "zstd",
+          "gzip",
+          "uncompressed"
+        ],
+        "default": "zstd"
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}
