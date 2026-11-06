@@ -7,7 +7,7 @@ export DAP_JDK
 JAR := engine-native/target/dap-native.jar
 
 .PHONY: help build-native test-native run-native goldens goldens-validate test-mcp smoke \
-        mcp-e2e bench bench-full image-native run-native-image lint check clean-native
+        mcp mcp-e2e bench bench-full image-native run-native-image lint check clean-native
 
 help:
 	@echo "DAP 1.0.0 — native analytics backend for agents"
@@ -18,12 +18,13 @@ help:
 	@echo "  make goldens        run the native golden suite (starts/stops its own engine)"
 	@echo "  make goldens-validate  structural check of the golden fixtures (no engine)"
 	@echo "  make smoke          black-box smoke against a running engine (DAP_BASE)"
+	@echo "  make mcp            run the stdio MCP adapter (client-facing entrypoint)"
 	@echo "  make mcp-e2e        MCP create/add/run/table e2e"
 	@echo "  make bench          native 100k-row benchmark"
 	@echo "  make bench-full     native 10M-row benchmark -> build/bench.json"
 	@echo "  make image-native   build the dap-native image (Docker host required)"
 	@echo "  make lint           static checks (scripts/check_repo.py)"
-	@echo "  make check          test-native + goldens + lint"
+	@echo "  make check          JUnit + goldens + validate + MCP launch/e2e + lint"
 	@echo ""
 	@echo "Env: DAP_PORT DAP_BIND DAP_HEAP DAP_JDK DAP_DUCKDB_MEMORY_LIMIT DAP_DUCKDB_TEMP_DIR"
 	@echo "Docs: README.md, docs/ROADMAP.md, docs/ARCHITECTURE.md, docs/NODES.md"
@@ -48,6 +49,9 @@ test-mcp:
 
 smoke:
 	python3 tests/native_smoke.py --base ${DAP_BASE:-http://127.0.0.1:7800}
+
+mcp: build-native
+	./scripts/dap-mcp
 
 mcp-e2e: build-native
 	python3 tests/mcp_e2e.py

@@ -147,7 +147,7 @@ make check          # test-native + goldens + lint
 engine-native/   движок: Java 21, specs/*.json, JUnit-тесты
 adapters/mcp/    stdio MCP-адаптер (Python, только stdlib)
 api/             контракт /v1: openapi.yaml
-docs/            ARCHITECTURE, NODES, QUALITY, ROADMAP, API, BENCH
+docs/            ARCHITECTURE, NODES, QUALITY, ROADMAP, API, MCP, BENCH
 tests/           goldens-native/, native_smoke.py, mcp_e2e.py, bench.py
 deploy/          Dockerfile.native (образ не проверен без Docker-демона)
 scripts/         статические проверки репозитория
@@ -163,6 +163,7 @@ Makefile         build-native, test-native, run-native, goldens, check
   контракт ошибок, критерий готовности узла.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — план продукта и пул узлов.
 - [docs/API.md](docs/API.md) — человекочитаемый контракт `/v1`;
+- [docs/MCP.md](docs/MCP.md) — подключение к клиенту (stdio, инструменты, lifecycle);
   [api/openapi.yaml](api/openapi.yaml) — машинный.
 - [docs/BENCH.md](docs/BENCH.md) — замеры ingest, cold start, памяти.
 

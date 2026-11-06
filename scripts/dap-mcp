@@ -1,0 +1,18 @@
+#!/bin/sh
+# MCP entrypoint for DSH and other stdio clients.
+#
+# Resolves the repository root from this script's location and execs the Python
+# adapter with DAP_HOME pointing at it. The adapter starts the engine on the
+# first tool call and stops it on dap_shutdown (or idle timeout).
+#
+#   scripts/dap-mcp
+#
+# Environment is passed through unchanged (DAP_PORT, DAP_SESSION, DAP_HEAP,
+# DAP_IDLE_TIMEOUT_SEC, JAVA_HOME, ...). Set DAP_HOME to override the root.
+set -eu
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+: "${DAP_HOME:=$here}"
+export DAP_HOME
+
+exec "${PYTHON:-python3}" "$here/adapters/mcp/dap_mcp.py" "$@"
