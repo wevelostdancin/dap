@@ -29,6 +29,9 @@ import java.util.zip.ZipOutputStream;
 public final class ExcelWriterExecutor implements NodeExecutor {
     private static final String NODE = "excel_writer";
     private static final String DEFAULT_SHEET = "Sheet1";
+    private static final int MAX_ROWS = 1_048_575;
+    private static final int MAX_COLUMNS = 16_384;
+    private static final int MAX_CELL_CHARS = 32_767;
     /** Characters Excel forbids in a worksheet name. */
     private static final String INVALID_SHEET_CHARACTERS = "[]:*?/\\";
     private static final String XML_DECLARATION =
@@ -53,7 +56,15 @@ public final class ExcelWriterExecutor implements NodeExecutor {
         String sheet = sheetName(config);
 
         Path target = IoNodeSupport.targetFile(file, NODE);
-        TableData data = input.preview(Integer.MAX_VALUE, context.workflowId(), context.nodeId());
+        if (input.columns().size() > MAX_COLUMNS) {
+            throw new IllegalArgumentException("excel_writer: " + input.columns().size()
+                    + " columns exceed the xlsx limit of " + MAX_COLUMNS);
+        }
+        TableData data = input.preview(MAX_ROWS + 1, context.workflowId(), context.nodeId());
+        if (data.data().size() > MAX_ROWS) {
+            throw new IllegalArgumentException("excel_writer: more than " + MAX_ROWS
+                    + " data rows cannot be written to one xlsx sheet");
+        }
 
         // Write next to the target and rename, so a failed write never leaves a truncated
         // workbook under the user's path (same pattern as the CSV/Parquet writers).
@@ -80,10 +91,26 @@ public final class ExcelWriterExecutor implements NodeExecutor {
         if (sheet.isBlank()) {
             throw new IllegalArgumentException("excel_writer: config field 'sheet' must not be empty");
         }
+        if (sheet.length() > 31) {
+            throw new IllegalArgumentException("excel_writer: sheet name must be at most 31 characters, got "
+                    + sheet.length());
+        }
+        if ("history".equalsIgnoreCase(sheet)) {
+            throw new IllegalArgumentException("excel_writer: sheet name 'History' is reserved by Excel");
+        }
+        if (sheet.startsWith("'") || sheet.endsWith("'")) {
+            throw new IllegalArgumentException("excel_writer: sheet name must not start or end with an apostrophe");
+        }
         for (char character : INVALID_SHEET_CHARACTERS.toCharArray()) {
             if (sheet.indexOf(character) >= 0) {
                 throw new IllegalArgumentException("excel_writer: sheet name '" + sheet
                         + "' must not contain any of " + INVALID_SHEET_CHARACTERS);
+            }
+        }
+        for (int index = 0; index < sheet.length(); index++) {
+            if (!validXml(sheet.charAt(index))) {
+                throw new IllegalArgumentException("excel_writer: sheet name contains a character "
+                        + "that XML 1.0 does not allow");
             }
         }
         return sheet;
@@ -172,8 +199,11 @@ public final class ExcelWriterExecutor implements NodeExecutor {
             xml.append("<c r=\"").append(reference).append("\"/>");
             return;
         }
+        if (column.numeric()) {
+            number(xml, reference, column, value);
+            return;
+        }
         switch (column.arrowType()) {
-            case "Int64", "Float64" -> number(xml, reference, column, value);
             case "Boolean" -> bool(xml, reference, column, value);
             default -> inlineString(xml, reference, value);
         }
@@ -184,6 +214,8 @@ public final class ExcelWriterExecutor implements NodeExecutor {
         try {
             if ("Int64".equals(column.arrowType())) {
                 text = Long.toString(Long.parseLong(value.trim()));
+            } else if (column.arrowType().startsWith("Decimal128")) {
+                text = new BigDecimal(value.trim()).toPlainString();
             } else {
                 double parsed = Double.parseDouble(value.trim());
                 if (!Double.isFinite(parsed)) {
@@ -215,6 +247,9 @@ public final class ExcelWriterExecutor implements NodeExecutor {
     }
 
     private static void inlineString(StringBuilder xml, String reference, String value) {
+        if (value.length() > MAX_CELL_CHARS) {
+            throw new IllegalArgumentException("excel_writer: a cell exceeds " + MAX_CELL_CHARS + " characters");
+        }
         xml.append("<c r=\"").append(reference).append("\" t=\"inlineStr\"><is>")
                 .append("<t xml:space=\"preserve\">").append(escape(value)).append("</t></is></c>");
     }
@@ -235,6 +270,14 @@ public final class ExcelWriterExecutor implements NodeExecutor {
         return name.toString();
     }
 
+    /** XML 1.0 allows tab/LF/CR, printable BMP and surrogate pairs; other chars corrupt the part. */
+    private static boolean validXml(char character) {
+        return character == 0x9 || character == 0xA || character == 0xD
+                || (character >= 0x20 && character <= 0xD7FF)
+                || (character >= 0xD800 && character <= 0xDFFF)
+                || (character >= 0xE000 && character <= 0xFFFD);
+    }
+
     private static String escape(String value) {
         StringBuilder escaped = new StringBuilder(value.length());
         for (int index = 0; index < value.length(); index++) {
@@ -245,7 +288,11 @@ public final class ExcelWriterExecutor implements NodeExecutor {
                 case '>' -> escaped.append("&gt;");
                 case '"' -> escaped.append("&quot;");
                 case '\'' -> escaped.append("&apos;");
-                default -> escaped.append(character);
+                default -> {
+                    if (validXml(character)) {
+                        escaped.append(character);
+                    }
+                }
             }
         }
         return escaped.toString();

@@ -100,10 +100,9 @@ class HistogramExecutorTest {
         try (DuckDbSession db = new DuckDbSession()) {
             LazyPlan input = doubles(db, 1.0, 2.0, 3.0);
 
-            IllegalArgumentException missing = assertThrows(IllegalArgumentException.class,
-                    () -> new HistogramExecutor().execute(
-                            NodeTestSupport.context(db, "{\"column\":\"v\"}"), List.of(input)));
-            assertTrue(missing.getMessage().contains("bins"), missing.getMessage());
+            TableData defaultBins = new HistogramExecutor().execute(
+                    NodeTestSupport.context(db, "{\"column\":\"v\"}"), List.of(input)).preview(20);
+            assertEquals(10, defaultBins.rows(), "bins defaults to 10");
 
             IllegalArgumentException zero = assertThrows(IllegalArgumentException.class,
                     () -> new HistogramExecutor().execute(

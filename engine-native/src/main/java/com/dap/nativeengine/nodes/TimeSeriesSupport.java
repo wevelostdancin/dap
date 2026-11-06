@@ -26,7 +26,7 @@ final class TimeSeriesSupport {
     static String interval(JsonNode config, String field, String node) {
         String text = NodeSql.text(config, field, null);
         if (text == null || text.isBlank()) {
-            throw new IllegalArgumentException(node + ": config field '" + field + "' is required");
+            return "1 day";
         }
         String trimmed = text.trim();
         Matcher matcher = INTERVAL.matcher(trimmed.toLowerCase(Locale.ROOT));

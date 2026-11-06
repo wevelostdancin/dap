@@ -67,7 +67,7 @@ public final class HistogramExecutor implements NodeExecutor {
     private static int bins(JsonNode config) {
         JsonNode node = config.get("bins");
         if (node == null || node.isNull()) {
-            throw new IllegalArgumentException("config field 'bins' is required");
+            return 10;
         }
         if (!node.isIntegralNumber() || !node.canConvertToInt()) {
             throw new IllegalArgumentException("histogram: 'bins' must be an integer greater than 0");

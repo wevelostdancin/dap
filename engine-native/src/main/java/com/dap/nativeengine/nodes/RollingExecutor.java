@@ -63,7 +63,7 @@ public final class RollingExecutor implements NodeExecutor {
         if (value == null || value.isNull()) {
             throw new IllegalArgumentException("rolling: config field 'window' is required");
         }
-        if (!value.isIntegralNumber() || value.longValue() <= 0 || value.longValue() > Integer.MAX_VALUE) {
+        if (!value.isIntegralNumber() || !value.canConvertToInt() || value.intValue() <= 0) {
             throw new IllegalArgumentException("rolling: 'window' must be a positive integer, got "
                     + value.asText());
         }

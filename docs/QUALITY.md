@@ -8,7 +8,7 @@
 
 | Уровень | Команда | Что покрывает |
 |---|---|---|
-| JUnit | `make test-native` | 394 теста: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
+| JUnit | `make test-native` | 401 тест: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
 | Goldens | `make goldens` | 15 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
 | Структура goldens | `python3 tests/goldens-native/runner.py --validate` | проверка фикстур без движка |
 | Smoke | `make smoke` (`DAP_BASE`, по умолчанию `:7800`) | 9 чёрных проверок контракта и пяти узлов на запущенном движке |
@@ -23,7 +23,7 @@
 ## 2. Unit-тесты
 
 JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java.base/java.nio`).
-394 теста в 61 классе:
+401 тест в 62 классах:
 
 - **Исполнители** — по классу на узел (`CsvReaderExecutorTest`, `ExcelReaderExecutorTest`,
   `ParquetReaderExecutorTest`, `JsonReaderExecutorTest`, `CsvWriterExecutorTest`,

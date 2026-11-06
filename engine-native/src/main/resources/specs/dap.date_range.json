@@ -40,8 +40,7 @@
     },
     "required": [
       "start",
-      "end",
-      "step"
+      "end"
     ]
   }
 }

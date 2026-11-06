@@ -145,11 +145,10 @@ class ResampleExecutorTest {
                             """));
             assertTrue(zeroEvery.getMessage().contains("positive"), zeroEvery.getMessage());
 
-            IllegalArgumentException missingEvery = assertThrows(IllegalArgumentException.class,
-                    () -> resample(db, COLUMNS, rows, """
-                            {"timeColumn":"ts","aggregations":[{"column":"v","fn":"mean"}]}
-                            """));
-            assertTrue(missingEvery.getMessage().contains("every"), missingEvery.getMessage());
+            TableData defaultEvery = resample(db, COLUMNS, rows, """
+                    {"timeColumn":"ts","aggregations":[{"column":"v","fn":"mean"}]}
+                    """).preview(10);
+            assertEquals(1, defaultEvery.rows(), "every defaults to 1 day");
 
             IllegalArgumentException noAggregations = assertThrows(IllegalArgumentException.class,
                     () -> resample(db, COLUMNS, rows, """

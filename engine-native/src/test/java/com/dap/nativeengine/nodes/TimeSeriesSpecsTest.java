@@ -69,7 +69,7 @@ class TimeSeriesSpecsTest {
         assertEquals(List.of("iqr", "zscore"), enumValues(method));
 
         assertEquals(Set.of("timeColumn", "every", "aggregations"), load("dap.resample").settingKeys());
-        assertEquals(List.of("timeColumn", "every", "aggregations"), load("dap.resample").requiredKeys());
+        assertEquals(List.of("timeColumn", "aggregations"), load("dap.resample").requiredKeys());
         JsonNode aggregation = property(load("dap.resample"), "aggregations").path("items");
         assertEquals(List.of("column", "fn"), texts(aggregation.path("required")));
         assertEquals(List.of("mean", "sum", "count", "min", "max"),
@@ -85,7 +85,7 @@ class TimeSeriesSpecsTest {
         assertEquals(List.of("column", "output", "orderBy"), load("dap.diff").requiredKeys());
 
         assertEquals(Set.of("start", "end", "step"), load("dap.date_range").settingKeys());
-        assertEquals(List.of("start", "end", "step"), load("dap.date_range").requiredKeys());
+        assertEquals(List.of("start", "end"), load("dap.date_range").requiredKeys());
         assertEquals("1 day", property(load("dap.date_range"), "step").path("default").asText());
 
         for (String id : List.of("dap.rolling", "dap.diff")) {

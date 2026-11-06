@@ -77,7 +77,8 @@ public final class ResampleExecutor implements NodeExecutor {
         }
 
         String sql = "SELECT " + select + " FROM " + input.asTable()
-                + " AS dap_input GROUP BY 1 ORDER BY 1";
+                + " AS dap_input WHERE dap_input." + NodeSql.quote(time.name()) + " IS NOT NULL"
+                + " GROUP BY 1 ORDER BY 1";
         return new LazyPlan(context.db(), sql, columns);
     }
 

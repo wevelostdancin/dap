@@ -36,7 +36,7 @@ public final class ValueCountsExecutor implements NodeExecutor {
                 + " FROM " + input.asTable() + " AS dap_input"
                 + " WHERE " + quoted + " IS NOT NULL"
                 + " GROUP BY 1"
-                + " ORDER BY 2 DESC, 1 ASC"
+                + " ORDER BY 2 DESC, MIN(" + quoted + ") ASC"
                 + " LIMIT " + limit;
         return new LazyPlan(context.db(), sql, OUTPUT);
     }

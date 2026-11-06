@@ -96,11 +96,10 @@ class DateRangeExecutorTest {
                             """));
             assertTrue(zero.getMessage().contains("positive"), zero.getMessage());
 
-            IllegalArgumentException missing = assertThrows(IllegalArgumentException.class,
-                    () -> range(db, """
-                            {"start":"2024-01-01","end":"2024-01-03"}
-                            """));
-            assertTrue(missing.getMessage().contains("step"), missing.getMessage());
+            TableData defaultStep = range(db, """
+                    {"start":"2024-01-01","end":"2024-01-03"}
+                    """).preview(10);
+            assertEquals(3, defaultStep.rows(), "step defaults to 1 day");
         }
     }
 }

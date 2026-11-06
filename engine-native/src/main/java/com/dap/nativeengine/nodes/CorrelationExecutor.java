@@ -69,8 +69,10 @@ public final class CorrelationExecutor implements NodeExecutor {
                 + NodeSql.literal(a.name()) + " AS \"column_a\", "
                 + NodeSql.literal(b.name()) + " AS \"column_b\", "
                 + "CAST(CORR(\"dap_rank_a\", \"dap_rank_b\") AS DOUBLE) AS \"correlation\""
-                + " FROM (SELECT RANK() OVER (ORDER BY " + qa + ") AS \"dap_rank_a\", "
-                + "RANK() OVER (ORDER BY " + qb + ") AS \"dap_rank_b\""
+                + " FROM (SELECT RANK() OVER (ORDER BY " + qa + ") + (COUNT(*) OVER (PARTITION BY "
+                + qa + ") - 1) / 2.0 AS \"dap_rank_a\", "
+                + "RANK() OVER (ORDER BY " + qb + ") + (COUNT(*) OVER (PARTITION BY "
+                + qb + ") - 1) / 2.0 AS \"dap_rank_b\""
                 + " FROM " + table + " AS dap_input"
                 + " WHERE " + qa + " IS NOT NULL AND " + qb + " IS NOT NULL) AS dap_ranked";
     }
