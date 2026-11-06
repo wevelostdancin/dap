@@ -406,6 +406,21 @@ TOOLS = [
         "inputSchema": _obj({"workflow": _str(_WF), "node": _str(_NODE)}, ["workflow", "node"]),
     },
     {
+        "name": "dap_ingest",
+        "description": (
+            "Один раз прочитать CSV/Excel/JSON/Parquet и сохранить в Parquet-кэш. "
+            "Повторный вызов для неизменённого файла возвращает тот же путь без перезаписи "
+            "(cached=true). Возвращает path, rows, columns и cached."
+        ),
+        "inputSchema": _obj(
+            {
+                "file": _str("путь к файлу CSV, XLSX, JSON или Parquet"),
+                "format": _str("csv, excel, json или parquet; по умолчанию по расширению"),
+            },
+            ["file"],
+        ),
+    },
+    {
         "name": "dap_save_workflow",
         "description": "Сохранить workflow в каталог на диске (файл workflow.json).",
         "inputSchema": _obj(
@@ -558,6 +573,13 @@ def tool_profile_table(args: dict):
     return call("GET", f"{_node_url(args)}/profile")
 
 
+def tool_ingest(args: dict):
+    body = {"file": _need(args, "file")}
+    if args.get("format"):
+        body["format"] = args["format"]
+    return call("POST", "/v1/datasets", body)
+
+
 def tool_save_workflow(args: dict):
     return call("POST", f"/v1/workflows/{_wf(args)}/save", {"dir": _need(args, "dir")})
 
@@ -613,6 +635,7 @@ HANDLERS = {
     "dap_list_jobs": tool_list_jobs,
     "dap_get_table": tool_get_table,
     "dap_profile_table": tool_profile_table,
+    "dap_ingest": tool_ingest,
     "dap_save_workflow": tool_save_workflow,
     "dap_load_workflow": tool_load_workflow,
     "dap_shutdown": tool_shutdown,
