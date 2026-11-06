@@ -8,7 +8,7 @@
 
 | Уровень | Команда | Что покрывает |
 |---|---|---|
-| JUnit | `make test-native` | 203 теста: исполнители, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
+| JUnit | `make test-native` | 204 теста: исполнители, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
 | Goldens | `make goldens` | 13 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
 | Структура goldens | `python3 tests/goldens-native/runner.py --validate` | проверка фикстур без движка |
 | Smoke | `make smoke` (`DAP_BASE`, по умолчанию `:7800`) | 9 чёрных проверок контракта и пяти узлов на запущенном движке |
@@ -23,7 +23,7 @@
 ## 2. Unit-тесты
 
 JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java.base/java.nio`).
-203 теста в 25 классах:
+204 теста в 25 классах:
 
 - **Исполнители** — по классу на узел (`CsvReaderExecutorTest`, `RowFilterExecutorTest`,
   `ColumnFilterExecutorTest`, `ColumnRenamerExecutorTest`, `SorterExecutorTest`,
@@ -37,7 +37,7 @@ JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java
   `JobManagerTest` (сериализация одного workflow, параллельность разных, timeout,
   cancel, закрытие).
 - **Каталог и HTTP** — `NodeRegistryTest`, `NodeSpecTest`, `CatalogHandlersTest`,
-  `NativeServiceTest` (17 интеграционных тестов на реальном Javalin: все маршруты,
+  `NativeServiceTest` (18 интеграционных тестов на реальном Javalin: все маршруты,
   400/404/408/409/500, изоляция сессий, health во время sync-run, shutdown).
 
 Минимум для нового узла — 3 теста: валидация config, успешный путь, граничный случай

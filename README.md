@@ -134,7 +134,7 @@ python3 adapters/mcp/dap_mcp.py
 ## Проверки
 
 ```bash
-make test-native    # JUnit: 203 теста
+make test-native    # JUnit: 204 теста
 make goldens        # 13 golden-workflow на отдельном экземпляре :7811
 make smoke          # чёрный smoke по HTTP против запущенного движка (DAP_BASE)
 make mcp-e2e        # create → add_node → connect → run → table → delete через MCP
