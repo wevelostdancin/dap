@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 16 узлов `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt`;
+Каталог нативного движка: 33 узла `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (33 строки);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 16 узлов имеют `available: true` и `tier: core`.
+спеке. Все 33 узла имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -13,8 +13,11 @@
   сразу; значения проверяются исполнителем при run (ошибка значения — 500).
 - `required` в `configSchema` влияет на `optional` в `/dialog`, а не на приём
   запроса: фактическую обязательность проверяет исполнитель.
-- У всех узлов один табличный выход (порт 0). У источников нет входов, у `dap.joiner`
-  два входа (0 — Left, 1 — Right), у остальных один вход (0).
+- У всех узлов один табличный выход (порт 0). У источников нет входов; у `dap.joiner`
+  два входа (0 — Left, 1 — Right), у `dap.concatenate` — два входа (0 — Top,
+  1 — Bottom), у остальных один вход (0). `dap.concatenate` требует оба входа.
+- Все преобразователи — ленивые SQL-отношения: данные читаются только в `/table`
+  и `/profile`; исключения — читатели и писатели (см. ниже).
 - Писатели (`dap.csv_writer`, `dap.parquet_writer`, `dap.json_writer`) — Sink:
   один вход и один выход, входная таблица возвращается неизменной (pass-through),
   поэтому граф можно продолжать за писателем. Файл пишется на run, на
@@ -37,6 +40,23 @@
 - Ячейки `data` в `/table` — строки (числа в десятичном виде) или `null`;
   `preview` — число возвращённых строк.
 
+- Особенности узлов волны P2:
+  - `dap.duplicate_filter` без `keys` (или с пустым массивом) — `SELECT DISTINCT *`;
+    с ключами остаётся одна произвольная строка на ключ, порядок строк не определён.
+  - `dap.pivot` требует непустой `values`: список фиксирует схему, поэтому значение,
+    которого нет в данных, всё равно даёт колонку (из NULL).
+  - `dap.unpivot` отбрасывает строки, где выбранное значение NULL, — это поведение
+    DuckDB `UNPIVOT`; остальные колонки сохраняются.
+  - `dap.type_cast` принимает `Int64`, `Float64`, `Utf8`, `Boolean`, `Date32`,
+    `Timestamp` и `Decimal128(p,s)`; `Time64` не приводится.
+  - `dap.window` при непустом `orderBy` считает `sum`/`mean` running-агрегатами
+    (`UNBOUNDED PRECEDING` → текущая строка), без `orderBy` — по всему разделу.
+  - `dap.outlier_filter` берёт статистику по всему входу; NULL всегда проходит.
+  - `dap.value_replace` сравнивает точно и с участием NULL (`IS NOT DISTINCT FROM`);
+    для колонки действует первое совпавшее правило.
+  - `dap.row_aggregator`: NULL в любой выбранной колонке делает `sum`/`mean`/`min`/`max`
+    NULL для строки, `count` считает не-NULL.
+
 | id | Название | Категория | Входы |
 |---|---|---|---|
 | `dap.csv_reader` | CSV Reader | `/IO/Read` | — |
@@ -55,6 +75,23 @@
 | `dap.csv_writer` | CSV Writer | `/IO/Write` | 1 (pass-through) |
 | `dap.parquet_writer` | Parquet Writer | `/IO/Write` | 1 (pass-through) |
 | `dap.json_writer` | JSON Writer | `/IO/Write` | 1 (pass-through) |
+| `dap.type_cast` | Type Cast | `/Manipulation/Column/Type` | 1 |
+| `dap.duplicate_filter` | Duplicate Filter | `/Manipulation/Row` | 1 |
+| `dap.value_replace` | Value Replace | `/Manipulation/Column` | 1 |
+| `dap.column_resorter` | Column Resorter | `/Manipulation/Column` | 1 |
+| `dap.outlier_filter` | Outlier Filter | `/Manipulation/Row/Filter` | 1 |
+| `dap.date_time` | Date & Time | `/Manipulation/Column/Date` | 1 |
+| `dap.rule_engine` | Rule Engine | `/Manipulation/Column` | 1 |
+| `dap.binner` | Binner | `/Manipulation/Column` | 1 |
+| `dap.normalizer` | Normalizer | `/Manipulation/Column` | 1 |
+| `dap.encoder` | Encoder | `/Manipulation/Column` | 1 |
+| `dap.sample_rows` | Sample Rows | `/Manipulation/Row` | 1 |
+| `dap.row_aggregator` | Row Aggregator | `/Manipulation/Column` | 1 |
+| `dap.pivot` | Pivot | `/Manipulation/Column` | 1 |
+| `dap.unpivot` | Unpivot | `/Manipulation/Column` | 1 |
+| `dap.window` | Window | `/Manipulation/Column` | 1 |
+| `dap.top_n_per_group` | Top N per Group | `/Manipulation/Row` | 1 |
+| `dap.concatenate` | Concatenate | `/Manipulation/Row/Join` | 2 |
 
 ## 2. dap.csv_reader
 
@@ -451,14 +488,486 @@ Arrow-имена. Строки читаются лениво, при `/table` и
 }
 ```
 
-## 18. Порядок для агента
+## 18. dap.type_cast
+
+Приводит выбранные колонки к другому Arrow-типу через SQL `CAST`. Имена и порядок
+колонок сохраняются, неперечисленные колонки остаются как есть; схема выхода
+показывает новые типы. Пустой `columns` — pass-through.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `columns` | array<{column, type}> | обязателен; список приводимых колонок |
+| `columns[].column` | string | колонка входа |
+| `columns[].type` | string | `Int64`, `Float64`, `Utf8`, `Boolean`, `Date32`, `Timestamp`, `Decimal128(precision,scale)` |
+
+`Decimal128` пишется как `Decimal128(18,4)`: precision 1–38, scale 0–precision.
+`Time64` не приводится. Повтор колонки, неизвестная колонка и неподдерживаемый тип —
+ошибка run; несовместимое значение (например, `"abc"` → `Int64`) — ошибка DuckDB на run.
+
+```json
+{
+  "factory": "dap.type_cast",
+  "settings": {
+    "columns": [
+      {"column": "score", "type": "Int64"},
+      {"column": "amount", "type": "Decimal128(18,4)"}
+    ]
+  }
+}
+```
+
+## 19. dap.duplicate_filter
+
+Удаляет дубликаты: оставляет одну строку на комбинацию ключей или только различные
+строки, если `keys` нет. Порядок строк не определён, и при заданных ключах выжившая
+строка тоже произвольна: без ключей — `SELECT DISTINCT *`, с ключами —
+`QUALIFY ROW_NUMBER() OVER (PARTITION BY …) = 1`.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `keys` | array<string> | — | колонки ключа; пусто или нет — сравнение по всем колонкам (DISTINCT) |
+
+```json
+{"factory": "dap.duplicate_filter", "settings": {"keys": ["customer_id"]}}
+```
+
+Без `keys` — `{"factory": "dap.duplicate_filter", "settings": {}}`: остаются только
+различные строки. Неизвестная или пустая колонка в `keys` — ошибка run.
+
+## 20. dap.value_replace
+
+Заменяет точные значения в выбранных колонках другим скаляром. Тип колонки
+сохраняется, NULL можно и сопоставлять, и записывать; правила одной колонки
+применяются по порядку, побеждает первое совпадение. Сравнение —
+`IS NOT DISTINCT FROM`, поэтому NULL совпадает с NULL. Пустой `rules` — pass-through.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `rules` | array<{column, from, to}> | обязателен |
+| `rules[].column` | string | колонка входа |
+| `rules[].from` | string \| number \| boolean \| null | что заменить; `null` — SQL NULL |
+| `rules[].to` | string \| number \| boolean \| null | замена; `null` — записать NULL |
+
+`from` и `to` обязательны в каждом правиле: отсутствие ключа — ошибка, `null` —
+значение. Объекты и массивы не принимаются; несовместимое значение — ошибка run.
+
+```json
+{
+  "factory": "dap.value_replace",
+  "settings": {
+    "rules": [
+      {"column": "category", "from": "A", "to": "Z"},
+      {"column": "score", "from": null, "to": 0}
+    ]
+  }
+}
+```
+
+## 21. dap.column_resorter
+
+Меняет порядок колонок входа. Список должен быть перестановкой входных колонок:
+каждая ровно один раз, без добавлений и потерь. Имена и типы сохраняются, данные не
+копируются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `columns` | array<string> | обязателен; новый порядок всех колонок |
+
+Дубль, неизвестная колонка и неполный список — ошибка run; сообщение о неполном
+списке содержит ожидаемое и фактическое число колонок.
+
+```json
+{
+  "factory": "dap.column_resorter",
+  "settings": {"columns": ["id", "name", "score", "category"]}
+}
+```
+
+## 22. dap.outlier_filter
+
+Отбрасывает строки, чьи числовые значения выходят за границы выбросов: fences IQR
+(`q1 − k·iqr`, `q3 + k·iqr`) или z-score (`mean ± k·stddev`). Несколько колонок
+объединяются по AND, NULL всегда проходит, статистика считается по всему входу.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `columns` | array<string> | — | обязателен; непустой, только числовые колонки |
+| `method` | `iqr` \| `zscore` | — | обязателен |
+| `threshold` | number | `1.5` для `iqr`, `3` для `zscore` | положительный множитель ширины |
+
+Для `iqr` квартили считаются `quantile_cont`; для `zscore` — `avg` и `stddev`, при
+нулевом stddev границы вырождаются в среднее. Нечисловая колонка, неизвестный `method`
+и неположительный `threshold` — ошибка run.
+
+```json
+{
+  "factory": "dap.outlier_filter",
+  "settings": {"columns": ["score"], "method": "iqr", "threshold": 1.5}
+}
+```
+
+## 23. dap.date_time
+
+Разбирает текст в timestamp, форматирует timestamp в текст или извлекает часть даты.
+Исходная колонка сохраняется, результат добавляется новой колонкой; имя `output` не
+должно совпадать с существующей колонкой.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `column` | string | — | обязателен; для `parse` — `Utf8`, для `format`/`extract` — `Timestamp` или `Date32`; `Time64` — только для `extract` с `unit: hour` |
+| `output` | string | — | обязателен; имя новой колонки |
+| `op` | `parse` \| `format` \| `extract` | `parse` | операция |
+| `format` | string | `%Y-%m-%d` | strptime/strftime; обязателен для `parse` и `format` |
+| `unit` | `year` \| `month` \| `day` \| `hour` \| `dow` \| `quarter` \| `week` | `year` | часть даты для `extract` |
+
+Типы выхода: `parse` → `Timestamp`, `format` → `Utf8`, `extract` → `Int64`. `dow` —
+день недели (в DuckDB `dayofweek`). Неверный `op`/`unit`/`format`, неподходящий тип
+колонки и занятое имя выхода — ошибка run.
+
+```json
+{
+  "factory": "dap.date_time",
+  "settings": {
+    "column": "created",
+    "output": "created_ts",
+    "op": "parse",
+    "format": "%Y-%m-%d %H:%M:%S"
+  }
+}
+```
+
+## 24. dap.rule_engine
+
+Присваивает значение первого сработавшего булева правила, как `CASE WHEN`. Результат
+добавляется новой колонкой; тип выхода выводится DuckDB из значений правил
+(`DESCRIBE ... LIMIT 0`). Условия — SQL-выражения; каждое проверяется на BOOLEAN до
+исполнения.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `output` | string | обязателен; имя новой колонки |
+| `rules` | array<{condition, value}> | обязателен; непустой, порядок важен |
+| `rules[].condition` | string | SQL boolean-выражение по колонкам входа |
+| `rules[].value` | скаляр | значение при истинном условии |
+| `elseValue` | скаляр | значение, если ни одно правило не сработало; нет — NULL |
+
+`value` и `elseValue` — JSON-скаляры (строка, число, boolean, null); тип CASE выводится
+из них. Небулево условие, битое выражение и занятое имя выхода — ошибка run.
+
+```json
+{
+  "factory": "dap.rule_engine",
+  "settings": {
+    "output": "segment",
+    "rules": [
+      {"condition": "score >= 90", "value": "high"},
+      {"condition": "score >= 60", "value": "mid"}
+    ],
+    "elseValue": "low"
+  }
+}
+```
+
+## 25. dap.binner
+
+Раскладывает числовую колонку по целочисленным бинам: равная ширина, явные границы
+или равночастотные buckets. Исходная колонка сохраняется, результат добавляется
+колонкой `Int64`.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `column` | string | — | обязателен; числовая колонка |
+| `output` | string | — | обязателен; имя новой колонки |
+| `method` | `width` \| `custom` \| `frequency` | `width` | способ разбиения |
+| `bins` | integer | `10` | положительное; для `width` и `frequency` |
+| `edges` | array<number> | — | для `custom`: не менее двух строго возрастающих границ |
+
+`width` считает границы по min/max входа, максимум попадает в последний бин, константа —
+бин 0. `custom`: n+1 границ задают n полуинтервалов `[edge[i], edge[i+1])`; значения
+ниже первой границы — бин 0, выше последней — последний бин. `frequency` — `NTILE(bins)`
+по возрастанию значений. NULL остаётся NULL. Нечисловая колонка, неизвестный `method`,
+неположительный `bins` и неотсортированные `edges` — ошибка run.
+
+```json
+{
+  "factory": "dap.binner",
+  "settings": {"column": "score", "output": "score_bin", "method": "width", "bins": 5}
+}
+```
+
+## 26. dap.normalizer
+
+Масштабирует числовые колонки в единичный диапазон (min-max) или к нулевому среднему и
+единичному отклонению (z-score). Результат добавляется колонками `Float64`, исходные
+колонки сохраняются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `columns` | array<{column, output}> | — | обязателен; непустой, только числовые колонки |
+| `columns[].column` | string | — | числовая колонка входа |
+| `columns[].output` | string | `<column>_norm` | имя новой колонки |
+| `method` | `minmax` \| `zscore` | `minmax` | способ масштабирования |
+
+`minmax`: `(x − min) / (max − min)`; `zscore`: `(x − avg) / stddev`. Нулевой размах или
+stddev даёт NULL (`NULLIF`). Нечисловая колонка, дубль имени выхода и неизвестный
+`method` — ошибка run.
+
+```json
+{
+  "factory": "dap.normalizer",
+  "settings": {
+    "columns": [{"column": "score"}, {"column": "amount", "output": "amount_norm"}],
+    "method": "minmax"
+  }
+}
+```
+
+## 27. dap.encoder
+
+Кодирует категориальную колонку плотными целочисленными метками или one-hot колонками
+0/1. Исходная колонка сохраняется.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `column` | string | — | обязателен; категориальная колонка |
+| `output` | string | — | обязателен; имя колонки меток или префикс one-hot |
+| `method` | `label` \| `onehot` | `label` | способ кодирования |
+| `categories` | array<скаляр> | — | для `onehot`: непустой список категорий |
+
+`label` — `DENSE_RANK()` по возрастанию значений, `Int64`. `onehot` добавляет по колонке
+`<output>_<category>` на категорию (`Int64` 0/1); схема задаётся конфигом, а не данными,
+поэтому категория, которой нет в данных, даёт колонку из нулей. Дубли категорий,
+занятое имя и категория несовместимого типа — ошибка run.
+
+```json
+{
+  "factory": "dap.encoder",
+  "settings": {"column": "category", "output": "category_label", "method": "label"}
+}
+```
+
+## 28. dap.sample_rows
+
+Оставляет первые n строк или берёт воспроизводимую случайную выборку резервуаром, не
+меняя схему. При `head` порядок строк сохраняется; `random` порядок не гарантирует.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `mode` | `head` \| `random` | `head` | способ выборки |
+| `n` | integer | `100` | положительное число строк |
+| `seed` | integer | — | seed для `random`; без него выборка случайна |
+
+`head` — `LIMIT n`; `random` — `USING SAMPLE reservoir(n ROWS)` с `REPEATABLE (seed)`,
+если seed задан. Неположительный `n` и неизвестный `mode` — ошибка run.
+
+```json
+{
+  "factory": "dap.sample_rows",
+  "settings": {"mode": "random", "n": 100, "seed": 42}
+}
+```
+
+## 29. dap.row_aggregator
+
+Добавляет построчные агрегаты по выбранным числовым колонкам: `sum` складывает колонки,
+`mean` делит сумму на их число, `min`/`max` — `LEAST`/`GREATEST`, `count` считает
+не-NULL. Входные колонки сохраняются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `columns` | array<string> | числовые колонки; пусто или нет — все числовые |
+| `aggregations` | array<{fn, output}> | обязателен; непустой |
+| `aggregations[].fn` | `sum` \| `mean` \| `min` \| `max` \| `count` | функция |
+| `aggregations[].output` | string | имя новой колонки; по умолчанию имя `fn` |
+
+NULL в любой выбранной колонке делает `sum`, `mean`, `min` и `max` NULL для этой
+строки; `count` NULL игнорирует. Типы выхода: `count` — `Int64`, `mean` — `Float64`,
+`sum`/`min`/`max` — `Int64`, если все выбранные колонки `Int64`, иначе `Float64`.
+Нечисловая колонка, дубль имени выхода и пустой список агрегаций — ошибка run.
+
+```json
+{
+  "factory": "dap.row_aggregator",
+  "settings": {
+    "columns": ["q1", "q2", "q3"],
+    "aggregations": [
+      {"fn": "sum", "output": "total"},
+      {"fn": "mean"},
+      {"fn": "count"}
+    ]
+  }
+}
+```
+
+## 30. dap.pivot
+
+Разворачивает строки в колонки: для каждого значения из `values` создаётся колонка с
+условным агрегатом по `valueColumn`, группировка — по `index`. Список `values`
+обязателен и фиксирует схему, поэтому значение, которого нет в данных, всё равно даёт
+колонку (из NULL).
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `index` | array<string> | обязателен; непустой, колонки строки выхода |
+| `pivotColumn` | string | обязателен; его значения становятся колонками |
+| `valueColumn` | string | обязателен; агрегируемая колонка |
+| `values` | array<string> | обязателен; непустой, порядок = порядок колонок выхода |
+| `agg` | `sum` \| `mean` \| `count` \| `min` \| `max` | обязателен |
+
+`sum`/`mean` требуют числовую `valueColumn`; `sum`/`min`/`max` возвращают тип
+`valueColumn`, `mean` — `Float64`, `count` — `Int64`. Значения `values` сравниваются
+с `pivotColumn` типизированным SQL-литералом (по типу колонки), а не как строки.
+Дубль `index`/`values`, коллизия имени выхода с `index` и неизвестная агрегация —
+ошибка run.
+
+```json
+{
+  "factory": "dap.pivot",
+  "settings": {
+    "index": ["customer_id"],
+    "pivotColumn": "month",
+    "valueColumn": "amount",
+    "values": ["2026-01", "2026-02"],
+    "agg": "sum"
+  }
+}
+```
+
+## 31. dap.unpivot
+
+Складывает выбранные колонки в пару «имя/значение» через DuckDB `UNPIVOT`. Остальные
+колонки сохраняются; выбранные колонки должны иметь один тип. Строки, где выбранное
+значение NULL, отбрасываются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `columns` | array<string> | — | обязателен; непустой, колонки для stacking |
+| `nameColumn` | string | `variable` | имя колонки с именами исходных колонок |
+| `valueColumn` | string | `value` | имя колонки со значениями |
+
+Порядок выхода: сохранённые колонки, затем `nameColumn` (`Utf8`), затем `valueColumn`
+(тип выбранных колонок). Совпадение `nameColumn`/`valueColumn` между собой или с
+сохраняемой колонкой, разные типы выбранных колонок и неизвестная колонка — ошибка run.
+
+```json
+{
+  "factory": "dap.unpivot",
+  "settings": {"columns": ["q1", "q2"], "nameColumn": "quarter", "valueColumn": "amount"}
+}
+```
+
+## 32. dap.window
+
+Добавляет колонки SQL window-функций. Все функции используют один `OVER`, собранный из
+`partitionBy` и `orderBy`; `rank`, `dense_rank`, `lag` и `lead` требуют `orderBy`;
+`row_number`, `sum` и `mean` работают и по всему разделу. При заданном `orderBy` `sum` и
+`mean` — running-агрегаты (`UNBOUNDED PRECEDING` → текущая строка). Входные колонки
+сохраняются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `partitionBy` | array<string> | — | колонки разделов; нет — вся таблица один раздел |
+| `orderBy` | array<{column, direction}> | — | порядок внутри раздела, общий для всех функций |
+| `orderBy[].direction` | `asc` \| `desc` | `asc` | `asc` — NULLS FIRST, `desc` — NULLS LAST |
+| `functions` | array<{fn, column, offset, output}> | — | обязателен; непустой |
+| `functions[].fn` | `row_number` \| `rank` \| `dense_rank` \| `lag` \| `lead` \| `sum` \| `mean` | — | функция |
+| `functions[].column` | string | — | для `lag`, `lead`, `sum`, `mean` |
+| `functions[].offset` | integer | `1` | сдвиг для `lag`/`lead`, ≥ 0 |
+| `functions[].output` | string | — | обязателен; имя новой колонки |
+
+Типы: `row_number`/`rank`/`dense_rank` — `Int64`, `sum` и `lag`/`lead` — тип колонки,
+`mean` — `Float64`. Отсутствие `orderBy` у функций, которым он нужен, нечисловая колонка
+для `sum`/`mean`, дубль имени выхода и неизвестная функция — ошибка run.
+
+```json
+{
+  "factory": "dap.window",
+  "settings": {
+    "partitionBy": ["customer_id"],
+    "orderBy": [{"column": "month", "direction": "asc"}],
+    "functions": [
+      {"fn": "row_number", "output": "rn"},
+      {"fn": "sum", "column": "amount", "output": "running_amount"}
+    ]
+  }
+}
+```
+
+## 33. dap.top_n_per_group
+
+Оставляет первые n строк каждой группы, упорядоченные по `orderBy`. Реализация —
+`QUALIFY ROW_NUMBER() OVER (PARTITION BY groupBy ORDER BY …) <= n`; при равных ключах
+сортировки номера строк произвольны. Входные колонки сохраняются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `groupBy` | array<string> | — | обязателен; непустой |
+| `orderBy` | array<{column, direction}> | — | обязателен; непустой |
+| `orderBy[].direction` | `asc` \| `desc` | `asc` | `asc` — NULLS FIRST, `desc` — NULLS LAST |
+| `n` | integer | — | обязателен; больше нуля |
+
+Пустые `groupBy`/`orderBy`, неизвестная колонка и `n ≤ 0` — ошибка run.
+
+```json
+{
+  "factory": "dap.top_n_per_group",
+  "settings": {
+    "groupBy": ["customer_id"],
+    "orderBy": [{"column": "amount", "direction": "desc"}],
+    "n": 3
+  }
+}
+```
+
+## 34. dap.concatenate
+
+Складывает строки двух таблиц. В режиме `name` таблицы сопоставляются по именам колонок
+(`UNION ALL BY NAME`), поэтому колонка, которой нет на одной стороне, заполняется NULL;
+в режиме `position` — по позициям, и число колонок должно совпадать. Оба входа
+обязательны.
+Порты: вход 0 — `Top`, вход 1 — `Bottom`; выход 0 — `Data`.
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `mode` | `name` \| `position` | обязателен; способ сопоставления колонок |
+
+Схема выхода выводится `DESCRIBE`; в режиме `position` имена берутся у верхнего входа.
+Разное число колонок в `position`, неподключённый вход, неизвестный `mode` и пустая
+схема — ошибка run.
+
+```json
+{"factory": "dap.concatenate", "settings": {"mode": "name"}}
+```
+
+## 35. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.
 2. `GET /v1/nodes?q=…` — найти `id`.
 3. `GET /v1/nodes/{id}/dialog` — поля, типы, умолчания, допустимые значения.
-4. `POST /v1/workflows/{id}/nodes` с `factory` и `settings`.
-5. `POST /v1/workflows/{id}/connect` — связи (порты данных с 0).
+4. `POST /v1/workflows/{id}/nodes` с `factory` и `settings`. Узлы, добавляющие
+   колонку (`date_time`, `rule_engine`, `binner`, `normalizer`, `encoder`,
+   `row_aggregator`, `window`), требуют новое имя выхода: оно не должно совпадать с
+   входной колонкой.
+5. `POST /v1/workflows/{id}/connect` — связи (порты данных с 0). У `dap.joiner` два
+   входа (0 — Left, 1 — Right), у `dap.concatenate` — (0 — Top, 1 — Bottom); оба входа
+   обязательны.
 6. `POST /v1/workflows/{id}/run` (или `/jobs`) → `GET .../table`, `.../profile`.
 
 Примеры выше — тело запроса `POST /v1/workflows/{id}/nodes`.

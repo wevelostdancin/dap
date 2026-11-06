@@ -8,7 +8,7 @@
 - Запросы с телом: `Content-Type: application/json`; ответы —
   `application/json; charset=utf-8`, заголовок `X-DAP-Api-Version: 1`
 - Аутентификации нет; сервис слушает loopback
-- Каталог — 16 узлов с id `dap.*`; контракт — 27 операций
+- Каталог — 33 узла с id `dap.*`; контракт — 27 операций
 
 ## 1. Основы
 
@@ -29,9 +29,10 @@
 | Узел workflow | `<номер workflow>:<индекс>`, например `1:2` для `wf-1` | workflow |
 
 Порты данных нумеруются с 0. У всех узлов один табличный выход (порт 0); у
-`dap.joiner` два входа (0 — Left, 1 — Right), у остальных один. Писатели
-(`dap.csv_writer`, `dap.parquet_writer`, `dap.json_writer`) возвращают входную
-таблицу без изменений (pass-through).
+`dap.joiner` два входа (0 — Left, 1 — Right), у `dap.concatenate` — два входа
+(0 — Top, 1 — Bottom), у остальных один. Писатели (`dap.csv_writer`,
+`dap.parquet_writer`, `dap.json_writer`) возвращают входную таблицу без изменений
+(pass-through).
 
 ### Ошибки
 
@@ -67,11 +68,11 @@
 ### `GET /v1/health`
 
 ```json
-{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":16,"coreNodes":16,
+{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":33,"coreNodes":33,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
-`nodes` и `coreNodes` — живые счётчики каталога (сейчас 16 и 16); `workflows` —
+`nodes` и `coreNodes` — живые счётчики каталога (сейчас 33 и 33); `workflows` —
 все workflow процесса; `sessions` — открытые сессионные БД; `jobs` — активные
 задания текущей сессии; `memory` — heap JVM.
 
@@ -83,7 +84,7 @@
 `category` — префикс; `limit` по умолчанию 50, сортировка по имени.
 
 ```json
-{"count":16,"nodes":[
+{"count":33,"nodes":[
   {"id":"dap.csv_reader","name":"CSV Reader","category":"/IO/Read","type":"Source",
    "deprecated":false,"tier":"core",
    "inPorts":[],"outPorts":[{"index":0,"name":"Data","type":"BufferedDataTable"}]}
@@ -113,7 +114,7 @@
    "labelCoverage":"5/5","warnings":[]}}
 ```
 
-Неизвестный id — 400. Все 16 узлов отдают `available: true`.
+Неизвестный id — 400. Все 33 узла отдают `available: true`.
 
 ### Диалог узла внутри workflow
 

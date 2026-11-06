@@ -6,7 +6,7 @@
 машину.
 
 Движок: Javalin 6.7 + DuckDB 1.5.6 (in-memory) + Arrow 19.0, Java 21. Каталог —
-16 узлов `dap.*`, контракт — 27 операций `/v1`. Версия: **1.0.0**.
+33 узла `dap.*`, контракт — 27 операций `/v1`. Версия: **1.0.0**.
 
 ## Что это
 
@@ -16,6 +16,10 @@
   для скриптов и тестов.
 - **Узлы как данные.** Узел описывается JSON-спекой: id, порты, `configSchema`.
   Агент читает схему настроек и собирает граф без XML и без GUI.
+- **33 узла.** IO (4 читателя, 3 писателя), очистка (фильтры, дедупликация,
+  замена значений, приведение типов, порядок колонок, выбросы), преобразование
+  (дата/время, правила, бины, нормализация, кодирование, выборка), агрегация и форма
+  (group_by, построчные агрегаты, pivot/unpivot, window, top-N, joiner/concatenate).
 - **DuckDB внутри.** Преобразования — ленивые SQL-отношения; данные материализуются
   только при чтении таблицы или профиля.
 - **Parquet-кэш.** `POST /v1/datasets` (инструмент `dap_ingest`) один раз конвертирует
@@ -49,7 +53,7 @@ curl -s http://127.0.0.1:7800/v1/health
 ```
 
 ```json
-{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":16,"coreNodes":16,
+{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":33,"coreNodes":33,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
@@ -140,8 +144,8 @@ python3 adapters/mcp/dap_mcp.py
 ## Проверки
 
 ```bash
-make test-native    # JUnit: 247 тестов
-make goldens        # 13 golden-workflow на отдельном экземпляре :7811
+make test-native    # JUnit: 332 теста
+make goldens        # 14 golden-workflow на отдельном экземпляре :7811
 make smoke          # чёрный smoke по HTTP против запущенного движка (DAP_BASE)
 make mcp-e2e        # create → add_node → connect → run → table → delete через MCP
 make check          # test-native + goldens + lint
@@ -164,7 +168,7 @@ Makefile         build-native, test-native, run-native, goldens, check
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — компоненты, жизненный цикл запроса,
   память и ресурсы DuckDB, отмена, MCP-адаптер.
-- [docs/NODES.md](docs/NODES.md) — 16 узлов: назначение, config, примеры JSON.
+- [docs/NODES.md](docs/NODES.md) — 33 узла: назначение, config, примеры JSON.
 - [docs/QUALITY.md](docs/QUALITY.md) — unit-тесты, goldens, правила сравнения,
   контракт ошибок, критерий готовности узла.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — план продукта и пул узлов.
@@ -183,7 +187,7 @@ Makefile         build-native, test-native, run-native, goldens, check
 - Остановка — явная (`POST /v1/shutdown`, сигнал процессу) или автоматическая по
   простою: `DAP_IDLE_TIMEOUT_SEC` (900 с по умолчанию, `0` выключает), если нет
   активных jobs.
-- Каталог — 16 узлов; файловые источники читают любой путь, доступный процессу.
+- Каталог — 33 узла; файловые источники читают любой путь, доступный процессу.
 - Память ingest живёт в JVM heap: для 10 млн строк нужно ~4,65 ГБ heap, и
   `DAP_DUCKDB_MEMORY_LIMIT` его не ограничивает.
 

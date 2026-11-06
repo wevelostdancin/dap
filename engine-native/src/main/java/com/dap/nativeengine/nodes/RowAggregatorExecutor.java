@@ -127,11 +127,20 @@ public final class RowAggregatorExecutor implements NodeExecutor {
         return switch (fn) {
             case "sum" -> "CAST((" + sumExpression(columns) + ") AS " + type + ")";
             case "mean" -> "CAST((" + sumExpression(columns) + ") / " + columns.size() + " AS DOUBLE)";
-            case "min" -> "CAST(LEAST(" + quotedList(columns) + ") AS " + type + ")";
-            case "max" -> "CAST(GREATEST(" + quotedList(columns) + ") AS " + type + ")";
+            case "min" -> nullGuard(columns, "LEAST(" + quotedList(columns) + ")", type);
+            case "max" -> nullGuard(columns, "GREATEST(" + quotedList(columns) + ")", type);
             case "count" -> countExpression(columns);
             default -> throw new IllegalArgumentException("row_aggregator: unknown function '" + fn + "'");
         };
+    }
+
+    /** LEAST/GREATEST ignore NULLs; the spec promises NULL propagation, so guard explicitly. */
+    private static String nullGuard(List<ColumnSpec> columns, String expression, String type) {
+        StringJoiner nulls = new StringJoiner(" OR ");
+        for (ColumnSpec column : columns) {
+            nulls.add(NodeSql.quote(column.name()) + " IS NULL");
+        }
+        return "CASE WHEN " + nulls + " THEN NULL ELSE CAST(" + expression + " AS " + type + ") END";
     }
 
     private static String sumExpression(List<ColumnSpec> columns) {

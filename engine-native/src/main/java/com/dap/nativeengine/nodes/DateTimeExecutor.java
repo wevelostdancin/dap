@@ -50,6 +50,10 @@ public final class DateTimeExecutor implements NodeExecutor {
                     throw new IllegalArgumentException("date_time: unknown unit '" + unit
                             + "' (expected year, month, day, hour, dow, quarter, week)");
                 }
+                if ("Time64".equals(column.arrowType()) && !"hour".equals(unit)) {
+                    throw new IllegalArgumentException("date_time: Time64 supports only unit 'hour', got '"
+                            + unit + "'");
+                }
                 // DuckDB spells day-of-week as dayofweek; keep the public vocabulary on dow.
                 String part = "dow".equals(unit) ? "dayofweek" : unit;
                 yield new Operation("CAST(date_part(" + NodeSql.literal(part) + ", " + quoted

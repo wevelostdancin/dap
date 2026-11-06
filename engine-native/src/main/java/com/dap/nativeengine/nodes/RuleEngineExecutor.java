@@ -37,9 +37,21 @@ public final class RuleEngineExecutor implements NodeExecutor {
         String sql = "SELECT " + NodeSql.projection(input.columns())
                 + ", (" + caseExpression + ") AS " + NodeSql.quote(output)
                 + " FROM " + input.asTable() + " AS dap_input";
+        validateProjection(context, sql);
         List<ColumnSpec> columns = new ArrayList<>(input.columns());
         columns.add(ColumnSpec.of(output, arrowType));
         return new LazyPlan(context.db(), sql, columns);
+    }
+
+    /** DESCRIBE the final SELECT: per-condition checks miss aggregate conditions. */
+    private static void validateProjection(NodeContext context, String sql) {
+        try (java.sql.Connection connection = context.db().newConnection();
+             java.sql.Statement statement = connection.createStatement();
+             java.sql.ResultSet result = statement.executeQuery("DESCRIBE " + sql)) {
+            result.next();
+        } catch (java.sql.SQLException failure) {
+            throw new IllegalArgumentException("rule_engine: invalid projection: " + failure.getMessage(), failure);
+        }
     }
 
     private static List<Rule> rules(JsonNode config) {

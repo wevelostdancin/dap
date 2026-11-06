@@ -76,9 +76,12 @@ scripts/dap-mcp
 | данные | `dap_get_table`, `dap_profile_table`, `dap_ingest` |
 | сервис | `dap_shutdown` |
 
-Всего 22 инструмента. `dap_ingest` один раз конвертирует CSV/Excel/JSON/Parquet
-в Parquet-кэш и возвращает `path`, `rows`, `columns` и `cached`; `path` можно
-сразу передать в `dap.parquet_reader` через `dap_add_node`.
+Всего 22 инструмента. Каталог движка — 33 узла `dap.*`: `dap_search_nodes` и
+`dap_node_dialog_schema` видят их все, включая узлы волны P2 (`type_cast`,
+`duplicate_filter`, `pivot`, `window`, `concatenate` и остальные). `dap_ingest`
+один раз конвертирует CSV/Excel/JSON/Parquet в Parquet-кэш и возвращает `path`,
+`rows`, `columns` и `cached`; `path` можно сразу передать в `dap.parquet_reader`
+через `dap_add_node`.
 
 Типовой проход агента: `dap_search_nodes` → `dap_node_dialog_schema` →
 `dap_workflow_create` → `dap_add_node` → `dap_connect` → `dap_run` →

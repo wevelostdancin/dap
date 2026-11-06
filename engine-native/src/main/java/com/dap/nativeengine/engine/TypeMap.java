@@ -18,6 +18,10 @@ public final class TypeMap {
             return "Utf8";
         }
         String value = type.trim();
+        Matcher decimal = DECIMAL.matcher(value);
+        if (decimal.matches()) {
+            return "Decimal128(" + decimal.group(1) + "," + decimal.group(2) + ")";
+        }
         return switch (value) {
             case "Number (Integer)", "Integer", "Long" -> "Int64";
             case "Number (Float)", "Double", "Float" -> "Float64";

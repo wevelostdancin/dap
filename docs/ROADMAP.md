@@ -3,7 +3,8 @@
 **Статус:** фазы 0–3 пилота (KNIME-oracle) закрыты 30.10.2026. **P0 «Отвязка» закрыт
 06.11.2026:** KNIME удалён, goldens-native зелёные (13/13), workflow сохраняется и
 загружается. **P1 «Lifecycle + IO» закрыт 06.11.2026:** idle-watchdog, 5 IO-узлов,
-Parquet-ingest, 16 узлов, 247 тестов. Дальше — P2 (ядро аналитики).
+Parquet-ingest, 16 узлов, 247 тестов. **P2 «Ядро аналитики» закрыт 06.11.2026:**
+17 новых узлов, 33 узла, 332 теста, 14 goldens. Дальше — P3 (статистика и время).
 **Цель:** лёгкий, быстрый и точный аналитический бэкенд для агента: локальный, по требованию,
 без KNIME.
 **Связанные документы:** [ARCHITECTURE.md](ARCHITECTURE.md), [NODES.md](NODES.md),
@@ -52,19 +53,20 @@ Parquet.
 
 ## 5. Пул узлов
 
-Цель — десятки узлов по направлениям. Существующие 11 помечены `*`.
+Цель — десятки узлов по направлениям. Реализовано 33 (помечены `*`); остальные —
+план P3–P4.
 
 | Направление | Узлы | Волна |
 |---|---|---|
-| IO | `csv_reader*`, `csv_writer`, `excel_reader*`, `excel_writer`, `json_reader`, `json_writer`, `parquet_reader`, `parquet_writer`, `file_list`, `sql_query` | 1 |
-| Очистка | `row_filter*`, `column_filter*`, `column_renamer*`, `column_resorter`, `type_cast`, `missing_value*`, `duplicate_filter`, `value_replace`, `outlier_filter` | 1 |
-| Преобразование | `sorter*`, `math_formula*`, `string_manipulation*`, `date_time`, `rule_engine`, `binner`, `normalizer`, `encoder`, `sample_rows`, `split` | 1–2 |
-| Агрегация и соединение | `group_by*`, `row_aggregator`, `pivot`, `unpivot`, `joiner*`, `concatenate`, `window`, `top_n_per_group` | 2 |
+| IO | `csv_reader*`, `csv_writer*`, `excel_reader*`, `excel_writer`, `json_reader*`, `json_writer*`, `parquet_reader*`, `parquet_writer*`, `file_list`, `sql_query` | 1 |
+| Очистка | `row_filter*`, `column_filter*`, `column_renamer*`, `column_resorter*`, `type_cast*`, `missing_value*`, `duplicate_filter*`, `value_replace*`, `outlier_filter*` | 1 |
+| Преобразование | `sorter*`, `math_formula*`, `string_manipulation*`, `date_time*`, `rule_engine*`, `binner*`, `normalizer*`, `encoder*`, `sample_rows*`, `split` | 1–2 |
+| Агрегация и соединение | `group_by*`, `row_aggregator*`, `pivot*`, `unpivot*`, `joiner*`, `concatenate*`, `window*`, `top_n_per_group*` | 2 |
 | Статистика | `describe`, `value_counts`, `correlation`, `covariance`, `histogram`, `quantile`, `outlier_detect` | 2 |
 | Временные ряды | `resample`, `rolling`, `diff`, `date_range` | 3 |
 | Текст | `text_split`, `regex_extract`, `text_concat` | 3 |
 
-Итого ~50 узлов; к концу P2 — 32, к концу P3 — 45. Новые узлы добавляются по задачам,
+Итого ~50 узлов; к концу P2 — 33, к концу P3 — 46. Новые узлы добавляются по задачам,
 но всегда по правилу «spec + executor + goldens + docs».
 
 ## 6. Форматы и хранение
@@ -90,7 +92,8 @@ Parquet.
 
 ## 8. Качество и воспроизводимость
 
-- **Goldens:** каждый узел — фикстура «вход → ожидаемый выход», прогон без сети и без KNIME.
+- **Goldens:** сценарий на волну — фикстура «вход → ожидаемый выход», прогон без сети и
+  без KNIME.
 - **Контракт ошибок:** 400 — невалидный config, 404 — неизвестный id, 500 — ошибка
   исполнения, 408 — timeout sync-run.
 - **Схемы:** `configSchema` валидируется до исполнения; `/v1/nodes/{id}/dialog` отдаёт
@@ -106,8 +109,8 @@ Parquet.
 |---|---|---|---|
 | **P0. Отвязка** ✅ | goldens-native, удаление KNIME, свой `workflow.json` (save/load), docs | закрыто 06.11.2026: `make check` зелёный, 13/13 goldens, save→load round-trip | 3 дня |
 | **P1. Lifecycle + IO** ✅ | idle-timeout, `dap_shutdown`, 5 IO-узлов (parquet/json readers, csv/parquet/json writers), `dap_ingest` | закрыто 06.11.2026: 16 узлов, 247 тестов, `make check` зелёный, ingest→parquet_reader→table проверен; DSH-плагин делает пользователь | 4 дня |
-| **P2. Ядро аналитики** | 17 узлов: очистка (type_cast, duplicate_filter, value_replace, column_resorter, outlier_filter), преобразование (date_time, rule_engine, binner, normalizer, encoder, sample_rows), форма (row_aggregator, pivot, unpivot, window, top_n_per_group, concatenate) | 33 узла, goldens зелёные, примеры в docs | 5 дней |
-| **P3. Статистика и время** | 13 узлов: describe, корреляции, гистограммы, квантили, resample, rolling | 45 узлов | 5 дней |
+| **P2. Ядро аналитики** ✅ | 17 узлов: очистка (type_cast, duplicate_filter, value_replace, column_resorter, outlier_filter), преобразование (date_time, rule_engine, binner, normalizer, encoder, sample_rows), форма (row_aggregator, pivot, unpivot, window, top_n_per_group, concatenate) | закрыто 06.11.2026: 33 узла, 332 теста, 14 goldens, `make check` зелёный | 5 дней |
+| **P3. Статистика и время** | 13 узлов: describe, корреляции, гистограммы, квантили, resample, rolling | 46 узлов | 5 дней |
 | **P4. Hardening** | bench, эвикция jobs/таблиц, install-скрипт, DSH-конфиг, docs | неделя ежедневной работы без сбоев и потери данных | 3 дня |
 
 **Веха:** после P1 (~1,5 недели) — ежедневное использование на CSV/Excel; после P2 —
@@ -133,7 +136,8 @@ Parquet.
 
 ## 12. Правила работы
 
-- Каждый узел: JSON-спека, executor, ≥3 unit-теста, golden, строка в `NODES.md`.
+- Каждый узел: JSON-спека, executor, ≥3 unit-теста, строка в `NODES.md`; golden —
+  сценарий на волну.
 - Правка `/v1` — запись в CHANGELOG и обновление `API.md`.
 - Сначала корректность и воспроизводимость, потом скорость, потом красота.
 - Коммиты — conventional, английский.

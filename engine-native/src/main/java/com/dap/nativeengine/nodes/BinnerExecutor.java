@@ -35,7 +35,8 @@ public final class BinnerExecutor implements NodeExecutor {
         String expression = switch (method) {
             case "width" -> width(quoted, input.asTable(), bins(config));
             case "custom" -> custom(quoted, config);
-            case "frequency" -> "CAST(NTILE(" + bins(config) + ") OVER (ORDER BY " + quoted + ") AS BIGINT)";
+            case "frequency" -> "CASE WHEN " + quoted + " IS NULL THEN NULL ELSE CAST(NTILE("
+                    + bins(config) + ") OVER (ORDER BY " + quoted + ") AS BIGINT) END";
             default -> throw new IllegalArgumentException("binner: unknown method '" + method
                     + "' (expected width, custom, frequency)");
         };

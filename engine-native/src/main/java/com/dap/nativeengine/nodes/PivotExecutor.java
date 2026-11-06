@@ -47,14 +47,16 @@ public final class PivotExecutor implements NodeExecutor {
             select.add(NodeSql.quote(column.name()));
             names.add(column.name());
         }
-        String condition = "CASE WHEN CAST(" + NodeSql.quote(pivotColumn.name()) + " AS VARCHAR) = ";
+        String condition = "CASE WHEN " + NodeSql.quote(pivotColumn.name()) + " = ";
         for (String value : values) {
             if (!names.add(value)) {
                 throw new IllegalArgumentException("pivot: value '" + value
                         + "' collides with another output column");
             }
-            String expression = condition + NodeSql.literal(value) + " THEN "
-                    + NodeSql.quote(valueColumn.name()) + " END";
+            String expression = condition
+                    + NodeSql.literal(pivotColumn,
+                            com.fasterxml.jackson.databind.node.TextNode.valueOf(value))
+                    + " THEN " + NodeSql.quote(valueColumn.name()) + " END";
             select.add(aggregate(agg, expression, valueColumn) + " AS " + NodeSql.quote(value));
             columns.add(ColumnSpec.of(value, outputType(agg, valueColumn)));
         }

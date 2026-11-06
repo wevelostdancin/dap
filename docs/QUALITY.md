@@ -8,8 +8,8 @@
 
 | Уровень | Команда | Что покрывает |
 |---|---|---|
-| JUnit | `make test-native` | 247 тестов: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
-| Goldens | `make goldens` | 13 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
+| JUnit | `make test-native` | 332 теста: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
+| Goldens | `make goldens` | 14 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
 | Структура goldens | `python3 tests/goldens-native/runner.py --validate` | проверка фикстур без движка |
 | Smoke | `make smoke` (`DAP_BASE`, по умолчанию `:7800`) | 9 чёрных проверок контракта и пяти узлов на запущенном движке |
 | MCP e2e | `make mcp-e2e` | адаптер поднимает движок, проходит create → add_node → connect → run → table → delete |
@@ -23,14 +23,20 @@
 ## 2. Unit-тесты
 
 JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java.base/java.nio`).
-247 тестов в 31 классе:
+332 теста в 49 классах:
 
 - **Исполнители** — по классу на узел (`CsvReaderExecutorTest`, `ExcelReaderExecutorTest`,
   `ParquetReaderExecutorTest`, `JsonReaderExecutorTest`, `CsvWriterExecutorTest`,
   `ParquetWriterExecutorTest`, `JsonWriterExecutorTest`, `RowFilterExecutorTest`,
   `ColumnFilterExecutorTest`, `ColumnRenamerExecutorTest`, `SorterExecutorTest`,
   `MissingValueExecutorTest`, `GroupByExecutorTest`, `JoinerExecutorTest`,
-  `StringManipulationExecutorTest`, `MathFormulaExecutorTest`):
+  `StringManipulationExecutorTest`, `MathFormulaExecutorTest`, `TypeCastExecutorTest`,
+  `DuplicateFilterExecutorTest`, `ValueReplaceExecutorTest`, `ColumnResorterExecutorTest`,
+  `OutlierFilterExecutorTest`, `DateTimeExecutorTest`, `RuleEngineExecutorTest`,
+  `BinnerExecutorTest`, `NormalizerExecutorTest`, `EncoderExecutorTest`,
+  `SampleRowsExecutorTest`, `RowAggregatorExecutorTest`, `PivotExecutorTest`,
+  `UnpivotExecutorTest`, `WindowExecutorTest`, `TopNPerGroupExecutorTest`,
+  `ConcatenateExecutorTest`):
   валидация config, типы и имена выходных колонок, NULL/`""`, порядок строк.
 - **IO и кэш** — `IngestServiceTest`: CSV/JSON/Parquet → Parquet, повторный вызов
   возвращает тот же файл (`cached`), неизвестный формат и отсутствующий файл
@@ -58,14 +64,15 @@ goldens-native/
   runner.py            # прогон и сравнение
   expected.json        # замороженные ожидания baseline-workflow
   data/                # входные фикстуры + datasets.json
-  workflows/           # 13 workflow: wf-*.json
+  workflows/           # 14 workflow: wf-*.json
 ```
 
-Сейчас 13 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 5
+Сейчас 14 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 6
 `kind: "native"` (литеральные проверки или эквивалентность). Фикстуры данных:
-`iris.csv`/`iris.xlsx`, `adult.csv`, `air_quality.csv`, `worldbank_countries.csv`;
-`datasets.json` задаёт файл, разделитель, заголовок, схему (`arrow`) и число
-пропусков по колонкам.
+`iris.csv`/`iris.xlsx`, `adult.csv`, `air_quality.csv`, `worldbank_countries.csv`,
+`p2.csv`; `datasets.json` задаёт файл, разделитель, заголовок, схему (`arrow`) и
+число пропусков по колонкам. `wf-n4-p2-clean` — golden волны P2: `type_cast` →
+`value_replace` → `duplicate_filter` → `sorter` на `p2.csv`.
 
 ### Формат workflow
 
@@ -88,10 +95,13 @@ goldens-native/
 
 Пример сокращён: в реальной проверке перечислены все колонки и строки.
 
-- Логические типы узлов: `table_source`, `csv_reader`, `excel_reader`, `row_filter`,
-  `sorter`, `group_by`, `joiner`, `column_filter`, `column_renamer`,
-  `missing_value`, `string_manipulation`, `math_formula`. Раннер переводит их в
-  `dap.<type>`, а `table_source` — в `dap.csv_reader`.
+- Логические типы узлов — id каталога без префикса `dap.` (`csv_reader`,
+  `row_filter`, `sorter`, `group_by`, `joiner`, `column_renamer`, `type_cast`,
+  `duplicate_filter`, `value_replace`, `column_resorter`, `outlier_filter`, `date_time`,
+  `rule_engine`, `binner`, `normalizer`, `encoder`, `sample_rows`, `row_aggregator`,
+  `pivot`, `unpivot`, `window`, `top_n_per_group`, `concatenate` и остальные), плюс
+  `table_source`. Раннер переводит их в `dap.<type>`, а `table_source` — в
+  `dap.csv_reader`.
 - `config.dataset` — сокращение раннера: он подставляет абсолютный путь из
   `data/`, разделитель, заголовок и схему колонок. Движок всегда получает реальный
   путь; сам узел сокращений не знает.
@@ -175,10 +185,12 @@ goldens-native/
 2. Исполнитель в `nodes/`, зарегистрированный в `NativeService.defaultExecutors`,
    возвращает `LazyPlan` и валидирует config с понятными сообщениями.
 3. Не менее трёх unit-тестов: валидация, успешный путь, граничный случай.
-4. Golden-workflow для узлов, работающих с таблицей, и `runner.py --validate` без
-   замечаний; ожидания посчитаны независимо. Для IO-узлов (читатели/писатели) вместо
-   golden — unit-тесты плюс интеграционный round-trip (ingest → `parquet_reader` →
-   `table`), потому что golden-раннер не проверяет файлы.
+4. Golden-сценарий на волну: один workflow покрывает несколько узлов волны
+   end-to-end (например, `wf-n4-p2-clean` — `type_cast` → `value_replace` →
+   `duplicate_filter` → `sorter` на `p2.csv`); `runner.py --validate` без замечаний,
+   ожидания посчитаны независимо. Golden на каждый узел не требуется. Для IO-узлов
+   (читатели/писатели) вместо golden — unit-тесты плюс интеграционный round-trip
+   (ingest → `parquet_reader` → `table`), потому что golden-раннер не проверяет файлы.
 5. Строка в [NODES.md](NODES.md): назначение, таблица config, пример JSON.
 6. В `engine-native/` нет ссылок на внешний аналитический рантайм (проверяет
    `make lint`); jar содержит ровно одну DuckDB-native библиотеку и меньше 50 МиБ.

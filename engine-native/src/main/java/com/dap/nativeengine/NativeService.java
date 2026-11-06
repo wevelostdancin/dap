@@ -427,7 +427,7 @@ public final class NativeService implements AutoCloseable {
         }
     }
 
-    /** All sixteen node executors. */
+    /** All thirty-three node executors. */
     public static Executors defaultExecutors() {
         return new Executors()
                 .register(new BinnerExecutor())
