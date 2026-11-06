@@ -61,11 +61,12 @@ class CatalogHandlersTest {
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(11, body.path("count").asInt());
+        assertEquals(16, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(11, nodes.size());
-        assertEquals(List.of("Column Filter", "Column Renamer", "CSV Reader", "Excel Reader", "Group By",
-                "Joiner", "Math Formula", "Missing Value", "Row Filter", "Sorter",
+        assertEquals(16, nodes.size());
+        assertEquals(List.of("Column Filter", "Column Renamer", "CSV Reader", "CSV Writer", "Excel Reader",
+                "Group By", "Joiner", "JSON Reader", "JSON Writer", "Math Formula", "Missing Value",
+                "Parquet Reader", "Parquet Writer", "Row Filter", "Sorter",
                 "String Manipulation"), names(nodes));
 
         JsonNode first = nodes.get(0);
@@ -88,15 +89,17 @@ class CatalogHandlersTest {
     @Test
     void filtersByQueryAndCategory() throws Exception {
         JsonNode csv = body(fetch("/nodes?q=CSV", "s"));
-        assertEquals(1, csv.path("count").asInt());
+        assertEquals(2, csv.path("count").asInt());
         assertEquals("dap.csv_reader", csv.path("nodes").get(0).path("id").asText());
+        assertEquals("dap.csv_writer", csv.path("nodes").get(1).path("id").asText());
 
         JsonNode io = body(fetch("/nodes?category=%2FIO", "s"));
-        assertEquals(2, io.path("count").asInt());
-        assertEquals(List.of("CSV Reader", "Excel Reader"), names(io.path("nodes")));
+        assertEquals(7, io.path("count").asInt());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Excel Reader", "JSON Reader", "JSON Writer",
+                "Parquet Reader", "Parquet Writer"), names(io.path("nodes")));
 
         JsonNode combined = body(fetch("/nodes?q=reader&category=%2FIO", "s"));
-        assertEquals(2, combined.path("count").asInt());
+        assertEquals(4, combined.path("count").asInt());
     }
 
     @Test

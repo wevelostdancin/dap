@@ -9,3 +9,8 @@ dap.joiner.json
 dap.string_manipulation.json
 dap.math_formula.json
 dap.column_renamer.json
+dap.parquet_reader.json
+dap.json_reader.json
+dap.csv_writer.json
+dap.parquet_writer.json
+dap.json_writer.json
