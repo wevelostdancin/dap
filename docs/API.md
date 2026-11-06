@@ -271,6 +271,29 @@ workflow — 404.
 выше — приблизительно с досчётом у границы. `min`/`max`/`mean` — только для
 числовых колонок; у колонки из одних NULL они опускаются.
 
+### `POST /v1/datasets`
+
+Один раз конвертирует CSV/Excel/JSON/Parquet в Parquet-кэш, чтобы повторный анализ
+не парсил исходник.
+
+```json
+{"file": "/data/iris.csv", "format": "csv"}
+```
+
+`format` необязателен: выводится из расширения (`.csv`, `.xlsx`, `.json`,
+`.parquet`). Ответ:
+
+```json
+{"path": "/Users/me/.dap/cache/<sha256>.parquet", "rows": 150,
+ "columns": [{"name": "sepal_length", "type": "Float64"}], "cached": false}
+```
+
+Типы — Arrow-имена (`Int64`, `Float64`, `Utf8`, `Boolean`, `Date32`, `Time64`,
+`Timestamp`, `Decimal128`). Кэш: `DAP_CACHE_DIR` или `~/.dap/cache`; ключ —
+путь + размер + mtime + формат, поэтому изменённый файл инвалидирует запись.
+400 — нет `file`, неизвестное расширение/формат, файл не найден. Полученный
+`path` можно передать в `dap.parquet_reader` как `file`.
+
 ## 7. Сохранение, диагностика, остановка
 
 ### `POST /v1/workflows/{workflowId}/save`
