@@ -1,0 +1,85 @@
+{
+  "id": "dap.diff",
+  "name": "Diff",
+  "category": "/Time Series",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Adds a column with the difference between the current and the previous row of the same partition: column - LAG(column) ordered by orderBy. The first row of every partition is NULL and the output keeps the input column type.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Diff configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Column",
+        "description": "Numeric input column whose consecutive differences are computed."
+      },
+      "output": {
+        "type": "string",
+        "title": "Output column",
+        "description": "Name of the new column."
+      },
+      "orderBy": {
+        "type": "array",
+        "title": "Order by",
+        "description": "Row order inside each partition; required.",
+        "items": {
+          "type": "object",
+          "title": "Order key",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column to order by."
+            },
+            "direction": {
+              "type": "string",
+              "title": "Direction",
+              "description": "Sort direction.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            }
+          },
+          "required": [
+            "column"
+          ]
+        }
+      },
+      "partitionBy": {
+        "type": "array",
+        "title": "Partition by",
+        "description": "Columns that define the partitions. When omitted the whole table is one partition.",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "column",
+      "output",
+      "orderBy"
+    ]
+  }
+}

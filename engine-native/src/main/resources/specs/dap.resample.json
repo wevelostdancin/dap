@@ -1,0 +1,86 @@
+{
+  "id": "dap.resample",
+  "name": "Resample",
+  "category": "/Time Series",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Buckets a Timestamp column into fixed intervals with time_bucket and aggregates each bucket. The bucket start replaces the time column, the result is ordered by it, and every aggregation can name its output column.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Resample configuration",
+    "additionalProperties": false,
+    "properties": {
+      "timeColumn": {
+        "type": "string",
+        "title": "Time column",
+        "description": "Timestamp column that defines the buckets."
+      },
+      "every": {
+        "type": "string",
+        "title": "Bucket size",
+        "description": "Bucket width such as '1 day' or '15 minutes' (a positive count and a unit: second, minute, hour, day, week, month, year).",
+        "default": "1 day"
+      },
+      "aggregations": {
+        "type": "array",
+        "title": "Aggregations",
+        "description": "Aggregates computed per bucket, in output order.",
+        "items": {
+          "type": "object",
+          "title": "Aggregation",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column to aggregate."
+            },
+            "fn": {
+              "type": "string",
+              "title": "Function",
+              "description": "Aggregate function; mean and sum require a numeric column.",
+              "enum": [
+                "mean",
+                "sum",
+                "count",
+                "min",
+                "max"
+              ]
+            },
+            "output": {
+              "type": "string",
+              "title": "Output column",
+              "description": "Name of the new column; defaults to the function and column, e.g. Mean(value)."
+            }
+          },
+          "required": [
+            "column",
+            "fn"
+          ]
+        }
+      }
+    },
+    "required": [
+      "timeColumn",
+      "every",
+      "aggregations"
+    ]
+  }
+}
