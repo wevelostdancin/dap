@@ -9,12 +9,12 @@
 
 `dap-native` — один JVM-процесс на Java 21: Javalin 6.7.0, DuckDB 1.5.6.0 (in-memory),
 Arrow 19.0.0, Jackson 2.19.0. Снаружи — HTTP-контракт `/v1` (27 операций) и каталог из
-33 узлов `dap.*`. Workflow, задания и результаты живут в памяти процесса; на диск
+44 узлов `dap.*`. Workflow, задания и результаты живут в памяти процесса; на диск
 попадают только результат `POST /v1/workflows/{id}/save` и Parquet-кэш
 `POST /v1/datasets`.
-Аутентификации нет, по умолчанию сервис слушает `127.0.0.1`. Каталог — 33 узла,
-по исполнителю на узел; проверки — 332 JUnit-теста в 49 классах и 14 golden-workflow
-([QUALITY.md](QUALITY.md)).
+Аутентификации нет, по умолчанию сервис слушает `127.0.0.1`. Каталог — 44 узла и 44
+исполнителя, по одному на узел; проверки — 394 JUnit-теста в 61 классе и 15
+golden-workflow ([QUALITY.md](QUALITY.md)).
 
 ```
 HTTP (Javalin, virtual threads)
@@ -38,6 +38,7 @@ JobManager ──► Dag (уровни Кана, параллельные вет
                  ├─ csv_reader / excel_reader: Arrow → Appender → таблица
                  ├─ parquet_reader / json_reader: read_parquet / read_json_auto
                  ├─ csv_writer / parquet_writer / json_writer: COPY ... TO
+                 ├─ excel_writer: zip + XML (без POI), атомарное переименование
                  └─ преобразования: SQL-отношения
 ```
 
@@ -70,7 +71,7 @@ JobManager ──► Dag (уровни Кана, параллельные вет
 | `NativeService` | Точка входа: читает `Settings` из env, собирает `ServiceState`, регистрирует маршруты `/v1`, отображает исключения в `{"error": ...}`, останавливает сервис |
 | `ServiceState` | Реестр узлов, `WorkflowStore`, `JobManager` и по одной `DuckDbSession` на сессию; закрывает их вместе с сервисом |
 | `NodeRegistry`, `NodeSpec` | Читают `specs/index.txt` и `specs/*.json` из classpath; поиск по каталогу; `configSchema` → поля `/dialog` |
-| `Executors`, `NodeExecutor`, `NodeContext` | Регистрация 33 исполнителей по id `dap.*`; исполнитель получает config, сессию, job-соединение и входные `LazyPlan` |
+| `Executors`, `NodeExecutor`, `NodeContext` | Регистрация 44 исполнителей по id `dap.*`; исполнитель получает config, сессию, job-соединение и входные `LazyPlan` |
 | `WorkflowStore`, `Workflow` | Workflow в памяти по сессиям, id `wf-N`, лимит на сессию, граф узлов и связей, снимок графа на run, состояния узлов |
 | `JobManager`, `Job` | Постановка run в виртуальный поток, сериализация запусков одного workflow, watchdog по дедлайну, отмена, состояния задания |
 | `Dag` | Исполнение снимка графа уровнями Кана: узлы уровня параллельны, следующий уровень — после предыдущего; падение узла отменяет соседей |
@@ -233,4 +234,4 @@ cached}`. Ключ кэша — SHA-256 от абсолютного пути, р
   только явно сохранённый `workflow.json` и Parquet-кэш `POST /v1/datasets`.
 - Остановка: `POST /v1/shutdown` (ответ 200, закрытие через ~100 мс), сигнал
   процессу или простой дольше `DAP_IDLE_TIMEOUT_SEC` без активных jobs (§6).
-- Каталог — 33 узла; расширение идёт по правилу «спека + исполнитель + goldens + docs».
+- Каталог — 44 узла; расширение идёт по правилу «спека + исполнитель + goldens + docs».

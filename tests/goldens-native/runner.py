@@ -66,7 +66,9 @@ LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "so
                  "type_cast", "duplicate_filter", "value_replace", "column_resorter",
                  "outlier_filter", "date_time", "rule_engine", "binner", "normalizer",
                  "encoder", "sample_rows", "row_aggregator", "pivot", "unpivot", "window",
-                 "top_n_per_group", "concatenate"}
+                 "top_n_per_group", "concatenate",
+                 "describe", "value_counts", "correlation", "histogram", "quantile",
+                 "outlier_detect", "resample", "rolling", "diff", "date_range", "excel_writer"}
 CHECK_KINDS = {"table", "profile", "equivalent", "expect", "expect_profile"}
 
 

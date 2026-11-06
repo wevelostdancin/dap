@@ -29,6 +29,17 @@ import com.dap.nativeengine.nodes.TypeCastExecutor;
 import com.dap.nativeengine.nodes.UnpivotExecutor;
 import com.dap.nativeengine.nodes.ValueReplaceExecutor;
 import com.dap.nativeengine.nodes.WindowExecutor;
+import com.dap.nativeengine.nodes.CorrelationExecutor;
+import com.dap.nativeengine.nodes.DateRangeExecutor;
+import com.dap.nativeengine.nodes.DescribeExecutor;
+import com.dap.nativeengine.nodes.DiffExecutor;
+import com.dap.nativeengine.nodes.ExcelWriterExecutor;
+import com.dap.nativeengine.nodes.HistogramExecutor;
+import com.dap.nativeengine.nodes.OutlierDetectExecutor;
+import com.dap.nativeengine.nodes.QuantileExecutor;
+import com.dap.nativeengine.nodes.ResampleExecutor;
+import com.dap.nativeengine.nodes.RollingExecutor;
+import com.dap.nativeengine.nodes.ValueCountsExecutor;
 import com.dap.nativeengine.nodes.ColumnFilterExecutor;
 import com.dap.nativeengine.nodes.ColumnRenamerExecutor;
 import com.dap.nativeengine.nodes.CsvReaderExecutor;
@@ -447,6 +458,17 @@ public final class NativeService implements AutoCloseable {
                 .register(new UnpivotExecutor())
                 .register(new ValueReplaceExecutor())
                 .register(new WindowExecutor())
+                .register(new DescribeExecutor())
+                .register(new ValueCountsExecutor())
+                .register(new CorrelationExecutor())
+                .register(new HistogramExecutor())
+                .register(new QuantileExecutor())
+                .register(new OutlierDetectExecutor())
+                .register(new ResampleExecutor())
+                .register(new RollingExecutor())
+                .register(new DiffExecutor())
+                .register(new DateRangeExecutor())
+                .register(new ExcelWriterExecutor())
                 .register(new CsvReaderExecutor())
                 .register(new CsvWriterExecutor())
                 .register(new JsonReaderExecutor())

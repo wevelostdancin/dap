@@ -8,8 +8,8 @@
 
 | Уровень | Команда | Что покрывает |
 |---|---|---|
-| JUnit | `make test-native` | 332 теста: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
-| Goldens | `make goldens` | 14 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
+| JUnit | `make test-native` | 394 теста: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
+| Goldens | `make goldens` | 15 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
 | Структура goldens | `python3 tests/goldens-native/runner.py --validate` | проверка фикстур без движка |
 | Smoke | `make smoke` (`DAP_BASE`, по умолчанию `:7800`) | 9 чёрных проверок контракта и пяти узлов на запущенном движке |
 | MCP e2e | `make mcp-e2e` | адаптер поднимает движок, проходит create → add_node → connect → run → table → delete |
@@ -23,7 +23,7 @@
 ## 2. Unit-тесты
 
 JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java.base/java.nio`).
-332 теста в 49 классах:
+394 теста в 61 классе:
 
 - **Исполнители** — по классу на узел (`CsvReaderExecutorTest`, `ExcelReaderExecutorTest`,
   `ParquetReaderExecutorTest`, `JsonReaderExecutorTest`, `CsvWriterExecutorTest`,
@@ -36,8 +36,13 @@ JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java
   `BinnerExecutorTest`, `NormalizerExecutorTest`, `EncoderExecutorTest`,
   `SampleRowsExecutorTest`, `RowAggregatorExecutorTest`, `PivotExecutorTest`,
   `UnpivotExecutorTest`, `WindowExecutorTest`, `TopNPerGroupExecutorTest`,
-  `ConcatenateExecutorTest`):
+  `ConcatenateExecutorTest`, `DescribeExecutorTest`, `ValueCountsExecutorTest`,
+  `CorrelationExecutorTest`, `HistogramExecutorTest`, `QuantileExecutorTest`,
+  `OutlierDetectExecutorTest`, `ResampleExecutorTest`, `RollingExecutorTest`,
+  `DiffExecutorTest`, `DateRangeExecutorTest`, `ExcelWriterExecutorTest`):
   валидация config, типы и имена выходных колонок, NULL/`""`, порядок строк.
+  `TimeSeriesSpecsTest` сверяет спеки P3 с контрактами исполнителей (порты, обязательные
+  ключи, enum-значения), `P2ReviewRegressionTest` — регрессии волны P2.
 - **IO и кэш** — `IngestServiceTest`: CSV/JSON/Parquet → Parquet, повторный вызов
   возвращает тот же файл (`cached`), неизвестный формат и отсутствующий файл
   отклоняются.
@@ -64,15 +69,16 @@ goldens-native/
   runner.py            # прогон и сравнение
   expected.json        # замороженные ожидания baseline-workflow
   data/                # входные фикстуры + datasets.json
-  workflows/           # 14 workflow: wf-*.json
+  workflows/           # 15 workflow: wf-*.json
 ```
 
-Сейчас 14 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 6
+Сейчас 15 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 7
 `kind: "native"` (литеральные проверки или эквивалентность). Фикстуры данных:
 `iris.csv`/`iris.xlsx`, `adult.csv`, `air_quality.csv`, `worldbank_countries.csv`,
 `p2.csv`; `datasets.json` задаёт файл, разделитель, заголовок, схему (`arrow`) и
 число пропусков по колонкам. `wf-n4-p2-clean` — golden волны P2: `type_cast` →
-`value_replace` → `duplicate_filter` → `sorter` на `p2.csv`.
+`value_replace` → `duplicate_filter` → `sorter` на `p2.csv`; `wf-n5-p3-stats` — golden
+волны P3: `value_counts` по колонке `category` из `p2.csv` (A=3, B=2, C=1).
 
 ### Формат workflow
 

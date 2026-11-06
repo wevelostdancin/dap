@@ -47,7 +47,18 @@ class NodeRegistryTest {
             "dap.unpivot",
             "dap.window",
             "dap.top_n_per_group",
-            "dap.concatenate");
+            "dap.concatenate",
+            "dap.describe",
+            "dap.value_counts",
+            "dap.correlation",
+            "dap.histogram",
+            "dap.quantile",
+            "dap.outlier_detect",
+            "dap.resample",
+            "dap.rolling",
+            "dap.diff",
+            "dap.date_range",
+            "dap.excel_writer");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -228,11 +239,12 @@ class NodeRegistryTest {
     @Test
     void categoryPrefixFindsAllIoNodes() {
         List<NodeSpec> hits = registry.search(null, "/IO", 50);
-        assertEquals(7, hits.size());
-        assertEquals(List.of("CSV Reader", "CSV Writer", "Excel Reader", "JSON Reader", "JSON Writer",
-                "Parquet Reader", "Parquet Writer"), hits.stream().map(NodeSpec::name).toList());
+        assertEquals(8, hits.size());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Excel Reader", "Excel Writer", "JSON Reader",
+                "JSON Writer", "Parquet Reader", "Parquet Writer"),
+                hits.stream().map(NodeSpec::name).toList());
         assertEquals(4, registry.search(null, "/IO/Read", 50).size());
-        assertEquals(3, registry.search(null, "/IO/Write", 50).size());
+        assertEquals(4, registry.search(null, "/IO/Write", 50).size());
     }
 
     @Test

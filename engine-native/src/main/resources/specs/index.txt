@@ -31,3 +31,14 @@ dap.unpivot.json
 dap.window.json
 dap.top_n_per_group.json
 dap.concatenate.json
+dap.describe.json
+dap.value_counts.json
+dap.correlation.json
+dap.histogram.json
+dap.quantile.json
+dap.outlier_detect.json
+dap.resample.json
+dap.rolling.json
+dap.diff.json
+dap.date_range.json
+dap.excel_writer.json
