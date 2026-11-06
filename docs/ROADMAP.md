@@ -110,7 +110,7 @@ Parquet.
 | **P0. Отвязка** ✅ | goldens-native, удаление KNIME, свой `workflow.json` (save/load), docs | закрыто 06.11.2026: `make check` зелёный, 13/13 goldens, save→load round-trip | 3 дня |
 | **P1. Lifecycle + IO** ✅ | idle-timeout, `dap_shutdown`, 5 IO-узлов (parquet/json readers, csv/parquet/json writers), `dap_ingest` | закрыто 06.11.2026: 16 узлов, 247 тестов, `make check` зелёный, ingest→parquet_reader→table проверен; DSH-плагин делает пользователь | 4 дня |
 | **P2. Ядро аналитики** ✅ | 17 узлов: очистка (type_cast, duplicate_filter, value_replace, column_resorter, outlier_filter), преобразование (date_time, rule_engine, binner, normalizer, encoder, sample_rows), форма (row_aggregator, pivot, unpivot, window, top_n_per_group, concatenate) | закрыто 06.11.2026: 33 узла, 332 теста, 14 goldens, `make check` зелёный | 5 дней |
-| **P3. Статистика и время** | 13 узлов: describe, корреляции, гистограммы, квантили, resample, rolling | 46 узлов | 5 дней |
+| **P3. Статистика и время** | 11 узлов: describe, value_counts, correlation, histogram, quantile, outlier_detect, resample, rolling, diff, date_range, excel_writer | 44 узла | 5 дней |
 | **P4. Hardening** | bench, эвикция jobs/таблиц, install-скрипт, DSH-конфиг, docs | неделя ежедневной работы без сбоев и потери данных | 3 дня |
 
 **Веха:** после P1 (~1,5 недели) — ежедневное использование на CSV/Excel; после P2 —
