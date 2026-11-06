@@ -55,6 +55,36 @@ class NativeServiceSettingsTest {
     }
 
     @Test
+    void idleTimeoutDefaultsTo900Seconds() {
+        assertEquals(900, NativeService.Settings.fromEnv(Map.of()).idleTimeoutSec());
+    }
+
+    @Test
+    void envConfiguresIdleTimeoutAndZeroDisablesIt() {
+        assertEquals(5, NativeService.Settings.fromEnv(
+                Map.of("DAP_IDLE_TIMEOUT_SEC", " 5 ")).idleTimeoutSec());
+        assertEquals(0, NativeService.Settings.fromEnv(
+                Map.of("DAP_IDLE_TIMEOUT_SEC", "0")).idleTimeoutSec());
+        assertEquals(900, NativeService.Settings.fromEnv(
+                Map.of("DAP_IDLE_TIMEOUT_SEC", " ")).idleTimeoutSec(), "blank keeps the default");
+    }
+
+    @Test
+    void invalidIdleTimeoutFailsLoudly() {
+        IllegalArgumentException notANumber = assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_IDLE_TIMEOUT_SEC", "soon")));
+        assertTrue(notANumber.getMessage().contains("DAP_IDLE_TIMEOUT_SEC"), notANumber.getMessage());
+        assertTrue(notANumber.getMessage().contains("soon"), notANumber.getMessage());
+
+        IllegalArgumentException negative = assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_IDLE_TIMEOUT_SEC", "-1")));
+        assertTrue(negative.getMessage().contains("DAP_IDLE_TIMEOUT_SEC"), negative.getMessage());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> new NativeService.Settings(1, 1, "127.0.0.1", 0, null, null, null, -1));
+    }
+
+    @Test
     void invalidThreadsEnvFailsLoudly() {
         IllegalArgumentException notANumber = assertThrows(IllegalArgumentException.class,
                 () -> NativeService.Settings.fromEnv(Map.of("DAP_DUCKDB_THREADS", "many")));
