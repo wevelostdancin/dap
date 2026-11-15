@@ -59,3 +59,4 @@ dap.geo_distance.json
 dap.calendar.json
 dap.logistic_regression.json
 dap.cluster.json
+dap.pca.json

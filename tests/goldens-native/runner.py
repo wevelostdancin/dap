@@ -68,7 +68,7 @@ LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "so
                  "encoder", "sample_rows", "row_aggregator", "pivot", "unpivot", "window",
                  "top_n_per_group", "concatenate",
                  "describe", "value_counts", "correlation", "histogram", "quantile",
-                 "outlier_detect", "cluster", "resample", "rolling", "diff", "date_range",
+                 "outlier_detect", "cluster", "pca", "resample", "rolling", "diff", "date_range",
                  "excel_writer", "markdown_report", "chart", "data_quality",
                  "hypothesis_test", "linear_regression",
                  "sql_query", "db_reader", "file_list"}

@@ -135,6 +135,7 @@
 | `dap.linear_regression` | Linear Regression | `/Statistics` | 1 |
 | `dap.logistic_regression` | Logistic Regression | `/Statistics` | 1 |
 | `dap.cluster` | Cluster | `/Statistics` | 1 |
+| `dap.pca` | PCA | `/Statistics` | 1 |
 | `dap.resample` | Resample | `/Time Series` | 1 |
 | `dap.rolling` | Rolling | `/Time Series` | 1 |
 | `dap.diff` | Diff | `/Time Series` | 1 |
@@ -2408,5 +2409,41 @@ Europe/Moscow); у `Date32` времени суток нет. `holidays` — с�
 {
   "factory": "dap.cluster",
   "settings": {"columns": ["sepal_length", "petal_length"], "method": "kmeans", "k": 3, "seed": 42}
+}
+```
+
+
+## 58. dap.pca
+
+Метод главных компонент по ковариационной матрице и разложению Якоби. Три режима:
+`scores` добавляет к входу `pc1..pcN` (линейные комбинации центрированных, при
+необходимости стандартизованных колонок), `loadings` выдаёт строку на компоненту и
+колонку, `explained` — собственную ценность, долю объяснённой дисперсии и накопленную
+долю на компоненту. Признаки по умолчанию стандартизуются (z-score). Знак каждой
+компоненты фиксируется так, чтобы её наибольшая по модулю нагрузка была положительной —
+это делает выход воспроизводимым.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `columns` | array<string> | — | обязателен; непустой; только числовые колонки |
+| `components` | integer | `2` | положительный; `components > columns` — ошибка |
+| `standardize` | boolean | `true` | z-score признаков перед разложением; константная колонка обнуляется |
+| `mode` | `scores` \| `loadings` \| `explained` | `scores` | что вернуть |
+| `max_rows` | integer | `100000` | положительный предел in-memory; больше — ошибка с подсказкой |
+
+Выход `scores`: входные колонки плюс `pc1..pcN` (Float64); занятое имя — ошибка run,
+строка с NULL в любой выбранной колонке получает NULL во всех компонентах. Выход
+`loadings`: `component` (Int64, с 1), `column` (Utf8), `loading` (Float64), строки в
+порядке компонент, затем колонок. Выход `explained`: `component`, `eigenvalue`,
+`explained_variance` (собственная ценность / сумма всех собственных ценностей),
+`cumulative` (накопленная доля по выбранным компонентам). Нужно не менее двух полных
+строк; превышение `max_rows` — ошибка с подсказкой поднять `max_rows` или отфильтровать
+вход.
+
+```json
+{
+  "factory": "dap.pca",
+  "settings": {"columns": ["sepal_length", "petal_length"], "components": 2, "standardize": true, "mode": "scores"}
 }
 ```

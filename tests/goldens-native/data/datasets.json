@@ -526,5 +526,28 @@
         "missing": 0
       }
     ]
+  },
+  "PCA_CORRELATED": {
+    "file": "pca_correlated.csv",
+    "rows": 12,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "id",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "x",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "y",
+        "arrow": "Float64",
+        "missing": 0
+      }
+    ]
   }
 }
