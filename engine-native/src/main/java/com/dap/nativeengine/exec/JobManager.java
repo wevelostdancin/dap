@@ -160,6 +160,21 @@ public final class JobManager implements AutoCloseable {
         }
     }
 
+    /**
+     * Forget the run lock of a deleted workflow: the lock map must not grow with every
+     * workflow the session ever ran.
+     */
+    public void forgetWorkflow(String workflowId) {
+        if (workflowId != null) {
+            workflowLocks.remove(workflowId);
+        }
+    }
+
+    /** Test and diagnostics seam: whether a run lock is registered for the workflow. */
+    boolean hasWorkflowLock(String workflowId) {
+        return workflowLocks.containsKey(workflowId);
+    }
+
     public void await(Job job) throws InterruptedException {
         Objects.requireNonNull(job, "job").await();
     }
@@ -220,6 +235,8 @@ public final class JobManager implements AutoCloseable {
             closeJobConnection(job);
             job.complete(JobState.cancelled, null, "cancelled");
         }
+        // Bounded: a node task that ignores interrupts must not hang the shutdown.
+        dag.close();
         watchdog.shutdownNow();
         runs.shutdownNow();
         awaitTermination(runs, 5);

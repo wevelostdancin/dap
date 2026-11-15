@@ -134,6 +134,29 @@ public final class ServiceState implements AutoCloseable {
     }
 
     /**
+     * Delete a workflow and everything it owns: cancel its jobs, interrupt its in-flight
+     * /table and /profile reads, drop its reader tables and forget its run lock.
+     */
+    public boolean deleteWorkflow(String sessionId, String workflowId) {
+        Workflow workflow = workflows.find(sessionId, workflowId);
+        if (workflow == null) {
+            return false;
+        }
+        for (Job job : jobs.activeForWorkflow(workflow.id())) {
+            jobs.cancel(job);
+        }
+        DuckDbSession database = sessionIfPresent(sessionId);
+        if (database != null) {
+            // A read on its own connection survives the job cancel above; close it first so
+            // the table drop does not race a running scan of the workflow's data.
+            database.interruptReads(workflow.id());
+            database.dropTablesForWorkflow(workflow.id());
+        }
+        jobs.forgetWorkflow(workflow.id());
+        return workflows.delete(sessionId, workflowId);
+    }
+
+    /**
      * Close TTL-expired sessions and LRU-evict above the cap. Active jobs of an evicted
      * session are cancelled; the engine itself stays up.
      */

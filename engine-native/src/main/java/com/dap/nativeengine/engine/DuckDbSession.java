@@ -57,7 +57,8 @@ public final class DuckDbSession implements AutoCloseable {
     private final AtomicLong tableIds = new AtomicLong();
     private final Object loadLock = new Object();
     private final ConcurrentHashMap<DuckDBConnection, Read> reads = new ConcurrentHashMap<>();
-    private final Object readsLock = new Object();
+    /** Guards {@link #reads}: openRead, endRead, close and interruptReads all take it. */
+    final Object readsLock = new Object();
     private boolean closed;
 
     /** Defaults: DuckDB's own resource settings are left untouched. */
@@ -467,8 +468,10 @@ public final class DuckDbSession implements AutoCloseable {
         for (String name : names) {
             try {
                 execute("DROP TABLE IF EXISTS " + quote(name));
-            } catch (SQLException ignored) {
-                // Best effort cleanup: the session database disappears with the session.
+            } catch (SQLException failure) {
+                // Cleanup stays best effort, but a leaked table must not disappear silently.
+                System.err.println("dap-native: cannot drop table " + name + ": "
+                        + failure.getMessage());
             }
         }
     }
@@ -500,8 +503,10 @@ public final class DuckDbSession implements AutoCloseable {
                     }
                 }
             }
-        } catch (SQLException ignored) {
-            // Best effort cleanup: the session database disappears with the session.
+        } catch (SQLException failure) {
+            // Best effort cleanup, but a leak must be visible in the engine log.
+            System.err.println("dap-native: cannot list tables of workflow " + workflowId
+                    + ": " + failure.getMessage());
             return;
         }
         dropTables(names);
@@ -568,20 +573,27 @@ public final class DuckDbSession implements AutoCloseable {
         closeQuietly(connection);
     }
 
-    /** Interrupt the in-flight /table and /profile reads of one workflow only. */
+    /**
+     * Interrupt the in-flight /table and /profile reads of one workflow only. The reads
+     * lock makes the cancel atomic with openRead: a read that was registered before this
+     * call cannot slip past the iteration and keep running.
+     */
     public void interruptReads(String workflowId) {
         if (workflowId == null) {
             return;
         }
-        for (Map.Entry<DuckDBConnection, Read> entry : reads.entrySet()) {
-            if (workflowId.equals(entry.getValue().workflowId())
-                    && reads.remove(entry.getKey()) != null) {
-                closeQuietly(entry.getKey());
+        synchronized (readsLock) {
+            for (Map.Entry<DuckDBConnection, Read> entry : reads.entrySet()) {
+                if (workflowId.equals(entry.getValue().workflowId())
+                        && reads.remove(entry.getKey()) != null) {
+                    closeQuietly(entry.getKey());
+                }
             }
         }
     }
 
-    int activeReadCount() {
+    /** In-flight /table and /profile reads; diagnostics and tests. */
+    public int activeReadCount() {
         return reads.size();
     }
 

@@ -17,6 +17,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -26,11 +27,28 @@ import java.util.concurrent.atomic.AtomicReference;
  * inputs as plans. Structural edits made after the snapshot was taken do not
  * affect the running execution.
  */
-public final class Dag {
+public final class Dag implements AutoCloseable {
+    /** Bounded shutdown: a node task that ignores interrupts must not block close(). */
+    private static final int CLOSE_TIMEOUT_SEC = 5;
+
     private final Executors executors;
+    private final ExecutorService pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
 
     public Dag(Executors executors) {
         this.executors = executors;
+    }
+
+    @Override
+    public void close() {
+        pool.shutdownNow();
+        try {
+            if (!pool.awaitTermination(CLOSE_TIMEOUT_SEC, TimeUnit.SECONDS)) {
+                pool.shutdownNow();
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            pool.shutdownNow();
+        }
     }
 
     public Map<String, LazyPlan> execute(Workflow workflow, DuckDbSession db, java.sql.Connection jobConnection)
@@ -83,74 +101,72 @@ public final class Dag {
         }
 
         Map<String, LazyPlan> results = new LinkedHashMap<>();
-        try (ExecutorService pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
-            while (!current.isEmpty()) {
-                Map<String, List<LazyPlan>> inputs = new LinkedHashMap<>();
-                for (String nodeId : current) {
-                    inputs.put(nodeId, inputPlans(nodeId, incoming.get(nodeId), results));
-                }
-                Map<String, Future<LazyPlan>> level = new LinkedHashMap<>();
-                List<Future<LazyPlan>> pending = new CopyOnWriteArrayList<>();
-                AtomicReference<Throwable> firstFailure = new AtomicReference<>();
-                for (String nodeId : current) {
-                    List<LazyPlan> nodeInputs = inputs.get(nodeId);
-                    NodeExecutor executor = resolved.get(nodeId);
-                    ObjectNode config = configs.get(nodeId);
-                    Future<?>[] self = new Future<?>[1];
-                    Future<LazyPlan> future = pool.submit((Callable<LazyPlan>) () -> {
-                        try {
-                            return executeNode(workflow, nodeId, executor, nodeInputs, config, db, jobConnection);
-                        } catch (Throwable failure) {
-                            firstFailure.compareAndSet(null, failure);
-                            for (Future<LazyPlan> sibling : pending) {
-                                if (sibling != self[0] && !sibling.isDone()) {
-                                    sibling.cancel(true);
-                                }
-                            }
-                            if (failure instanceof Exception exception) {
-                                throw exception;
-                            }
-                            throw new CompletionException(failure);
-                        }
-                    });
-                    self[0] = future;
-                    pending.add(future);
-                    level.put(nodeId, future);
-                }
-                if (firstFailure.get() != null) {
-                    cancelAll(level);
-                }
-                try {
-                    for (Map.Entry<String, Future<LazyPlan>> entry : level.entrySet()) {
-                        results.put(entry.getKey(), entry.getValue().get());
-                    }
-                } catch (InterruptedException interrupted) {
-                    cancelAll(level);
-                    closeQuietly(jobConnection);
-                    Thread.currentThread().interrupt();
-                    throw interrupted;
-                } catch (ExecutionException failed) {
-                    cancelAll(level);
-                    closeQuietly(jobConnection);
-                    rethrow(firstFailure.get() != null ? firstFailure.get() : failed.getCause());
-                    throw new IllegalStateException("unreachable");
-                } catch (CancellationException cancelled) {
-                    cancelAll(level);
-                    closeQuietly(jobConnection);
-                    Throwable failure = firstFailure.get();
-                    if (failure != null) {
-                        rethrow(failure);
-                    }
-                    Thread.currentThread().interrupt();
-                    throw new InterruptedException("node execution was cancelled");
-                }
-                for (String nodeId : current) {
-                    for (String target : outgoing.get(nodeId)) {
-                        remaining.merge(target, -1, Integer::sum);
-                    }
-                }
-                current = nextLevel(nodes, remaining, results.keySet());
+        while (!current.isEmpty()) {
+            Map<String, List<LazyPlan>> inputs = new LinkedHashMap<>();
+            for (String nodeId : current) {
+                inputs.put(nodeId, inputPlans(nodeId, incoming.get(nodeId), results));
             }
+            Map<String, Future<LazyPlan>> level = new LinkedHashMap<>();
+            List<Future<LazyPlan>> pending = new CopyOnWriteArrayList<>();
+            AtomicReference<Throwable> firstFailure = new AtomicReference<>();
+            for (String nodeId : current) {
+                List<LazyPlan> nodeInputs = inputs.get(nodeId);
+                NodeExecutor executor = resolved.get(nodeId);
+                ObjectNode config = configs.get(nodeId);
+                Future<?>[] self = new Future<?>[1];
+                Future<LazyPlan> future = pool.submit((Callable<LazyPlan>) () -> {
+                    try {
+                        return executeNode(workflow, nodeId, executor, nodeInputs, config, db, jobConnection);
+                    } catch (Throwable failure) {
+                        firstFailure.compareAndSet(null, failure);
+                        for (Future<LazyPlan> sibling : pending) {
+                            if (sibling != self[0] && !sibling.isDone()) {
+                                sibling.cancel(true);
+                            }
+                        }
+                        if (failure instanceof Exception exception) {
+                            throw exception;
+                        }
+                        throw new CompletionException(failure);
+                    }
+                });
+                self[0] = future;
+                pending.add(future);
+                level.put(nodeId, future);
+            }
+            if (firstFailure.get() != null) {
+                cancelAll(level);
+            }
+            try {
+                for (Map.Entry<String, Future<LazyPlan>> entry : level.entrySet()) {
+                    results.put(entry.getKey(), entry.getValue().get());
+                }
+            } catch (InterruptedException interrupted) {
+                cancelAll(level);
+                closeQuietly(jobConnection);
+                Thread.currentThread().interrupt();
+                throw interrupted;
+            } catch (ExecutionException failed) {
+                cancelAll(level);
+                closeQuietly(jobConnection);
+                rethrow(firstFailure.get() != null ? firstFailure.get() : failed.getCause());
+                throw new IllegalStateException("unreachable");
+            } catch (CancellationException cancelled) {
+                cancelAll(level);
+                closeQuietly(jobConnection);
+                Throwable failure = firstFailure.get();
+                if (failure != null) {
+                    rethrow(failure);
+                }
+                Thread.currentThread().interrupt();
+                throw new InterruptedException("node execution was cancelled");
+            }
+            for (String nodeId : current) {
+                for (String target : outgoing.get(nodeId)) {
+                    remaining.merge(target, -1, Integer::sum);
+                }
+            }
+            current = nextLevel(nodes, remaining, results.keySet());
         }
 
         Map<String, LazyPlan> ordered = new LinkedHashMap<>();
