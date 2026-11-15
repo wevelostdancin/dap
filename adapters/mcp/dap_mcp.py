@@ -974,6 +974,7 @@ def tool_workflow_build(args: dict):
     limit = int(args.get("limit") or 20)
     if limit < 1 or limit > 1000:
         raise DapError("'limit' должен быть от 1 до 1000", code=-32602)
+    ensure_service()
     created = call("POST", "/v1/workflows", {"name": args.get("name") or "workflow"})
     workflow = created.get("id") if isinstance(created, dict) else None
     if not workflow:
@@ -1026,6 +1027,7 @@ def tool_analyze(args: dict):
     limit = int(args.get("limit") or 20)
     if limit < 1 or limit > 1000:
         raise DapError("'limit' должен быть от 1 до 1000", code=-32602)
+    ensure_service()
     cached = None
     ingest_cached = False
     source = args.get("dataset")
@@ -1268,7 +1270,7 @@ def handle(msg: dict) -> None:
             fail(msg_id, -32602, "arguments должен быть объектом")
             return
         try:
-            if name != "dap_shutdown":
+            if name not in ("dap_shutdown", "dap_analyze", "dap_workflow_build"):
                 ensure_service()
             result = handler(args)
         except DapError as e:

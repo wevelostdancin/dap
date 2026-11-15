@@ -184,14 +184,15 @@ class AnalyzeTest(unittest.TestCase):
         self.assertEqual(error["code"], -32602)
         call.assert_not_called()
 
-    def test_analyze_rejects_ddl_before_http(self):
-        with mock.patch.object(self.module, "ensure_service"), \
+    def test_analyze_rejects_ddl_before_http_and_before_engine_start(self):
+        with mock.patch.object(self.module, "ensure_service") as ensure, \
                 mock.patch.object(self.module, "call") as call:
             error = tool_error(self.module, "dap_analyze",
                                {"file": "/data/sales.csv", "sql": "DROP TABLE src"})
         self.assertEqual(error["code"], -32602)
         self.assertEqual(error.get("data", {}).get("code"), "sql_not_allowed")
         call.assert_not_called()
+        ensure.assert_not_called()
 
     def test_analyze_deletes_the_workflow_when_run_fails(self):
         error, engine = self.run_error("dap_analyze", {"dataset": "/cache/x.parquet"},
