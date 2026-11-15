@@ -134,6 +134,7 @@
 | `dap.hypothesis_test` | Hypothesis Test | `/Statistics` | 1 |
 | `dap.linear_regression` | Linear Regression | `/Statistics` | 1 |
 | `dap.logistic_regression` | Logistic Regression | `/Statistics` | 1 |
+| `dap.cluster` | Cluster | `/Statistics` | 1 |
 | `dap.resample` | Resample | `/Time Series` | 1 |
 | `dap.rolling` | Rolling | `/Time Series` | 1 |
 | `dap.diff` | Diff | `/Time Series` | 1 |
@@ -2366,5 +2367,46 @@ Europe/Moscow); у `Date32` времени суток нет. `holidays` — с�
     "max_iterations": 100,
     "tolerance": 1e-8
   }
+}
+```
+
+
+## 57. dap.cluster
+
+Кластеризация числовых колонок: `kmeans` (k-means++, по умолчанию), `dbscan` или
+иерархическая агломеративная кластеризация (`ward`, `complete`, `average`). К входу
+добавляются Int64-колонка `cluster` (`-1` — шум DBSCAN) и Float64 `silhouette`
+(на строку; NULL для шума и когда кластеров меньше двух). Признаки по умолчанию
+стандартизуются (z-score). `kmeans` и `dbscan` реализованы в движке; иерархическая
+кластеризация держит матрицу расстояний `n × n` (O(n²) памяти, O(n³) времени) и поэтому
+ограничена 1000 строк.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `columns` | array<string> | — | обязателен; непустой; только числовые колонки |
+| `method` | `kmeans` \| `dbscan` \| `hierarchical` | `kmeans` | способ кластеризации |
+| `k` | integer | `3` | положительный; для `kmeans`/`hierarchical`; `k > n` — ошибка; для `dbscan` игнорируется |
+| `standardize` | boolean | `true` | z-score признаков перед кластеризацией; константная колонка обнуляется |
+| `seed` | integer | `42` | seed k-means++; одинаковый seed и вход дают одинаковые кластеры |
+| `max_iterations` | integer | `100` | положительный предел итераций Ллойда |
+| `eps` | number | `0.5` | положительный радиус соседства DBSCAN |
+| `min_points` | integer | `5` | положительный минимум соседей (с самой точкой) для core-точки |
+| `linkage` | `ward` \| `complete` \| `average` | `ward` | правило слияния иерархической кластеризации |
+| `max_rows` | integer | `50000` | положительный предел in-memory; больше — ошибка с подсказкой |
+
+`cluster`/`silhouette` добавляются последними; занятое имя любой из них — ошибка run.
+Строки с NULL или нефинитным значением в выбранной колонке в модель не входят и получают
+`cluster = NULL`, `silhouette = NULL`. Силуэт: `a` — среднее расстояние до своего
+кластера (без самой точки), `b` — минимум средних расстояний до других кластеров,
+`s = (b − a) / max(a, b)`; для кластера из одной точки `s = 0`. Строки читаются в
+лексикографическом порядке вектора признаков, поэтому результат не зависит от порядка
+сканирования входа. `k > n` — ошибка `k=… exceeds the … rows`; превышение `max_rows` —
+ошибка с подсказкой поднять `max_rows` или отфильтровать вход.
+
+```json
+{
+  "factory": "dap.cluster",
+  "settings": {"columns": ["sepal_length", "petal_length"], "method": "kmeans", "k": 3, "seed": 42}
 }
 ```

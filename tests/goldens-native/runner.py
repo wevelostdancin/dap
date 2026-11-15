@@ -68,8 +68,8 @@ LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "so
                  "encoder", "sample_rows", "row_aggregator", "pivot", "unpivot", "window",
                  "top_n_per_group", "concatenate",
                  "describe", "value_counts", "correlation", "histogram", "quantile",
-                 "outlier_detect", "resample", "rolling", "diff", "date_range", "excel_writer",
-                 "markdown_report", "chart", "data_quality",
+                 "outlier_detect", "cluster", "resample", "rolling", "diff", "date_range",
+                 "excel_writer", "markdown_report", "chart", "data_quality",
                  "hypothesis_test", "linear_regression",
                  "sql_query", "db_reader", "file_list"}
 CHECK_KINDS = {"table", "profile", "equivalent", "expect", "expect_profile", "file"}
