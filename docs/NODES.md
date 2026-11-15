@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 46 узлов `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (46 строк);
+Каталог нативного движка: 47 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (47 строк);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 46 узлов имеют `available: true` и `tier: core`.
+спеке. Все 47 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -1382,7 +1382,39 @@ workflow.json учётные данные нужно передать занов
 }
 ```
 
-## 48. Порядок для агента
+## 48. dap.file_list
+
+Перечисляет каталог таблицей: `path` (абсолютный нормализованный), `name`,
+`extension` (без точки; пусто у каталогов и файлов без расширения), `size`
+(байты), `modified` (UTC, `Date&Time (Timestamp)`), `is_directory`.
+Обход — Java NIO `Files.walk` без перехода по символическим ссылкам
+(`LinkOption.NOFOLLOW_LINKS`), поэтому цикл ссылок не зацикливает обход; атрибуты
+берутся из `BasicFileAttributes`. Скрытые записи (имя с точки) пропускаются, пока не
+включён `include_hidden`. Сортировка и `limit` применяются после фильтрации, поэтому
+результат детерминирован (тай-брейк — путь).
+Порты: входов нет; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `directory` | string | — | обязателен; каталог должен существовать |
+| `pattern` | string | `*` | glob по имени файла (`*.csv`), не по пути |
+| `recursive` | boolean | `false` | обходить подкаталоги; по ссылкам не ходит |
+| `include_hidden` | boolean | `false` | включить имена, начинающиеся с точки |
+| `sort` | string | `name` | `name`, `size` или `modified`; по возрастанию |
+| `limit` | integer | `1000` | максимум строк; от 1 до 1000000 |
+
+Отсутствующий каталог, путь-не-каталог, невалидный glob и нецелый `limit` — ошибка
+run. `modified` — в UTC, поэтому результат не зависит от таймзоны процесса.
+Символическая ссылка попадает в список как запись с `is_directory=false`.
+
+```json
+{
+  "factory": "dap.file_list",
+  "settings": {"directory": "/data/incoming", "pattern": "*.csv", "recursive": true}
+}
+```
+
+## 49. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.

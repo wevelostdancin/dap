@@ -60,7 +60,8 @@ class NodeRegistryTest {
             "dap.date_range",
             "dap.excel_writer",
             "dap.sql_query",
-            "dap.db_reader");
+            "dap.db_reader",
+            "dap.file_list");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -242,11 +243,11 @@ class NodeRegistryTest {
     @Test
     void categoryPrefixFindsAllIoNodes() {
         List<NodeSpec> hits = registry.search(null, "/IO", 50);
-        assertEquals(9, hits.size());
+        assertEquals(10, hits.size());
         assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Excel Reader", "Excel Writer",
-                "JSON Reader", "JSON Writer", "Parquet Reader", "Parquet Writer"),
+                "File List", "JSON Reader", "JSON Writer", "Parquet Reader", "Parquet Writer"),
                 hits.stream().map(NodeSpec::name).toList());
-        assertEquals(5, registry.search(null, "/IO/Read", 50).size());
+        assertEquals(6, registry.search(null, "/IO/Read", 50).size());
         assertEquals(4, registry.search(null, "/IO/Write", 50).size());
     }
 

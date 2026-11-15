@@ -1,0 +1,82 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "A9",
+      "title": "List the files of a directory with size and modification time",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-file-list",
+        "nodes": [
+          {
+            "id": "files",
+            "type": "file_list",
+            "config": {
+              "directory": "{DATA}/file_list",
+              "recursive": true,
+              "sort": "name",
+              "limit": 100
+            }
+          }
+        ],
+        "edges": []
+      },
+      "checks": [
+        {
+          "node": "files",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "path",
+              "type": "String"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "extension",
+              "type": "String"
+            },
+            {
+              "name": "size",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "modified",
+              "type": "Date&Time (Timestamp)"
+            },
+            {
+              "name": "is_directory",
+              "type": "Boolean"
+            }
+          ]
+        },
+        {
+          "node": "files",
+          "kind": "expect_profile",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "name",
+              "type": "String",
+              "distinct": 6
+            },
+            {
+              "name": "extension",
+              "type": "String",
+              "distinct": 3
+            },
+            {
+              "name": "is_directory",
+              "type": "Boolean",
+              "distinct": 2
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
