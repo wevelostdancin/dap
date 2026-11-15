@@ -15,7 +15,7 @@ DAP 1.0.0 — локальный аналитический движок (Java 2
 
 | # | Критерий | Как проверяется |
 |---|---|---|
-| S1 | Покрытие ≥66 из 69 задач таксономии (§6) | `make coverage`: 69 сценариев, каждый через `/v1`, PASS/FAIL |
+| S1 | Покрытие ≥67 из 69 задач таксономии (§6); 68 при доступной сети | `make coverage`: 69 сценариев, каждый через `/v1`, PASS/FAIL |
 | S2 | Подключение одной командой для Hermes и DSH | `make install-e2e`: временный HOME, install, разбор конфига клиента, `tools/list` ≥23, smoke |
 | S3 | Каждый вызов ограничен по времени и отменяем | fault-injection: timeout, cancel, рестарт движка, cross-join |
 | S4 | Обнаружимые искажения данных не молчат | тесты типизации: `""`, NULL, mixed types; ошибка с hint там, где искажение можно обнаружить |
@@ -38,7 +38,7 @@ DAP 1.0.0 — локальный аналитический движок (Java 2
 - Cold start 459 мс; idle-shutdown по `DAP_IDLE_TIMEOUT_SEC`; отмена через `DELETE /v1/jobs/{id}`.
 - 401 JUnit-тест, 15 goldens (1563/1563 ячеек), MCP e2e, lint 0 ошибок.
 - Покрытие таксономии: 47/69 (68%).
-- Расширения DuckDB: загружены `core_functions`, `icu`, `json`, `parquet`; `sqlite_scanner`, `postgres_scanner`, `mysql_scanner`, `httpfs` не установлены.
+- Расширения DuckDB: загружены `core_functions`, `icu`, `json`, `parquet`; `sqlite_scanner`, `postgres_scanner`, `httpfs` проверены — официальные подписанные сборки 1.5.6, ставятся в отдельный каталог, после установки работают офлайн; SQLite attach и HTTP-чтение по HTTPS подтверждены.
 - Дефекты: узел-призрак при невалидном `add_node`; `""` в числовой колонке делает её String или ломает ingest с явной схемой; лимит workflow отдаёт 500; `/table` до run отдаёт 400 и не отличает непрогнанный узел от упавшего; нецелый query-параметр отдаёт 500; сессии и jobs не эвиктятся; таблицы сессии не удаляются при удалении workflow; у `/table`/`/profile` нет таймаута; в `~/.dsh` нет записи DAP.
 
 ## 5. Архитектура
@@ -60,7 +60,7 @@ DAP 1.0.0 — локальный аналитический движок (Java 2
 
 Задача считается покрытой, если в `tests/coverage/` есть сценарий, который исполняется end-to-end через `/v1` и проверяет результат (строки, колонки, значения). Сценарий может использовать один узел или документированный рецепт (композицию узлов). Покрытие = PASS / 69.
 
-Офлайн-цель — **66/69**: пропуски A6 (внешняя SQL БД), A8 (HTTP/API) и F6 (прогноз) требуют сети или выходят за ядро. При доступной сети A6 и A8 реализуются как опциональные читатели и дают **68/69**.
+Расширения DuckDB `sqlite_scanner`, `postgres_scanner` и `httpfs` проверены: официальные подписанные сборки 1.5.6, установка ~2 с, кэш ~74 МБ, после установки работают офлайн. Поэтому A6 покрывается через SQLite офлайн, A7 — нативным attach; A8 (HTTP) требует сети в момент чтения. Офлайн-цель — **67/69**, при доступной сети — **68/69**; единственный гарантированный пропуск — F6 (прогноз, не-цель).
 
 ### 6.2 Таксономия (69 задач)
 
@@ -71,9 +71,9 @@ DAP 1.0.0 — локальный аналитический движок (Java 2
 | A3 | Чтение JSON/JSONL | `dap.json_reader` | ✅ |
 | A4 | Чтение Parquet | `dap.parquet_reader` | ✅ |
 | A5 | Сжатый CSV (gzip) | `dap.csv_reader.compression` | ❌ |
-| A6 | Чтение внешней SQL БД | `dap.db_reader` (сеть, опция) | ❌ |
+| A6 | Чтение внешней SQL БД | `dap.db_reader` (SQLite офлайн; Postgres/MySQL — сервер) | ❌ |
 | A7 | Чтение файла DuckDB | `dap.db_reader` (attach, офлайн) | ❌ |
-| A8 | Чтение HTTP/API | `dap.http_reader` (httpfs, сеть) | ❌ |
+| A8 | Чтение HTTP/API | рецепт `sql_query` (`read_csv_auto` через httpfs, сеть) | ❌ |
 | A9 | Список файлов каталога | `dap.file_list` | ❌ |
 | B1 | Фильтр строк | `dap.row_filter` | ✅ |
 | B2 | Выбор/переименование/порядок колонок | `column_filter`/`column_renamer`/`column_resorter` | ✅ |
@@ -140,11 +140,11 @@ DAP 1.0.0 — локальный аналитический движок (Java 2
 
 ### 6.3 Новые узлы, расширения и рецепты
 
-**Новые узлы (8):** `dap.sql_query`, `dap.db_reader` (в v1 — файлы DuckDB, read-only attach; внешние БД — опция), `dap.file_list`, `dap.hypothesis_test`, `dap.linear_regression`, `dap.markdown_report`, `dap.chart`, `dap.data_quality`.
+**Новые узлы (8):** `dap.sql_query`, `dap.db_reader` (DuckDB-файл read-only attach; SQLite офлайн через расширение; Postgres/MySQL — расширение и сервер), `dap.file_list`, `dap.hypothesis_test`, `dap.linear_regression`, `dap.markdown_report`, `dap.chart`, `dap.data_quality`.
 
 **Расширения (3):** `csv_reader.compression` (auto/none/gzip; zstd отложен — нужен zstd-jni), `joiner.how` (+full/semi/anti), `group_by.fn` (+count_distinct/median/percentile с параметром `p`).
 
-**Рецепты вместо узлов (7):** regex_extract, split_column, covariance, rollup/cube, normality, HAVING, train/test split — каждая задача выражается SQL-выражением; отдельные узлы не добавляем (YAGNI), но каждая получает coverage-сценарий и документированный рецепт.
+**Рецепты вместо узлов (8):** regex_extract, split_column, covariance, rollup/cube, normality, HAVING, train/test split, HTTP-чтение (`read_csv_auto`/`read_json_auto` через httpfs) — каждая задача выражается SQL-выражением; отдельные узлы не добавляем (YAGNI), но каждая получает coverage-сценарий и документированный рецепт.
 
 Правило репозитория сохраняется: spec + executor + ≥3 unit-теста + golden + строка в NODES.md; правка `/v1` — openapi + API.md.
 
@@ -172,7 +172,7 @@ YAML-редактор: минимальный блочный, два режим�
 Семантика новых узлов (детали config — в NODES.md при реализации):
 
 - `sql_query`: read-only SELECT/WITH по таблицам — выходам узлов workflow (id узла как имя таблицы в кавычках) и загруженным датасетам; схема — `SELECT * FROM (<sql>) LIMIT 0` + `ResultSetMetaData`; запрет DDL/DML/ATTACH/COPY/INSTALL/LOAD/PRAGMA/SET и нескольких стейтментов; лимит строк (по умолчанию 10 000, максимум 1 000 000) и таймаут; LIST/STRUCT/MAP/TIMESTAMPTZ отклоняются с именем колонки.
-- `db_reader`: `driver[duckdb]`, `path`, `table` или `query`, `read_only: true`; DuckDB-файл — нативный `ATTACH ... (READ_ONLY)`. Внешние БД (`sqlite`/`postgres`/`mysql`) — отдельная опция с расширениями DuckDB (сеть, кэш `~/.duckdb/extensions`); при отсутствии расширения — ошибка с hint.
+- `db_reader`: `driver[duckdb|sqlite|postgres|mysql]`, `path` или `url`, `table` или `query`, `read_only: true`, `user`/`password`. DuckDB-файл — нативный `ATTACH ... (READ_ONLY)`; SQLite — `ATTACH ... (TYPE SQLITE, READ_ONLY)` через расширение; Postgres/MySQL — расширение и сервер. Расширения ставятся один раз в `DAP_DUCKDB_EXTENSION_DIR` (`make extensions`), после чего работают офлайн; при отсутствии расширения — ошибка с hint. Учётные данные не попадают в `workflow.json` и логи (маскируются).
 - `file_list`: `directory`, `pattern`, `recursive`, `include_hidden`, `sort`, `limit`; Java NIO `Files.walk` + `BasicFileAttributes` (у `glob()` нет size/mtime) → path/name/extension/size/modified/is_directory.
 - `hypothesis_test`: `test[t_test_two_sample|paired|one_sample|chi_square|anova]`, `value`, `group`, `group_a/b`, `mu`, `alpha`, `alternative`; выход — statistic, df, p_value, n. В DuckDB нет `erf`/`beta`, поэтому p-value считается своей реализацией неполной беты (~100 строк, без зависимости) и сверяется с эталонными значениями.
 - `linear_regression`: коэффициенты через `regr_slope/intercept/r2/count`; стандартные ошибки и p-value — на той же математике, что и `hypothesis_test`; `mode[coefficients|predict]`.
@@ -194,6 +194,7 @@ YAML-редактор: минимальный блочный, два режим�
 8. **Рестарт движка.** `/v1/health` отдаёт `generation`; адаптер при смене generation добавляет к следующей ошибке «engine restarted; workflows lost» вместо молчаливых 404.
 9. **Гонки.** `openRead`/`interruptReads` — под одним локом (или generation-счётчик); `workflowLocks` очищается при удалении workflow; `Dag.close()` — bounded `shutdownNow()` + `awaitTermination(5s)` вместо блокирующего try-with-resources.
 10. **Тесты.** Fault-injection: отмена посреди ingest, timeout, отсутствующий файл, битый CSV, cross-join под таймаутом, 100 сессий, рестарт движка. Soak: 200 × create→run→table→delete, heap в пределах лимита, `sessionCount()==1`, jobs ≤ cap.
+11. **Расширения.** `DAP_DUCKDB_EXTENSION_DIR` (по умолчанию `$DAP_HOME/build/duckdb-ext`), `make extensions` ставит sqlite/postgres/httpfs, `doctor` показывает набор; движок задаёт `extension_directory` и не полагается на autoinstall (сеть — только при явной установке).
 
 ## 10. Подпроект 4 — Adaptability
 
@@ -219,7 +220,7 @@ YAML-редактор: минимальный блочный, два режим�
 ## 12. Приёмка
 
 - `make check` — без регрессий.
-- `make coverage` — ≥66/69 офлайн.
+- `make coverage` — ≥67/69 офлайн (68 при сети); `make extensions` — расширения установлены, `doctor` подтверждает.
 - `make install-e2e` — Hermes и DSH: install + doctor PASS.
 - `make soak` — 200 workflow × 10 сессий, heap в пределах лимита, эвикция и dropTables сработали.
 - Fault-injection зелёный; goldens 15/15 + новые.
@@ -230,7 +231,7 @@ YAML-редактор: минимальный блочный, два режим�
 | Риск | Мера |
 |---|---|
 | Патч DSH заменяет весь `servers`-map; ручные правки требуют перезапуска | install мержит только `servers.dap` и сохраняет остальные ключи; при нестандартном YAML — фрагмент + код 2; `doctor` проверяет stdio напрямую |
-| Расширения DuckDB (sqlite/postgres/httpfs) не установлены и требуют сети | v1: только файлы DuckDB (attach, офлайн); внешние БД — опция с явной ошибкой и hint; голдены офлайн |
+| Расширения DuckDB требуют сети при установке | проверено: подписанные сборки 1.5.6, ~74 МБ кэш, установка ~2 с, после — офлайн; `make extensions` + `doctor`; autoinstall выключен |
 | p-value для тестов и регрессии | своя неполная бета (~100 строк), без зависимости; сверка с эталонными значениями R/scipy |
 | sql_query read-only нельзя гарантировать через `enable_external_access=false` | subquery-обёртка + deny-list ключевых слов + лимиты; тесты на multi-statement и DDL |
 | PNG недетерминирован (AA/шрифты) | golden только для SVG; PNG — smoke-проверка «файл создан, размер > 0» |
