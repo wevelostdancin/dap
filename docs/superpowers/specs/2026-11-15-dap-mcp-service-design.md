@@ -99,7 +99,7 @@ DAP 1.0.0 — локальный аналитический движок (Java 2
 | C12 | Unpivot | `dap.unpivot` | ✅ |
 | C13 | Window (rank/lag/lead/agg) | `dap.window` | ✅ |
 | C14 | Top-N по группе | `dap.top_n_per_group` | ✅ |
-| C15 | Train/test split | `dap.split` | ❌ |
+| C15 | Train/test split | рецепт `sql_query` (`random()` + два `row_filter`) | ❌ |
 | C16 | Rollup/cube | рецепт `sql_query` | ❌ |
 | D1 | Group by (mean/sum/count/min/max) | `dap.group_by` | ✅ |
 | D2 | Count distinct | `dap.group_by` (fn) | ❌ |
@@ -144,7 +144,7 @@ DAP 1.0.0 — локальный аналитический движок (Java 2
 
 **Расширения (3):** `csv_reader.compression` (auto/none/gzip; zstd отложен — нужен zstd-jni), `joiner.how` (+full/semi/anti), `group_by.fn` (+count_distinct/median/percentile с параметром `p`).
 
-**Рецепты вместо узлов (6):** regex_extract, split_column, covariance, rollup/cube, normality, HAVING — каждая задача выражается одним SQL-выражением; отдельные узлы не добавляем (YAGNI), но каждая получает coverage-сценарий и документированный рецепт.
+**Рецепты вместо узлов (7):** regex_extract, split_column, covariance, rollup/cube, normality, HAVING, train/test split — каждая задача выражается SQL-выражением; отдельные узлы не добавляем (YAGNI), но каждая получает coverage-сценарий и документированный рецепт.
 
 Правило репозитория сохраняется: spec + executor + ≥3 unit-теста + golden + строка в NODES.md; правка `/v1` — openapi + API.md.
 
@@ -210,7 +210,7 @@ YAML-редактор: минимальный блочный, два режим�
 | 1 | `p5/connect` | CLI, install/doctor, dist, install-e2e | 0 |
 | 2 | `p5/sql-io` | sql_query, db_reader (duckdb), file_list, csv gzip, рецепты regex/split/covariance | 1 (коды/ошибки) |
 | 2 | `p5/stats` | group_by ext, joiner ext, hypothesis_test, linear_regression | 1 |
-| 2 | `p5/output` | split, markdown_report, chart, data_quality, рецепты rollup/normality/HAVING | 1 |
+| 2 | `p5/output` | markdown_report, chart, data_quality, рецепты rollup/normality/HAVING/train-test | 1 |
 | 3 | `p5/recipes` | ресурсы, prompts, инструменты рецептов, dap_sql | 1 (connect), 2 (sql_query) |
 | 4 | — | интеграция: make check, coverage, install-e2e, soak, docs, релиз 1.1.0 | 1–3 |
 
