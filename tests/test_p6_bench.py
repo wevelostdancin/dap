@@ -260,6 +260,49 @@ class ManifestTest(HarnessCase):
             self.bench.select_entries(entries, ("zzz",))
 
 
+class RegressionSettingsTest(HarnessCase):
+    def test_predictors_exclude_value_column(self):
+        settings = self.bench.regression_settings({
+            "numeric_columns": ["a", "b", "y"], "value_column": "y", "group_column": "g"})
+        self.assertEqual(settings["x"], ["a", "b"])
+        self.assertEqual(settings["y"], "y")
+        self.assertEqual(settings["group_by"], ["g"])
+        self.assertEqual(settings["mode"], "coefficients")
+
+    def test_no_value_column_means_no_regression(self):
+        self.assertIsNone(self.bench.regression_settings({"numeric_columns": ["a", "b"]}))
+
+    def test_value_column_without_predictors_means_no_regression(self):
+        self.assertIsNone(self.bench.regression_settings(
+            {"numeric_columns": ["y"], "value_column": "y"}))
+
+    def test_group_column_equal_to_value_is_not_grouped(self):
+        settings = self.bench.regression_settings({
+            "numeric_columns": ["a", "y"], "value_column": "y", "group_column": "y"})
+        self.assertNotIn("group_by", settings)
+
+
+class GroupCountsTest(HarnessCase):
+    def test_parses_string_table_values(self):
+        table = {"columns": [{"name": "grp"}, {"name": "n"}],
+                 "data": [["a", "10"], ["b", "3"]]}
+        self.assertEqual(self.bench.group_counts_from_table(table), {"a": 10, "b": 3})
+
+    def test_ignores_short_rows_and_garbage(self):
+        table = {"columns": [{"name": "grp"}, {"name": "n"}],
+                 "data": [["a"], ["b", "x"], ["c", "2"]]}
+        self.assertEqual(self.bench.group_counts_from_table(table), {"c": 2})
+
+    def test_empty_table(self):
+        self.assertEqual(self.bench.group_counts_from_table(None), {})
+
+
+class QuoteIdentifierTest(HarnessCase):
+    def test_quotes_and_escapes(self):
+        self.assertEqual(self.bench.quote_identifier("state"), '"state"')
+        self.assertEqual(self.bench.quote_identifier('we"ird'), '"we""ird"')
+
+
 class MemorySnapshotTest(HarnessCase):
     class FakeEngine:
         rss_error = "ps unavailable: boom"
