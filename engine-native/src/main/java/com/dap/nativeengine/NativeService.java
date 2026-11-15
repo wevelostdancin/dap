@@ -186,9 +186,9 @@ public final class NativeService implements AutoCloseable {
                     intEnv(env, "DAP_JOB_TIMEOUT", 600),
                     env.getOrDefault("DAP_BIND", "127.0.0.1"),
                     intEnv(env, "DAP_PORT", 7800),
-                    env.get("DAP_DUCKDB_MEMORY_LIMIT"),
+                    memoryLimit(env),
                     positiveIntEnv(env, "DAP_DUCKDB_THREADS"),
-                    env.get("DAP_DUCKDB_TEMP_DIR"),
+                    tempDirectory(env),
                     nonNegativeIntEnv(env, "DAP_IDLE_TIMEOUT_SEC", DEFAULT_IDLE_TIMEOUT_SEC),
                     nonNegativeIntEnv(env, "DAP_QUERY_TIMEOUT_SEC", DEFAULT_QUERY_TIMEOUT_SEC),
                     positiveIntEnv(env, "DAP_MAX_SESSIONS", DEFAULT_MAX_SESSIONS),
@@ -253,6 +253,34 @@ public final class NativeService implements AutoCloseable {
 
         private static String blankToNull(String value) {
             return value == null || value.isBlank() ? null : value.strip();
+        }
+
+        /** Out-of-core default: 512MB unless DAP_DUCKDB_MEMORY_LIMIT overrides it. */
+        private static String memoryLimit(Map<String, String> env) {
+            String configured = blankToNull(env.get("DAP_DUCKDB_MEMORY_LIMIT"));
+            return configured != null ? configured : "512MB";
+        }
+
+        /**
+         * Out-of-core spill directory: DAP_DUCKDB_TEMP_DIR, else $DAP_HOME/build/duckdb-tmp,
+         * else ~/.dap/tmp. The directory is created best effort; a session that still cannot
+         * use it reports the path in its own error.
+         */
+        private static String tempDirectory(Map<String, String> env) {
+            String configured = blankToNull(env.get("DAP_DUCKDB_TEMP_DIR"));
+            if (configured != null) {
+                return configured;
+            }
+            String home = blankToNull(env.get("DAP_HOME"));
+            java.nio.file.Path temp = home != null
+                    ? java.nio.file.Path.of(home, "build", "duckdb-tmp")
+                    : java.nio.file.Path.of(System.getProperty("user.home"), ".dap", "tmp");
+            try {
+                java.nio.file.Files.createDirectories(temp);
+            } catch (java.io.IOException | RuntimeException ignored) {
+                // A read-only home must not keep the engine from starting; DuckDB reports it.
+            }
+            return temp.toString();
         }
 
         /**

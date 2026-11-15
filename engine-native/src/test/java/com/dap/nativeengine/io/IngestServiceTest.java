@@ -127,6 +127,48 @@ class IngestServiceTest {
         assertTrue(failure.getMessage().contains("xml"), failure.getMessage());
     }
 
+    private static List<List<String>> rows(Path parquet) throws Exception {
+        try (DuckDbSession db = new DuckDbSession();
+             Connection connection = db.newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT * FROM read_parquet("
+                     + literal(parquet) + ") ORDER BY 1")) {
+            List<List<String>> rows = new java.util.ArrayList<>();
+            int columns = result.getMetaData().getColumnCount();
+            while (result.next()) {
+                List<String> row = new java.util.ArrayList<>(columns);
+                for (int column = 1; column <= columns; column++) {
+                    row.add(DuckDbSession.format(result.getObject(column)));
+                }
+                rows.add(row);
+            }
+            return rows;
+        }
+    }
+
+    @Test
+    void streamingCsvPathProducesTheSameTableAsTheArrowPath() throws Exception {
+        Path source = write("stream.csv", "name,age\nann,34\nbob,28\n");
+
+        IngestService.Result arrow = new IngestService(dir.resolve("cache-arrow")).ingest(source, "csv");
+        IngestService.Result streamed = new IngestService(dir.resolve("cache-stream"), 0)
+                .ingest(source, "csv");
+
+        assertFalse(arrow.cached());
+        assertFalse(streamed.cached());
+        assertEquals(2, streamed.rows());
+        assertEquals(arrow.columns(), streamed.columns());
+        assertEquals(rows(arrow.path()), rows(streamed.path()));
+    }
+
+    @Test
+    void streamingThresholdIsMeasuredInMegabytes() {
+        assertFalse(IngestService.shouldStream(64L * 1024 * 1024, 64));
+        assertTrue(IngestService.shouldStream(64L * 1024 * 1024 + 1, 64));
+        assertTrue(IngestService.shouldStream(1, 0));
+        assertFalse(IngestService.shouldStream(0, 0));
+    }
+
     @Test
     void sourceOutsideTheAllowlistIsRejected() {
         ApiException failure = assertThrows(ApiException.class,

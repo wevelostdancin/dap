@@ -99,6 +99,9 @@ public final class DuckDbSession implements AutoCloseable {
                        String extensionDirectory) throws SQLException {
         try (Statement statement = base.createStatement()) {
             statement.execute("SET TimeZone='UTC'");
+            // Out-of-core default (spec §8): scans may reorder rows, which lets DuckDB stream
+            // and spill instead of buffering the insertion order of every table.
+            statement.execute("SET preserve_insertion_order=false");
         }
         applyExtensionDirectory(extensionDirectory);
         if (threads != null) {
