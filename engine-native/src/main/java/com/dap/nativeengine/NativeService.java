@@ -3,6 +3,7 @@ package com.dap.nativeengine;
 import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.api.CatalogHandlers;
 import com.dap.nativeengine.api.DataHandlers;
+import com.dap.nativeengine.api.DatasetCatalogHandlers;
 import com.dap.nativeengine.api.DatasetHandlers;
 import com.dap.nativeengine.api.Http;
 import com.dap.nativeengine.api.JobHandlers;
@@ -13,6 +14,7 @@ import io.javalin.http.Context;
 import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Executors;
+import com.dap.nativeengine.io.DatasetCatalog;
 import com.dap.nativeengine.nodes.BinnerExecutor;
 import com.dap.nativeengine.nodes.ChartExecutor;
 import com.dap.nativeengine.nodes.ColumnResorterExecutor;
@@ -275,6 +277,7 @@ public final class NativeService implements AutoCloseable {
 
     private final Settings settings;
     private final ServiceState state;
+    private final DatasetCatalog catalog;
     private final Javalin app;
     private final CountDownLatch stopped = new CountDownLatch(1);
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -295,6 +298,13 @@ public final class NativeService implements AutoCloseable {
 
     /** Test seam: inject catalog and executors (for example a test-only node). */
     public NativeService(Settings settings, NodeRegistry registry, Executors executors) {
+        this(settings, registry, executors, new DatasetCatalog());
+    }
+
+    /** Test seam: inject the dataset catalog so tests do not touch the shared datasets.json. */
+    public NativeService(Settings settings, NodeRegistry registry, Executors executors,
+                         DatasetCatalog catalog) {
+        this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.state = new ServiceState(settings,
                 Objects.requireNonNull(registry, "registry"),
@@ -345,11 +355,12 @@ public final class NativeService implements AutoCloseable {
     }
 
     private void registerRoutes(NodeRegistry registry) {
-        CatalogHandlers catalog = new CatalogHandlers(registry);
+        CatalogHandlers nodes = new CatalogHandlers(registry);
         WorkflowHandlers workflows = new WorkflowHandlers(state);
         JobHandlers jobs = new JobHandlers(state);
         DataHandlers data = new DataHandlers(state);
         DatasetHandlers datasets = new DatasetHandlers();
+        DatasetCatalogHandlers datasetCatalog = new DatasetCatalogHandlers(catalog);
         OpsHandlers ops = new OpsHandlers(state, this::shutdownAsync);
 
         app.get("/v1", context -> Http.ok(context, meta()));
@@ -360,9 +371,9 @@ public final class NativeService implements AutoCloseable {
         });
         app.delete("/v1/sessions/{sessionId}", this::deleteSession);
 
-        app.get("/v1/nodes", catalog::list);
-        app.get("/v1/nodes/{nodeTypeId}", catalog::get);
-        app.get("/v1/nodes/{nodeTypeId}/dialog", catalog::dialog);
+        app.get("/v1/nodes", nodes::list);
+        app.get("/v1/nodes/{nodeTypeId}", nodes::get);
+        app.get("/v1/nodes/{nodeTypeId}/dialog", nodes::dialog);
 
         app.get("/v1/workflows", workflows::list);
         app.post("/v1/workflows", workflows::create);
@@ -383,6 +394,13 @@ public final class NativeService implements AutoCloseable {
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/table", data::table);
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/profile", data::profile);
         app.post("/v1/datasets", datasets::ingest);
+        app.get("/v1/catalog/datasets", datasetCatalog::list);
+        app.post("/v1/catalog/datasets", datasetCatalog::add);
+        app.get("/v1/catalog/datasets/{name}", datasetCatalog::get);
+        app.patch("/v1/catalog/datasets/{name}", datasetCatalog::update);
+        app.delete("/v1/catalog/datasets/{name}", datasetCatalog::remove);
+        app.post("/v1/catalog/datasets/{name}/refresh", datasetCatalog::refresh);
+        app.get("/v1/catalog/datasets/{name}/profile", datasetCatalog::profile);
         app.post("/v1/workflows/{workflowId}/save", ops::save);
         app.get("/v1/workflows/{workflowId}/debug", ops::debug);
         app.post("/v1/shutdown", ops::shutdown);

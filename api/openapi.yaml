@@ -43,6 +43,8 @@ tags:
     description: Open session databases, TTL and LRU limits
   - name: datasets
     description: One-time conversion of source files into the Parquet cache
+  - name: dataset-catalog
+    description: Persistent dataset catalog with versions and profile cache
 paths:
   /v1:
     get:
@@ -815,6 +817,181 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '500':
           $ref: '#/components/responses/ServerError'
+  /v1/catalog/datasets:
+    get:
+      tags: [dataset-catalog]
+      operationId: listCatalogDatasets
+      summary: List catalogued datasets
+      description: |
+        Datasets recorded in the persistent catalog (DAP_DATASETS_FILE, else
+        $DAP_HOME/build/datasets.json, else ~/.dap/build/datasets.json), sorted by
+        name. The listing is compact: history and the profile cache are omitted.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Catalog listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetList'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [dataset-catalog]
+      operationId: addCatalogDataset
+      summary: Ingest a source and record it in the catalog
+      description: |
+        Ingests a CSV/XLSX/JSON/Parquet file, or copies an already ingested Parquet
+        dataset passed as dataset, and records it under name. The cached Parquet
+        path, row/column counts and the SHA-256 content hash are stored; the first
+        version is 1. Errors: 400 invalid_dataset_name, invalid_format,
+        dataset_source_not_found, path_not_allowed; 409 dataset_exists.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatasetAddRequest'
+      responses:
+        '200':
+          description: Created catalog entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetEntryDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/catalog/datasets/{name}:
+    get:
+      tags: [dataset-catalog]
+      operationId: getCatalogDataset
+      summary: Show one catalogued dataset
+      description: |
+        The entry with its version history and the cached profile, when one was
+        computed.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Catalog entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetEntryDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [dataset-catalog]
+      operationId: updateCatalogDataset
+      summary: Merge dataset metadata
+      description: |
+        Updates description, tags and owner; omitted fields keep their value. Data
+        fields and the version are untouched.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatasetUpdateRequest'
+      responses:
+        '200':
+          description: Updated catalog entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetEntryDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [dataset-catalog]
+      operationId: removeCatalogDataset
+      summary: Delete a catalogued dataset
+      description: Removes the catalog entry; the cached Parquet file stays on disk.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetRemoveResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/catalog/datasets/{name}/refresh:
+    post:
+      tags: [dataset-catalog]
+      operationId: refreshCatalogDataset
+      summary: Re-ingest the source and bump the version
+      description: |
+        Re-ingests the recorded source, increments version and keeps the previous
+        snapshot in history (the last ten). The profile cache is reused only when
+        the content hash did not change.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Refreshed catalog entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetEntryDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/catalog/datasets/{name}/profile:
+    get:
+      tags: [dataset-catalog]
+      operationId: getCatalogDatasetProfile
+      summary: Profile of a catalogued dataset
+      description: |
+        Returns the stored profile when it was computed for the current content
+        hash, otherwise computes and caches it. cached reports which path was
+        taken; refresh=true forces a recomputation.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+        - name: refresh
+          in: query
+          required: false
+          description: Recompute the profile instead of serving the cache
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Dataset profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetProfileResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
 components:
   parameters:
     SessionHeader:
@@ -867,6 +1044,15 @@ components:
         type: string
         pattern: '^job-[0-9]+$'
       example: job-5
+    DatasetName:
+      name: name
+      in: path
+      required: true
+      description: Dataset name from the catalog
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._-]{1,64}$'
+      example: iris
   responses:
     BadRequest:
       description: Invalid request, settings, session id, or disallowed operation
@@ -1525,3 +1711,192 @@ components:
             type: object
             additionalProperties: true
       additionalProperties: true
+    DatasetAddRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          pattern: '^[A-Za-z0-9._-]{1,64}$'
+        file:
+          type: string
+          description: Source path; exactly one of file and dataset is required
+        dataset:
+          type: string
+          description: Already ingested Parquet path; implies format parquet
+        format:
+          type: string
+          enum: [csv, excel, json, parquet]
+          description: Defaults to the file extension; dataset input is always parquet
+        description:
+          type: string
+        owner:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    DatasetUpdateRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        owner:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    DatasetEntry:
+      type: object
+      required: [name, tags, source, format, path, rows, columns, version, contentHash, createdAt, updatedAt]
+      properties:
+        name:
+          type: string
+          pattern: '^[A-Za-z0-9._-]{1,64}$'
+        description:
+          type: [string, 'null']
+        owner:
+          type: [string, 'null']
+        tags:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+          description: Absolute path of the ingested source
+        format:
+          type: string
+          enum: [csv, excel, json, parquet]
+        path:
+          type: string
+          description: Absolute path of the cached Parquet file
+        rows:
+          type: integer
+        columns:
+          type: integer
+          description: Column count; the per-column schema lives in the profile
+        version:
+          type: integer
+          description: Starts at 1 and grows on every refresh
+        contentHash:
+          type: string
+          description: SHA-256 of the cached Parquet bytes; keys the profile cache
+        createdAt:
+          type: string
+          description: ISO-8601 instant
+        updatedAt:
+          type: string
+          description: ISO-8601 instant
+      additionalProperties: true
+    DatasetVersion:
+      type: object
+      required: [version, contentHash, rows, columns, path, updatedAt]
+      properties:
+        version:
+          type: integer
+        contentHash:
+          type: string
+        rows:
+          type: integer
+        columns:
+          type: integer
+        path:
+          type: string
+        updatedAt:
+          type: string
+      additionalProperties: false
+    DatasetEntryDetail:
+      allOf:
+        - $ref: '#/components/schemas/DatasetEntry'
+        - type: object
+          properties:
+            history:
+              type: array
+              description: Superseded versions, oldest first, at most ten
+              items:
+                $ref: '#/components/schemas/DatasetVersion'
+            profile:
+              $ref: '#/components/schemas/DatasetProfile'
+    DatasetList:
+      type: object
+      required: [count, datasets]
+      properties:
+        count:
+          type: integer
+        datasets:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatasetEntry'
+      additionalProperties: false
+    DatasetProfile:
+      type: object
+      required: [contentHash, rows, computedAt, columns]
+      properties:
+        contentHash:
+          type: string
+        rows:
+          type: integer
+        computedAt:
+          type: string
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatasetProfileColumn'
+      additionalProperties: false
+    DatasetProfileColumn:
+      type: object
+      required: [name, type, missing, distinct]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: Arrow type name, e.g. Int64 or Utf8
+        missing:
+          type: integer
+        distinct:
+          type: integer
+        min:
+          type: number
+          description: Numeric columns only
+        max:
+          type: number
+          description: Numeric columns only
+        mean:
+          type: number
+          description: Numeric columns only
+      additionalProperties: false
+    DatasetProfileResult:
+      type: object
+      required: [name, version, contentHash, rows, cached, computedAt, columns]
+      properties:
+        name:
+          type: string
+        version:
+          type: integer
+        contentHash:
+          type: string
+        rows:
+          type: integer
+        cached:
+          type: boolean
+          description: True when the stored profile was served without recomputation
+        computedAt:
+          type: string
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatasetProfileColumn'
+      additionalProperties: false
+    DatasetRemoveResult:
+      type: object
+      required: [ok, name]
+      properties:
+        ok:
+          type: boolean
+        name:
+          type: string
+      additionalProperties: false
