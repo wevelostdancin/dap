@@ -268,6 +268,68 @@ class SqlQueryExecutorTest {
     }
 
     @Test
+    void joinsThreeInputsByName() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            LazyPlan users = NodeTestSupport.table(db,
+                    List.of(ColumnSpec.of("id", "Int64"), ColumnSpec.of("name", "Utf8")),
+                    List.<Object[]>of(new Object[]{1L, "ann"}, new Object[]{2L, "bob"}));
+            LazyPlan orders = NodeTestSupport.table(db,
+                    List.of(ColumnSpec.of("id", "Int64"), ColumnSpec.of("user_id", "Int64"),
+                            ColumnSpec.of("amount", "Float64")),
+                    List.<Object[]>of(new Object[]{10L, 1L, 5.0}, new Object[]{11L, 2L, 7.0}));
+            LazyPlan statuses = NodeTestSupport.table(db,
+                    List.of(ColumnSpec.of("order_id", "Int64"), ColumnSpec.of("status", "Utf8")),
+                    List.<Object[]>of(new Object[]{10L, "ok"}, new Object[]{11L, "late"}));
+
+            LazyPlan plan = plan(db, connection, List.of(users, orders, statuses),
+                    config("SELECT a.name, b.amount, c.status FROM a JOIN b ON a.id = b.user_id "
+                            + "JOIN c ON b.id = c.order_id ORDER BY a.name", "a", "b", "c"));
+
+            assertEquals(List.of("name", "amount", "status"), columnNames(plan));
+            TableData data = plan.preview(10);
+            assertEquals(2, data.rows());
+            assertEquals(List.of("ann", "5.0", "ok"), data.data().get(0));
+            assertEquals(List.of("bob", "7.0", "late"), data.data().get(1));
+        }
+    }
+
+    @Test
+    void acceptsEightInputPorts() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            List<LazyPlan> inputs = new java.util.ArrayList<>();
+            List<String> aliases = new java.util.ArrayList<>();
+            for (int index = 0; index < 8; index++) {
+                inputs.add(NodeTestSupport.table(db, List.of(ColumnSpec.of("v", "Int64")),
+                        List.<Object[]>of(new Object[]{(long) index})));
+                aliases.add("t" + index);
+            }
+            String sql = "SELECT COUNT(*) AS n FROM ("
+                    + java.util.stream.IntStream.range(0, 8)
+                            .mapToObj(index -> "SELECT v FROM t" + index)
+                            .collect(java.util.stream.Collectors.joining(" UNION ALL "))
+                    + ")";
+            LazyPlan plan = plan(db, connection, inputs, config(sql, aliases.toArray(new String[0])));
+
+            assertEquals(List.of("n"), columnNames(plan));
+            assertEquals(List.of("8"), plan.preview(10).data().get(0));
+        }
+    }
+
+    @Test
+    void sqlReadingADeniedPathIsRejected() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            NodeContext context = NodeTestSupport.context(db, connection,
+                    config("SELECT * FROM read_csv('/etc/passwd')"));
+
+            ApiException failure = assertThrows(ApiException.class,
+                    () -> new SqlQueryExecutor().execute(context, List.of()));
+            assertEquals(400, failure.status(), failure.getMessage());
+            assertEquals("path_not_allowed", failure.code(), failure.getMessage());
+            assertTrue(failure.hint().contains("allowed roots"), failure.hint());
+        }
+    }
+
+    @Test
     void aliasCountMustMatchConnectedInputs() throws Exception {
         try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
             LazyPlan input = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);

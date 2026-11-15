@@ -65,6 +65,27 @@ public final class LazyPlan {
         return session.count(sql);
     }
 
+    /** One page of this plan; {@code rows} is the total count. */
+    public TableData page(int limit, int offset, long timeoutMillis, String workflowId, String nodeId)
+            throws SQLException {
+        return session.page(sql, columns, limit, offset, timeoutMillis, workflowId, nodeId);
+    }
+
+    /**
+     * One page of an already filtered/projected variant of this plan (the /table query
+     * parameters), reported with the projected columns.
+     */
+    public TableData page(String pageSql, List<ColumnSpec> pageColumns, int limit, int offset,
+                          long timeoutMillis, String workflowId, String nodeId) throws SQLException {
+        return session.page(pageSql, List.copyOf(pageColumns), limit, offset, timeoutMillis,
+                workflowId, nodeId);
+    }
+
+    /** Physical plan of this plan as DuckDB JSON (EXPLAIN FORMAT JSON, no execution). */
+    public String explainJson() throws SQLException {
+        return session.explainJson(sql);
+    }
+
     /** Wrap this plan in a subquery usable as a table expression. */
     public String asTable() {
         return "(" + stripSemicolon(sql) + ")";

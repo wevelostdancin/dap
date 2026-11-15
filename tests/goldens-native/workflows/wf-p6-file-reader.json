@@ -1,0 +1,54 @@
+{
+  "id": "wf-p6-file-reader",
+  "title": "File reader: a directory of CSV parts as one table",
+  "rationale": "Pins dap.file_reader: a directory expands to sorted parts and the union is one table.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "file_reader",
+      "config": {
+        "path": "{DATA}/multifile",
+        "format": "csv"
+      }
+    }
+  ],
+  "edges": [],
+  "checks": [
+    {
+      "node": "src",
+      "kind": "expect",
+      "rows": 4,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        }
+      ],
+      "data": [
+        [
+          1,
+          "alpha"
+        ],
+        [
+          2,
+          "beta"
+        ],
+        [
+          3,
+          "gamma"
+        ],
+        [
+          4,
+          "delta"
+        ]
+      ],
+      "order": "unordered"
+    }
+  ],
+  "notes": "data/multifile/part1.csv (1,2) and part2.csv (3,4); sorted by path."
+}

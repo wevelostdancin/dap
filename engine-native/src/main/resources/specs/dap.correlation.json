@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Pairwise correlation of two or more numeric columns in long format, one row per pair. Pearson uses the raw values, Spearman correlates ranks.",
+  "description": "Pairwise correlation of two or more numeric columns, in long format (one row per pair) or as a matrix. Methods: Pearson, Spearman (rank correlation, ties share a rank) and Kendall tau-b. Optional partial correlation on control columns via the inverse of the correlation matrix. Long output carries the sample size, the p-value (t approximation for Pearson/Spearman, normal z approximation for Kendall) and a confidence interval (Fisher's z for Pearson/Spearman, asymptotic standard error for Kendall).",
   "inPorts": [
     {
       "index": 0,
@@ -39,12 +39,40 @@
       "method": {
         "type": "string",
         "title": "Method",
-        "description": "pearson correlates raw values, spearman correlates ranks with ties sharing a rank.",
+        "description": "pearson correlates raw values, spearman correlates ranks with ties sharing a rank, kendall computes tau-b with the usual tie correction.",
         "enum": [
           "pearson",
-          "spearman"
+          "spearman",
+          "kendall"
         ],
         "default": "pearson"
+      },
+      "partial": {
+        "type": "array",
+        "title": "Control columns",
+        "description": "Optional numeric columns partialled out: correlation is computed from the inverse of the correlation matrix of the pair plus these controls.",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        }
+      },
+      "output": {
+        "type": "string",
+        "title": "Output",
+        "description": "long returns one row per pair with n, p_value and confidence interval; matrix returns one row per variable with a column per variable.",
+        "enum": [
+          "long",
+          "matrix"
+        ],
+        "default": "long"
+      },
+      "alpha": {
+        "type": "number",
+        "title": "Significance level",
+        "description": "Confidence level of the interval: 1 - alpha. Must be in (0, 1).",
+        "default": 0.05,
+        "minimum": 0,
+        "maximum": 1
       }
     },
     "required": [

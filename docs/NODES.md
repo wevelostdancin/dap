@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 52 узла `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (52 строки);
+Каталог нативного движка: 66 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (66 строк);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 52 узла имеют `available: true` и `tier: core`.
+спеке. Все 66 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -16,12 +16,13 @@
 - У всех узлов один табличный выход (порт 0). У источников нет входов; у `dap.joiner`
   два входа (0 — Left, 1 — Right), у `dap.concatenate` — два входа (0 — Top,
   1 — Bottom), у `dap.data_quality` — два входа (0 — Data, 1 — Reference; второй
-  нужен только для проверок `referential`), у остальных один вход (0).
+  нужен только для проверок `referential`), у `dap.chart_grid` — восемь входов
+  (0…7, подключаются только используемые), у остальных один вход (0).
   `dap.concatenate` требует оба входа.
 - Все преобразователи — ленивые SQL-отношения: данные читаются только в `/table`
   и `/profile`; исключения — читатели и писатели (см. ниже).
 - Писатели (`dap.csv_writer`, `dap.parquet_writer`, `dap.json_writer`,
-  `dap.excel_writer`, `dap.markdown_report`, `dap.chart`) — Sink:
+  `dap.excel_writer`, `dap.markdown_report`, `dap.chart`, `dap.chart_grid`) — Sink:
   один вход и один выход, входная таблица возвращается неизменной (pass-through),
   поэтому граф можно продолжать за писателем. Файл пишется на run (csv/parquet/json —
   на job-соединении, excel — сборкой книги в памяти); родительские каталоги создаются.
@@ -69,13 +70,15 @@
     значения; `limit` (по умолчанию 20) обрезает хвост.
   - `dap.correlation` — только пары `i < j` в порядке `columns`; `pearson` считает
     `CORR` по сырым значениям, `spearman` — по `RANK()` (равные значения делят ранг),
-    строки с NULL в любой колонке пары исключены.
+    `kendall` — tau-b; строки с NULL в любой колонке пары исключены. P6 добавил
+    `partial`, `output` long/matrix, p-value и доверительный интервал (см. §37).
   - `dap.histogram` — выдаются все бины, включая пустые (`count: 0`); последний бин
     включает максимум; константная колонка попадает целиком в первый бин.
   - `dap.quantile` — вероятности в `[0, 1]` включительно; `QUANTILE_CONT` интерполирует
     между соседними значениями, строка на каждую вероятность в порядке массива.
-  - `dap.outlier_detect` — добавляет Boolean-колонку `outlier`; NULL не бывает выбросом;
-    статистика берётся по всему входу, а не по окну.
+  - `dap.outlier_detect` — `iqr`/`zscore` добавляют Boolean-колонку `outlier`; NULL не
+    бывает выбросом; статистика берётся по всему входу, а не по окну. P6 добавил
+    `dbscan`/`lof`/`isolation_forest` с Float64-колонкой `score` (см. §40).
   - `dap.resample` — бакеты DuckDB `time_bucket`, `every` по умолчанию `1 day`; старт бакета
     заменяет колонку времени, выход упорядочен по ней.
   - `dap.rolling` — окно по строкам (`ROWS BETWEEN n-1 PRECEDING AND CURRENT ROW`),
@@ -88,56 +91,72 @@
 
 | id | Название | Категория | Входы |
 |---|---|---|---|
-| `dap.csv_reader` | CSV Reader | `/IO/Read` | — |
-| `dap.excel_reader` | Excel Reader | `/IO/Read` | — |
-| `dap.parquet_reader` | Parquet Reader | `/IO/Read` | — |
-| `dap.json_reader` | JSON Reader | `/IO/Read` | — |
-| `dap.row_filter` | Row Filter | `/Manipulation/Row/Filter` | 1 |
-| `dap.column_filter` | Column Filter | `/Manipulation/Column/Filter` | 1 |
-| `dap.column_renamer` | Column Renamer | `/Manipulation/Column` | 1 |
-| `dap.sorter` | Sorter | `/Manipulation/Row/Sort` | 1 |
-| `dap.missing_value` | Missing Value | `/Manipulation/Column/Missing` | 1 |
-| `dap.group_by` | Group By | `/Manipulation/Row/GroupBy` | 1 |
-| `dap.joiner` | Joiner | `/Manipulation/Row/Join` | 2 |
-| `dap.string_manipulation` | String Manipulation | `/Manipulation/Column/String` | 1 |
-| `dap.math_formula` | Math Formula | `/Manipulation/Column/Math` | 1 |
-| `dap.csv_writer` | CSV Writer | `/IO/Write` | 1 (pass-through) |
-| `dap.parquet_writer` | Parquet Writer | `/IO/Write` | 1 (pass-through) |
-| `dap.json_writer` | JSON Writer | `/IO/Write` | 1 (pass-through) |
-| `dap.type_cast` | Type Cast | `/Manipulation/Column/Type` | 1 |
-| `dap.duplicate_filter` | Duplicate Filter | `/Manipulation/Row` | 1 |
-| `dap.value_replace` | Value Replace | `/Manipulation/Column` | 1 |
-| `dap.column_resorter` | Column Resorter | `/Manipulation/Column` | 1 |
-| `dap.outlier_filter` | Outlier Filter | `/Manipulation/Row/Filter` | 1 |
-| `dap.date_time` | Date & Time | `/Manipulation/Column/Date` | 1 |
-| `dap.rule_engine` | Rule Engine | `/Manipulation/Column` | 1 |
-| `dap.binner` | Binner | `/Manipulation/Column` | 1 |
-| `dap.normalizer` | Normalizer | `/Manipulation/Column` | 1 |
-| `dap.encoder` | Encoder | `/Manipulation/Column` | 1 |
-| `dap.sample_rows` | Sample Rows | `/Manipulation/Row` | 1 |
-| `dap.row_aggregator` | Row Aggregator | `/Manipulation/Column` | 1 |
-| `dap.pivot` | Pivot | `/Manipulation/Column` | 1 |
-| `dap.unpivot` | Unpivot | `/Manipulation/Column` | 1 |
-| `dap.window` | Window | `/Manipulation/Column` | 1 |
-| `dap.top_n_per_group` | Top N per Group | `/Manipulation/Row` | 1 |
-| `dap.concatenate` | Concatenate | `/Manipulation/Row/Join` | 2 |
-| `dap.describe` | Describe | `/Statistics` | 1 |
-| `dap.value_counts` | Value Counts | `/Statistics` | 1 |
-| `dap.correlation` | Correlation | `/Statistics` | 1 |
-| `dap.histogram` | Histogram | `/Statistics` | 1 |
-| `dap.quantile` | Quantile | `/Statistics` | 1 |
-| `dap.outlier_detect` | Outlier Detect | `/Statistics` | 1 |
-| `dap.data_quality` | Data Quality | `/Statistics` | 2 (1 — опционален) |
-| `dap.hypothesis_test` | Hypothesis Test | `/Statistics` | 1 |
-| `dap.linear_regression` | Linear Regression | `/Statistics` | 1 |
-| `dap.resample` | Resample | `/Time Series` | 1 |
-| `dap.rolling` | Rolling | `/Time Series` | 1 |
-| `dap.diff` | Diff | `/Time Series` | 1 |
-| `dap.date_range` | Date Range | `/Time Series` | — |
-| `dap.excel_writer` | Excel Writer | `/IO/Write` | 1 (pass-through) |
-
-| `dap.markdown_report` | Markdown Report | `/IO/Write` | 1 (pass-through) |
-| `dap.chart` | Chart | `/Visualization` | 1 (pass-through) |
+| `dap.ab_test` | A/B Test | /Statistics | 1 |
+| `dap.binner` | Binner | /Manipulation/Column | 1 |
+| `dap.calendar` | Calendar | /Manipulation/Column/Date | 1 |
+| `dap.chart` | Chart | /Visualization | 1 (pass-through) |
+| `dap.chart_grid` | Chart Grid | /Visualization | 8 (pass-through) |
+| `dap.cluster` | Cluster | /Statistics | 1 |
+| `dap.column_filter` | Column Filter | /Manipulation/Column/Filter | 1 |
+| `dap.column_renamer` | Column Renamer | /Manipulation/Column | 1 |
+| `dap.column_resorter` | Column Resorter | /Manipulation/Column | 1 |
+| `dap.concatenate` | Concatenate | /Manipulation/Row/Join | 2 |
+| `dap.correlation` | Correlation | /Statistics | 1 |
+| `dap.csv_reader` | CSV Reader | /IO/Read | — |
+| `dap.csv_writer` | CSV Writer | /IO/Write | 1 (pass-through) |
+| `dap.data_quality` | Data Quality | /Statistics | 2 |
+| `dap.date_range` | Date Range | /Time Series | — |
+| `dap.date_time` | Date & Time | /Manipulation/Column/Date | 1 |
+| `dap.db_reader` | Database Reader | /IO/Read | — |
+| `dap.db_writer` | Database Writer | /IO/Write | 1 (pass-through) |
+| `dap.describe` | Describe | /Statistics | 1 |
+| `dap.diff` | Diff | /Time Series | 1 |
+| `dap.duplicate_filter` | Duplicate Filter | /Manipulation/Row | 1 |
+| `dap.encoder` | Encoder | /Manipulation/Column | 1 |
+| `dap.excel_reader` | Excel Reader | /IO/Read | — |
+| `dap.excel_writer` | Excel Writer | /IO/Write | 1 (pass-through) |
+| `dap.file_list` | File List | /IO/Read | — |
+| `dap.file_reader` | File Reader | /IO/Read | — |
+| `dap.fuzzy_join` | Fuzzy Join | /Manipulation/Row/Join | 2 |
+| `dap.geo_distance` | Geo Distance | /Manipulation/Column/Geo | 1 |
+| `dap.group_by` | Group By | /Manipulation/Row/GroupBy | 1 |
+| `dap.histogram` | Histogram | /Statistics | 1 |
+| `dap.hypothesis_test` | Hypothesis Test | /Statistics | 1 |
+| `dap.joiner` | Joiner | /Manipulation/Row/Join | 2 |
+| `dap.json_reader` | JSON Reader | /IO/Read | — |
+| `dap.json_writer` | JSON Writer | /IO/Write | 1 (pass-through) |
+| `dap.linear_regression` | Linear Regression | /Statistics | 1 |
+| `dap.logistic_regression` | Logistic Regression | /Statistics | 1 |
+| `dap.markdown_report` | Markdown Report | /IO/Write | 8 (pass-through) |
+| `dap.math_formula` | Math Formula | /Manipulation/Column/Math | 1 |
+| `dap.missing_value` | Missing Value | /Manipulation/Column/Missing | 1 |
+| `dap.normalizer` | Normalizer | /Manipulation/Column | 1 |
+| `dap.outlier_detect` | Outlier Detect | /Statistics | 1 |
+| `dap.outlier_filter` | Outlier Filter | /Manipulation/Row/Filter | 1 |
+| `dap.parquet_reader` | Parquet Reader | /IO/Read | — |
+| `dap.parquet_writer` | Parquet Writer | /IO/Write | 1 (pass-through) |
+| `dap.pca` | PCA | /Statistics | 1 |
+| `dap.pivot` | Pivot | /Manipulation/Column | 1 |
+| `dap.quantile` | Quantile | /Statistics | 1 |
+| `dap.resample` | Resample | /Time Series | 1 |
+| `dap.resample_test` | Resample Test | /Statistics | 1 |
+| `dap.rolling` | Rolling | /Time Series | 1 |
+| `dap.row_aggregator` | Row Aggregator | /Manipulation/Column | 1 |
+| `dap.row_filter` | Row Filter | /Manipulation/Row/Filter | 1 |
+| `dap.rule_engine` | Rule Engine | /Manipulation/Column | 1 |
+| `dap.sample_rows` | Sample Rows | /Manipulation/Row | 1 |
+| `dap.sorter` | Sorter | /Manipulation/Row/Sort | 1 |
+| `dap.sql_query` | SQL Query | /Manipulation/Row | 8 |
+| `dap.string_manipulation` | String Manipulation | /Manipulation/Column/String | 1 |
+| `dap.survival` | Survival | /Statistics | 1 |
+| `dap.text_normalize` | Text Normalize | /Manipulation/Column/String | 1 |
+| `dap.time_series` | Time Series | /Statistics | 1 |
+| `dap.top_n_per_group` | Top N per Group | /Manipulation/Row | 1 |
+| `dap.type_cast` | Type Cast | /Manipulation/Column/Type | 1 |
+| `dap.unpivot` | Unpivot | /Manipulation/Column | 1 |
+| `dap.value_counts` | Value Counts | /Statistics | 1 |
+| `dap.value_replace` | Value Replace | /Manipulation/Column | 1 |
+| `dap.window` | Window | /Manipulation/Column | 1 |
 
 ## 2. dap.csv_reader
 
@@ -361,18 +380,27 @@ ISO-даты и даты по `numFmtId`; ошибки ячеек становя
 
 ## 10. dap.joiner
 
-Соединяет два входа по ключам: `inner`, `left` или `right`. Ключи сопоставляются
-позиционно; `left_keys` и `right_keys` должны быть одной длины. При `merge_keys`
-ключевые колонки сливаются в одну (`COALESCE(left, right)`, чтобы right-only строка
-не теряла ключ). Колонка правого входа, имя которой уже есть в выходе, получает
-суффикс `" (Right)"`.
+Соединяет два входа по ключам: `inner`, `left`, `right`, `full`, `semi`, `anti`,
+`asof` или `cross`. Ключи сопоставляются позиционно; `left_keys` и `right_keys`
+должны быть одной длины. При `merge_keys` ключевые колонки сливаются в одну
+(`COALESCE(left, right)`, чтобы right-only строка не теряла ключ). Колонка правого
+входа, имя которой уже есть в выходе, получает суффикс `" (Right)"`.
+`semi`/`anti` возвращают только колонки левого входа.
+`asof` — `ASOF LEFT JOIN` по времени: каждой левой строке достаётся ближайшая
+правая с `right_time` ≤ `left_time` (при `asof_inequality: ">="`) или ближайшая
+следующая (`"<="`); необязательные `left_keys`/`right_keys` ограничивают
+сопоставление равенством (например, по символу инструмента). Ключи `asof` не
+сливаются. `cross` — `CROSS JOIN`: все пары строк, ключи не нужны и не читаются.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `how` | `inner` \| `left` \| `right` | `inner` | режим соединения |
-| `left_keys` | array<string> | — | обязателен, непустой |
-| `right_keys` | array<string> | — | обязателен, та же длина |
+| `how` | `inner` \| `left` \| `right` \| `full` \| `semi` \| `anti` \| `asof` \| `cross` | `inner` | режим соединения |
+| `left_keys` | array<string> | — | обязателен для key-режимов, непустой |
+| `right_keys` | array<string> | — | обязателен для key-режимов, та же длина |
 | `merge_keys` | boolean | `true` | слить ключи в одну колонку |
+| `left_time` | string | — | колонка времени левого входа для `asof` |
+| `right_time` | string | — | колонка времени правого входа для `asof` |
+| `asof_inequality` | `>=` \| `<=` | `>=` | ближайшая предыдущая или следующая строка |
 
 Ключи сравниваются SQL-равенством: NULL-ключи не совпадают ни в одном режиме.
 
@@ -1056,26 +1084,60 @@ NULL в любой выбранной колонке делает `sum`, `mean`,
 
 ## 37. dap.correlation
 
-Считает парные корреляции двух и более числовых колонок в длинном формате: одна строка
-на неупорядоченную пару `i < j` в порядке `columns`. `pearson` — `CORR` по сырым
-значениям; `spearman` — `CORR` по `RANK()` каждой колонки, причём равные значения
-делят ранг. Строки с NULL хотя бы в одной колонке пары исключены.
+Считает парные корреляции двух и более числовых колонок в длинном формате (одна строка
+на неупорядоченную пару `i < j` в порядке `columns`) или матрицей. `pearson` —
+`CORR` по сырым значениям; `spearman` — `CORR` по `RANK()` каждой колонки, причём
+равные значения делят ранг; `kendall` — tau-b с поправкой на связи (Fenwick-дерево
+по рангам, `O(n log n)`). Строки с NULL хотя бы в одной колонке пары исключены; при
+`partial` статистика считается по полным строкам всех участвующих колонок.
 Порты: вход 0 — `Data`; выход 0 — `Data`.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
 | `columns` | array<string> | — | обязателен; не менее двух различных числовых колонок |
-| `method` | `pearson` \| `spearman` | `pearson` | по умолчанию `pearson`; `pearson` — сырые значения, `spearman` — ранги |
+| `method` | `pearson` \| `spearman` \| `kendall` | `pearson` | `pearson` — сырые значения, `spearman` — ранги, `kendall` — tau-b |
+| `partial` | array<string> | — | необязательные числовые контрольные колонки; не должны пересекаться с `columns` |
+| `output` | `long` \| `matrix` | `long` | `matrix` — строка на переменную, колонка на переменную |
+| `alpha` | number | `0.05` | уровень значимости для интервала: `1 − alpha`; в `(0, 1)` |
 
-Схема выхода: `column_a`, `column_b` (`String`), `correlation` (`Number (Float)`).
-Число строк — `n·(n−1)/2`. Меньше двух колонок, дубль, неизвестная или нечисловая
-колонка и неизвестный `method` — ошибка run; на вырожденной паре (меньше двух полных
-строк или нулевой разброс) `CORR` даёт NULL.
+Схема выхода `long`: `column_a`, `column_b`, `method`, `partial` (`String`),
+`n` (`Number (Integer)`), `correlation`, `p_value`, `ci_low`, `ci_high`
+(`Number (Float)`). `partial` — контрольные колонки через запятую (NULL, если
+частичной корреляции нет). Число строк — `n·(n−1)/2`.
+
+Схема выхода `matrix`: `column` (`String`) и по одной `Number (Float)` колонке на
+каждую переменную `columns`, имя колонки — имя переменной; строк столько же, сколько
+переменных, диагональ 1, матрица симметрична. При `partial` матрица содержит частичные
+корреляции (обратная корреляционная матрица пар с контролем).
+
+Правила:
+
+- p-value: для Pearson/Spearman `t = r·sqrt(df/(1−r²))`, `df = n−2−k` (`k` —
+  число контрольных колонок), двусторонний хвост t; для Kendall
+  `z = 3τ·sqrt(n(n−1))/(2·sqrt(2n+5))`, двусторонний нормальный хвост.
+- Интервал: Fisher `atanh` с `se = 1/sqrt(n−3−k)` для Pearson/Spearman; для Kendall
+  асимптотическая `se = sqrt(2(2n+5)/(9n(n−1)))`; значения обрезаны в `[−1, 1]`.
+- `n < 3` (для Pearson/Spearman `df ≤ 0` или `n−3−k ≤ 0`) оставляет `p_value`
+  и/или `ci_low`/`ci_high` NULL; `|r| = 1` даёт `p_value = 0` и вырожденный
+  интервал.
+- Меньше двух колонок, дубль, неизвестная или нечисловая колонка, пересечение
+  `columns` и `partial`, неизвестный `method`/`output`, `alpha` вне `(0, 1)` —
+  ошибка run.
+- Kendall читает значения в память: не более 100 000 строк, иначе ошибка с подсказкой
+  использовать `spearman`.
+- На вырожденной паре (нулевой разброс) корреляция NULL; если корреляционная матрица
+  вырождена, частичная корреляция NULL.
 
 ```json
 {
   "factory": "dap.correlation",
-  "settings": {"columns": ["sepal_length", "sepal_width", "petal_length"], "method": "spearman"}
+  "settings": {
+    "columns": ["sepal_length", "sepal_width", "petal_length"],
+    "method": "spearman",
+    "partial": ["petal_width"],
+    "output": "long",
+    "alpha": 0.05
+  }
 }
 ```
 
@@ -1134,24 +1196,54 @@ NULL в любой выбранной колонке делает `sum`, `mean`,
 `outlier`; строка помечается, если хотя бы одна из перечисленных колонок вне своей
 границы. Статистика берётся по всему входу, NULL не бывает выбросом. Исходные колонки
 сохраняются.
+
+Методы `dbscan`, `lof`, `isolation_forest` считают модель в пространстве выбранных
+колонок: признаки стандартизуются (z-score по выборке, `n − 1`), строки с NULL или
+нефинитным значением из модели исключаются, а к входу добавляются `outlier` и Float64
+`score`. `dbscan` — классический DBSCAN: выброс = шумовая метка `-1`, score = 0 для
+core-точки и расстояние до k-го ближайшего соседа иначе. `lof` — локальный фактор
+выброса, выброс при `score >` квантиля `1 − contamination`. `isolation_forest` —
+100 деревьев по `min(256, n)` точкам, score — нормированная аномальность в `[0, 1]`,
+выбросы — верхняя доля `contamination`.
 Порты: вход 0 — `Data`; выход 0 — `Data`.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
 | `columns` | array<string> | — | обязателен; непустой; только числовые колонки |
-| `method` | `iqr` \| `zscore` | — | обязателен; способ границ |
-| `threshold` | number | `1.5` для `iqr`, `3` для `zscore` | положительный множитель ширины границы |
+| `method` | `iqr` \| `zscore` \| `dbscan` \| `lof` \| `isolation_forest` | — | обязателен; способ поиска выбросов |
+| `threshold` | number | `1.5` для `iqr`, `3` для `zscore` | положительный множитель ширины границы; только `iqr`/`zscore` |
+| `eps` | number | `0.5` | положительный радиус соседства DBSCAN в стандартизованном пространстве |
+| `min_points` | integer | `5` | положительный минимум соседей (с самой точкой) для core-точки |
+| `k` | integer | `5` | положительное число соседей для score DBSCAN и плотности LOF; зажимается до `n − 1` |
+| `contamination` | number | `0.05` | доля выбросов в `[0, 0.5]`; порог — квантиль `1 − contamination` |
+| `seed` | integer | `42` | seed выборки isolation forest; одинаковый seed и вход дают одинаковые score |
+| `max_rows` | integer | `50000` | положительный предел in-memory; больше — ошибка с подсказкой |
 
-`outlier` добавляется последней колонкой; если такое имя уже занято — ошибка run.
-NULL в проверяемой колонке не помечает строку (`IS NOT NULL` в условии). При нулевом
-`stddev` границы `zscore` вырождаются в среднее, и строки со значением, отличным от
-среднего, помечаются. Дубль колонки игнорируется, пустой список, нечисловая или
-неизвестная колонка, `threshold ≤ 0` — ошибка run.
+`iqr`/`zscore`: `outlier` добавляется последней колонкой; если такое имя уже занято —
+ошибка run. NULL в проверяемой колонке не помечает строку (`IS NOT NULL` в условии).
+При нулевом `stddev` границы `zscore` вырождаются в среднее, и строки со значением,
+отличным от среднего, помечаются. Дубль колонки игнорируется, пустой список, нечисловая
+или неизвестная колонка, `threshold ≤ 0` — ошибка run.
+
+`dbscan`/`lof`/`isolation_forest`: добавляются `outlier` и `score`; занятое имя любой из
+этих колонок — ошибка run. Строки с NULL или нефинитным значением в выбранной колонке в
+модель не входят и получают `outlier = false`, `score = NULL`. Строки читаются в
+лексикографическом порядке вектора признаков, поэтому результат не зависит от порядка
+сканирования входа. `contamination = 0` отключает флаги LOF и isolation forest (порог
+равен максимуму, сравнение строгое). Превышение `max_rows` — ошибка с подсказкой поднять
+`max_rows` или отфильтровать вход.
 
 ```json
 {
   "factory": "dap.outlier_detect",
   "settings": {"columns": ["sepal_length", "petal_length"], "method": "iqr", "threshold": 1.5}
+}
+```
+
+```json
+{
+  "factory": "dap.outlier_detect",
+  "settings": {"columns": ["x", "y"], "method": "dbscan", "eps": 0.5, "min_points": 3, "k": 5}
 }
 ```
 
@@ -1314,29 +1406,43 @@ Apache POI не используется: книга собирается сре
 
 ## 46. dap.markdown_report
 
-Пишет детерминированный Markdown-отчёт и возвращает входную таблицу без изменений
-(pass-through). Разделы рендерятся в порядке конфига: `table` — строки входа,
+Пишет детерминированный отчёт в формате `md` (по умолчанию), `html`, `pdf` или
+`pptx` и возвращает таблицу входа порта 0 без изменений (pass-through). У узла восемь
+входных портов; каждый раздел выбирает таблицу через `sections[].input` (0…7, по
+умолчанию 0). Разделы рендерятся в порядке конфига: `table` — строки выбранного входа,
 `profile` — статистика `dap.describe` (по колонкам), `text` — литеральный абзац,
-`metrics` — счётчики строк/колонок и агрегаты по выбранным колонкам. Файл пишется
-на run атомарно (временный файл рядом с целевым + переименование), родительские
-каталоги создаются; вывод не содержит времени и прочих недетерминированных данных.
-Порты: вход 0 — `Data`, выход 0 — `Data` (та же таблица).
+`metrics` — счётчики строк/колонок и агрегаты по выбранным колонкам, `image` —
+растровый файл, `page_break` — явный разрыв страницы. Файл пишется на run атомарно
+(временный файл рядом с целевым + переименование), родительские каталоги создаются;
+вывод не содержит времени и прочих недетерминированных данных.
+Порты: входы 0–7 — `Data 1`…`Data 8`; выход 0 — `Data` (таблица входа порта 0).
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `file` | string | — | обязателен; путь к выходному `.md` |
-| `title` | string | — | заголовок документа (`#`); пустой — без заголовка |
+| `file` | string | — | обязателен; путь к выходному файлу |
+| `format` | `md` \| `html` \| `pdf` \| `pptx` | `md` | формат отчёта |
+| `title` | string | — | заголовок документа |
+| `subtitle` | string | — | подзаголовок (html, pdf) |
+| `author` | string | — | автор (html, pdf) |
+| `toc` | boolean | `false` | оглавление по заголовкам разделов (html) |
+| `theme` | `default` \| `light` \| `dark` \| `mono` | `default` | палитра; в pdf/pptx используется акцентный цвет |
+| `page_size` | `a4` \| `letter` | — | бумага для html/pdf; по умолчанию A4 (html/pdf) или 16:9 (pptx) |
+| `orientation` | `portrait` \| `landscape` | — | ориентация; по умолчанию portrait, для pptx — landscape |
 | `sections` | array | — | обязателен, непустой; порядок = порядок вывода |
 
 Раздел (`sections[]`):
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `kind` | `table` \| `profile` \| `text` \| `metrics` | — | обязателен |
-| `title` | string | — | заголовок раздела (`##`) |
+| `kind` | `table` \| `profile` \| `text` \| `metrics` \| `image` \| `page_break` | — | обязателен |
+| `title` | string | — | заголовок раздела (`##` в md) |
+| `input` | integer | 0 | вход 0…7 для `table`/`profile`/`metrics`; порт должен быть подключён |
 | `columns` | string[] | — | для `table`/`profile` — какие колонки показывать (пусто = все); для `metrics` — какие колонки суммировать (пусто = только `rows`/`columns`) |
 | `limit` | integer | 100 (table), 1000 (profile) | 1…10000; для `table` — строк, для `profile` — строк статистики |
 | `text` | string | — | обязателен для `kind: text` |
+| `path` | string | — | обязателен для `kind: image`; PNG, JPEG или GIF |
+| `alt` | string | — | альтернативный текст (md, html) |
+| `width` | integer | — | ширина изображения в пикселях, 1…10000; в pdf/pptx масштабируется под страницу |
 
 Семантика:
 
@@ -1347,18 +1453,41 @@ Apache POI не используется: книга собирается сре
 - `metrics` — таблица `metric`/`value`: всегда `rows` и `columns`, затем для каждой
   выбранной колонки `<col>.count`, `<col>.missing` и для числовых —
   `<col>.mean`, `<col>.min`, `<col>.max`.
-- Один preview на все `table`-разделы (по максимальному `limit`), поэтому отчёт
-  читает вход один раз; ошибка конфига или пути видна на run (500).
+- `image` — файл читается один раз при разборе конфига; отсутствующий файл — ошибка run.
+- `page_break` — новая страница в pdf/html, `---` в md, в pptx пропускается.
+- Один preview на вход (по максимальному `limit` среди его `table`-разделов), поэтому
+  каждый вход читается один раз; ошибка конфига или пути видна на run (500).
+
+Форматы:
+
+- `md` — прежний Markdown: изображение рендерится как `![alt](path)`, разрыв — `---`;
+  побайтово совместим с одно-входовым отчётом прежних версий.
+- `html` — один самодостаточный файл: CSS внутри, таблицы, изображения как data URI,
+  без внешних ссылок; `toc: true` добавляет оглавление со ссылками на разделы.
+- `pdf` — минимальный writer без библиотек: A4/Letter, portrait/landscape, раскладка
+  через Java2D (заголовки, текст с переносами, таблицы с повтором шапки на новой
+  странице, изображения); PNG/JPEG декодируются в RGB и встраиваются Flate-потоком;
+  в файле нет дат и id, поэтому вывод побайтово детерминирован. Символы вне WinAnsi
+  (например кириллица) заменяются на `?`: шрифт не встраивается.
+- `pptx` — минимальный OOXML-пакет: `[Content_Types].xml`, rels, `ppt/presentation.xml`,
+  master/layout/theme и по одному слайду на раздел (`page_break` не создаёт слайд);
+  слайд — заголовок плюс текст, таблица (до 12 строк и строка «… N more rows») или
+  картинка в `ppt/media`. Zip детерминирован: фиксированные даты и порядок частей.
 
 ```json
 {
   "factory": "dap.markdown_report",
   "settings": {
-    "file": "/data/report.md",
+    "file": "/data/report.pdf",
+    "format": "pdf",
     "title": "Sales report",
+    "page_size": "a4",
+    "orientation": "landscape",
     "sections": [
-      {"kind": "table", "title": "Rows", "columns": ["id", "amount"], "limit": 50},
-      {"kind": "metrics", "title": "Totals", "columns": ["amount"]},
+      {"kind": "table", "title": "Rows", "input": 0, "columns": ["id", "amount"], "limit": 50},
+      {"kind": "metrics", "title": "Totals", "input": 0, "columns": ["amount"]},
+      {"kind": "image", "title": "Chart", "input": 1, "path": "/data/chart.png", "width": 480},
+      {"kind": "page_break"},
       {"kind": "text", "title": "Note", "text": "Generated by DAP."}
     ]
   }
@@ -1376,30 +1505,62 @@ smoke-тестом (файл существует, размеры совпада
 родительские каталоги создаются.
 Порты: вход 0 — `Data`, выход 0 — `Data` (та же таблица).
 
+Типы: `bar`, `line`, `scatter`, `histogram`, `pie`, `boxplot`, `heatmap`, `map`.
+
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
 | `file` | string | — | обязателен; путь к `.svg` или `.png` |
 | `format` | `svg` \| `png` | `svg` | SVG детерминирован |
-| `type` | `bar` \| `line` \| `scatter` \| `histogram` | — | обязателен |
-| `x` | string | — | для `bar` — категория (любой тип); для `line`/`scatter`/`histogram` — числовая колонка |
-| `y` | string[] | — | `bar` — ровно одна; `line`/`scatter` — одна или больше; `histogram` — не задаётся |
-| `series` | string | — | необязательная колонка-серия; при ней `y` — ровно одна колонка |
-| `title` | string | — | заголовок графика |
+| `type` | `bar` \| `line` \| `scatter` \| `histogram` \| `pie` \| `boxplot` \| `heatmap` \| `map` | — | обязателен |
+| `x` | string | — | категория для `bar`/`pie`/`boxplot`/`heatmap`; числовая колонка для `line`/`scatter`/`histogram`; у `map` не используется |
+| `y` | string[] | — | `bar`/`pie`/`boxplot`/`heatmap` — ровно одна; `line`/`scatter` — одна или больше; `histogram`/`map` — не задаётся |
+| `series` | string | — | колонка-серия: группы баров, цвет линий/точек или строка `heatmap`; с ней `y` — ровно одна колонка |
+| `title` | string | — | заголовок; рисуется на канве и дублируется в `<title>` |
+| `subtitle` | string | — | строка под заголовком |
+| `x_label` / `y_label` | string | — | подписи осей; `y_label` поворачивается на −90° |
+| `x_unit` / `y_unit` | string | — | единицы: подпись оси становится `label (unit)` |
+| `sort` | `value` \| `label` \| `none` | зависит от типа | порядок категорий; для `bar`/`pie`/`boxplot` по умолчанию `value` |
+| `sort_direction` | `asc` \| `desc` | `desc` для `value`, иначе `asc` | направление сортировки |
+| `log_x` / `log_y` | boolean | `false` | логарифмические оси (только положительные значения); `log_x` — для `line`/`scatter`, `log_y` — для `bar`/`line`/`scatter`/`boxplot` |
+| `grid` | boolean | `true` | горизонтальная сетка по делениям y |
+| `data_labels` | boolean | `false` | значения у баров, точек, секторов и ячеек |
+| `annotations` | array | `[]` | `{text, x?, y?, color?}`: `x`/`y` — координаты данных, `x` может быть именем категории; без координат — заметки в левом верхнем углу |
+| `facet` | string | — | колонка фасета: малые кратные в одном файле, у каждой панели свои оси |
+| `facet_columns` | integer | 2 | панелей в строке (1…12) |
+| `lat` / `lng` | string | — | только `map`: широта `[-90, 90]` и долгота `[-180, 180]` |
+| `size` / `color` / `label` | string | — | только `map`: размер и цвет пузыря, подпись точки |
 | `width` / `height` | integer | 640 / 400 | 100…4000 |
 | `limit` | integer | 1000 | 1…100000; сколько строк входа читать |
 | `bins` | integer | 10 | только `histogram`, 1…1000 |
 
 Семантика:
 
-- Строки, где `x` или `y` NULL или не число, пропускаются.
-- `bar` — значения суммируются по категории (и по значению `series`); категории
-  сортируются численно, если все значения — числа, иначе лексикографически;
-  серии — так же; при `series` бары группируются внутри категории.
+- Строки, где `x`/`y` (или `lat`/`lng`) NULL или не число, пропускаются.
+- `bar` — значения суммируются по категории (и по значению `series`); при
+  `series` бары группируются внутри категории; по умолчанию категории идут по
+  убыванию суммы. Бары начинаются от 0, сверху 5 % запаса: верхнее деление всегда
+  выше самого высокого бара.
 - `line`/`scatter` — без `series` одна серия на колонку `y` (имя — имя колонки);
-  с `series` — по серии на значение; точки сортируются по `x`.
+  с `series` — по серии на значение; точки сортируются по `x`. Оси получают 5 %
+  запаса с обеих сторон.
 - `histogram` — равные интервалы между min и max `x`; при min = max один бин.
-- Оси: y-деления «круглые» (1/2/5 × 10^n), подписи округляются до двух знаков;
-  легенда рисуется при двух и более сериях.
+- `pie` — доли одной колонки `y`; легенда и подписи показывают проценты с одним
+  знаком; отрицательные значения и нулевая сумма — ошибка.
+- `boxplot` — q1/медиана/q3, усы до 1.5×IQR и выбросы-точки; по умолчанию
+  категории сортируются по медиане.
+- `heatmap` — среднее `y` в ячейке `x` × `series`; последовательная синяя шкала и
+  легенда min/max справа.
+- `map` — equirectangular-проекция: контуры мира из ресурса
+  `viz/world-110m.json` (Natural Earth 110m, public domain, см. `viz/NOTICE.txt`)
+  и пузыри по `lat`/`lng`; `size` масштабируется в радиус (с легендой размеров),
+  `color` — палитра по категориям, `label` — подпись точки (до 40 точек).
+  Координаты вне диапазона — ошибка.
+- `facet` — данные делятся по значениям колонки (отсортированы как категории),
+  панели рисуются сеткой `facet_columns` в одном SVG/PNG; заголовок общий,
+  у каждой панели свои оси и подпись значения фасета.
+- Оси: деления «круглые» (1/2/5 × 10^n), границы расширены до целого деления,
+  поэтому верхнее деление всегда выше максимума данных; подписи округляются до
+  двух знаков; легенда рисуется при двух и более сериях.
 
 ```json
 {
@@ -1412,6 +1573,16 @@ smoke-тестом (файл существует, размеры совпада
     "y": ["amount"],
     "series": "region",
     "title": "Amount by category",
+    "subtitle": "Q3 2026",
+    "x_label": "Category",
+    "y_label": "Amount",
+    "y_unit": "EUR",
+    "sort": "value",
+    "sort_direction": "desc",
+    "data_labels": true,
+    "annotations": [{"text": "target", "x": "A", "y": 120}],
+    "facet": "region",
+    "facet_columns": 2,
     "width": 640,
     "height": 400
   }
@@ -1478,92 +1649,138 @@ smoke-тестом (файл существует, размеры совпада
 
 ## 49. dap.hypothesis_test
 
-Один статистический тест над входом: выход — ровно одна строка `test`,
-`statistic`, `df`, `p_value`, `n`. p-value считается движком
-(`engine/Distributions`, неполная бета/гамма), потому что в DuckDB нет
-`erf`/`beta`; статистика и `df` считаются SQL-агрегатами.
+Один или несколько статистических тестов над входом: строка на сравнение с полями
+`test`, `statistic`, `df`, `p_value`, `n`, `comparison`, `p_adjusted`,
+`effect_size`, `effect_size_name`, `ci_low`, `ci_high`. p-value считается
+движком (`engine/Distributions`: неполная бета/гамма и квадратура studentized
+range), потому что в DuckDB нет `erf`/`beta`; статистики параметрических тестов и
+Tukey — SQL-агрегаты, ранговые тесты считаются в Java с поправкой на связи.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `test` | `t_test_two_sample` \| `t_test_paired` \| `t_test_one_sample` \| `chi_square` \| `anova` | — | обязателен |
-| `value` | string | — | числовая колонка для t-тестов и ANOVA, категориальная для `chi_square` |
-| `group` | string | — | категориальная колонка для `t_test_two_sample`, `chi_square`, `anova` |
-| `group_a` | string | — | для `t_test_two_sample`/`chi_square` — значение `group` (сравнивается как текст); для `t_test_paired` — первая числовая колонка |
-| `group_b` | string | — | вторая группа или вторая числовая колонка (paired) |
+| `test` | `t_test_two_sample` \| `t_test_paired` \| `t_test_one_sample` \| `chi_square` \| `anova` \| `mann_whitney` \| `kruskal_wallis` \| `wilcoxon_signed_rank` \| `tukey_hsd` | — | обязателен |
+| `value` | string | — | числовая колонка для t-тестов, ANOVA, Tukey и ранговых тестов; категориальная для `chi_square` |
+| `group` | string | — | категориальная колонка для `t_test_two_sample`, `chi_square`, `anova`, `mann_whitney`, `kruskal_wallis`, `tukey_hsd` |
+| `group_a` | string | — | для `t_test_two_sample`/`mann_whitney` — значение `group` (сравнивается как текст); для `t_test_paired`/`wilcoxon_signed_rank` — первая числовая колонка |
+| `group_b` | string | — | вторая группа или вторая числовая колонка (paired/wilcoxon) |
 | `mu` | number | `0` | нулевая гипотеза для `t_test_one_sample` |
-| `alpha` | number | — | проверяется, что в `(0, 1)`; на выход не влияет |
-| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост t-тестов; `chi_square`/`anova` всегда верхний |
+| `alpha` | number | `0.05` | проверяется, что в `(0, 1)`; задаёт уровень доверия интервала эффекта |
+| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост t-тестов, `mann_whitney` и `wilcoxon_signed_rank`; `chi_square`/`anova`/`kruskal_wallis`/`tukey_hsd` всегда верхний |
+| `correction` | `none` \| `bonferroni` \| `holm` \| `bh` | `none` | поправка на множественные сравнения для `p_adjusted` по всем строкам узла |
+
+Схема выхода: `test`, `comparison`, `effect_size_name` (`String`), `n`
+(`Number (Integer)`), `statistic`, `df`, `p_value`, `p_adjusted`,
+`effect_size`, `ci_low`, `ci_high` (`Number (Float)`). `comparison` —
+`"A vs B"` для двухвыборочных/парных тестов, `"value vs group"` для
+`chi_square`, `"value ~ group"` для `anova`/`kruskal_wallis`,
+`"value vs mu"` для одновыборочного t.
 
 Правила:
 
 - `t_test_two_sample` — Welch (как `t.test` в R по умолчанию), `df` дробный; без
   `group_a`/`group_b` берутся ровно две различные группы колонки, иначе ошибка.
+  Эффект — Cohen's `d` по объединённому sd, интервал `d ± t(1−α/2, n1+n2−2)·se`.
 - `t_test_paired` — `group_a`/`group_b` задают имена двух числовых колонок; пары
-  строятся по строкам, строки с NULL в любой из них исключаются.
-- `t_test_one_sample` — `(mean(value) - mu) / (sd / sqrt(n))`, `df = n - 1`.
+  строятся по строкам, строки с NULL в любой из них исключаются; эффект —
+  `cohens_dz` (средняя разность / sd разностей).
+- `t_test_one_sample` — `(mean(value) − mu) / (sd / sqrt(n))`, `df = n − 1`,
+  эффект — Cohen's `d`.
 - `chi_square` — тест независимости по таблице сопряжённости `value` × `group`
-  (NULL-категории исключаются), `df = (r-1)(c-1)`.
-- `anova` — однофакторный: `df` — числитель `k - 1`, знаменатель `n - k`
-  восстанавливается из `n` и числа групп; `n` — число строк.
-- `n` — число использованных наблюдений (сумма по группам).
-- Меньше двух наблюдений в выборке, меньше двух групп/категорий, ноль строк —
-  ошибка конфигурации; при нулевой дисперсии `statistic` и `p_value` — NULL,
-  `df` и `n` заполнены.
+  (NULL-категории исключаются), `df = (r−1)(c−1)`, эффект — Cramér's `V`.
+- `anova` — однофакторный: `df` — числитель `k − 1`, знаменатель `n − k`;
+  эффект — eta squared; интервала нет.
+- `mann_whitney` — U по рангам (средние ранги для связей), нормальная
+  аппроксимация с поправкой на связи и continuity; `statistic` — U первой группы,
+  `df` NULL, эффект — rank-biserial `2U/(n1·n2) − 1`.
+- `kruskal_wallis` — H с поправкой на связи, `df = k − 1`, p по χ²; эффект —
+  epsilon squared `H/(N−1)`.
+- `wilcoxon_signed_rank` — `group_a − group_b`, нулевые разности отбрасываются,
+  `statistic` — W+, `df` NULL, нормальная аппроксимация с поправкой на связи;
+  эффект — matched-pairs rank-biserial.
+- `tukey_hsd` — строка на пару групп (в порядке имён групп), `statistic` — q
+  studentized range (`Tukey-Kramer`: `se = sqrt(MSE/2·(1/n_i + 1/n_j))`),
+  `p_value` — `1 − studentizedRangeCdf(q, k, N−k)` (уже учитывает множественность),
+  `p_adjusted` — дополнительно поправленный p; эффект — Cohen's `d` по
+  `sqrt(MSE)`, интервал через `t(1−α/2, N−k)`.
+- `n` — число использованных наблюдений (сумма по группам; для Wilcoxon — число
+  ненулевых пар).
+- Меньше двух наблюдений в выборке/группе, меньше двух групп/категорий, ноль строк —
+  ошибка конфигурации; при нулевой дисперсии/нулевом MSE `statistic`, `p_value`,
+  `effect_size` и интервал — NULL, `df` и `n` заполнены.
+- Ранговые тесты и Tukey читают значения в память: не более 100 000 строк, иначе
+  ошибка с подсказкой.
+- Поправки: `bonferroni` — `p·m`; `holm` — step-down с монотонностью;
+  `bh` — Benjamini-Hochberg step-up с монотонностью. Для одной строки
+  `p_adjusted = p_value`.
 
 ```json
 {
   "factory": "dap.hypothesis_test",
   "settings": {
-    "test": "t_test_two_sample",
+    "test": "tukey_hsd",
     "value": "sepal_length",
     "group": "species",
-    "group_a": "setosa",
-    "group_b": "versicolor"
+    "correction": "bh"
   }
 }
 ```
 
 ## 50. dap.linear_regression
 
-Парная линейная регрессия одной числовой колонки на ровно один числовой
-предиктор, при необходимости — отдельно по группам. В режиме `coefficients` —
-одна строка на терм (`intercept` и колонка `x`), в режиме `predict` — все
-входные строки плюс `prediction` и `residual`.
+Линейная регрессия одной числовой колонки на один или несколько числовых
+предикторов, при необходимости — отдельно по группам. В режиме `coefficients` —
+строка на терм (`intercept` и каждый предиктор), в режиме `diagnostics` — строка
+на подгонку, в режиме `predict` — все входные строки плюс предсказание, остаток и
+интервал предсказания.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `x` | array<string> | — | обязателен; ровно одна числовая колонка |
+| `x` | array<string> | — | обязателен; одна или несколько различных числовых колонок |
 | `y` | string | — | обязателен; числовая колонка отклика |
 | `group_by` | array<string> | — | необязательные колонки группировки: своя регрессия на группу |
-| `mode` | `coefficients` \| `predict` | `coefficients` | — |
-| `intercept` | boolean | `true` | `false` — модель `y = slope * x` без свободного члена |
+| `mode` | `coefficients` \| `predict` \| `diagnostics` | `coefficients` | — |
+| `intercept` | boolean | `true` | `false` — модель без свободного члена |
+| `robust` | `none` \| `hc1` | `none` | `hc1` — гетероскедастичность-устойчивая ковариация `(X'X)⁻¹·meat·(X'X)⁻¹·n/(n−p)` |
+| `alpha` | number | `0.05` | уровень значимости интервалов: `1 − alpha`; в `(0, 1)` |
 | `output` | string | `prediction` | имя колонки предсказания в режиме `predict` |
 
 Выход `coefficients`: `[group_by…]`, `term`, `coefficient`, `std_error`,
-`t_statistic`, `p_value`, `r2`, `n`. Коэффициенты — из `regr_slope`,
-`regr_intercept`, `regr_r2`, `regr_count`; стандартные ошибки и p-value — из
-`engine/Distributions` (`t` с `df = n - 2`, для модели без свободного члена
-`df = n - 1` и несцентрированный `r2 = 1 - SSE / sum(y^2)`).
+`t_statistic`, `p_value`, `r2`, `n`, `adj_r2`, `f_statistic`, `f_p_value`,
+`rmse`, `df_residual`, `vif`, `ci_low`, `ci_high`. Подгонка — обычный МНК по
+`X'X` и его обратной матрице; стандартные ошибки — классические или HC1, p-value
+из `engine/Distributions` (`t` с `df_residual = n − p`), интервал
+`coefficient ± t(1−α/2, df)·se`. `vif` — `1/(1−R²_j)` регрессии предиктора на
+остальные (только при `intercept`); у `intercept` — NULL.
 
-Выход `predict`: входные колонки, затем `output` и `residual`
-(`y - prediction`); при `group_by` коэффициенты считаются оконными агрегатами
-по каждой группе. `prediction` NULL, если NULL предиктор; `residual` NULL, если
-NULL отклик.
+Выход `diagnostics`: `[group_by…]`, `n`, `df_residual`, `r2`, `adj_r2`,
+`f_statistic`, `f_p_value`, `rmse`, `durbin_watson`, `aic`, `bic`.
+`f_statistic` — общий F модели (`df1 = p`, `df2 = n − p`), `rmse` — корень из
+`MSE`, `aic = n·ln(SSE/n) + 2p`, `bic = n·ln(SSE/n) + ln(n)·p`.
 
-Правила: строки с NULL в `x` или `y` исключаются из подгонки; меньше двух таких
-строк — ошибка; константный `x` даёт NULL-коэффициенты и NULL-`r2`; идеальная
-подгонка (`std_error = 0`) даёт NULL `t_statistic`/`p_value`; `r2` для модели
-без свободного члена может быть отрицательным. Режим `predict` ленивый (оконные
-агрегаты в SQL), `coefficients` считает подгонку на run.
+Выход `predict`: входные колонки, затем `output`, `residual` (`y − prediction`),
+`prediction_lower` и `prediction_upper` — интервал предсказания для нового
+наблюдения: `prediction ± t(1−α/2, df)·sqrt(MSE + x₀'·Cov(β)·x₀)`. При
+`group_by` коэффициенты подставляются через литеральную таблицу, соединённую по
+колонкам группировки (`IS NOT DISTINCT FROM`), поэтому порядок входных строк
+сохраняется. `prediction` и интервалы NULL, если NULL предиктор.
+
+Правила: строки с NULL в `x` или `y` исключаются из подгонки; `n ≤ p`
+(включая свободный член) — ошибка с подсказкой; вырожденная (сингулярная) матрица
+`X'X` — NULL-коэффициенты и NULL-статистики, `n` и `df_residual` заполнены;
+идеальная подгонка (`std_error = 0`) даёт NULL `t_statistic`/`p_value`; `r2`
+для модели без свободного члена считается по несцентрированному SST и может быть
+отрицательным. Категориальные предикторы не поддерживаются — сначала `dap.encoder`.
+Подгонка читает значения в память: не более 100 000 строк.
 
 ```json
 {
   "factory": "dap.linear_regression",
   "settings": {
-    "x": ["petal_length"],
+    "x": ["petal_length", "petal_width"],
     "y": "sepal_length",
     "group_by": ["species"],
-    "mode": "coefficients"
+    "mode": "coefficients",
+    "robust": "hc1"
   }
 }
 ```
@@ -1579,7 +1796,10 @@ NULL отклик.
 Схема выхода определяется запросом через `SELECT * FROM (<sql>) LIMIT 0` +
 `ResultSetMetaData`; `LIST`, `STRUCT`, `MAP` и `TIMESTAMPTZ` отклоняются с именем
 колонки — у движка нет для них Arrow-представления.
-Порты: входы 0 — `Data`, 1 — `Data 2`; выход 0 — `Data`.
+Порты: входы 0–7 — `Data` … `Data 8` (до восьми таблиц); выход 0 — `Data`.
+Литералы путей в запросе (`read_parquet(...)`, `read_csv(...)`, `FROM '<path>'`)
+проверяются allowlist-ом путей: файл вне разрешённых корней — 400 `path_not_allowed`;
+URL `http(s)://`/`s3://` разрешены.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
@@ -1848,3 +2068,582 @@ coverage-сценарий в `tests/coverage/` и проверяется чер�
 6. `POST /v1/workflows/{id}/run` (или `/jobs`) → `GET .../table`, `.../profile`.
 
 Примеры выше — тело запроса `POST /v1/workflows/{id}/nodes`.
+
+## 56. dap.chart_grid
+
+Рисует от 1 до 8 графиков в один файл — сетку панелей — и возвращает вход порта 0
+без изменений (pass-through). Каждая панель читает свой вход и принимает те же
+настройки, что `dap.chart` (кроме `file`/`format`/`width`/`height`: размер
+панели задаёт сетка). `format: svg` — один детерминированный SVG; `format: png` —
+Java2D; `format: html` — самодостаточная страница с `<h1>`, одним inline `<svg>` на
+панель и без внешних ресурсов. Файл пишется атомарно, родительские каталоги
+создаются.
+Порты: входы 0…7 — `Data 1`…`Data 8` (подключаются только используемые), выход 0 —
+`Data` (таблица входа 0).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `file` | string | — | обязателен; путь к `.svg`, `.png` или `.html` |
+| `format` | `svg` \| `png` \| `html` | `svg` | `html` — один `<svg>` на панель |
+| `title` | string | — | общий заголовок сетки |
+| `columns` | integer | 2 | панелей в строке, 1…8 |
+| `width` / `height` | integer | 1200 / 800 | 100…4000; панель получает width/columns и (height − заголовок)/строк |
+| `charts` | array | — | обязателен, 1…8 объектов |
+| `charts[].input` | integer | 0 | номер входного порта 0…7 |
+| `charts[].type` | string | — | обязателен; те же типы, что у `dap.chart` |
+| `charts[].x`, `.y`, `.series`, `.title`, … | — | — | остальные ключи — как у `dap.chart` |
+
+Семантика:
+
+- `input` указывает на подключённый порт: неподключённый порт — ошибка.
+- Панели заполняются слева направо и сверху вниз; общий заголовок рисуется один раз.
+- SVG детерминирован; PNG и HTML проверяются smoke-тестами (размеры, число `<svg>`).
+
+```json
+{
+  "factory": "dap.chart_grid",
+  "settings": {
+    "file": "/data/dashboard.svg",
+    "format": "svg",
+    "title": "Sales dashboard",
+    "columns": 2,
+    "width": 1200,
+    "height": 800,
+    "charts": [
+      {"input": 0, "type": "bar", "x": "category", "y": ["amount"], "title": "Amount"},
+      {"input": 1, "type": "line", "x": "day", "y": ["amount"], "title": "Trend"},
+      {"input": 2, "type": "pie", "x": "region", "y": ["amount"], "title": "Share"}
+    ]
+  }
+}
+```
+## 57. dap.file_reader
+
+Читает много файлов как одну таблицу: список файлов (`paths`), glob или каталог
+(`path`). Форматы — `csv`, `parquet`, `json` (JSON-массив или newline-delimited).
+Файлы раскрываются в движке: glob — `Files.walk` + `PathMatcher`, каталог —
+`Files.walk` на глубину 1 или без ограничения при `recursive`; результат
+сортируется по пути, ограничен 10 000 файлов, каждый файл проходит allowlist путей
+(вне разрешённых корней — 400 `path_not_allowed`). Чтение всегда потоковое:
+DuckDB получает список файлов и читает их `read_csv`/`read_parquet`/
+`read_json_auto`, в heap ничего не загружается.
+ORC и Avro не поддерживаются (в DuckDB 1.5.6 нет ORC-расширения для darwin/arm64,
+Avro нет в ядре) — ошибка с подсказкой конвертировать в parquet/csv.
+Порты: входов нет; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `path` | string | — | файл, каталог или glob; ровно один из `path`/`paths` |
+| `paths` | array<string> | — | несколько файлов/каталогов/glob; ровно один из `path`/`paths` |
+| `format` | `csv` \| `parquet` \| `json` | — | обязателен |
+| `recursive` | boolean | `false` | обходить каталог рекурсивно |
+| `union_by_name` | boolean | `false` | объединять разные схемы по именам колонок |
+| `filename` | boolean | `false` | добавить колонку `filename` (Utf8) с путём файла |
+| `delimiter` | string | `,` | CSV-разделитель, один символ (`\t` — табуляция) |
+| `header` | boolean | `true` | первая строка CSV — заголовок |
+| `quote` | string | — | CSV-quote, один символ |
+| `escape` | string | — | CSV-escape, один символ |
+| `nullstr` | string | — | текст, читаемый как NULL |
+| `ignore_errors` | boolean | `false` | пропускать битые CSV-строки |
+
+Пустой набор файлов — ошибка с перечнем путей; неизвестный формат — ошибка со
+списком `csv`, `parquet`, `json`.
+
+```json
+{
+  "factory": "dap.file_reader",
+  "settings": {
+    "path": "/data/events/*.parquet",
+    "format": "parquet",
+    "recursive": true,
+    "union_by_name": true,
+    "filename": true
+  }
+}
+```
+
+## 58. dap.db_writer
+
+Пишет входную таблицу в DuckDB-файл, SQLite-файл или PostgreSQL/MySQL и возвращает
+вход без изменений (pass-through), поэтому узел можно ставить в середину графа.
+Цель подключается как DuckDB-база (`ATTACH ... (TYPE DUCKDB|SQLITE|POSTGRES|MYSQL)`),
+таблица создаётся (`create`), пересоздаётся (`replace`) или дополняется
+(`append`), затем `DETACH`. Локальный путь проверяется allowlist-ом
+(`checkWrite`, вне корней — 400 `path_not_allowed`); пароль в DSN маскируется в
+ошибках. Для sqlite/postgres/mysql нужно расширение DuckDB (`make extensions`),
+иначе — 500 `extension_missing` с hint.
+Порты: вход 0 — `Data`; выход 0 — `Data` (тот же вход).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `driver` | `duckdb` \| `sqlite` \| `postgres` \| `mysql` | — | обязателен |
+| `connection` | string | — | путь к файлу для duckdb/sqlite или DSN для postgres/mysql |
+| `table` | string | — | обязательна; `schema.table` допустим |
+| `mode` | `create` \| `replace` \| `append` | `create` | `create` падает, если таблица уже есть |
+
+```json
+{
+  "factory": "dap.db_writer",
+  "settings": {
+    "driver": "duckdb",
+    "connection": "/data/analytics.duckdb",
+    "table": "analytics.events",
+    "mode": "replace"
+  }
+}
+```
+
+## 59. dap.text_normalize
+
+Нормализует текстовые колонки и сохраняет исходные рядом с нормализованными
+(`suffix`, по умолчанию `_normalized`) либо заменяет их (`replace: true`).
+Поддержаны Unicode-формы NFC/NFD/NFKC/NFKD, снятие диакритики, регистр, удаление
+пунктуации, схлопывание пробелов и trim. DuckDB 1.5.6 умеет только
+`nfc_normalize`, поэтому NFC, регистр, пунктуация, пробелы и trim считаются SQL-ом,
+а NFD/NFKD/NFKC и снятие диакритики — в Java по **уникальным значениям** выбранных
+колонок (не более 100 000 уникальных; выше — ошибка с подсказкой отфильтровать
+таблицу), после чего отображение джойнится обратно в SQL: число строк в heap не
+попадает. Колонки должны быть `Utf8`.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `columns` | array<string> | — | обязателен, непустой; только `Utf8` |
+| `mode` | `none` \| `nfc` \| `nfd` \| `nfkc` \| `nfkd` | `none` | форма нормализации Unicode |
+| `case` | `none` \| `lower` \| `upper` | `none` | регистр |
+| `strip_accents` | boolean | `false` | снять диакритику (Café → Cafe) |
+| `collapse_whitespace` | boolean | `false` | серии пробелов → один пробел |
+| `trim` | boolean | `false` | обрезать пробелы по краям |
+| `remove_punctuation` | boolean | `false` | удалить Unicode-пунктуацию |
+| `suffix` | string | `_normalized` | суффикс новой колонки (когда `replace: false`) |
+| `replace` | boolean | `false` | заменить значения исходных колонок |
+
+```json
+{
+  "factory": "dap.text_normalize",
+  "settings": {
+    "columns": ["company"],
+    "mode": "nfkc",
+    "strip_accents": true,
+    "case": "lower",
+    "collapse_whitespace": true,
+    "trim": true
+  }
+}
+```
+
+## 60. dap.fuzzy_join
+
+Соединяет две таблицы по похожим текстовым ключам. Похожесть считает DuckDB:
+`jaro_winkler_similarity`, `levenshtein` или `damerau_levenshtein` (для
+расстояний — нормировка `1 - dist / max(length(l), length(r))`). Пары ниже
+`threshold` отбрасываются, на каждую левую строку остаётся до `max_matches`
+лучших правых (`row_number() OVER (PARTITION BY left_row ORDER BY similarity DESC)`);
+`how: left` сохраняет левые строки без пары (NULL в similarity и правых колонках).
+В выходе — все колонки обеих сторон плюс `similarity` (Float64); правая колонка с
+совпадающим именем получает `suffix`. Оба входа материализуются как CTE с
+синтетическим row id (`MATERIALIZED`), чтобы id были стабильны.
+Порты: вход 0 — `Left`, 1 — `Right`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `left_key` | string | — | обязателен; `Utf8`-колонка левого входа |
+| `right_key` | string | — | обязателен; `Utf8`-колонка правого входа |
+| `method` | `jaro_winkler` \| `levenshtein` \| `damerau` | `jaro_winkler` | мера похожести |
+| `threshold` | number | `0.8` | минимум похожести, 0..1 |
+| `how` | `inner` \| `left` | `inner` | сохранять ли левые строки без пары |
+| `max_matches` | integer | `1` | сколько правых строк может получить левая |
+| `suffix` | string | `" (Right)"` | суффикс совпадающей правой колонки |
+
+```json
+{
+  "factory": "dap.fuzzy_join",
+  "settings": {
+    "left_key": "name",
+    "right_key": "legal_name",
+    "method": "jaro_winkler",
+    "threshold": 0.9,
+    "how": "left",
+    "max_matches": 1
+  }
+}
+```
+
+## 61. dap.geo_distance
+
+Добавляет haversine-расстояние между двумя парами координат (широта/долгота в
+десятичных градусах). Считается SQL-ом, средний радиус Земли 6371.0088 км; `unit`
+`km` или `mi`. Нужны обе пары координат; колонки должны быть числовыми.
+Исходные колонки сохраняются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `lat` | string | — | обязателен; широта первой точки |
+| `lng` | string | — | обязателен; долгота первой точки |
+| `lat2` | string | — | обязателен; широта второй точки |
+| `lng2` | string | — | обязателен; долгота второй точки |
+| `unit` | `km` \| `mi` | `km` | единица расстояния |
+| `output` | string | `distance` | имя колонки с расстоянием |
+
+Париж (48.8566, 2.3522) — Лондон (51.5074, −0.1278) даёт ≈ 343.5 км.
+
+```json
+{
+  "factory": "dap.geo_distance",
+  "settings": {
+    "lat": "store_lat", "lng": "store_lng",
+    "lat2": "client_lat", "lng2": "client_lng",
+    "unit": "km", "output": "km_apart"
+  }
+}
+```
+
+## 62. dap.calendar
+
+Добавляет календарные признаки даты/времени с учётом таймзоны: `year`, `quarter`,
+`month`, `week` (ISO), `day` (день месяца), `dow` (0 = воскресенье), `doy`,
+`is_weekend`, `is_holiday`. Колонка `Timestamp` трактуется как UTC и переводится
+в `timezone` до взятия частей даты (2024-01-01 22:00 UTC — это уже 2024-01-02 в
+Europe/Moscow); у `Date32` времени суток нет. `holidays` — список дат ISO
+(`yyyy-MM-dd`), `holiday_column` — имя флага. Исходные колонки сохраняются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `column` | string | — | обязателен; `Date32` или `Timestamp` |
+| `timezone` | string | — | IANA-таймзона (Europe/Moscow); для Timestamp — перевод из UTC |
+| `features` | array<string> | все, кроме `is_holiday` | какие признаки добавить |
+| `holidays` | array<string> | `[]` | даты-праздники ISO; включает `is_holiday` по умолчанию |
+| `holiday_column` | string | `<column>_is_holiday` | имя флага праздника |
+
+Неизвестная таймзона, неверная дата в `holidays`, `is_holiday` без `holidays` и
+неизвестный признак — ошибка с сообщением. 2024-01-01 — понедельник
+(`dow = 1`), `is_weekend = false`; 2024-01-06 — суббота, `is_weekend = true`.
+
+```json
+{
+  "factory": "dap.calendar",
+  "settings": {
+    "column": "created_at",
+    "timezone": "Europe/Moscow",
+    "features": ["year", "month", "dow", "is_weekend", "is_holiday"],
+    "holidays": ["2024-01-01", "2024-05-09"],
+    "holiday_column": "is_holiday"
+  }
+}
+```
+
+## 63. dap.logistic_regression
+
+Бинарная логистическая регрессия: отклик `y` — 0/1 (числовой) или boolean, предикторы
+`x` — одна или несколько числовых колонок. Подгонка — IRLS (Newton-Raphson) по
+`X'WX`; режим `coefficients` возвращает строку на терм (`intercept` и каждый
+предиктор), режим `predict` — все входные строки плюс вероятность и класс.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `x` | array<string> | — | обязателен; одна или несколько различных числовых колонок |
+| `y` | string | — | обязателен; бинарная колонка 0/1 или boolean, должны быть оба класса |
+| `mode` | `coefficients` \| `predict` | `coefficients` | — |
+| `robust` | `none` \| `hc1` | `none` | `hc1` — сэндвич-оценка `(X'WX)⁻¹·[Σ(y−p)²xx']·(X'WX)⁻¹·n/(n−p)` |
+| `max_iterations` | integer | `50` | положительное; предел итераций Ньютона |
+| `tolerance` | number | `1e-8` | положительное; остановка по максимальному изменению коэффициента |
+| `l2` | number | `0` | необязательный ridge-штраф на диагональ `X'WX` для не-свободных термов |
+| `alpha` | number | `0.05` | уровень значимости интервала лог-шансов: `1 − alpha` |
+| `output` | string | `probability` | имя колонки вероятности в режиме `predict` |
+
+Выход `coefficients`: `term`, `coefficient` (лог-шансы), `std_error`,
+`z_statistic`, `p_value` (Wald, нормальный хвост), `ci_low`, `ci_high`
+(интервал лог-шансов `coefficient ± z(1−α/2)·se`), `odds_ratio` (`exp(coefficient)`),
+`n`, `pseudo_r2` (McFadden: `1 − LL/LL₀`), `auc` (ранговая, Манн-Уитни по
+вероятностям), `iterations`, `converged`.
+
+Выход `predict`: входные колонки, затем `output` (`Number (Float)` — сигмоида
+линейного предиктора) и `prediction` (`Number (Integer)` — 1 при вероятности
+`≥ 0.5`, иначе 0). `probability` и `prediction` NULL, если NULL предиктор.
+
+Правила: строки с NULL в `x` или `y` исключаются; `y` вне `{0, 1}` — ошибка
+`binary`; один класс в `y` — ошибка (нужны оба); `n ≤ p` (включая свободный
+член) — ошибка с подсказкой; при идеальном разделении без `l2` итерации Ньютона
+могут не сойтись — `converged = false`, `l2 > 0` даёт конечное решение; сингулярная
+матрица `X'WX` оставляет коэффициенты NULL, `n` и `iterations` заполнены.
+Подгонка читает значения в память: не более 100 000 строк.
+
+```json
+{
+  "factory": "dap.logistic_regression",
+  "settings": {
+    "x": ["sepal_length", "sepal_width"],
+    "y": "is_big",
+    "robust": "hc1",
+    "max_iterations": 100,
+    "tolerance": 1e-8
+  }
+}
+```
+
+
+## 64. dap.cluster
+
+Кластеризация числовых колонок: `kmeans` (k-means++, по умолчанию), `dbscan` или
+иерархическая агломеративная кластеризация (`ward`, `complete`, `average`). К входу
+добавляются Int64-колонка `cluster` (`-1` — шум DBSCAN) и Float64 `silhouette`
+(на строку; NULL для шума и когда кластеров меньше двух). Признаки по умолчанию
+стандартизуются (z-score). `kmeans` и `dbscan` реализованы в движке; иерархическая
+кластеризация держит матрицу расстояний `n × n` (O(n²) памяти, O(n³) времени) и поэтому
+ограничена 1000 строк.
+## 65. dap.resample_test
+
+Bootstrap-доверительные интервалы и перестановочный тест на две группы; считаются в
+Java по строкам входа (не более `max_rows`), результат — литеральный план, как у
+остальных in-memory статистик. В режиме `bootstrap` наблюдения пересэмплируются с
+возвращением, выдаётся одна строка: `statistic`, `estimate`, `se` (стандартное
+отклонение пересэмплированных статистик), `ci_low`/`ci_high` (перцентильный
+интервал уровня `confidence`), `bias` (среднее пересэмплированных минус estimate),
+`n`, `resamples`. Статистики: `mean`, `median`, `sd` (выборочное, n−1),
+`correlation` (Пирсон, две колонки), `slope` (МНК-наклон второй колонки по первой).
+В режиме `permutation` метки `group` переставляются между двумя уровнями `value`,
+выдаётся одна строка: `statistic`, `observed` (разность средних или медиан: первая
+группа в лексикографическом порядке минус вторая), `p_value` (оценка «+1»:
+`(extreme + 1) / (permutations + 1)`, поэтому p никогда не 0), `n`, `permutations`.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `columns` | array<string> | — | обязателен; непустой; только числовые колонки |
+| `method` | `kmeans` \| `dbscan` \| `hierarchical` | `kmeans` | способ кластеризации |
+| `k` | integer | `3` | положительный; для `kmeans`/`hierarchical`; `k > n` — ошибка; для `dbscan` игнорируется |
+| `standardize` | boolean | `true` | z-score признаков перед кластеризацией; константная колонка обнуляется |
+| `seed` | integer | `42` | seed k-means++; одинаковый seed и вход дают одинаковые кластеры |
+| `max_iterations` | integer | `100` | положительный предел итераций Ллойда |
+| `eps` | number | `0.5` | положительный радиус соседства DBSCAN |
+| `min_points` | integer | `5` | положительный минимум соседей (с самой точкой) для core-точки |
+| `linkage` | `ward` \| `complete` \| `average` | `ward` | правило слияния иерархической кластеризации |
+| `max_rows` | integer | `50000` | положительный предел in-memory; больше — ошибка с подсказкой |
+
+`cluster`/`silhouette` добавляются последними; занятое имя любой из них — ошибка run.
+Строки с NULL или нефинитным значением в выбранной колонке в модель не входят и получают
+`cluster = NULL`, `silhouette = NULL`. Силуэт: `a` — среднее расстояние до своего
+кластера (без самой точки), `b` — минимум средних расстояний до других кластеров,
+`s = (b − a) / max(a, b)`; для кластера из одной точки `s = 0`. Силуэт считается по
+всем парам строк (O(n²) на запуск), поэтому большие входы заметно медленнее. Строки читаются в
+лексикографическом порядке вектора признаков, поэтому результат не зависит от порядка
+сканирования входа. `k > n` — ошибка `k=… exceeds the … rows`; превышение `max_rows` —
+ошибка с подсказкой поднять `max_rows` или отфильтровать вход.
+
+```json
+{
+  "factory": "dap.cluster",
+  "settings": {"columns": ["sepal_length", "petal_length"], "method": "kmeans", "k": 3, "seed": 42}
+}
+```
+
+
+## 66. dap.pca
+
+Метод главных компонент по ковариационной матрице и разложению Якоби. Три режима:
+`scores` добавляет к входу `pc1..pcN` (линейные комбинации центрированных, при
+необходимости стандартизованных колонок), `loadings` выдаёт строку на компоненту и
+колонку, `explained` — собственную ценность, долю объяснённой дисперсии и накопленную
+долю на компоненту. Признаки по умолчанию стандартизуются (z-score). Знак каждой
+компоненты фиксируется так, чтобы её наибольшая по модулю нагрузка была положительной —
+это делает выход воспроизводимым.
+| `mode` | `bootstrap` \| `permutation` | — | обязателен |
+| `statistic` | `mean` \| `median` \| `sd` \| `correlation` \| `slope` \| `difference_mean` \| `difference_median` | — | обязателен; bootstrap принимает первые пять, permutation — две разности |
+| `columns` | array<string> | — | 1 числовая колонка для mean/median/sd, 2 различные для correlation/slope (x, y) |
+| `value` | string | — | permutation: числовая колонка значений |
+| `group` | string | — | permutation: колонка ровно с двумя уровнями |
+| `resamples` | integer | `1000` | положительное |
+| `permutations` | integer | `1000` | положительное |
+| `confidence` | number | `0.95` | в (0, 1); уровень перцентильного интервала |
+| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост permutation p-value |
+| `seed` | integer | `42` | сид одного `java.util.Random`; одинаковый сид — одинаковые числа |
+| `max_rows` | integer | `100000` | больше строк — ошибка с подсказкой |
+
+Строки с NULL в выбранных колонках исключаются. Для `sd` нужно ≥2 строк, для
+`correlation`/`slope` — ≥3 и положительная дисперсия; вырожденные пересэмплы
+(например, все x одинаковы) пропускаются. Seed детерминирует каждый draw.
+
+```json
+{
+  "factory": "dap.resample_test",
+  "settings": {
+    "mode": "bootstrap",
+    "statistic": "mean",
+    "columns": ["revenue"],
+    "resamples": 2000,
+    "confidence": 0.95,
+    "seed": 42
+  }
+}
+```
+
+## 67. dap.survival
+
+Анализ выживаемости: кривая Каплана-Мейера и лог-ранк тест; считаются в Java по
+строкам входа (не более 100 000), результат — таблица в сессии (у кривой бывает
+строка на каждое время события) или литеральная строка для лог-ранка.
+`time` — числовая колонка или `Date32` (неотрицательное время наблюдения),
+`event` — boolean или 0/1 (1/true — событие, 0/false — цензурирование), `group` —
+необязательная категориальная колонка. Строки с NULL во времени, событии или группе
+исключаются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+Режим `km` — строка на каждое различное время события: `group`? (если задана),
+`time`, `n_at_risk` (наблюдения с временем ≥ t), `events` (события в t),
+`censored` (цензурирования в t), `survival` (произведение `1 − d/n`),
+`ci_low`/`ci_high` — интервал Гринвуда на лог-шкале
+`exp(log S ∓ z·√(Σ d/(n(n−d))))`, зажатый в [0, 1] (как `survfit`,
+`conf.type = "log"`). Если последнее наблюдение — событие, то S = 0, а дисперсия
+Гринвуда бесконечна, поэтому интервал максимально широкий [0, 1]. Времена только
+цензурирования строк не дают.
+
+Режим `logrank` — одна строка: `test` (`logrank`), `statistic` (Mantel-Haenszel
+`(O−E)′V⁻¹(O−E)` по первым k−1 группам), `df` (k−1), `p_value` (хи-квадрат с k−1
+степенями свободы), `groups` (k). Нужны минимум две группы и хотя бы одно событие;
+вырожденная (сингулярная) матрица дисперсии даёт ошибку с объяснением.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `time` | string | — | обязателен; числовая колонка или `Date32` |
+| `event` | string | — | обязателен; boolean или 0/1 |
+| `group` | string | — | необязательна для `km`, обязательна для `logrank` |
+| `mode` | `km` \| `logrank` | `km` | — |
+
+```json
+{
+  "factory": "dap.survival",
+  "settings": {
+    "time": "months",
+    "event": "churned",
+    "group": "plan",
+    "mode": "km"
+  }
+}
+```
+
+## 68. dap.ab_test
+
+A/B-тест: двухвыборочный z-тест для долей плюс мощность и необходимый размер выборки.
+Счётчики агрегируются в SQL (`COUNT`/`SUM` по группам), строки в Java не читаются.
+Два уровня `group` упорядочены лексикографически: первый — контроль, второй — вариант
+(детерминированно и задокументировано). Выход — одна строка.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `group` | string | — | обязателен; колонка ровно с двумя уровнями |
+| `value` | string | — | обязателен; boolean или числовая 0/1 (конверсии) |
+| `alpha` | number | `0.05` | в (0, 1); двусторонний уровень теста и формул мощности |
+| `power` | number | `0.8` | в (0, 1); целевая мощность для `required_n_per_group` |
+| `mde` | number | — | относительный lift для `required_n_per_group`; без него — наблюдаемый lift |
+| `baseline` | number | — | доля контроля для `required_n_per_group`; без неё — наблюдаемая доля контроля |
+
+Выход: `control_rate`, `treatment_rate`, `lift` (относительный:
+`treatment/control − 1`), `z_statistic` (z с объединённой дисперсией
+`p̄(1−p̄)(1/n₁+1/n₂)`), `p_value` (двусторонний нормальный хвост), `power`
+(достигнутая мощность для наблюдаемого эффекта и размеров групп), `required_n_per_group`
+(формула Флейсса:
+`(z(1−α/2)√(2p̄(1−p̄)) + z(power)√(p₁(1−p₁)+p₂(1−p₂)))² / (p₂−p₁)²`, округление
+вверх; NULL, если эффект нулевой или доли вырождены), `mde` (использованный lift),
+`alpha`. Достигнутая мощность использует
+`Φ((|p₂−p₁|√n_eff − z(1−α/2)√(2p̄(1−p̄))) / √(p₁(1−p₁)+p₂(1−p₂)))` с
+`n_eff = 2n₁n₂/(n₁+n₂)`. NULL-строки исключаются; значения вне 0/1 — ошибка.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+```json
+{
+  "factory": "dap.ab_test",
+  "settings": {
+    "group": "variant",
+    "value": "converted",
+    "alpha": 0.05,
+    "power": 0.8,
+    "mde": 0.2,
+    "baseline": 0.1
+  }
+}
+```
+
+## 69. dap.time_series
+
+Анализ временного ряда: декомпозиция, ACF/PACF, лаги, прогноз и тест стационарности.
+Строки упорядочиваются по `time` внутри каждой группы `group_by`; Java-режимы читают
+не более `max_rows` строк и возвращают результат таблицей в сессии (у декомпозиции
+строка на наблюдение), режим `lag` остаётся ленивым SQL-планом с
+`LAG(...) OVER (...)`. `time` — числовая колонка или `Date32`, `value` — числовая.
+Выходная колонка времени называется `time`; колонки групп идут первыми.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `columns` | array<string> | — | обязателен; непустой; только числовые колонки |
+| `components` | integer | `2` | положительный; `components > columns` — ошибка |
+| `standardize` | boolean | `true` | z-score признаков перед разложением; константная колонка обнуляется |
+| `mode` | `scores` \| `loadings` \| `explained` | `scores` | что вернуть |
+| `max_rows` | integer | `100000` | положительный предел in-memory; больше — ошибка с подсказкой |
+
+Выход `scores`: входные колонки плюс `pc1..pcN` (Float64); занятое имя — ошибка run,
+строка с NULL в любой выбранной колонке получает NULL во всех компонентах. Выход
+`loadings`: `component` (Int64, с 1), `column` (Utf8), `loading` (Float64), строки в
+порядке компонент, затем колонок. Выход `explained`: `component`, `eigenvalue`,
+`explained_variance` (собственная ценность / сумма всех собственных ценностей),
+`cumulative` (накопленная доля по выбранным компонентам). Нужно не менее двух полных
+строк; превышение `max_rows` — ошибка с подсказкой поднять `max_rows` или отфильтровать
+вход.
+
+```json
+{
+  "factory": "dap.pca",
+  "settings": {"columns": ["sepal_length", "petal_length"], "components": 2, "standardize": true, "mode": "scores"}
+| `mode` | `decompose` \| `acf` \| `lag` \| `forecast` \| `stationarity` | — | обязателен |
+| `time` | string | — | обязателен; числовая колонка или `Date32` |
+| `value` | string | — | обязателен; числовая колонка ряда |
+| `group_by` | array<string> | — | необязательные колонки: отдельный ряд на группу |
+| `period` | integer | `12` | ≥2; период сезонности для `decompose` и `holt_winters` |
+| `max_lag` | integer | `20` | максимальный лаг ACF или число лаговых колонок в `lag` |
+| `horizon` | integer | `12` | число шагов прогноза |
+| `method` | `additive` \| `multiplicative` \| `naive` \| `seasonal_naive` \| `mean` \| `drift` \| `holt_winters` | — | для `decompose` — additive/multiplicative, для `forecast` — остальные |
+| `confidence` | number | `0.95` | в (0, 1); уровень интервала прогноза |
+| `max_rows` | integer | `100000` | больше строк — ошибка с подсказкой |
+
+Выходы:
+
+- `decompose` → `time`, `observed`, `trend`, `seasonal`, `residual`: тренд —
+  центрированное скользящее среднее порядка `period` (для чётного периода 2×period),
+  сезонные индексы — средние детрендированного ряда по позициям, нормированные в сумму 0
+  (additive) или в среднее 1 (multiplicative); `residual = observed − trend − seasonal`
+  (или `observed / (trend·seasonal)`); на краях, где нет полного окна, `trend` и
+  `residual` — NULL. Нужно ≥ 2·period строк на группу; multiplicative требует
+  строго положительных значений.
+- `acf` → `lag`, `acf`, `pacf`: `r_k = Σ(y_t−ȳ)(y_{t+k}−ȳ) / Σ(y_t−ȳ)²` для
+  `k = 0..max_lag` (ACF(0) = 1), PACF — рекурсия Дарбина-Левинсона; нужно больше
+  `max_lag` строк на группу.
+- `lag` → все входные колонки плюс `value_lag_1..value_lag_<max_lag>` (`Number (Float)`).
+- `forecast` → `time`, `forecast`, `lower`, `upper`, `method`: naive (последнее
+  значение), seasonal_naive (значение того же сезона), mean, drift (последнее + средний
+  наклон) или аддитивный Holt-Winters с фиксированным сглаживанием 0.3/0.1/0.1; время
+  будущих точек — последнее + средний шаг × h. Интервал —
+  `forecast ± z(confidence)·σ·√h`, где σ — стандартное отклонение одношаговых
+  остатков выбранного метода (приближение, задокументировано).
+- `stationarity` → `test` (`adf`), `statistic`, `p_value`, `critical_1`,
+  `critical_5`, `critical_10`, `stationary`: ADF с константой и одним лагом разности,
+  t-статистика коэффициента при `y_{t−1}`; критические значения МакКиннона
+  (−3.43, −2.86, −2.57), p-value — нормальная аппроксимация, подогнанная под эти три
+  значения; `stationary = statistic < −2.86` (отвергаем единичный корень на 5 %).
+  Нужно ≥ 8 строк на группу.
+
+```json
+{
+  "factory": "dap.time_series",
+  "settings": {
+    "mode": "forecast",
+    "time": "month",
+    "value": "revenue",
+    "group_by": ["region"],
+    "period": 12,
+    "horizon": 6,
+    "method": "seasonal_naive"
+  }
+}
+```

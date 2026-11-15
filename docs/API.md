@@ -8,7 +8,7 @@
 - Запросы с телом: `Content-Type: application/json`; ответы —
   `application/json; charset=utf-8`, заголовок `X-DAP-Api-Version: 1`
 - Аутентификации нет; сервис слушает loopback
-- Каталог — 52 узла с id `dap.*`; контракт — 27 операций
+- Каталог — 66 узлов с id `dap.*`; контракт — 30 операций
 
 ## 1. Основы
 
@@ -30,9 +30,10 @@
 
 Порты данных нумеруются с 0. У всех узлов один табличный выход (порт 0); у
 `dap.joiner` два входа (0 — Left, 1 — Right), у `dap.concatenate` — два входа
-(0 — Top, 1 — Bottom), у остальных один. Писатели (`dap.csv_writer`,
-`dap.parquet_writer`, `dap.json_writer`, `dap.excel_writer`) возвращают входную таблицу
-без изменений (pass-through).
+(0 — Top, 1 — Bottom), у `dap.markdown_report` восемь входов (0–7 — `Data 1`…`Data 8`,
+раздел отчёта выбирает вход через `sections[].input`), у остальных один. Писатели
+(`dap.csv_writer`, `dap.parquet_writer`, `dap.json_writer`, `dap.excel_writer`,
+`dap.markdown_report`) возвращают входную таблицу порта 0 без изменений (pass-through).
 
 ### Ошибки
 
@@ -59,26 +60,32 @@
 |---|---|---|
 | 200 | успех | — |
 | 202 | асинхронный запуск принят | — |
-| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, порт вне диапазона, отсутствующий `dir` | `bad_request`, `unknown_setting`, `invalid_query_param` |
+| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, порт вне диапазона, отсутствующий `dir`, путь вне allowlist, неизвестная колонка в `/table?columns=`, запрещённый `/table?where=` | `bad_request`, `unknown_setting`, `invalid_query_param`, `path_not_allowed`, `unknown_column`, `invalid_filter` |
 | 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `/table`/`/profile`/`PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут | `not_found`, `unknown_node` |
 | 408 | истёк `timeoutSec` синхронного run (тело — job со `state: "timeout"`); истёк `DAP_QUERY_TIMEOUT_SEC` у `/table`/`/profile` | `query_timeout` |
-| 409 | отмена уже завершённого job; лимит workflow на сессию; у узла ещё нет таблицы (до run); узел упал | `not_cancellable`, `workflow_limit`, `not_materialized`, `node_failed` |
+| 409 | отмена уже завершённого job; лимит workflow на сессию; у узла ещё нет таблицы или плана (до run); узел упал | `not_cancellable`, `workflow_limit`, `not_materialized`, `estimate_unavailable`, `node_failed` |
 | 500 | ошибка исполнения, невалидное значение config, нечитаемый файл, битый JSON | `server_error`, `node_failed` |
 
 Метод, не поддержанный для маршрута, даёт 404 `no route: <METHOD> <path>`, а не 405.
+
+Коды каталога датасетов: `dataset_not_found` (404); `dataset_exists` (409);
+`invalid_dataset_name`, `invalid_format`, `dataset_source_not_found`,
+`dataset_source_required`, `invalid_path`, `path_not_allowed` (400);
+`datasets_corrupt`, `datasets_write_failed`, `dataset_ingest_failed`,
+`dataset_profile_failed` (500).
 
 ## 2. Мета и здоровье
 
 ### `GET /v1`
 
 ```json
-{"name":"DAP","version":"1.1.0","api":"v1","endpoints":"/v1/nodes, /v1/workflows, /v1/jobs, /v1/health"}
+{"name":"DAP","version":"1.2.0","api":"v1","endpoints":"/v1/nodes, /v1/workflows, /v1/jobs, /v1/health"}
 ```
 
 ### `GET /v1/health`
 
 ```json
-{"ok":true,"name":"DAP","version":"1.1.0","api":"1",
+{"ok":true,"name":"DAP","version":"1.2.0","api":"1",
  "generation":"0f8c2f7a-…","extensions":{"installed":["sqlite_scanner"]},
  "nodes":44,"coreNodes":44,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
@@ -162,7 +169,7 @@
    "labelCoverage":"5/5","warnings":[]}}
 ```
 
-Неизвестный id — 400. Все 52 узла отдают `available: true`.
+Неизвестный id — 400. Все 66 узлов отдают `available: true`.
 
 ### Диалог узла внутри workflow
 
@@ -291,14 +298,19 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 
 Поля job: `id`, `workflow`, `state`, `createdAt`, `timeoutSec`,
 `startedAt`/`finishedAt`/`durationMs` (когда известны), `error`, `code`
-(у упавшего run), `result`, `statusUrl`. Состояния: `queued`, `running`,
+(у упавшего run), `result`, `progress`, `statusUrl`. Состояния: `queued`, `running`,
 `succeeded`, `failed`, `cancelled`, `timeout`.
+
+`progress` — прогресс по узлам: `{nodesTotal, nodesDone, currentNode, percent}`.
+Dag обновляет его на старте и финише каждого узла; `currentNode` — узел, который
+стартовал или только что закончился (`null` между уровнями), `percent` — целые
+проценты (100 у завершённого job).
 
 ## 6. Данные
 
-### `GET /v1/workflows/{workflowId}/nodes/{node}/table?port=0&limit=1`
+### `GET /v1/workflows/{workflowId}/nodes/{node}/table?port=0&limit=1&offset=0&columns=&where=`
 
-Материализует сохранённый план узла: `COUNT(*)` и первые `limit` строк (по
+Материализует сохранённый план узла: `COUNT(*)` и страницу строк (по
 умолчанию 50). Материализация ограничена `DAP_QUERY_TIMEOUT_SEC` (по умолчанию
 60 с; `0` выключает): по истечении соединение закрывается, ответ — 408
 `query_timeout` с `hint`, следующий запрос работает как обычно. Пример ниже
@@ -308,11 +320,25 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 {"rows":150,
  "columns":[{"index":0,"name":"sepal_length","type":"Number (Float)"}],
  "data":[["5.1"]],
- "preview":1}
+ "preview":1,
+ "offset":0,
+ "nextOffset":1,
+ "truncated":true}
 ```
 
-`rows` — всего строк, `data` — строки значениями-строками (`null` для NULL),
-`preview` — сколько строк вернулось. `limit < 0` даёт пустой `data`; `port`
+Параметры пагинации, проекции и фильтра (все опциональные):
+
+| Параметр | Тип | Смысл |
+|---|---|---|
+| `offset` | int ≥ 0 | пропустить N строк после фильтра |
+| `columns` | csv | проекция: имена через запятую; неизвестное имя — 400 `unknown_column` с подсказкой |
+| `where` | string | SQL-предикат над выходными колонками; запрещены `;`, `--`, `/*`, `SELECT`, `FROM`, `read_`, `ATTACH`, `COPY`, `PRAGMA` (регистр не важен); нарушение или несвязываемый предикат — 400 `invalid_filter` |
+
+`rows` — всего строк после фильтра, `data` — строки значениями-строками (`null`
+для NULL), `preview` — сколько строк вернулось, `offset` — запрошенное смещение,
+`nextOffset` — смещение следующей страницы (`null`, если страница последняя),
+`truncated` — есть ли ещё строки после этой страницы. Проекция меняет
+`columns` и порядок значений в `data`. `limit < 0` даёт пустой `data`; `port`
 вне диапазона или нецелый query-параметр — 400; неизвестный узел workflow —
 404 `unknown_node`; узел ещё не исполнялся — 409 `not_materialized` (в теле
 есть `ports` и `hint` с командой run); узел упал — 409 `node_failed` с
@@ -333,6 +359,24 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 числовых колонок; у колонки из одних NULL они опускаются. Статусы те же, что у
 `/table`: 404 `unknown_node`, 409 `not_materialized`/`node_failed`.
 
+### `GET /v1/workflows/{workflowId}/nodes/{node}/estimate`
+
+Выполняет `EXPLAIN (FORMAT JSON)` над сохранённым планом узла (без исполнения
+запроса) и отдаёт оценку стоимости:
+
+```json
+{"node":"1:2","rows":95,
+ "operators":[{"name":"PROJECTION","rows":95},{"name":"FILTER","rows":95},
+              {"name":"SEQ_SCAN","rows":150}],
+ "plan":{"physical_plan":[...]}}
+```
+
+`rows` — оценка корневого оператора (для projection без оценки — первый оператор,
+у которого она есть, то есть скан); `operators` — дерево операторов в порядке
+обхода (имя и оценка строк); `plan` — исходный JSON DuckDB.
+До run узла плана нет — 409 `estimate_unavailable` (у упавшего узла — 409
+`node_failed`); неизвестный узел — 404 `unknown_node`.
+
 ### `POST /v1/datasets`
 
 Один раз конвертирует CSV/Excel/JSON/Parquet в Parquet-кэш, чтобы повторный анализ
@@ -344,6 +388,13 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 
 `format` необязателен: выводится из расширения (`.csv`, `.xlsx`, `.json`,
 `.parquet`). Явно допустимы `csv`, `excel` (или `xlsx`), `json`, `parquet`.
+
+Для CSV доступны опции чтения (все необязательные): `header` (по умолчанию
+`true`), `delimiter`, `quote`, `escape`, `ignoreErrors`, `nullPadding`,
+`strictMode` и `nullStrings` (массив строк, которые считать NULL, например
+`["NA"]`). Опции входят в ключ кэша, поэтому один файл с разными опциями даёт
+разные записи. Файл без заголовка: `{"file":"...","format":"csv","header":false}`;
+битые строки: `ignoreErrors=true`; `NA`/`N/A`: `nullStrings=["NA","N/A"]`.
 Ответ:
 
 ```json
@@ -361,6 +412,135 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 `file`, пустой или нестроковый `format`, неизвестное расширение/формат, файл не
 найден; 500 — ошибка записи.
 Полученный `path` можно передать в `dap.parquet_reader` как `file`.
+
+### Каталог датасетов
+
+Постоянный каталог (JSON) поверх Parquet-кэша: имя, описание, владелец, теги,
+источник, версия, content hash и кэш профиля. Файл каталога — `DAP_DATASETS_FILE`,
+иначе `$DAP_HOME/build/datasets.json`, иначе `~/.dap/build/datasets.json`. Запись
+атомарная (tmp + rename), чтение и запись под read/write-lock; битый файл — 500
+`datasets_corrupt` с путём и подсказкой, а не молчаливая перезапись.
+
+Имя датасета — `[A-Za-z0-9._-]{1,64}`; оно же path-параметр маршрутов.
+
+#### `GET /v1/catalog/datasets`
+
+Список без `history` и `profile`, отсортирован по имени:
+
+```json
+{"count": 1, "datasets": [{"name": "iris", "description": "flowers", "owner": "alice",
+  "tags": ["demo"], "source": "/data/iris.csv", "format": "csv",
+  "path": "<cache>/<sha256>.parquet", "rows": 150, "columns": 5, "version": 1,
+  "contentHash": "<sha256>", "createdAt": "...", "updatedAt": "..."}]}
+```
+
+#### `POST /v1/catalog/datasets`
+
+```json
+{"name": "iris", "file": "/data/iris.csv", "format": "csv",
+ "description": "flowers", "tags": ["demo"], "owner": "alice"}
+```
+
+`file` — CSV/XLSX/JSON/Parquet; `dataset` — уже ингестированный Parquet-путь
+(формат тогда всегда `parquet`; передавать `format` с другим значением — 400).
+Нужно ровно одно из `file`/`dataset`. `format` необязателен: выводится из
+расширения. Ответ — запись целиком (как `GET .../{name}`). 400
+`invalid_dataset_name`, `invalid_format`, `dataset_source_not_found`,
+`path_not_allowed`, `dataset_source_required`, `invalid_path`; 409
+`dataset_exists`.
+
+#### `GET /v1/catalog/datasets/{name}`
+
+Запись + `history` (последние 10 вытесненных версий) + `profile`, если он уже
+закэширован. 404 `dataset_not_found`.
+
+#### `PATCH /v1/catalog/datasets/{name}`
+
+`{"description": "...", "tags": ["..."], "owner": "..."}` — только метаданные,
+опущенные поля сохраняют значение; данные, версия и кэш профиля не меняются.
+
+#### `DELETE /v1/catalog/datasets/{name}`
+
+`{"ok": true, "name": "iris"}`. Удаляется только запись каталога; Parquet-файл в
+кэше остаётся.
+
+#### `POST /v1/catalog/datasets/{name}/refresh`
+
+Переингестит записанный источник, `version` += 1, предыдущий снимок уходит в
+`history` (не более 10). Кэш профиля переиспользуется, только если `contentHash`
+не изменился.
+
+#### `GET /v1/catalog/datasets/{name}/profile?refresh=false`
+
+Профиль считается один раз и кэшируется по `contentHash`; `cached` показывает,
+взят ли он из кэша, `refresh=true` форсирует пересчёт:
+
+```json
+{"name": "iris", "version": 1, "contentHash": "<sha256>", "rows": 150, "cached": false,
+ "computedAt": "...", "columns": [{"name": "sepal_length", "type": "Float64",
+ "missing": 0, "distinct": 35, "min": 4.3, "max": 7.9, "mean": 5.843}]}
+```
+
+`min`/`max`/`mean` — только для числовых колонок, у колонки из одних NULL
+опускаются. `columns` в записи каталога — число колонок, схема — в профиле.
+### `POST /v1/explore`
+
+Один вызов на первичный анализ датасета: профиль колонок, качество, связи,
+различия групп, временной диапазон, гипотезы и рекомендации.
+
+```json
+{"file": "/data/iris.csv", "format": "csv", "maxColumns": 50, "sampleRows": 1000}
+```
+
+Ровно один источник: `file` (конвертируется в Parquet-кэш по правилам
+`POST /v1/datasets`) или `dataset` (путь уже ингестированного Parquet из ответа
+`POST /v1/datasets`). `format` — только для `file`, по умолчанию из расширения;
+вместе с `dataset` даёт 400. `sql` — один read-only `SELECT`/`WITH`,
+уточняющий источник; ингестированный файл доступен как вью `src`. Оба источника
+или ни одного, нестроковые поля, неизвестный формат, не найденный `file`,
+нечисловой или выходящий за границы `maxColumns`/`sampleRows` — 400;
+несуществующий `dataset` — 404 `dataset_not_found`; SQL не является одним
+read-only SELECT — 400 `invalid_sql`.
+
+```json
+{"source": "/data/iris.csv", "rows": 150,
+ "columns": [{"name": "petal_length", "type": "Float64", "missing": 0, "distinct": 43,
+              "min": 1.0, "max": 6.9, "mean": 3.7587, "stddev": 1.7644,
+              "zeros": 0, "negatives": 0, "outliers": 0}],
+ "quality": {"score": 97, "issues": [{"severity": "low", "kind": "duplicate_rows",
+              "count": 3, "detail": "3 of 150 rows are exact duplicates"}]},
+ "relationships": [{"left": "petal_length", "right": "petal_width",
+                    "method": "pearson", "value": 0.9629, "p_value": 0.0,
+                    "n": 150, "strength": "very strong"}],
+ "group_differences": [{"value": "petal_length", "group": "species", "test": "anova",
+                        "statistic": 1180.16, "p_value": 0.0, "effect_size": 0.941}],
+ "hypotheses": [{"id": "h1", "question": "Do petal_length and petal_width move together?",
+                 "test": "pearson", "columns": ["petal_length", "petal_width"],
+                 "rationale": "Very strong correlation (pearson=0.963, p<0.001, n=150).",
+                 "priority": "high"}],
+ "recommendations": ["Model petal_width with petal_length (pearson=0.963, p<0.001)."]}
+```
+
+`columns` — до `maxColumns` первых колонок (по умолчанию 50); `missing` и
+`distinct` точные; `min`/`max`/`mean`/`stddev` (выборочное СКО), `zeros`,
+`negatives` и `outliers` (вне границ 1.5×IQR) — только для числовых колонок.
+`quality.score` — 100 минус штрафы за найденные проблемы (high 12, medium 5,
+low 1), в диапазоне 0..100; `kind` — одно из `missing`, `empty`, `constant`,
+`duplicate_rows`, `high_cardinality`, `outliers`, `mixed_type`.
+
+`relationships` — до 20 пар по убыванию |value|, затем по именам: Pearson для
+числовых пар (p-value по t с n−2 степенями свободы), Cramér's V и p хи-квадрат
+для категориальных (Utf8/Boolean, от 2 до 20 категорий). `group_differences` —
+до 10 пар «числовая × категориальная» по возрастанию p-value: ANOVA, если в
+каждой группе не меньше 5 значений, иначе Kruskal-Wallis; `effect_size` — η²
+или ε². `p_value` может отдаваться как `0.0`, если истинное значение меньше
+точности double. `time` — первый столбец даты/времени: диапазон и оценка
+гранулярности (`day`/`week`/`month`/`year`); без такого столбца поле отсутствует.
+`hypotheses` — от 3 до 5 шаблонных вопросов по самым сильным находкам, порядок:
+priority (`high`/`medium`/`low`), затем `id`; на пустом источнике — пустой
+список. `recommendations` — до 8 конкретных шагов. Профиль и quality считаются
+по всему источнику, связи, различия и гипотезы — по первым `sampleRows` строкам
+(по умолчанию 1000, детерминированно, без случайной выборки).
 
 ## 7. Сохранение, диагностика, остановка
 
@@ -461,8 +641,8 @@ curl -s -X POST $B/v1/shutdown
 
 - Один пользователь, без auth; сервис должен слушать loopback.
 - Состояние в памяти: workflow, задания и таблицы живут до остановки процесса;
-  на диск сохраняются только `workflow.json` через `/save` и Parquet-кэш
-  `POST /v1/datasets`.
+  на диск сохраняются `workflow.json` через `/save`, Parquet-кэш
+  `POST /v1/datasets` и каталог датасетов (`DAP_DATASETS_FILE`).
 - Workflow нельзя переименовать или получить отдельным запросом: есть список,
   создание, загрузка, удаление и операции над узлами.
 - Файловые источники читают любой путь, доступный процессу.

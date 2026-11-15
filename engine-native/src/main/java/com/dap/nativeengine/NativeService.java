@@ -3,7 +3,9 @@ package com.dap.nativeengine;
 import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.api.CatalogHandlers;
 import com.dap.nativeengine.api.DataHandlers;
+import com.dap.nativeengine.api.DatasetCatalogHandlers;
 import com.dap.nativeengine.api.DatasetHandlers;
+import com.dap.nativeengine.api.ExploreHandlers;
 import com.dap.nativeengine.api.Http;
 import com.dap.nativeengine.api.JobHandlers;
 import com.dap.nativeengine.api.OpsHandlers;
@@ -13,8 +15,15 @@ import io.javalin.http.Context;
 import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Executors;
+import com.dap.nativeengine.io.DatasetCatalog;
+import com.dap.nativeengine.nodes.AbTestExecutor;
 import com.dap.nativeengine.nodes.BinnerExecutor;
+import com.dap.nativeengine.nodes.CalendarExecutor;
+import com.dap.nativeengine.nodes.LogisticRegressionExecutor;
 import com.dap.nativeengine.nodes.ChartExecutor;
+import com.dap.nativeengine.nodes.ChartGridExecutor;
+import com.dap.nativeengine.nodes.ClusterExecutor;
+import com.dap.nativeengine.nodes.PcaExecutor;
 import com.dap.nativeengine.nodes.ColumnResorterExecutor;
 import com.dap.nativeengine.nodes.ConcatenateExecutor;
 import com.dap.nativeengine.nodes.DateTimeExecutor;
@@ -49,8 +58,12 @@ import com.dap.nativeengine.nodes.ColumnRenamerExecutor;
 import com.dap.nativeengine.nodes.CsvReaderExecutor;
 import com.dap.nativeengine.nodes.CsvWriterExecutor;
 import com.dap.nativeengine.nodes.DbReaderExecutor;
+import com.dap.nativeengine.nodes.DbWriterExecutor;
 import com.dap.nativeengine.nodes.FileListExecutor;
+import com.dap.nativeengine.nodes.FileReaderExecutor;
 import com.dap.nativeengine.nodes.ExcelReaderExecutor;
+import com.dap.nativeengine.nodes.FuzzyJoinExecutor;
+import com.dap.nativeengine.nodes.GeoDistanceExecutor;
 import com.dap.nativeengine.nodes.GroupByExecutor;
 import com.dap.nativeengine.nodes.JsonReaderExecutor;
 import com.dap.nativeengine.nodes.JsonWriterExecutor;
@@ -61,10 +74,14 @@ import com.dap.nativeengine.nodes.MathFormulaExecutor;
 import com.dap.nativeengine.nodes.MissingValueExecutor;
 import com.dap.nativeengine.nodes.ParquetReaderExecutor;
 import com.dap.nativeengine.nodes.ParquetWriterExecutor;
+import com.dap.nativeengine.nodes.ResampleTestExecutor;
 import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
 import com.dap.nativeengine.nodes.SqlQueryExecutor;
+import com.dap.nativeengine.nodes.SurvivalExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
+import com.dap.nativeengine.nodes.TextNormalizeExecutor;
+import com.dap.nativeengine.nodes.TimeSeriesExecutor;
 import io.javalin.Javalin;
 
 import java.sql.SQLException;
@@ -87,7 +104,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public final class NativeService implements AutoCloseable {
     public static final String NAME = "DAP";
-    public static final String VERSION = "1.1.0";
+    public static final String VERSION = "1.2.0";
     private static final String ERROR_BODY_ATTRIBUTE = "dap.errorBody";
     private static final String IN_FLIGHT_ATTRIBUTE = "dap.inFlight";
 
@@ -186,9 +203,9 @@ public final class NativeService implements AutoCloseable {
                     intEnv(env, "DAP_JOB_TIMEOUT", 600),
                     env.getOrDefault("DAP_BIND", "127.0.0.1"),
                     intEnv(env, "DAP_PORT", 7800),
-                    env.get("DAP_DUCKDB_MEMORY_LIMIT"),
+                    memoryLimit(env),
                     positiveIntEnv(env, "DAP_DUCKDB_THREADS"),
-                    env.get("DAP_DUCKDB_TEMP_DIR"),
+                    tempDirectory(env),
                     nonNegativeIntEnv(env, "DAP_IDLE_TIMEOUT_SEC", DEFAULT_IDLE_TIMEOUT_SEC),
                     nonNegativeIntEnv(env, "DAP_QUERY_TIMEOUT_SEC", DEFAULT_QUERY_TIMEOUT_SEC),
                     positiveIntEnv(env, "DAP_MAX_SESSIONS", DEFAULT_MAX_SESSIONS),
@@ -255,6 +272,34 @@ public final class NativeService implements AutoCloseable {
             return value == null || value.isBlank() ? null : value.strip();
         }
 
+        /** Out-of-core default: 512MB unless DAP_DUCKDB_MEMORY_LIMIT overrides it. */
+        private static String memoryLimit(Map<String, String> env) {
+            String configured = blankToNull(env.get("DAP_DUCKDB_MEMORY_LIMIT"));
+            return configured != null ? configured : "512MB";
+        }
+
+        /**
+         * Out-of-core spill directory: DAP_DUCKDB_TEMP_DIR, else $DAP_HOME/build/duckdb-tmp,
+         * else ~/.dap/tmp. The directory is created best effort; a session that still cannot
+         * use it reports the path in its own error.
+         */
+        private static String tempDirectory(Map<String, String> env) {
+            String configured = blankToNull(env.get("DAP_DUCKDB_TEMP_DIR"));
+            if (configured != null) {
+                return configured;
+            }
+            String home = blankToNull(env.get("DAP_HOME"));
+            java.nio.file.Path temp = home != null
+                    ? java.nio.file.Path.of(home, "build", "duckdb-tmp")
+                    : java.nio.file.Path.of(System.getProperty("user.home"), ".dap", "tmp");
+            try {
+                java.nio.file.Files.createDirectories(temp);
+            } catch (java.io.IOException | RuntimeException ignored) {
+                // A read-only home must not keep the engine from starting; DuckDB reports it.
+            }
+            return temp.toString();
+        }
+
         /**
          * DAP_DUCKDB_EXTENSION_DIR, else $DAP_HOME/build/duckdb-ext, else ~/.dap/extensions.
          * A blank override keeps the default.
@@ -275,6 +320,7 @@ public final class NativeService implements AutoCloseable {
 
     private final Settings settings;
     private final ServiceState state;
+    private final DatasetCatalog catalog;
     private final Javalin app;
     private final CountDownLatch stopped = new CountDownLatch(1);
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -295,6 +341,13 @@ public final class NativeService implements AutoCloseable {
 
     /** Test seam: inject catalog and executors (for example a test-only node). */
     public NativeService(Settings settings, NodeRegistry registry, Executors executors) {
+        this(settings, registry, executors, new DatasetCatalog());
+    }
+
+    /** Test seam: inject the dataset catalog so tests do not touch the shared datasets.json. */
+    public NativeService(Settings settings, NodeRegistry registry, Executors executors,
+                         DatasetCatalog catalog) {
+        this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.state = new ServiceState(settings,
                 Objects.requireNonNull(registry, "registry"),
@@ -345,11 +398,13 @@ public final class NativeService implements AutoCloseable {
     }
 
     private void registerRoutes(NodeRegistry registry) {
-        CatalogHandlers catalog = new CatalogHandlers(registry);
+        CatalogHandlers nodes = new CatalogHandlers(registry);
         WorkflowHandlers workflows = new WorkflowHandlers(state);
         JobHandlers jobs = new JobHandlers(state);
         DataHandlers data = new DataHandlers(state);
         DatasetHandlers datasets = new DatasetHandlers();
+        DatasetCatalogHandlers datasetCatalog = new DatasetCatalogHandlers(catalog);
+        ExploreHandlers explore = new ExploreHandlers(state.settings());
         OpsHandlers ops = new OpsHandlers(state, this::shutdownAsync);
 
         app.get("/v1", context -> Http.ok(context, meta()));
@@ -360,9 +415,9 @@ public final class NativeService implements AutoCloseable {
         });
         app.delete("/v1/sessions/{sessionId}", this::deleteSession);
 
-        app.get("/v1/nodes", catalog::list);
-        app.get("/v1/nodes/{nodeTypeId}", catalog::get);
-        app.get("/v1/nodes/{nodeTypeId}/dialog", catalog::dialog);
+        app.get("/v1/nodes", nodes::list);
+        app.get("/v1/nodes/{nodeTypeId}", nodes::get);
+        app.get("/v1/nodes/{nodeTypeId}/dialog", nodes::dialog);
 
         app.get("/v1/workflows", workflows::list);
         app.post("/v1/workflows", workflows::create);
@@ -382,7 +437,16 @@ public final class NativeService implements AutoCloseable {
         app.delete("/v1/jobs/{jobId}", jobs::cancel);
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/table", data::table);
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/profile", data::profile);
+        app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/estimate", data::estimate);
         app.post("/v1/datasets", datasets::ingest);
+        app.get("/v1/catalog/datasets", datasetCatalog::list);
+        app.post("/v1/catalog/datasets", datasetCatalog::add);
+        app.get("/v1/catalog/datasets/{name}", datasetCatalog::get);
+        app.patch("/v1/catalog/datasets/{name}", datasetCatalog::update);
+        app.delete("/v1/catalog/datasets/{name}", datasetCatalog::remove);
+        app.post("/v1/catalog/datasets/{name}/refresh", datasetCatalog::refresh);
+        app.get("/v1/catalog/datasets/{name}/profile", datasetCatalog::profile);
+        app.post("/v1/explore", explore::explore);
         app.post("/v1/workflows/{workflowId}/save", ops::save);
         app.get("/v1/workflows/{workflowId}/debug", ops::debug);
         app.post("/v1/shutdown", ops::shutdown);
@@ -662,6 +726,9 @@ public final class NativeService implements AutoCloseable {
                 .register(new JsonReaderExecutor())
                 .register(new JsonWriterExecutor())
                 .register(new LinearRegressionExecutor())
+                .register(new LogisticRegressionExecutor())
+                .register(new ClusterExecutor())
+                .register(new PcaExecutor())
                 .register(new ParquetReaderExecutor())
                 .register(new ParquetWriterExecutor())
                 .register(new RowFilterExecutor())
@@ -676,10 +743,21 @@ public final class NativeService implements AutoCloseable {
                 .register(new MathFormulaExecutor())
                 .register(new MarkdownReportExecutor())
                 .register(new ChartExecutor())
+                .register(new ChartGridExecutor())
                 .register(new DataQualityExecutor())
                 .register(new SqlQueryExecutor())
                 .register(new DbReaderExecutor())
-                .register(new FileListExecutor());
+                .register(new FileListExecutor())
+                .register(new FileReaderExecutor())
+                .register(new DbWriterExecutor())
+                .register(new TextNormalizeExecutor())
+                .register(new FuzzyJoinExecutor())
+                .register(new GeoDistanceExecutor())
+                .register(new CalendarExecutor())
+                .register(new ResampleTestExecutor())
+                .register(new SurvivalExecutor())
+                .register(new AbTestExecutor())
+                .register(new TimeSeriesExecutor());
     }
 
     /**

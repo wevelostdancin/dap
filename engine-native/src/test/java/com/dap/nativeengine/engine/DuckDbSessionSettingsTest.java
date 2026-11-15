@@ -67,6 +67,18 @@ class DuckDbSessionSettingsTest {
     }
 
     @Test
+    void preserveInsertionOrderIsOffByDefault() throws Exception {
+        try (DuckDbSession session = new DuckDbSession();
+             DuckDBConnection connection = session.newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT current_setting('preserve_insertion_order')")) {
+            assertTrue(result.next());
+            assertEquals("false", result.getString(1));
+        }
+    }
+
+    @Test
     void invalidMemoryLimitFailsLoudly() {
         SQLException notAMemoryLimit = assertThrows(SQLException.class,
                 () -> new DuckDbSession("banana", null, null));

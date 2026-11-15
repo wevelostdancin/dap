@@ -1,0 +1,170 @@
+{
+  "id": "dap.chart_grid",
+  "name": "Chart Grid",
+  "category": "/Visualization",
+  "type": "Sink",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Renders up to eight charts into one grid file (SVG, PNG or self-contained HTML) and passes input port 0 through unchanged. Every entry of 'charts' selects its input port and uses the same settings as dap.chart; the grid owns the panel sizes, the column count and the shared title.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data 1",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 1,
+      "name": "Data 2",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 2,
+      "name": "Data 3",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 3,
+      "name": "Data 4",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 4,
+      "name": "Data 5",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 5,
+      "name": "Data 6",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 6,
+      "name": "Data 7",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 7,
+      "name": "Data 8",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Chart grid configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Output file",
+        "description": "Absolute path of the .svg, .png or .html file to write; parent directories are created.",
+        "placeholder": "/data/dashboard.html"
+      },
+      "format": {
+        "type": "string",
+        "title": "Format",
+        "enum": [
+          "svg",
+          "png",
+          "html"
+        ],
+        "default": "svg",
+        "description": "svg is deterministic and golden-tested; png is drawn with Java2D; html embeds one inline SVG per chart and references no external resources."
+      },
+      "title": {
+        "type": "string",
+        "title": "Shared title",
+        "description": "Title drawn once at the top of the grid; HTML uses it as <h1> and <title>."
+      },
+      "columns": {
+        "type": "integer",
+        "title": "Columns",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 8,
+        "description": "Panels per row; rows follow from the number of charts."
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 1200,
+        "minimum": 100,
+        "maximum": 4000,
+        "description": "Total image width in pixels; each cell gets width/columns."
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 800,
+        "minimum": 100,
+        "maximum": 4000,
+        "description": "Total image height in pixels; each cell gets the remaining height divided by rows."
+      },
+      "charts": {
+        "type": "array",
+        "title": "Charts",
+        "description": "1-8 chart panels. Each object takes the dap.chart settings (type, x, y, series, title, subtitle, labels, units, sort, log axes, data_labels, grid, annotations, facet, lat/lng/size/color/label) plus 'input' - the input port 0-7 to read.",
+        "items": {
+          "type": "object",
+          "title": "Chart panel",
+          "properties": {
+            "input": {
+              "type": "integer",
+              "title": "Input port",
+              "default": 0,
+              "minimum": 0,
+              "maximum": 7,
+              "description": "Index of the connected input port this panel reads."
+            },
+            "type": {
+              "type": "string",
+              "title": "Chart type",
+              "enum": [
+                "bar",
+                "line",
+                "scatter",
+                "histogram",
+                "pie",
+                "boxplot",
+                "heatmap",
+                "map"
+              ]
+            },
+            "x": {
+              "type": "string",
+              "title": "X column"
+            },
+            "y": {
+              "type": "array",
+              "title": "Y columns",
+              "items": {
+                "type": "string",
+                "title": "Column"
+              }
+            },
+            "series": {
+              "type": "string",
+              "title": "Series column"
+            },
+            "title": {
+              "type": "string",
+              "title": "Panel title"
+            }
+          }
+        }
+      }
+    },
+    "required": [
+      "file",
+      "charts"
+    ]
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "id": "dap.fuzzy_join",
+  "name": "Fuzzy Join",
+  "category": "/Manipulation/Row/Join",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Joins two tables on similar text keys. Similarity is computed by DuckDB: jaro_winkler_similarity, levenshtein or damerau_levenshtein normalised by the longer key length. Candidates below 'threshold' are dropped, the best 'max_matches' right rows per left row are kept, and 'how' decides whether unmatched left rows survive. The output is the joined table plus a 'similarity' column; a right column whose name clashes gets the 'suffix'.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Left",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 1,
+      "name": "Right",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Fuzzy Join configuration",
+    "additionalProperties": false,
+    "properties": {
+      "left_key": {
+        "type": "string",
+        "title": "Left key",
+        "description": "Text column of the left input."
+      },
+      "right_key": {
+        "type": "string",
+        "title": "Right key",
+        "description": "Text column of the right input."
+      },
+      "method": {
+        "type": "string",
+        "title": "Similarity method",
+        "description": "String similarity used to match the keys.",
+        "enum": [
+          "jaro_winkler",
+          "levenshtein",
+          "damerau"
+        ],
+        "default": "jaro_winkler"
+      },
+      "threshold": {
+        "type": "number",
+        "title": "Threshold",
+        "description": "Minimum similarity (0..1) for a match.",
+        "default": 0.8,
+        "minimum": 0,
+        "maximum": 1
+      },
+      "how": {
+        "type": "string",
+        "title": "Join type",
+        "description": "inner keeps matched rows only, left keeps every left row.",
+        "enum": [
+          "inner",
+          "left"
+        ],
+        "default": "inner"
+      },
+      "max_matches": {
+        "type": "integer",
+        "title": "Max matches",
+        "description": "How many right rows one left row may match.",
+        "default": 1,
+        "minimum": 1
+      },
+      "suffix": {
+        "type": "string",
+        "title": "Right column suffix",
+        "description": "Suffix for a right column whose name already exists.",
+        "default": " (Right)"
+      }
+    },
+    "required": [
+      "left_key",
+      "right_key"
+    ]
+  }
+}

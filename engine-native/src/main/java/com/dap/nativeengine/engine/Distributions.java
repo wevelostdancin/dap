@@ -13,6 +13,29 @@ public final class Distributions {
     private static final double EPS = 1e-15;
     private static final double FPMIN = 1e-300;
     private static final int MAX_ITERATIONS = 500;
+    /** Acklam's inverse normal approximation coefficients (|error| &lt; 1.15e-9 before refinement). */
+    private static final double[] ACKLAM_A = {
+            -3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
+            1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00
+    };
+    private static final double[] ACKLAM_B = {
+            -5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
+            6.680131188771972e+01, -1.328068155288572e+01
+    };
+    private static final double[] ACKLAM_C = {
+            -7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
+            -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00
+    };
+    private static final double[] ACKLAM_D = {
+            7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
+            3.754408661907416e+00
+    };
+    /** Quadrature for the studentized range: outer over z, inner over the range density. */
+    private static final double RANGE_Z_LIMIT = 12.0;
+    private static final double INNER_LIMIT = 12.0;
+    private static final double[][] RANGE_NODES = gaussLegendre(96);
+    private static final double[][] INNER_NODES = gaussLegendre(128);
+
     /** Lanczos coefficients for g = 7, n = 9 (accuracy ~1e-15). */
     private static final double[] LANCZOS = {
             0.99999999999980993,
@@ -77,6 +100,224 @@ public final class Distributions {
         }
         double z = df1 * x / (df1 * x + df2);
         return regularizedBeta(df1 / 2.0, df2 / 2.0, z);
+    }
+
+    /** P(Z &lt;= x) for the standard normal distribution. */
+    public static double normalCdf(double x) {
+        if (Double.isNaN(x)) {
+            return Double.NaN;
+        }
+        if (x == Double.NEGATIVE_INFINITY) {
+            return 0.0;
+        }
+        if (x == Double.POSITIVE_INFINITY) {
+            return 1.0;
+        }
+        // erf(z) = P(1/2, z^2), so the normal tail reuses the incomplete gamma.
+        double z = x / Math.sqrt(2.0);
+        double erf = regularizedGammaP(0.5, z * z);
+        return x >= 0.0 ? 0.5 * (1.0 + erf) : 0.5 * (1.0 - erf);
+    }
+
+    /**
+     * Inverse of {@link #normalCdf}: the p-quantile of the standard normal distribution.
+     * Acklam's rational approximation followed by one Halley refinement step.
+     */
+    public static double normalQuantile(double p) {
+        if (!(p > 0.0) || !(p < 1.0)) {
+            throw new IllegalArgumentException("normalQuantile: p must be in (0, 1), got " + p);
+        }
+        if (p == 0.5) {
+            return 0.0;
+        }
+        double x;
+        if (p < 0.02425) {
+            double q = Math.sqrt(-2.0 * Math.log(p));
+            x = (((((ACKLAM_C[0] * q + ACKLAM_C[1]) * q + ACKLAM_C[2]) * q + ACKLAM_C[3]) * q
+                    + ACKLAM_C[4]) * q + ACKLAM_C[5])
+                    / ((((ACKLAM_D[0] * q + ACKLAM_D[1]) * q + ACKLAM_D[2]) * q + ACKLAM_D[3]) * q + 1.0);
+        } else if (p > 1.0 - 0.02425) {
+            double q = Math.sqrt(-2.0 * Math.log(1.0 - p));
+            x = -(((((ACKLAM_C[0] * q + ACKLAM_C[1]) * q + ACKLAM_C[2]) * q + ACKLAM_C[3]) * q
+                    + ACKLAM_C[4]) * q + ACKLAM_C[5])
+                    / ((((ACKLAM_D[0] * q + ACKLAM_D[1]) * q + ACKLAM_D[2]) * q + ACKLAM_D[3]) * q + 1.0);
+        } else {
+            double q = p - 0.5;
+            double r = q * q;
+            x = (((((ACKLAM_A[0] * r + ACKLAM_A[1]) * r + ACKLAM_A[2]) * r + ACKLAM_A[3]) * r
+                    + ACKLAM_A[4]) * r + ACKLAM_A[5]) * q
+                    / (((((ACKLAM_B[0] * r + ACKLAM_B[1]) * r + ACKLAM_B[2]) * r + ACKLAM_B[3]) * r
+                    + ACKLAM_B[4]) * r + 1.0);
+        }
+        // One Halley step; skipped in the far tails where the CDF underflows.
+        double cdf = normalCdf(x);
+        if (cdf > 1e-15 && cdf < 1.0 - 1e-15) {
+            double error = cdf - p;
+            double u = error * Math.sqrt(2.0 * Math.PI) * Math.exp(0.5 * x * x);
+            x -= u / (1.0 + 0.5 * x * u);
+        }
+        return x;
+    }
+
+    /** Inverse of {@link #tCdf}: the p-quantile of Student's t with df degrees of freedom. */
+    public static double tQuantile(double p, double df) {
+        if (!(p > 0.0) || !(p < 1.0)) {
+            throw new IllegalArgumentException("tQuantile: p must be in (0, 1), got " + p);
+        }
+        requirePositive(df, "df");
+        if (p == 0.5) {
+            return 0.0;
+        }
+        if (p < 0.5) {
+            return -tQuantile(1.0 - p, df);
+        }
+        double high = 1.0;
+        while (tCdf(high, df) < p) {
+            high *= 2.0;
+            if (high > 1e300) {
+                return Double.POSITIVE_INFINITY;
+            }
+        }
+        double low = 0.0;
+        for (int i = 0; i < 200; i++) {
+            double middle = 0.5 * (low + high);
+            if (tCdf(middle, df) < p) {
+                low = middle;
+            } else {
+                high = middle;
+            }
+            if (high - low <= 1e-13 * Math.max(1.0, high)) {
+                break;
+            }
+        }
+        return 0.5 * (low + high);
+    }
+
+    /**
+     * P(Q &lt;= q) for the studentized range distribution with k means and df degrees of
+     * freedom: the CDF behind Tukey's HSD. This is a port of R's {@code ptukey}:
+     *
+     * <pre>P(Q &lt;= q) = E_s[ P(range of k standard normals &lt;= q * s) ],
+     * s = sqrt(chi^2_df / df)</pre>
+     *
+     * <p>Both integrals are Gauss-Legendre quadrature. The outer one runs over the normal
+     * deviate z with u = Phi(z) as the chi-square probability, which keeps the integrand
+     * analytic and exponentially decaying instead of singular at the interval ends.</p>
+     */
+    public static double studentizedRangeCdf(double q, int k, double df) {
+        if (k < 2) {
+            throw new IllegalArgumentException("studentizedRangeCdf: k must be at least 2, got " + k);
+        }
+        requirePositive(df, "df");
+        if (Double.isNaN(q)) {
+            return Double.NaN;
+        }
+        if (q <= 0.0) {
+            return 0.0;
+        }
+        if (q == Double.POSITIVE_INFINITY) {
+            return 1.0;
+        }
+        double sum = 0.0;
+        for (int i = 0; i < RANGE_NODES[0].length; i++) {
+            double z = RANGE_Z_LIMIT * RANGE_NODES[0][i];
+            double weight = RANGE_Z_LIMIT * RANGE_NODES[1][i];
+            double probability = normalCdf(z);
+            if (probability <= 0.0) {
+                continue;
+            }
+            probability = Math.min(probability, 1.0 - 1e-16);
+            double x = chiSquareQuantile(probability, df);
+            double s = Math.sqrt(x / df);
+            sum += weight * normalDensity(z) * rangeCdf(q * s, k);
+        }
+        return clamp(sum);
+    }
+
+    /** CDF of the range of k independent standard normals: k * int phi(z) [Phi(z)-Phi(z-w)]^(k-1) dz. */
+    private static double rangeCdf(double w, int k) {
+        if (!(w > 0.0)) {
+            return 0.0;
+        }
+        double sum = 0.0;
+        for (int i = 0; i < INNER_NODES[0].length; i++) {
+            double z = INNER_LIMIT * INNER_NODES[0][i];
+            double weight = INNER_LIMIT * INNER_NODES[1][i];
+            double bracket = normalCdf(z) - normalCdf(z - w);
+            if (bracket <= 0.0) {
+                continue;
+            }
+            double powered = 1.0;
+            for (int j = 1; j < k; j++) {
+                powered *= bracket;
+                if (powered < 1e-300) {
+                    break;
+                }
+            }
+            sum += weight * normalDensity(z) * powered;
+        }
+        return clamp(k * sum);
+    }
+
+    /** Quantile of the chi-square distribution: bisection over {@link #chiSquareCdf}. */
+    private static double chiSquareQuantile(double p, double df) {
+        double high = df + 1.0;
+        while (chiSquareCdf(high, df) < p) {
+            high *= 2.0;
+            if (high > 1e300) {
+                return Double.POSITIVE_INFINITY;
+            }
+        }
+        double low = 0.0;
+        for (int i = 0; i < 100; i++) {
+            double middle = 0.5 * (low + high);
+            if (chiSquareCdf(middle, df) < p) {
+                low = middle;
+            } else {
+                high = middle;
+            }
+            if (high - low <= 1e-13 * Math.max(1.0, high)) {
+                break;
+            }
+        }
+        return 0.5 * (low + high);
+    }
+
+    private static double normalDensity(double z) {
+        return Math.exp(-0.5 * z * z) / Math.sqrt(2.0 * Math.PI);
+    }
+
+    private static double clamp(double probability) {
+        return Math.max(0.0, Math.min(1.0, probability));
+    }
+
+    /** Gauss-Legendre nodes and weights on [-1, 1] (Newton iteration on the Legendre polynomial). */
+    private static double[][] gaussLegendre(int nodes) {
+        double[] abscissae = new double[nodes];
+        double[] weights = new double[nodes];
+        int half = (nodes + 1) / 2;
+        for (int i = 0; i < half; i++) {
+            double z = Math.cos(Math.PI * (i + 0.75) / (nodes + 0.5));
+            double previous;
+            double derivative;
+            do {
+                double p1 = 1.0;
+                double p2 = 0.0;
+                for (int j = 0; j < nodes; j++) {
+                    double p3 = p2;
+                    p2 = p1;
+                    p1 = ((2.0 * j + 1.0) * z * p2 - j * p3) / (j + 1.0);
+                }
+                derivative = nodes * (z * p1 - p2) / (z * z - 1.0);
+                previous = z;
+                z = previous - p1 / derivative;
+            } while (Math.abs(z - previous) > 1e-15);
+            abscissae[i] = -z;
+            abscissae[nodes - 1 - i] = z;
+            weights[i] = 2.0 / ((1.0 - z * z) * derivative * derivative);
+            weights[nodes - 1 - i] = weights[i];
+        }
+        return new double[][]{abscissae, weights};
     }
 
     private static void requirePositive(double value, String name) {

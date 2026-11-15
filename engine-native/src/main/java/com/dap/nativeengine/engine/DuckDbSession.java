@@ -99,6 +99,9 @@ public final class DuckDbSession implements AutoCloseable {
                        String extensionDirectory) throws SQLException {
         try (Statement statement = base.createStatement()) {
             statement.execute("SET TimeZone='UTC'");
+            // Out-of-core default (spec §8): scans may reorder rows, which lets DuckDB stream
+            // and spill instead of buffering the insertion order of every table.
+            statement.execute("SET preserve_insertion_order=false");
         }
         applyExtensionDirectory(extensionDirectory);
         if (threads != null) {
@@ -350,6 +353,64 @@ public final class DuckDbSession implements AutoCloseable {
     }
 
     /**
+     * One page of a plan after an optional filter: {@code rows} is the total count after the
+     * filter, {@code data} is the projected page starting at {@code offset}.
+     */
+    public TableData page(String sql, List<ColumnSpec> columns, int limit, int offset,
+                          long timeoutMillis, String workflowId, String nodeId) throws SQLException {
+        int safeLimit = Math.max(0, limit);
+        int safeOffset = Math.max(0, offset);
+        DuckDBConnection connection = openRead(workflowId, nodeId);
+        try {
+            return bounded("table", timeoutMillis, workflowId,
+                    () -> readPage(connection, sql, columns, safeLimit, safeOffset));
+        } finally {
+            endRead(connection);
+        }
+    }
+
+    private static TableData readPage(DuckDBConnection connection, String sql,
+                                      List<ColumnSpec> columns, int limit, int offset)
+            throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            long rows = countWith(statement, sql);
+            List<List<String>> data = new ArrayList<>();
+            try (ResultSet result = statement.executeQuery("SELECT * FROM ("
+                    + LazyPlan.stripSemicolon(sql) + ") AS dap_page LIMIT " + limit
+                    + " OFFSET " + offset)) {
+                while (result.next()) {
+                    List<String> row = new ArrayList<>(columns.size());
+                    for (int column = 1; column <= columns.size(); column++) {
+                        row.add(format(result.getObject(column)));
+                    }
+                    data.add(row);
+                }
+            }
+            return new TableData(rows, columns, data);
+        }
+    }
+
+    /**
+     * The physical plan of a query as DuckDB's JSON array, without executing it.
+     * {@code EXPLAIN (FORMAT JSON)} returns (explain_key, explain_value) rows.
+     */
+    public String explainJson(String sql) throws SQLException {
+        try (DuckDBConnection connection = newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("EXPLAIN (FORMAT JSON) "
+                     + LazyPlan.stripSemicolon(sql))) {
+            int valueColumn = result.getMetaData().getColumnCount() >= 2 ? 2 : 1;
+            while (result.next()) {
+                String value = result.getString(valueColumn);
+                if (value != null && !value.isBlank()) {
+                    return value;
+                }
+            }
+            throw new SQLException("EXPLAIN returned no plan");
+        }
+    }
+
+    /**
      * Declared output columns of a query: {@code SELECT * FROM (<sql>) LIMIT 0} plus JDBC
      * metadata, mapped through {@link TypeMap}. Nested result types (LIST, STRUCT, MAP)
      * and TIMESTAMPTZ are rejected with the column name because the engine has no Arrow
@@ -432,42 +493,87 @@ public final class DuckDbSession implements AutoCloseable {
         }
     }
 
+    /** Above this row count the profile skips the exact-distinct refinement to stay bounded. */
+    private static final long REFINE_ROW_LIMIT = 1_000_000L;
+
     private static ProfileData readProfile(DuckDBConnection connection, String sql,
                                            List<ColumnSpec> columns) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             long rows = countWith(statement, sql);
-            List<ProfileColumn> profile = new ArrayList<>(columns.size());
-            for (ColumnSpec column : columns) {
+            String table = "(" + LazyPlan.stripSemicolon(sql) + ") AS dap_plan";
+            StringBuilder aggregates = new StringBuilder("COUNT(*) AS dap_rows");
+            for (int index = 0; index < columns.size(); index++) {
+                ColumnSpec column = columns.get(index);
                 String quoted = quote(column.name());
                 // KNIME counts distinct exactly up to 100k distinct values per column; above
-                // that the approximate sketch is allowed to differ (docs/QUALITY.md). Decide
-                // from the single COUNT(*) taken for the whole plan, not per column.
+                // that the approximate sketch is allowed to differ (docs/QUALITY.md).
                 String distinctSql = rows > MAX_DISTINCT
                         ? "APPROX_COUNT_DISTINCT(" + quoted + ")"
                         : "COUNT(DISTINCT " + quoted + ")";
-                String stats = "COUNT(*) - COUNT(" + quoted + ") AS missing, " + distinctSql + " AS distinct";
+                aggregates.append(", COUNT(").append(quoted).append(") AS \"c").append(index)
+                        .append("_present\"");
+                aggregates.append(", ").append(distinctSql).append(" AS \"c").append(index)
+                        .append("_distinct\"");
                 if (column.numeric()) {
-                    stats += ", MIN(" + quoted + ") AS min_value, MAX(" + quoted + ") AS max_value, AVG(" + quoted + ") AS mean_value";
+                    aggregates.append(", MIN(").append(quoted).append(") AS \"c").append(index)
+                            .append("_min\"");
+                    aggregates.append(", MAX(").append(quoted).append(") AS \"c").append(index)
+                            .append("_max\"");
+                    aggregates.append(", AVG(").append(quoted).append(") AS \"c").append(index)
+                            .append("_mean\"");
                 }
-                String query = "SELECT " + stats + " FROM (" + LazyPlan.stripSemicolon(sql) + ") AS dap_plan";
-                try (ResultSet result = statement.executeQuery(query)) {
-                    result.next();
-                    long missing = result.getLong("missing");
-                    long distinct = result.getLong("distinct");
-                    Double min = column.numeric() ? asDouble(result.getObject("min_value")) : null;
-                    Double max = column.numeric() ? asDouble(result.getObject("max_value")) : null;
-                    Double mean = column.numeric() ? asDouble(result.getObject("mean_value")) : null;
-                    if (rows > MAX_DISTINCT && distinct <= REFINE_DISTINCT) {
-                        // The sketch may only differ for genuinely large cardinality: when its
-                        // estimate is still near the cap, refine to the exact count so the
-                        // "exact up to 100k" promise survives the sketch's ~3 % error. A second
-                        // statement keeps the open stats ResultSet out of the driver's way.
-                        try (Statement refine = connection.createStatement()) {
-                            distinct = exactDistinct(refine, sql, quoted);
-                        }
+            }
+            long[] present = new long[columns.size()];
+            long[] distinct = new long[columns.size()];
+            Double[] min = new Double[columns.size()];
+            Double[] max = new Double[columns.size()];
+            Double[] mean = new Double[columns.size()];
+            try (ResultSet result = statement.executeQuery(
+                    "SELECT " + aggregates + " FROM " + table)) {
+                result.next();
+                for (int index = 0; index < columns.size(); index++) {
+                    ColumnSpec column = columns.get(index);
+                    present[index] = result.getLong("c" + index + "_present");
+                    distinct[index] = result.getLong("c" + index + "_distinct");
+                    if (column.numeric()) {
+                        min[index] = asDouble(result.getObject("c" + index + "_min"));
+                        max[index] = asDouble(result.getObject("c" + index + "_max"));
+                        mean[index] = asDouble(result.getObject("c" + index + "_mean"));
                     }
-                    profile.add(new ProfileColumn(column.name(), column.knimeType(), missing, distinct, min, max, mean));
                 }
+            }
+            // Refine low-cardinality estimates in one extra scan, not one scan per column.
+            List<Integer> refine = new ArrayList<>();
+            if (rows > MAX_DISTINCT && rows <= REFINE_ROW_LIMIT) {
+                for (int index = 0; index < columns.size(); index++) {
+                    if (distinct[index] <= REFINE_DISTINCT) {
+                        refine.add(index);
+                    }
+                }
+            }
+            if (!refine.isEmpty()) {
+                StringBuilder exact = new StringBuilder();
+                for (int position = 0; position < refine.size(); position++) {
+                    if (position > 0) {
+                        exact.append(", ");
+                    }
+                    int index = refine.get(position);
+                    exact.append("COUNT(DISTINCT ").append(quote(columns.get(index).name()))
+                            .append(") AS \"r").append(index).append('"');
+                }
+                try (ResultSet result = statement.executeQuery(
+                        "SELECT " + exact + " FROM " + table)) {
+                    result.next();
+                    for (int index : refine) {
+                        distinct[index] = result.getLong("r" + index);
+                    }
+                }
+            }
+            List<ProfileColumn> profile = new ArrayList<>(columns.size());
+            for (int index = 0; index < columns.size(); index++) {
+                ColumnSpec column = columns.get(index);
+                profile.add(new ProfileColumn(column.name(), column.knimeType(), rows - present[index],
+                        distinct[index], min[index], max[index], mean[index]));
             }
             return new ProfileData(rows, profile);
         }
@@ -575,6 +681,12 @@ public final class DuckDbSession implements AutoCloseable {
         prefixes.add("excel_" + sanitize(workflowId) + "_");
         prefixes.add("db_" + sanitize(workflowId) + "_");
         prefixes.add("files_" + sanitize(workflowId) + "_");
+        // text_normalize loads a distinct-value mapping table per selected column.
+        prefixes.add("textnorm_");
+        // The in-memory statistics nodes (outlier methods, cluster, pca) materialize one
+        // per-row result mapping table named stats_<workflow>_<node>.
+        prefixes.add("stats_" + workflowId + "_");
+        prefixes.add("stats_" + sanitize(workflowId) + "_");
         List<String> names = new ArrayList<>();
         try (Statement statement = base.createStatement();
              ResultSet result = statement.executeQuery(

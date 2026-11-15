@@ -1,0 +1,61 @@
+{
+  "id": "dap.survival",
+  "name": "Survival",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Kaplan-Meier survival curves and the log-rank test, computed in Java over at most 100000 rows. Mode km emits one row per distinct event time with time, n_at_risk, events, censored, survival and the Greenwood log confidence interval ci_low/ci_high (clamped to [0, 1]; the maximal [0, 1] when the last observation is an event), plus the optional group column. Mode logrank emits one row with test, statistic, df, p_value and groups: the Mantel-Haenszel (O-E)'V^-1(O-E) over the first k-1 groups with the hypergeometric variance and a chi-square p-value with k-1 degrees of freedom. The time column is numeric or a date; event is boolean or 0/1 numeric; rows with a NULL time, event or group are dropped.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Survival configuration",
+    "additionalProperties": false,
+    "properties": {
+      "time": {
+        "type": "string",
+        "title": "Time column",
+        "description": "Numeric or date column with the non-negative follow-up time."
+      },
+      "event": {
+        "type": "string",
+        "title": "Event column",
+        "description": "Boolean or numeric 0/1 column: 1/true is an event, 0/false a censoring."
+      },
+      "group": {
+        "type": "string",
+        "title": "Group column",
+        "description": "Optional categorical column: one curve per group; required for mode logrank (at least two groups)."
+      },
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "km emits the Kaplan-Meier curve; logrank runs the log-rank test over the groups.",
+        "enum": [
+          "km",
+          "logrank"
+        ],
+        "default": "km"
+      }
+    },
+    "required": [
+      "time",
+      "event"
+    ]
+  }
+}

@@ -7,6 +7,8 @@ import com.dap.nativeengine.engine.LazyPlan;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.exec.NodeContext;
 import com.dap.nativeengine.exec.NodeExecutor;
+import com.dap.nativeengine.io.DatasetCatalog;
+import com.dap.nativeengine.io.IngestService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -100,7 +102,7 @@ class NativeServiceTest {
         Resp meta = send("GET", "/v1", "bad session!", null);
         assertEquals(200, meta.status());
         assertEquals("DAP", meta.body().path("name").asText());
-        assertEquals("1.1.0", meta.body().path("version").asText());
+        assertEquals("1.2.0", meta.body().path("version").asText());
         assertEquals("v1", meta.body().path("api").asText());
         assertEquals("/v1/nodes, /v1/workflows, /v1/jobs, /v1/health", meta.body().path("endpoints").asText());
         assertEquals("1", meta.header("X-DAP-Api-Version"));
@@ -113,10 +115,10 @@ class NativeServiceTest {
         JsonNode body = health.body();
         assertTrue(body.path("ok").asBoolean());
         assertEquals("DAP", body.path("name").asText());
-        assertEquals("1.1.0", body.path("version").asText());
+        assertEquals("1.2.0", body.path("version").asText());
         assertEquals("1", body.path("api").asText());
-        assertEquals(52, body.path("nodes").asInt());
-        assertEquals(52, body.path("coreNodes").asInt());
+        assertEquals(66, body.path("nodes").asInt());
+        assertEquals(66, body.path("coreNodes").asInt());
         assertEquals(0, body.path("workflows").asInt());
         assertEquals(0, body.path("sessions").asInt());
         assertEquals(0, body.path("jobs").asInt());
@@ -134,7 +136,7 @@ class NativeServiceTest {
     void catalogRoutes() throws Exception {
         Resp list = get("/v1/nodes?limit=100");
         assertEquals(200, list.status());
-        assertEquals(52, list.body().path("count").asInt());
+        assertEquals(66, list.body().path("count").asInt());
 
         Resp node = get("/v1/nodes/dap.csv_reader");
         assertEquals(200, node.status());
@@ -376,6 +378,23 @@ class NativeServiceTest {
                 Map.of("settings", Map.of("keys", List.of(Map.of("column", "age", "direction", "asc")))));
         assertEquals(200, patchOk.status());
         assertEquals(nodeId, patchOk.body().path("node").asText());
+    }
+
+    @Test
+    void sqlQueryAcceptsEightInputsAndRejectsTheNinth() throws Exception {
+        String workflow = createWorkflow("sql-eight-ports");
+        String query = addNode(workflow, "dap.sql_query", Map.of("sql", "SELECT 1 AS one"));
+        for (int port = 0; port < 8; port++) {
+            String source = addNode(workflow, "dap.sorter", Map.of("keys", List.of()));
+            Resp connected = post("/v1/workflows/" + workflow + "/connect",
+                    Map.of("from", source, "to", query, "fromPort", 0, "toPort", port));
+            assertEquals(200, connected.status(), "port " + port + ": " + connected.raw().body());
+        }
+        String ninth = addNode(workflow, "dap.sorter", Map.of("keys", List.of()));
+        Resp rejected = post("/v1/workflows/" + workflow + "/connect",
+                Map.of("from", ninth, "to", query, "fromPort", 0, "toPort", 8));
+        assertEquals(400, rejected.status());
+        assertEquals("node has 8 in ports", rejected.error());
     }
 
     @Test
@@ -875,6 +894,22 @@ class NativeServiceTest {
         return started;
     }
 
+    /** Service whose dataset catalog writes to a temp file instead of the shared one. */
+    private NativeService startCatalogService(Path datasetsFile) throws IOException {
+        return startServiceWithCatalog(new DatasetCatalog(datasetsFile,
+                new IngestService(tempDir.resolve("catalog-cache"))));
+    }
+
+    private NativeService startServiceWithCatalog(DatasetCatalog catalog) throws IOException {
+        NativeService started = new NativeService(
+                new NativeService.Settings(100, 600, "127.0.0.1", 0), new NodeRegistry(),
+                NativeService.defaultExecutors(), catalog);
+        started.start(0);
+        base = "http://127.0.0.1:" + started.port();
+        extras.add(started);
+        return started;
+    }
+
     private Path csvFile() throws IOException {
         Path file = tempDir.resolve("people.csv");
         Files.writeString(file, "name,age,city\nalice,34,Berlin\nbob,28,\ncarol,41,Paris\n",
@@ -989,6 +1024,103 @@ class NativeServiceTest {
     }
 
     @Test
+    void tablePagingProjectionAndFilter() throws Exception {
+        String workflow = createWorkflow("table-page");
+        String node = addNode(workflow, "dap.sql_query", Map.of("sql",
+                "SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, 'c')) AS t(id, name) ORDER BY id"));
+        assertEquals(200, post("/v1/workflows/" + workflow + "/run", Map.of()).status());
+
+        String base = "/v1/workflows/" + workflow + "/nodes/" + node + "/table";
+        Resp first = get(base + "?limit=2&offset=0");
+        assertEquals(200, first.status(), first.raw().body());
+        assertEquals(3, first.body().path("rows").asInt());
+        assertEquals(0, first.body().path("offset").asInt());
+        assertEquals(2, first.body().path("nextOffset").asInt());
+        assertTrue(first.body().path("truncated").asBoolean());
+        assertEquals(2, first.body().path("data").size());
+        assertEquals("1", first.body().path("data").get(0).get(0).asText());
+
+        Resp second = get(base + "?limit=2&offset=2");
+        assertEquals(200, second.status());
+        assertEquals(1, second.body().path("data").size());
+        assertEquals("3", second.body().path("data").get(0).get(0).asText());
+        assertTrue(second.body().path("nextOffset").isNull());
+        assertFalse(second.body().path("truncated").asBoolean());
+
+        Resp projected = get(base + "?columns=name");
+        assertEquals(200, projected.status(), projected.raw().body());
+        assertEquals(1, projected.body().path("columns").size());
+        assertEquals("name", projected.body().path("columns").get(0).path("name").asText());
+        assertEquals("a", projected.body().path("data").get(0).get(0).asText());
+
+        Resp filtered = get(base + "?where=" + java.net.URLEncoder.encode("id > 1",
+                java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(200, filtered.status(), filtered.raw().body());
+        assertEquals(2, filtered.body().path("rows").asInt());
+        assertEquals(2, filtered.body().path("data").size());
+
+        Resp unknown = get(base + "?columns=nope");
+        assertEquals(400, unknown.status());
+        assertEquals("unknown_column", unknown.body().path("code").asText(), unknown.error());
+
+        for (String injection : List.of("1=1; DROP TABLE x", "1=1 -- x", "SELECT 1",
+                "read_csv('/etc/passwd')", "1=1 /* x")) {
+            Resp rejected = get(base + "?where=" + java.net.URLEncoder.encode(injection,
+                    java.nio.charset.StandardCharsets.UTF_8));
+            assertEquals(400, rejected.status(), injection);
+            assertEquals("invalid_filter", rejected.body().path("code").asText(), rejected.error());
+        }
+    }
+
+    @Test
+    void estimateReportsCardinalityForReaderAndQueryNodes() throws Exception {
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+        String workflow = createWorkflow("estimate");
+        String reader = addNode(workflow, "dap.csv_reader", Map.of("file", csv.toString()));
+        String query = addNode(workflow, "dap.sql_query",
+                Map.of("sql", "SELECT * FROM \"" + reader + "\" WHERE sepal_length > 5"));
+        assertEquals(200, post("/v1/workflows/" + workflow + "/connect",
+                Map.of("from", reader, "to", query)).status());
+
+        Resp before = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/estimate");
+        assertEquals(409, before.status());
+        assertEquals("estimate_unavailable", before.body().path("code").asText(), before.error());
+
+        assertEquals(200, post("/v1/workflows/" + workflow + "/run", Map.of()).status());
+
+        Resp readerEstimate = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/estimate");
+        assertEquals(200, readerEstimate.status(), readerEstimate.raw().body());
+        assertEquals(reader, readerEstimate.body().path("node").asText());
+        assertEquals(150, readerEstimate.body().path("rows").asInt());
+        assertFalse(readerEstimate.body().path("operators").isEmpty());
+        assertTrue(readerEstimate.body().path("plan").has("physical_plan"));
+
+        Resp queryEstimate = get("/v1/workflows/" + workflow + "/nodes/" + query + "/estimate");
+        assertEquals(200, queryEstimate.status(), queryEstimate.raw().body());
+        assertTrue(queryEstimate.body().path("rows").asInt() > 0);
+        assertTrue(queryEstimate.body().path("operators").size() >= 2);
+    }
+
+    @Test
+    void asyncRunReportsProgress() throws Exception {
+        String workflow = createWorkflow("progress");
+        String node = addNode(workflow, "dap.sql_query",
+                Map.of("sql", "SELECT * FROM range(5) AS t(i)"));
+        Resp submitted = post("/v1/workflows/" + workflow + "/run?async=true", Map.of());
+        assertEquals(202, submitted.status(), submitted.raw().body());
+        String jobId = submitted.body().path("id").asText();
+
+        JsonNode finished = awaitJobState(jobId, Set.of("succeeded"), Duration.ofSeconds(10));
+        JsonNode progress = finished.path("progress");
+        assertEquals(1, progress.path("nodesTotal").asInt());
+        assertEquals(1, progress.path("nodesDone").asInt());
+        assertEquals(100, progress.path("percent").asInt());
+        assertTrue(progress.has("currentNode"));
+        assertNotNull(node);
+    }
+
+    @Test
     void ingestFeedsParquetReader() throws Exception {
         Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
                 .toAbsolutePath().normalize();
@@ -1010,6 +1142,331 @@ class NativeServiceTest {
         assertEquals(200, table.status(), table.raw().body());
         assertEquals(150, table.body().path("rows").asInt());
         assertEquals("sepal_length", table.body().path("columns").get(0).path("name").asText());
+    }
+
+    @Test
+    void ingestCsvOptionsHandleHeaderlessAndRaggedFiles() throws Exception {
+        Path headerless = tempDir.resolve("headerless.csv");
+        Files.writeString(headerless, "1,alpha\n2,beta\n", StandardCharsets.UTF_8);
+
+        Resp noHeader = post("/v1/datasets", Map.of("file", headerless.toString(),
+                "format", "csv", "header", false));
+        assertEquals(200, noHeader.status(), noHeader.raw().body());
+        assertEquals(2, noHeader.body().path("rows").asInt());
+        assertEquals(2, noHeader.body().path("columns").size());
+
+        Path ragged = tempDir.resolve("ragged.csv");
+        Files.writeString(ragged, "a,b\n1,2\n3,4,5\n6,7\n", StandardCharsets.UTF_8);
+        Resp tolerant = post("/v1/datasets", Map.of("file", ragged.toString(),
+                "format", "csv", "ignoreErrors", true, "strictMode", true));
+        assertEquals(200, tolerant.status(), tolerant.raw().body());
+        assertEquals(2, tolerant.body().path("rows").asInt());
+
+        Resp invalid = post("/v1/datasets", Map.of("file", headerless.toString(),
+                "format", "csv", "header", "yes"));
+        assertEquals(400, invalid.status(), invalid.raw().body());
+    }
+
+    // ------------------------------------------------------- dataset catalog
+
+    @Test
+    void datasetCatalogCrudRoutes() throws Exception {
+        Path datasetsFile = tempDir.resolve("catalog").resolve("datasets.json");
+        startCatalogService(datasetsFile);
+
+        Resp empty = get("/v1/catalog/datasets");
+        assertEquals(200, empty.status(), empty.raw().body());
+        assertEquals(0, empty.body().path("count").asInt());
+
+        Path csv = csvFile();
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("name", "people");
+        request.put("file", csv.toString());
+        request.put("format", "csv");
+        request.put("description", "demo data");
+        request.put("tags", List.of("demo", "p6"));
+        request.put("owner", "alice");
+        Resp added = post("/v1/catalog/datasets", request);
+        assertEquals(200, added.status(), added.raw().body());
+        JsonNode entry = added.body();
+        assertEquals("people", entry.path("name").asText());
+        assertEquals("demo data", entry.path("description").asText());
+        assertEquals("alice", entry.path("owner").asText());
+        assertEquals(2, entry.path("tags").size());
+        assertEquals(csv.toAbsolutePath().normalize().toString(), entry.path("source").asText());
+        assertEquals("csv", entry.path("format").asText());
+        assertEquals(3, entry.path("rows").asInt());
+        assertEquals(3, entry.path("columns").asInt());
+        assertEquals(1, entry.path("version").asInt());
+        assertEquals(64, entry.path("contentHash").asText().length());
+        assertTrue(Files.isRegularFile(Path.of(entry.path("path").asText())));
+        assertTrue(Files.isRegularFile(datasetsFile), "the catalog file must be written");
+        assertEquals(0, entry.path("history").size());
+        assertFalse(entry.has("profile"), "a fresh entry has no cached profile");
+
+        Resp duplicate = post("/v1/catalog/datasets", request);
+        assertEquals(409, duplicate.status());
+        assertEquals("dataset_exists", duplicate.body().path("code").asText());
+        assertTrue(duplicate.body().path("hint").asText().contains("refresh"));
+
+        Resp invalidName = post("/v1/catalog/datasets",
+                Map.of("name", "bad name", "file", csv.toString()));
+        assertEquals(400, invalidName.status());
+        assertEquals("invalid_dataset_name", invalidName.body().path("code").asText());
+        Resp missingName = post("/v1/catalog/datasets", Map.of("file", csv.toString()));
+        assertEquals(400, missingName.status());
+        assertEquals("invalid_dataset_name", missingName.body().path("code").asText());
+        assertEquals(400, post("/v1/catalog/datasets", Map.of("name", "nofile")).status());
+        assertEquals(400, post("/v1/catalog/datasets",
+                Map.of("name", "two", "file", csv.toString(), "dataset", entry.path("path").asText()))
+                .status());
+        assertEquals(400, post("/v1/catalog/datasets",
+                Map.of("name", "badformat", "file", csv.toString(), "format", "xml")).status());
+        assertEquals(400, post("/v1/catalog/datasets",
+                Map.of("name", "badtags", "file", csv.toString(), "tags", "not-an-array")).status());
+        Path denied = Path.of(System.getProperty("user.home"), ".ssh", "id_ed25519");
+        Resp deniedSource = post("/v1/catalog/datasets",
+                Map.of("name", "keys", "file", denied.toString()));
+        assertEquals(400, deniedSource.status());
+        assertEquals("path_not_allowed", deniedSource.body().path("code").asText());
+        assertTrue(deniedSource.body().path("hint").asText().contains("DAP_ALLOWED_ROOTS"));
+
+        Resp listed = get("/v1/catalog/datasets");
+        assertEquals(200, listed.status());
+        assertEquals(1, listed.body().path("count").asInt());
+        assertEquals("people", listed.body().path("datasets").get(0).path("name").asText());
+        assertFalse(listed.body().path("datasets").get(0).has("history"),
+                "the listing stays compact");
+
+        Resp fetched = get("/v1/catalog/datasets/people");
+        assertEquals(200, fetched.status());
+        assertEquals("people", fetched.body().path("name").asText());
+        assertEquals(0, fetched.body().path("history").size());
+
+        // An already ingested Parquet dataset is accepted through the dataset field.
+        Resp fromParquet = post("/v1/catalog/datasets", Map.of("name", "people-parquet",
+                "dataset", entry.path("path").asText()));
+        assertEquals(200, fromParquet.status(), fromParquet.raw().body());
+        assertEquals("parquet", fromParquet.body().path("format").asText());
+        assertEquals(3, fromParquet.body().path("rows").asInt());
+        assertEquals(400, post("/v1/catalog/datasets", Map.of("name", "parquet-csv",
+                "dataset", entry.path("path").asText(), "format", "csv")).status());
+
+        // Profile: computed once, then served from the cache.
+        Resp profile = get("/v1/catalog/datasets/people/profile");
+        assertEquals(200, profile.status(), profile.raw().body());
+        assertEquals("people", profile.body().path("name").asText());
+        assertEquals(1, profile.body().path("version").asInt());
+        assertEquals(3, profile.body().path("rows").asInt());
+        assertEquals(3, profile.body().path("columns").size());
+        assertEquals("age", profile.body().path("columns").get(1).path("name").asText());
+        assertEquals("Int64", profile.body().path("columns").get(1).path("type").asText());
+        assertEquals(28.0, profile.body().path("columns").get(1).path("min").asDouble());
+        assertEquals(41.0, profile.body().path("columns").get(1).path("max").asDouble());
+        assertEquals(1, profile.body().path("columns").get(2).path("missing").asInt());
+        assertFalse(profile.body().path("cached").asBoolean());
+        Resp cachedProfile = get("/v1/catalog/datasets/people/profile");
+        assertTrue(cachedProfile.body().path("cached").asBoolean());
+        Resp forcedProfile = get("/v1/catalog/datasets/people/profile?refresh=true");
+        assertFalse(forcedProfile.body().path("cached").asBoolean());
+        assertEquals(profile.body().path("columns"), forcedProfile.body().path("columns"));
+        assertTrue(get("/v1/catalog/datasets/people").body().has("profile"),
+                "the computed profile is cached in the entry");
+
+        Resp patched = patch("/v1/catalog/datasets/people",
+                Map.of("description", "updated", "tags", List.of("x"), "owner", "bob"));
+        assertEquals(200, patched.status(), patched.raw().body());
+        assertEquals("updated", patched.body().path("description").asText());
+        assertEquals("bob", patched.body().path("owner").asText());
+        assertEquals(1, patched.body().path("tags").size());
+        assertEquals(1, patched.body().path("version").asInt());
+        assertEquals(400, patch("/v1/catalog/datasets/people", Map.of("tags", "not-an-array")).status());
+
+        Resp refreshed = post("/v1/catalog/datasets/people/refresh", Map.of());
+        assertEquals(200, refreshed.status(), refreshed.raw().body());
+        assertEquals(2, refreshed.body().path("version").asInt());
+        assertEquals("updated", refreshed.body().path("description").asText(),
+                "refresh keeps the metadata");
+        assertEquals(1, refreshed.body().path("history").size());
+        assertEquals(1, refreshed.body().path("history").get(0).path("version").asInt());
+        assertEquals(2, get("/v1/catalog/datasets/people/profile").body().path("version").asInt());
+
+        Resp unknown = get("/v1/catalog/datasets/nope");
+        assertEquals(404, unknown.status());
+        assertEquals("dataset_not_found", unknown.body().path("code").asText());
+        assertTrue(unknown.body().path("hint").asText().contains("/v1/catalog/datasets"));
+        assertEquals(404, get("/v1/catalog/datasets/nope/profile").status());
+        assertEquals(404, patch("/v1/catalog/datasets/nope", Map.of("description", "x")).status());
+        assertEquals(404, post("/v1/catalog/datasets/nope/refresh", Map.of()).status());
+        assertEquals(404, delete("/v1/catalog/datasets/nope").status());
+
+        Resp removed = delete("/v1/catalog/datasets/people");
+        assertEquals(200, removed.status());
+        assertTrue(removed.body().path("ok").asBoolean());
+        assertEquals("people", removed.body().path("name").asText());
+        assertEquals(404, get("/v1/catalog/datasets/people").status());
+        assertEquals(1, get("/v1/catalog/datasets").body().path("count").asInt());
+    }
+
+    @Test
+    void datasetCatalogSurvivesARestart() throws Exception {
+        Path datasetsFile = tempDir.resolve("catalog-restart").resolve("datasets.json");
+        startCatalogService(datasetsFile);
+        Path csv = csvFile();
+        Resp added = post("/v1/catalog/datasets",
+                Map.of("name", "people", "file", csv.toString(), "description", "demo"));
+        assertEquals(200, added.status(), added.raw().body());
+        assertEquals(200, post("/v1/catalog/datasets/people/refresh", Map.of()).status());
+        assertFalse(get("/v1/catalog/datasets/people/profile").body().path("cached").asBoolean());
+
+        // A new engine process over the same file sees the entry, its history and the cache.
+        DatasetCatalog reloaded = new DatasetCatalog(datasetsFile,
+                new IngestService(tempDir.resolve("catalog-cache")));
+        startServiceWithCatalog(reloaded);
+
+        Resp listed = get("/v1/catalog/datasets");
+        assertEquals(200, listed.status(), listed.raw().body());
+        assertEquals(1, listed.body().path("count").asInt());
+        Resp fetched = get("/v1/catalog/datasets/people");
+        assertEquals("people", fetched.body().path("name").asText());
+        assertEquals("demo", fetched.body().path("description").asText());
+        assertEquals(2, fetched.body().path("version").asInt());
+        assertEquals(1, fetched.body().path("history").size());
+        assertTrue(get("/v1/catalog/datasets/people/profile").body().path("cached").asBoolean(),
+                "the profile cache must survive a restart");
+    }
+
+    @Test
+    void datasetCatalogCorruptFileFailsWithAHint() throws Exception {
+        Path datasetsFile = tempDir.resolve("broken-catalog").resolve("datasets.json");
+        Files.createDirectories(datasetsFile.getParent());
+        Files.writeString(datasetsFile, "{not json", StandardCharsets.UTF_8);
+        startCatalogService(datasetsFile);
+
+        Resp listed = get("/v1/catalog/datasets");
+
+        assertEquals(500, listed.status(), listed.raw().body());
+        assertEquals("datasets_corrupt", listed.body().path("code").asText());
+        assertTrue(listed.body().path("error").asText().contains("datasets.json"));
+        assertTrue(listed.body().path("hint").asText().contains("datasets.json"));
+    }
+
+    @Test
+    void exploreProfilesIrisAndIsStableAcrossCalls() throws Exception {
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+        assertTrue(Files.isRegularFile(csv), "fixture missing: " + csv);
+
+        Resp first = post("/v1/explore", Map.of("file", csv.toString(), "format", "csv"));
+        assertEquals(200, first.status(), first.raw().body());
+        JsonNode body = first.body();
+        assertEquals(csv.toString(), body.path("source").asText());
+        assertEquals(150, body.path("rows").asInt());
+        assertEquals(5, body.path("columns").size());
+        JsonNode species = column(body, "species");
+        assertEquals("Utf8", species.path("type").asText());
+        assertEquals(3, species.path("distinct").asInt());
+        assertEquals(0, species.path("missing").asInt());
+        assertEquals(43, column(body, "petal_length").path("distinct").asInt());
+        int score = body.path("quality").path("score").asInt();
+        assertTrue(score >= 0 && score <= 100, "quality score out of range: " + score);
+        assertTrue(body.path("quality").path("issues").isArray());
+
+        JsonNode petals = findPair(body.path("relationships"), "petal_length", "petal_width");
+        assertNotNull(petals, "petal relationship missing: " + body.path("relationships"));
+        assertEquals("pearson", petals.path("method").asText());
+        assertTrue(petals.path("value").asDouble() > 0.9);
+        assertTrue(petals.path("p_value").asDouble() < 1e-10);
+        assertEquals(150, petals.path("n").asInt());
+        assertEquals("very strong", petals.path("strength").asText());
+
+        JsonNode anova = findPair(body.path("group_differences"), "petal_length", "species");
+        assertNotNull(anova, "species difference missing: " + body.path("group_differences"));
+        assertEquals("anova", anova.path("test").asText());
+        assertTrue(anova.path("p_value").asDouble() < 1e-6);
+
+        JsonNode hypotheses = body.path("hypotheses");
+        assertTrue(hypotheses.size() >= 3 && hypotheses.size() <= 5,
+                "expected 3 to 5 hypotheses, got " + hypotheses);
+        for (JsonNode hypothesis : hypotheses) {
+            assertFalse(hypothesis.path("id").asText().isBlank());
+            assertFalse(hypothesis.path("question").asText().isBlank());
+            assertFalse(hypothesis.path("test").asText().isBlank());
+            assertTrue(hypothesis.path("columns").size() > 0);
+            assertFalse(hypothesis.path("rationale").asText().isBlank());
+            assertTrue(Set.of("high", "medium", "low").contains(hypothesis.path("priority").asText()));
+        }
+        assertTrue(body.path("recommendations").size() > 0);
+        assertTrue(body.path("time").isMissingNode(), "iris has no date column");
+
+        Resp second = post("/v1/explore", Map.of("file", csv.toString(), "format", "csv"));
+        assertEquals(200, second.status(), second.raw().body());
+        assertEquals(hypotheses, second.body().path("hypotheses"),
+                "hypotheses must be stable across calls");
+        assertEquals(body.path("relationships"), second.body().path("relationships"));
+    }
+
+    @Test
+    void exploreAcceptsAnIngestedDatasetPath() throws Exception {
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+        Resp ingested = post("/v1/datasets", Map.of("file", csv.toString(), "format", "csv"));
+        assertEquals(200, ingested.status(), ingested.raw().body());
+        String parquet = ingested.body().path("path").asText();
+
+        Resp explored = post("/v1/explore", Map.of("dataset", parquet));
+        assertEquals(200, explored.status(), explored.raw().body());
+        assertEquals(parquet, explored.body().path("source").asText());
+        assertEquals(150, explored.body().path("rows").asInt());
+
+        Resp sql = post("/v1/explore", Map.of("dataset", parquet,
+                "sql", "SELECT petal_length * 2 AS pl2, species FROM src"));
+        assertEquals(200, sql.status(), sql.raw().body());
+        assertEquals(2, sql.body().path("columns").size());
+        assertEquals("pl2", sql.body().path("columns").get(0).path("name").asText());
+    }
+
+    @Test
+    void exploreRejectsBothOrNeitherSource() throws Exception {
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+
+        Resp both = post("/v1/explore", Map.of("file", csv.toString(), "dataset", csv.toString()));
+        assertEquals(400, both.status(), both.raw().body());
+
+        Resp neither = post("/v1/explore", Map.of());
+        assertEquals(400, neither.status(), neither.raw().body());
+
+        Resp badFormat = post("/v1/explore", Map.of("file", csv.toString(), "format", "xml"));
+        assertEquals(400, badFormat.status(), badFormat.raw().body());
+    }
+
+    @Test
+    void exploreReportsMissingDatasetAndInvalidSql() throws Exception {
+        Resp missing = post("/v1/explore", Map.of("dataset", tempDir.resolve("absent.parquet").toString()));
+        assertEquals(404, missing.status(), missing.raw().body());
+        assertEquals("dataset_not_found", missing.body().path("code").asText());
+
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+        Resp invalidSql = post("/v1/explore", Map.of("file", csv.toString(),
+                "sql", "DROP TABLE src"));
+        assertEquals(400, invalidSql.status(), invalidSql.raw().body());
+        assertEquals("invalid_sql", invalidSql.body().path("code").asText());
+    }
+
+    private static JsonNode findPair(JsonNode array, String left, String right) {
+        for (JsonNode pair : array) {
+            if (left.equals(pair.path("left").asText())
+                    && right.equals(pair.path("right").asText())) {
+                return pair;
+            }
+            if (left.equals(pair.path("value").asText())
+                    && right.equals(pair.path("group").asText())) {
+                return pair;
+            }
+        }
+        return null;
     }
 
     private JsonNode awaitJobState(String jobId, Set<String> states, Duration timeout) throws Exception {

@@ -217,28 +217,70 @@
               "type": "String"
             },
             {
+              "name": "method",
+              "type": "String"
+            },
+            {
+              "name": "n",
+              "type": "Number (Integer)"
+            },
+            {
               "name": "correlation",
               "type": "Number (Float)"
+            },
+            {
+              "name": "p_value",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "ci_low",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "ci_high",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "partial",
+              "type": "String"
             }
           ],
           "data": [
             [
               "sepal_length",
               "sepal_width",
-              -0.10936924995064935
+              "pearson",
+              150,
+              -0.10936924995064935,
+              0.1827652152713597,
+              -0.26498618240245647,
+              0.051800214010953936,
+              null
             ],
             [
               "sepal_length",
               "petal_length",
-              0.8717541573048713
+              "pearson",
+              150,
+              0.8717541573048713,
+              0.0,
+              0.8270368317875925,
+              0.9055083349187735,
+              null
             ],
             [
               "sepal_width",
               "petal_length",
-              -0.42051609640115456
+              "pearson",
+              150,
+              -0.42051609640115456,
+              8.429366382678438e-08,
+              -0.5441087459960842,
+              -0.2790612176227117,
+              null
             ]
           ],
-          "order": "unordered"
+          "order": "ordered"
         }
       ]
     },

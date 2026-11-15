@@ -13,15 +13,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NativeServiceSettingsTest {
 
     @Test
-    void defaultSettingsLeaveDuckDbResourcesUnset() {
+    void defaultSettingsUseOutOfCoreDuckDbResources() {
         NativeService.Settings settings = NativeService.Settings.fromEnv(Map.of());
         assertEquals(100, settings.maxWorkflows());
         assertEquals(600, settings.defaultJobTimeoutSec());
         assertEquals("127.0.0.1", settings.bindHost());
         assertEquals(7800, settings.port());
-        assertNull(settings.duckdbMemoryLimit());
+        assertEquals("512MB", settings.duckdbMemoryLimit(), "out-of-core default memory limit");
         assertNull(settings.duckdbThreads());
-        assertNull(settings.duckdbTempDirectory());
+        assertEquals(System.getProperty("user.home") + "/.dap/tmp", settings.duckdbTempDirectory(),
+                "out-of-core default spill directory");
+        assertEquals("/tmp/dap/build/duckdb-tmp", NativeService.Settings.fromEnv(
+                Map.of("DAP_HOME", "/tmp/dap")).duckdbTempDirectory());
     }
 
     @Test
@@ -44,14 +47,14 @@ class NativeServiceSettingsTest {
     }
 
     @Test
-    void blankDuckDbEnvValuesMeanUnset() {
+    void blankDuckDbEnvValuesKeepTheDefaults() {
         NativeService.Settings settings = NativeService.Settings.fromEnv(Map.of(
                 "DAP_DUCKDB_MEMORY_LIMIT", "  ",
                 "DAP_DUCKDB_THREADS", "",
                 "DAP_DUCKDB_TEMP_DIR", "\t"));
-        assertNull(settings.duckdbMemoryLimit());
+        assertEquals("512MB", settings.duckdbMemoryLimit());
         assertNull(settings.duckdbThreads());
-        assertNull(settings.duckdbTempDirectory());
+        assertEquals(System.getProperty("user.home") + "/.dap/tmp", settings.duckdbTempDirectory());
     }
 
     @Test

@@ -52,7 +52,14 @@ class RestartNoticeTest(unittest.TestCase):
 
     def call_tool(self, name, arguments, probe, call):
         """Run one tools/call and return the single JSON-RPC payload it wrote."""
-        with mock.patch.object(self.module, "probe", side_effect=probe), \
+        # One tools/call probes health twice: ensure_service(), then the warm-up
+        # wait. A one-shot side_effect would run dry, so the last body repeats.
+        bodies = list(probe)
+
+        def next_probe():
+            return bodies[0] if len(bodies) == 1 else bodies.pop(0)
+
+        with mock.patch.object(self.module, "probe", side_effect=next_probe), \
                 mock.patch.object(self.module, "call", side_effect=call):
             self.module.handle({
                 "jsonrpc": "2.0",

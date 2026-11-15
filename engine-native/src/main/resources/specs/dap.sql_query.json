@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Runs one read-only SELECT/WITH query over the connected input tables. Each connected input is exposed under its source node id (quote it: FROM \"1:1\"); 'inputs' names every connected input in port order. The output schema is read with SELECT * FROM (<sql>) LIMIT 0; LIST, STRUCT, MAP and TIMESTAMPTZ columns are rejected. DDL/DML (INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, ATTACH, DETACH, COPY, INSTALL, LOAD, PRAGMA, SET, EXPORT, IMPORT, CALL) and multiple statements are rejected before the query runs; the result is capped by 'limit'.",
+  "description": "Runs one read-only SELECT/WITH query over up to eight connected input tables. Each connected input is exposed under its source node id (quote it: FROM \"1:1\"); 'inputs' names every connected input in port order. The output schema is read with SELECT * FROM (<sql>) LIMIT 0; LIST, STRUCT, MAP and TIMESTAMPTZ columns are rejected. DDL/DML (INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, ATTACH, DETACH, COPY, INSTALL, LOAD, PRAGMA, SET, EXPORT, IMPORT, CALL) and multiple statements are rejected before the query runs; the result is capped by 'limit'.",
   "inPorts": [
     {
       "index": 0,
@@ -17,6 +17,36 @@
     {
       "index": 1,
       "name": "Data 2",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 2,
+      "name": "Data 3",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 3,
+      "name": "Data 4",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 4,
+      "name": "Data 5",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 5,
+      "name": "Data 6",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 6,
+      "name": "Data 7",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 7,
+      "name": "Data 8",
       "type": "BufferedDataTable"
     }
   ],

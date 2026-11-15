@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Renders a bar, line, scatter or histogram chart from the input table and passes the table through unchanged. SVG is hand-written XML with rounded coordinates and no timestamps, so the same input produces byte-identical output; PNG is drawn with Java2D in headless mode.",
+  "description": "Renders a bar, line, scatter, histogram, pie, boxplot, heatmap or world bubble map from the input table and passes the table through unchanged. A visible title, subtitle, axis labels and units are drawn on the canvas; axes get 5% headroom, bars start at 0 and sort by value by default. Pie slices show shares with percentages, boxplots draw quartiles with whiskers and outliers, heatmaps aggregate means per cell with a colour legend, and maps project lat/lng bubbles over a bundled public-domain Natural Earth 110m outline. SVG is hand-written XML with rounded coordinates and no timestamps, so the same input produces byte-identical output; PNG is drawn with Java2D in headless mode.",
   "inPorts": [
     {
       "index": 0,
@@ -50,14 +50,18 @@
           "bar",
           "line",
           "scatter",
-          "histogram"
+          "histogram",
+          "pie",
+          "boxplot",
+          "heatmap",
+          "map"
         ],
-        "description": "bar - summed values per category; line/scatter - points over a numeric x; histogram - distribution of the x column."
+        "description": "bar - summed values per category; line/scatter - points over a numeric x; histogram - distribution of the x column; pie - shares of one y column per category; boxplot - quartiles and outliers of one y column per category; heatmap - mean of one y column per x/series cell; map - lat/lng bubble map over a world outline."
       },
       "x": {
         "type": "string",
         "title": "X column",
-        "description": "Category column for bar; numeric column for line, scatter and histogram."
+        "description": "Category column for bar/pie/boxplot/heatmap; numeric column for line, scatter and histogram; not used by map."
       },
       "y": {
         "type": "array",
@@ -66,17 +70,117 @@
           "type": "string",
           "title": "Column"
         },
-        "description": "Numeric value columns. bar takes exactly one; line and scatter take one or more (one series each); histogram takes none."
+        "description": "Numeric value columns. bar, pie, boxplot and heatmap take exactly one; line and scatter take one or more (one series each); histogram takes none."
       },
       "series": {
         "type": "string",
         "title": "Series column",
-        "description": "Optional column that splits values into series (one bar group, line or point colour per value); with series, y must contain exactly one column."
+        "description": "Column that splits values into series: one bar group, line or point colour per value, or the heatmap row axis. bar/line/scatter take at most one y column with series; heatmap requires it."
       },
       "title": {
         "type": "string",
         "title": "Title",
-        "description": "Optional chart title."
+        "description": "Visible chart title, also used for the SVG <title> element."
+      },
+      "subtitle": {
+        "type": "string",
+        "title": "Subtitle",
+        "description": "Optional line under the title."
+      },
+      "x_label": {
+        "type": "string",
+        "title": "X axis label",
+        "description": "Text under the x axis; combined with x_unit as 'label (unit)'."
+      },
+      "y_label": {
+        "type": "string",
+        "title": "Y axis label",
+        "description": "Rotated text next to the y axis; combined with y_unit as 'label (unit)'."
+      },
+      "x_unit": {
+        "type": "string",
+        "title": "X unit",
+        "description": "Unit appended to the x axis label."
+      },
+      "y_unit": {
+        "type": "string",
+        "title": "Y unit",
+        "description": "Unit appended to the y axis label."
+      },
+      "sort": {
+        "type": "string",
+        "title": "Category sort",
+        "enum": [
+          "value",
+          "label",
+          "none"
+        ],
+        "description": "Category order: by aggregated value (bar default, descending), by label, or input order."
+      },
+      "sort_direction": {
+        "type": "string",
+        "title": "Sort direction",
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "description": "Direction for sort=value/label; defaults to desc for value and asc for label."
+      },
+      "log_x": {
+        "type": "boolean",
+        "title": "Logarithmic x axis",
+        "default": false,
+        "description": "line/scatter only; all x values must be positive."
+      },
+      "log_y": {
+        "type": "boolean",
+        "title": "Logarithmic y axis",
+        "default": false,
+        "description": "All y values must be positive; bar baselines at the axis minimum."
+      },
+      "grid": {
+        "type": "boolean",
+        "title": "Grid lines",
+        "default": true,
+        "description": "Draw horizontal grid lines at y ticks."
+      },
+      "data_labels": {
+        "type": "boolean",
+        "title": "Data labels",
+        "default": false,
+        "description": "Print the value next to each bar, point or slice."
+      },
+      "annotations": {
+        "type": "array",
+        "title": "Annotations",
+        "description": "Text notes placed on the canvas.",
+        "items": {
+          "type": "object",
+          "title": "Annotation",
+          "properties": {
+            "text": {
+              "type": "string",
+              "title": "Text"
+            },
+            "x": {
+              "type": "string",
+              "title": "X",
+              "description": "Data x for numeric axes or a category name."
+            },
+            "y": {
+              "type": "number",
+              "title": "Y"
+            },
+            "color": {
+              "type": "string",
+              "title": "Colour",
+              "description": "#rrggbb"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
       },
       "width": {
         "type": "integer",
@@ -109,12 +213,49 @@
         "minimum": 1,
         "maximum": 1000,
         "description": "Number of equal-width bins for the histogram type."
+      },
+      "lat": {
+        "type": "string",
+        "title": "Latitude column",
+        "description": "map only: numeric latitude in [-90, 90]; rows with NULL lat/lng are skipped."
+      },
+      "lng": {
+        "type": "string",
+        "title": "Longitude column",
+        "description": "map only: numeric longitude in [-180, 180]."
+      },
+      "size": {
+        "type": "string",
+        "title": "Bubble size column",
+        "description": "map only: numeric column scaled to bubble radius; adds a size legend."
+      },
+      "color": {
+        "type": "string",
+        "title": "Bubble colour column",
+        "description": "map only: categorical column; one palette colour per value."
+      },
+      "label": {
+        "type": "string",
+        "title": "Bubble label column",
+        "description": "map only: text drawn next to each bubble when there are at most 40 points."
+      },
+      "facet": {
+        "type": "string",
+        "title": "Facet column",
+        "description": "Split the chart into small multiples, one panel per value of this column, in one SVG/PNG. Every panel keeps its own axes; the title is shared."
+      },
+      "facet_columns": {
+        "type": "integer",
+        "title": "Facet columns",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 12,
+        "description": "Panels per row in a faceted chart; rows follow from the number of facet values."
       }
     },
     "required": [
       "file",
-      "type",
-      "x"
+      "type"
     ]
   }
 }

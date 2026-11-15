@@ -7,11 +7,46 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Writes a deterministic Markdown report and passes the input table through unchanged. Sections are rendered in config order: table (input rows), profile (per-column statistics), text (a literal paragraph) and metrics (row/column counters and per-column aggregates). Pipes, newlines and HTML metacharacters in cells are escaped; NULL renders as an empty cell.",
+  "description": "Writes a deterministic report and passes input port 0 through unchanged. The node has eight input ports; each section selects the table it reads with sections[].input (0..7, default 0). Sections are rendered in config order: table (input rows), profile (per-column statistics), text (a literal paragraph), metrics (row/column counters and per-column aggregates), image (a raster file) and page_break. Pipes, newlines and HTML metacharacters in cells are escaped; NULL renders as an empty cell.",
   "inPorts": [
     {
       "index": 0,
-      "name": "Data",
+      "name": "Data 1",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 1,
+      "name": "Data 2",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 2,
+      "name": "Data 3",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 3,
+      "name": "Data 4",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 4,
+      "name": "Data 5",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 5,
+      "name": "Data 6",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 6,
+      "name": "Data 7",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 7,
+      "name": "Data 8",
       "type": "BufferedDataTable"
     }
   ],
@@ -30,13 +65,71 @@
       "file": {
         "type": "string",
         "title": "Output file",
-        "description": "Absolute path of the Markdown file to write; parent directories are created.",
+        "description": "Absolute path of the report file to write; parent directories are created.",
         "placeholder": "/data/report.md"
+      },
+      "format": {
+        "type": "string",
+        "title": "Format",
+        "enum": [
+          "md",
+          "html",
+          "pdf",
+          "pptx"
+        ],
+        "default": "md",
+        "description": "Output format: md - Markdown; html - one self-contained HTML file with embedded CSS, tables, images and an optional table of contents; pdf - paginated A4/Letter document with text, tables and images; pptx - PowerPoint deck with one slide per section (page_break is ignored)."
       },
       "title": {
         "type": "string",
         "title": "Title",
         "description": "Optional document title rendered as a level-1 heading."
+      },
+      "subtitle": {
+        "type": "string",
+        "title": "Subtitle",
+        "description": "Optional subtitle under the title (HTML and PDF)."
+      },
+      "author": {
+        "type": "string",
+        "title": "Author",
+        "description": "Optional author line under the title (HTML and PDF)."
+      },
+      "toc": {
+        "type": "boolean",
+        "title": "Table of contents",
+        "default": false,
+        "description": "Add a table of contents built from section titles (HTML)."
+      },
+      "theme": {
+        "type": "string",
+        "title": "Theme",
+        "enum": [
+          "default",
+          "light",
+          "dark",
+          "mono"
+        ],
+        "default": "default",
+        "description": "Colour palette: default - blue accent; light - grey; dark - dark background (HTML); mono - black and white."
+      },
+      "page_size": {
+        "type": "string",
+        "title": "Page size",
+        "enum": [
+          "a4",
+          "letter"
+        ],
+        "description": "Paper size for paginated formats (default: A4 for HTML/PDF, 16:9 for PPTX)."
+      },
+      "orientation": {
+        "type": "string",
+        "title": "Orientation",
+        "enum": [
+          "portrait",
+          "landscape"
+        ],
+        "description": "Page orientation for paginated formats (default: portrait; PPTX defaults to landscape)."
       },
       "sections": {
         "type": "array",
@@ -54,14 +147,24 @@
                 "table",
                 "profile",
                 "text",
-                "metrics"
+                "metrics",
+                "image",
+                "page_break"
               ],
-              "description": "table - input rows; profile - per-column statistics; text - a literal paragraph; metrics - row/column counters and per-column aggregates."
+              "description": "table - input rows; profile - per-column statistics; text - a literal paragraph; metrics - row/column counters and per-column aggregates; image - a raster file; page_break - an explicit page break."
             },
             "title": {
               "type": "string",
               "title": "Section title",
               "description": "Optional level-2 heading before the section."
+            },
+            "input": {
+              "type": "integer",
+              "title": "Input port",
+              "minimum": 0,
+              "maximum": 7,
+              "default": 0,
+              "description": "Input port this section reads (table, profile, metrics); the port must be connected."
             },
             "columns": {
               "type": "array",
@@ -83,6 +186,23 @@
               "type": "string",
               "title": "Text",
               "description": "Literal paragraph; required for the text kind."
+            },
+            "path": {
+              "type": "string",
+              "title": "Image path",
+              "description": "Path of a PNG, JPEG or GIF image; required for the image kind."
+            },
+            "alt": {
+              "type": "string",
+              "title": "Image alt text",
+              "description": "Alternative text used by Markdown and HTML."
+            },
+            "width": {
+              "type": "integer",
+              "title": "Image width",
+              "minimum": 1,
+              "maximum": 10000,
+              "description": "Image width in pixels; empty means natural size (PDF/PPTX scale it to the page)."
             }
           },
           "required": [

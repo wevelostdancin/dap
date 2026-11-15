@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -34,16 +35,49 @@ import java.util.concurrent.TimeUnit;
  * while an unchanged source returns the existing Parquet file untouched.
  */
 public final class IngestService {
+    /** CSVs above this size are streamed through DuckDB instead of parsed into Arrow. */
+    private static final long DEFAULT_STREAM_MB = 64;
+
     private final Path cacheDir;
+    private final long streamThresholdMb;
 
     /** Production service: {@code DAP_CACHE_DIR} or {@code ~/.dap/cache}. */
     public IngestService() {
-        this(defaultCacheDir());
+        this(defaultCacheDir(), streamThresholdMb(System.getenv()));
     }
 
-    /** Test seam: an explicit cache directory. */
+    /** Test seam: an explicit cache directory and the default streaming threshold. */
     public IngestService(Path cacheDir) {
+        this(cacheDir, streamThresholdMb(System.getenv()));
+    }
+
+    /** Test seam: an explicit cache directory and streaming threshold in megabytes (0 = always stream). */
+    public IngestService(Path cacheDir, long streamThresholdMb) {
         this.cacheDir = Objects.requireNonNull(cacheDir, "cacheDir");
+        if (streamThresholdMb < 0) {
+            throw new IllegalArgumentException("DAP_INGEST_STREAM_MB must be non-negative, got "
+                    + streamThresholdMb);
+        }
+        this.streamThresholdMb = streamThresholdMb;
+    }
+
+    /** {@code DAP_INGEST_STREAM_MB}, 64 by default; a blank or invalid value keeps the default. */
+    static long streamThresholdMb(Map<String, String> env) {
+        String raw = env.get("DAP_INGEST_STREAM_MB");
+        if (raw == null || raw.isBlank()) {
+            return DEFAULT_STREAM_MB;
+        }
+        try {
+            long value = Long.parseLong(raw.strip());
+            return value < 0 ? DEFAULT_STREAM_MB : value;
+        } catch (NumberFormatException ignored) {
+            return DEFAULT_STREAM_MB;
+        }
+    }
+
+    /** A source larger than the threshold is ingested by DuckDB's streaming CSV reader. */
+    static boolean shouldStream(long bytes, long thresholdMb) {
+        return bytes > thresholdMb * 1024L * 1024L;
     }
 
     /** One output column of the ingested dataset, in Arrow type names. */
@@ -52,6 +86,29 @@ public final class IngestService {
 
     /** {@code path} is the cached Parquet file; {@code cached} is true when it already existed. */
     public record Result(Path path, long rows, List<Column> columns, boolean cached) {
+    }
+
+    /** CSV reader options for the streaming path; defaults match the historical reader. */
+    public record CsvOptions(boolean header, String delimiter, String quote, String escape,
+                             boolean ignoreErrors, boolean nullPadding, boolean strictMode,
+                             List<String> nullStrings) {
+        public CsvOptions {
+            nullStrings = nullStrings == null ? List.of() : List.copyOf(nullStrings);
+        }
+
+        public CsvOptions(boolean header, String delimiter, String quote, String escape,
+                          boolean ignoreErrors, boolean nullPadding, boolean strictMode) {
+            this(header, delimiter, quote, escape, ignoreErrors, nullPadding, strictMode, List.of());
+        }
+
+        public static CsvOptions defaults() {
+            return new CsvOptions(true, ",", "\"", "\"", false, false, true, List.of());
+        }
+
+        public boolean isDefault() {
+            return header && ",".equals(delimiter) && "\"".equals(quote) && "\"".equals(escape)
+                    && !ignoreErrors && !nullPadding && strictMode && nullStrings.isEmpty();
+        }
     }
 
     private enum Format {
@@ -72,16 +129,21 @@ public final class IngestService {
     }
 
     public Result ingest(Path file, String format) {
+        return ingest(file, format, CsvOptions.defaults());
+    }
+
+    public Result ingest(Path file, String format, CsvOptions options) {
         Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(options, "options");
         Format parsed = Format.parse(format);
-        Path source = file.toAbsolutePath().normalize();
+        Path source = PathGuard.shared().checkRead(file.toAbsolutePath().normalize().toString());
         if (!Files.isRegularFile(source)) {
             throw new IllegalArgumentException("file not found: " + file);
         }
 
         Path target;
         try {
-            target = cacheDir.resolve(key(source, parsed) + ".parquet");
+            target = cacheDir.resolve(key(source, parsed, options) + ".parquet");
         } catch (IOException failure) {
             throw new IllegalStateException("cannot read " + file + ": " + failure.getMessage(), failure);
         }
@@ -93,7 +155,7 @@ public final class IngestService {
         try {
             Files.createDirectories(cacheDir);
             try (DuckDbSession db = new DuckDbSession()) {
-                write(db, source, parsed, temporary);
+                write(db, source, parsed, temporary, options);
                 Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
                 return describe(db, target, false);
             }
@@ -108,13 +170,60 @@ public final class IngestService {
         }
     }
 
-    private static void write(DuckDbSession db, Path source, Format format, Path target) throws SQLException {
+    private void write(DuckDbSession db, Path source, Format format, Path target,
+                       CsvOptions options) throws SQLException {
         switch (format) {
-            case CSV -> copyArrow(db, CsvTableReader.read(source,
-                    new CsvTableReader.Options(',', true, List.of(), false)), target);
+            case CSV -> {
+                // Large or custom CSVs never become an Arrow table: DuckDB streams read_csv
+                // into the Parquet writer, so heap usage stays bounded by the read buffer.
+                if (stream(source) || !options.isDefault()) {
+                    copy(db, csvRelation(source, options), target);
+                } else {
+                    copyArrow(db, CsvTableReader.read(source,
+                            new CsvTableReader.Options(',', true, List.of(), false)), target);
+                }
+            }
             case EXCEL -> copyArrow(db, excel(source), target);
             case JSON -> copy(db, "read_json_auto(" + literal(source.toString()) + ")", target);
             case PARQUET -> copy(db, "read_parquet(" + literal(source.toString()) + ")", target);
+        }
+    }
+
+    /** DuckDB read_csv call with explicit options; every value is a SQL literal. */
+    private static String csvRelation(Path source, CsvOptions options) {
+        return "read_csv(" + literal(source.toString())
+                + ", header=" + options.header()
+                + ", delim=" + literal(options.delimiter())
+                + ", quote=" + literal(options.quote())
+                + ", escape=" + literal(options.escape())
+                + ", ignore_errors=" + options.ignoreErrors()
+                + ", null_padding=" + options.nullPadding()
+                + ", strict_mode=" + options.strictMode()
+                + (options.nullStrings().isEmpty() ? ""
+                        : ", nullstr=" + stringList(options.nullStrings()))
+                + ")";
+    }
+
+    private static String stringList(List<String> values) {
+        if (values.isEmpty()) {
+            return "[]";
+        }
+        StringBuilder list = new StringBuilder("[");
+        for (int index = 0; index < values.size(); index++) {
+            if (index > 0) {
+                list.append(", ");
+            }
+            list.append(literal(values.get(index)));
+        }
+        return list.append(']').toString();
+    }
+
+    /** Whether this source is big enough for the streaming CSV path. */
+    private boolean stream(Path source) throws SQLException {
+        try {
+            return shouldStream(Files.size(source), streamThresholdMb);
+        } catch (IOException failure) {
+            throw new SQLException("cannot read " + source + ": " + failure.getMessage(), failure);
         }
     }
 
@@ -198,10 +307,14 @@ public final class IngestService {
         }
     }
 
-    private static String key(Path source, Format format) throws IOException {
+    private static String key(Path source, Format format, CsvOptions options) throws IOException {
         String descriptor = source + "\n" + Files.size(source) + "\n"
                 + Files.getLastModifiedTime(source).to(TimeUnit.NANOSECONDS) + "\n"
-                + format.name().toLowerCase(Locale.ROOT);
+                + format.name().toLowerCase(Locale.ROOT) + "\n"
+                + options.header() + "\n" + options.delimiter() + "\n" + options.quote() + "\n"
+                + options.escape() + "\n" + options.ignoreErrors() + "\n"
+                + options.nullPadding() + "\n" + options.strictMode() + "\n"
+                + String.join("\u0001", options.nullStrings());
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(descriptor.getBytes(StandardCharsets.UTF_8)));

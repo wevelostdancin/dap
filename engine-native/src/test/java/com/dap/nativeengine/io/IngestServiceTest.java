@@ -1,5 +1,6 @@
 package com.dap.nativeengine.io;
 
+import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.engine.DuckDbSession;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -126,6 +127,57 @@ class IngestServiceTest {
         assertTrue(failure.getMessage().contains("xml"), failure.getMessage());
     }
 
+    private static List<List<String>> rows(Path parquet) throws Exception {
+        try (DuckDbSession db = new DuckDbSession();
+             Connection connection = db.newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT * FROM read_parquet("
+                     + literal(parquet) + ") ORDER BY 1")) {
+            List<List<String>> rows = new java.util.ArrayList<>();
+            int columns = result.getMetaData().getColumnCount();
+            while (result.next()) {
+                List<String> row = new java.util.ArrayList<>(columns);
+                for (int column = 1; column <= columns; column++) {
+                    row.add(DuckDbSession.format(result.getObject(column)));
+                }
+                rows.add(row);
+            }
+            return rows;
+        }
+    }
+
+    @Test
+    void streamingCsvPathProducesTheSameTableAsTheArrowPath() throws Exception {
+        Path source = write("stream.csv", "name,age\nann,34\nbob,28\n");
+
+        IngestService.Result arrow = new IngestService(dir.resolve("cache-arrow")).ingest(source, "csv");
+        IngestService.Result streamed = new IngestService(dir.resolve("cache-stream"), 0)
+                .ingest(source, "csv");
+
+        assertFalse(arrow.cached());
+        assertFalse(streamed.cached());
+        assertEquals(2, streamed.rows());
+        assertEquals(arrow.columns(), streamed.columns());
+        assertEquals(rows(arrow.path()), rows(streamed.path()));
+    }
+
+    @Test
+    void streamingThresholdIsMeasuredInMegabytes() {
+        assertFalse(IngestService.shouldStream(64L * 1024 * 1024, 64));
+        assertTrue(IngestService.shouldStream(64L * 1024 * 1024 + 1, 64));
+        assertTrue(IngestService.shouldStream(1, 0));
+        assertFalse(IngestService.shouldStream(0, 0));
+    }
+
+    @Test
+    void sourceOutsideTheAllowlistIsRejected() {
+        ApiException failure = assertThrows(ApiException.class,
+                () -> service().ingest(Path.of("/etc/passwd"), "csv"));
+
+        assertEquals(400, failure.status(), failure.getMessage());
+        assertEquals("path_not_allowed", failure.code(), failure.getMessage());
+    }
+
     @Test
     void missingFileIsRejected() {
         Path absent = dir.resolve("absent.csv");
@@ -134,5 +186,65 @@ class IngestServiceTest {
                 () -> service().ingest(absent, "csv"));
 
         assertTrue(failure.getMessage().contains("absent.csv"), failure.getMessage());
+    }
+
+    @Test
+    void headerlessCsvKeepsEveryRowWithHeaderFalse() throws Exception {
+        Path source = write("noheader.csv", "1,alpha\n2,beta\n");
+        IngestService.CsvOptions options = new IngestService.CsvOptions(
+                false, ",", "\"", "\"", false, false, true);
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(2, result.rows(), "a headerless file must not lose its first row");
+        assertEquals(2, result.columns().size());
+    }
+
+    @Test
+    void malformedRowsCanBeSkippedWithIgnoreErrors() throws Exception {
+        Path source = write("ragged.csv", "a,b\n1,2\n3,4,5\n6,7\n");
+        IngestService.CsvOptions options = new IngestService.CsvOptions(
+                true, ",", "\"", "\"", true, false, true);
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(2, result.rows());
+        assertEquals(List.of(
+                new IngestService.Column("a", "Int64"),
+                new IngestService.Column("b", "Int64")), result.columns());
+    }
+
+    @Test
+    void nullStringsBecomeNulls() throws Exception {
+        Path source = write("nulls.csv", "id,value\n1,NA\n2,5\n");
+        IngestService.CsvOptions options = new IngestService.CsvOptions(
+                true, ",", "\"", "\"", false, false, true, List.of("NA"));
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(2, result.rows());
+        try (DuckDbSession db = new DuckDbSession();
+             Connection connection = db.newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("SELECT value FROM read_parquet("
+                     + literal(result.path()) + ") ORDER BY id")) {
+            assertTrue(rows.next());
+            assertEquals(null, rows.getObject(1));
+            assertTrue(rows.next());
+            assertEquals(5, rows.getInt(1));
+        }
+    }
+
+    @Test
+    void csvOptionsArePartOfTheCacheKey() throws Exception {
+        Path source = write("people.csv", "1,alpha\n2,beta\n");
+        IngestService service = service();
+
+        IngestService.Result withHeader = service.ingest(source, "csv");
+        IngestService.Result withoutHeader = service.ingest(source, "csv",
+                new IngestService.CsvOptions(false, ",", "\"", "\"", false, false, true));
+
+        assertFalse(withHeader.path().equals(withoutHeader.path()),
+                "different CSV options must not share a cache entry");
     }
 }

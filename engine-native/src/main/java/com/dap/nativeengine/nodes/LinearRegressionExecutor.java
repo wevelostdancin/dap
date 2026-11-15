@@ -3,6 +3,7 @@ package com.dap.nativeengine.nodes;
 import com.dap.nativeengine.engine.ColumnSpec;
 import com.dap.nativeengine.engine.Distributions;
 import com.dap.nativeengine.engine.LazyPlan;
+import com.dap.nativeengine.engine.Matrix;
 import com.dap.nativeengine.exec.NodeContext;
 import com.dap.nativeengine.exec.NodeExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,21 +13,62 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.StringJoiner;
 
 /**
- * dap.linear_regression: simple (one-predictor) least squares with optional grouping.
+ * dap.linear_regression: least squares with one or more numeric predictors.
  *
- * <p>coefficients mode: the fit comes from DuckDB regr_slope/regr_intercept/regr_r2/
- * regr_count (or the intercept-free sums), standard errors and p-values from
- * {@link Distributions}; the output is one row per term. predict mode stays lazy:
- * window aggregates fit per partition and the plan adds prediction and residual.</p>
+ * <p>coefficients mode returns one row per term (intercept and each predictor) with the
+ * standard error, t statistic, p-value, confidence interval and variance inflation
+ * factor, plus the model fit (r2, adj_r2, F, RMSE, residual df); diagnostics mode
+ * returns one row per fit with the model-level statistics (including Durbin-Watson,
+ * AIC and BIC); predict mode returns the input rows plus the prediction, residual and
+ * prediction interval. Standard errors are classical (none) or heteroskedasticity
+ * consistent (hc1). The fit is computed in Java from X'X, the inverse and the residuals;
+ * predict stays a lazy plan over the input with the coefficients as literals (or as a
+ * literal coefficient table joined on the group columns).</p>
  */
 public final class LinearRegressionExecutor implements NodeExecutor {
-    private static final List<String> MODES = List.of("coefficients", "predict");
+    private static final List<String> MODES = List.of("coefficients", "predict", "diagnostics");
+    private static final List<String> ROBUST = List.of("none", "hc1");
+    /** The fit reads values into Java; same cap as the other in-memory statistics. */
+    private static final int ROW_CAP = 100_000;
     private static final String RESIDUAL = "residual";
+    private static final String LOWER = "prediction_lower";
+    private static final String UPPER = "prediction_upper";
+    private static final List<ColumnSpec> COEFFICIENTS = List.of(
+            ColumnSpec.of("term", "Utf8"),
+            ColumnSpec.of("coefficient", "Float64"),
+            ColumnSpec.of("std_error", "Float64"),
+            ColumnSpec.of("t_statistic", "Float64"),
+            ColumnSpec.of("p_value", "Float64"),
+            ColumnSpec.of("r2", "Float64"),
+            ColumnSpec.of("n", "Int64"),
+            ColumnSpec.of("adj_r2", "Float64"),
+            ColumnSpec.of("f_statistic", "Float64"),
+            ColumnSpec.of("f_p_value", "Float64"),
+            ColumnSpec.of("rmse", "Float64"),
+            ColumnSpec.of("df_residual", "Float64"),
+            ColumnSpec.of("vif", "Float64"),
+            ColumnSpec.of("ci_low", "Float64"),
+            ColumnSpec.of("ci_high", "Float64"));
+    private static final List<ColumnSpec> DIAGNOSTICS = List.of(
+            ColumnSpec.of("n", "Int64"),
+            ColumnSpec.of("df_residual", "Float64"),
+            ColumnSpec.of("r2", "Float64"),
+            ColumnSpec.of("adj_r2", "Float64"),
+            ColumnSpec.of("f_statistic", "Float64"),
+            ColumnSpec.of("f_p_value", "Float64"),
+            ColumnSpec.of("rmse", "Float64"),
+            ColumnSpec.of("durbin_watson", "Float64"),
+            ColumnSpec.of("aic", "Float64"),
+            ColumnSpec.of("bic", "Float64"));
 
     @Override
     public String nodeId() {
@@ -37,40 +79,84 @@ public final class LinearRegressionExecutor implements NodeExecutor {
     public LazyPlan execute(NodeContext context, List<LazyPlan> inputs) throws Exception {
         LazyPlan input = NodeSql.input(inputs);
         JsonNode config = context.config();
-        String x = predictor(input, config);
-        String y = numericColumn(input, config, "y");
+        List<ColumnSpec> predictors = predictors(input, config);
+        ColumnSpec response = numericColumn(input, config, "y");
         List<ColumnSpec> groups = groups(input, config);
-        String mode = NodeSql.text(config, "mode", "coefficients").toLowerCase(Locale.ROOT);
+        String mode = NodeSql.text(config, "mode", "coefficients").trim().toLowerCase(Locale.ROOT);
         if (!MODES.contains(mode)) {
             throw new IllegalArgumentException("linear_regression: unknown mode '" + mode
-                    + "' (expected coefficients, predict)");
+                    + "' (expected coefficients, predict, diagnostics)");
         }
         boolean intercept = NodeSql.bool(config, "intercept", true);
-        if ("predict".equals(mode)) {
-            return predict(context, input, config, x, y, groups, intercept);
+        String robust = NodeSql.text(config, "robust", "none").trim().toLowerCase(Locale.ROOT);
+        if (!ROBUST.contains(robust)) {
+            throw new IllegalArgumentException("linear_regression: unknown robust '" + robust
+                    + "' (expected none or hc1)");
         }
-        return coefficients(context, input, x, y, groups, intercept);
+        double alpha = alpha(config);
+        int sampleRows = config == null ? 0 : config.path("sample_rows").asInt(0);
+        if (sampleRows < 0) {
+            throw new IllegalArgumentException("linear_regression: 'sample_rows' must be 0 or positive");
+        }
+        String prediction = "predict".equals(mode) ? predictionName(input, config) : null;
+        List<SampleRow> rows = readRows(context, input, groups, predictors, response, sampleRows);
+        LinkedHashMap<List<Object>, List<SampleRow>> grouped = group(rows, groups.size());
+        LinkedHashMap<List<Object>, Model> models = new LinkedHashMap<>();
+        if (rows.isEmpty()) {
+            return emptyPlan(context, input, predictors, groups, mode, config);
+        }
+        for (Map.Entry<List<Object>, List<SampleRow>> entry : grouped.entrySet()) {
+            models.put(entry.getKey(), fit(entry.getValue(), predictors, intercept, robust,
+                    alpha, entry.getKey()));
+        }
+        if ("predict".equals(mode)) {
+            return predict(context, input, prediction, predictors, response, groups, models, intercept);
+        }
+        if ("diagnostics".equals(mode)) {
+            return diagnostics(context, groups, models);
+        }
+        return coefficients(context, groups, models);
     }
 
-    // ------------------------------------------------------------ coefficients
+    // -------------------------------------------------------------- data
 
-    private record Fit(long n, Double slope, Double intercept, Double r2, Double meanX,
-                       Double sxx, Double sse, Double syy) {
+    private record SampleRow(List<Object> groupValues, double[] x, double y) {
     }
 
-    private static LazyPlan coefficients(NodeContext context, LazyPlan input, String x, String y,
-                                         List<ColumnSpec> groups, boolean intercept) throws SQLException {
-        String sql = intercept ? fittedSql(input, x, y, groups) : slopeOnlySql(input, x, y, groups);
-        List<ColumnSpec> output = new ArrayList<>(groups);
-        output.add(ColumnSpec.of("term", "Utf8"));
-        output.add(ColumnSpec.of("coefficient", "Float64"));
-        output.add(ColumnSpec.of("std_error", "Float64"));
-        output.add(ColumnSpec.of("t_statistic", "Float64"));
-        output.add(ColumnSpec.of("p_value", "Float64"));
-        output.add(ColumnSpec.of("r2", "Float64"));
-        output.add(ColumnSpec.of("n", "Int64"));
+    /**
+     * One fitted model. {@code defined} is false when the design matrix is singular (a
+     * constant or collinear predictor), in which case every estimate is NULL but the
+     * row count and residual degrees of freedom are still reported.
+     */
+    private record Model(long n, int parameters, int predictors, boolean intercept, boolean defined,
+                         String[] terms, double[] beta, double[] stdErrors, double[] tStatistics,
+                         Double[] pValues, double[] ciLow, double[] ciHigh, Double[] vif,
+                         double[][] covariance, double mse, Double rmse, double dfResidual,
+                         Double r2, Double adjR2, Double fStatistic, Double fPValue,
+                         double[] residuals, Double durbinWatson, Double aic, Double bic) {
+    }
 
-        List<String> rows = new ArrayList<>();
+    private static List<SampleRow> readRows(NodeContext context, LazyPlan input,
+                                            List<ColumnSpec> groups, List<ColumnSpec> predictors,
+                                            ColumnSpec response, int sampleRows) throws SQLException {
+        StringJoiner projection = new StringJoiner(", ");
+        for (ColumnSpec group : groups) {
+            projection.add(NodeSql.quote(group.name()));
+        }
+        for (ColumnSpec predictor : predictors) {
+            projection.add("CAST(" + NodeSql.quote(predictor.name()) + " AS DOUBLE)");
+        }
+        projection.add("CAST(" + NodeSql.quote(response.name()) + " AS DOUBLE)");
+        StringJoiner where = new StringJoiner(" AND ");
+        for (ColumnSpec predictor : predictors) {
+            where.add(NodeSql.quote(predictor.name()) + " IS NOT NULL");
+        }
+        where.add(NodeSql.quote(response.name()) + " IS NOT NULL");
+        String sql = "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input"
+                + " WHERE " + where
+                + (groups.isEmpty() ? "" : " ORDER BY " + groupProjection(groups))
+                + " LIMIT " + (sampleRows > 0 ? sampleRows : ROW_CAP + 1);
+        List<SampleRow> rows = new ArrayList<>();
         try (Connection connection = context.db().newConnection();
              Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(sql)) {
@@ -79,246 +165,577 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                 for (int i = 0; i < groups.size(); i++) {
                     groupValues.add(result.getObject(i + 1));
                 }
-                Fit fit = fit(result, intercept);
-                if (fit.n() < 2) {
-                    throw new IllegalArgumentException("linear_regression: need at least 2 rows with "
-                            + "non-null '" + x + "' and '" + y + "', got " + fit.n());
+                double[] x = new double[predictors.size()];
+                for (int i = 0; i < predictors.size(); i++) {
+                    x[i] = result.getDouble(groups.size() + i + 1);
                 }
-                for (Term term : terms(fit, x, intercept)) {
-                    rows.add(row(groupValues, groups, term, fit));
+                rows.add(new SampleRow(groupValues,
+                        x, result.getDouble(groups.size() + predictors.size() + 1)));
+            }
+        }
+        if (sampleRows == 0 && rows.size() > ROW_CAP) {
+            throw new IllegalArgumentException("linear_regression: the fit is computed in memory and needs "
+                    + "at most " + ROW_CAP + " rows, got more; set sample_rows=N to fit on a "
+                    + "deterministic first-N sample, or pre-filter the input");
+        }
+        return rows;
+    }
+
+    private static LinkedHashMap<List<Object>, List<SampleRow>> group(List<SampleRow> rows, int groupCount) {
+        LinkedHashMap<List<Object>, List<SampleRow>> grouped = new LinkedHashMap<>();
+        if (groupCount == 0) {
+            grouped.put(List.of(), rows);
+            return grouped;
+        }
+        for (SampleRow row : rows) {
+            grouped.computeIfAbsent(row.groupValues(), ignored -> new ArrayList<>()).add(row);
+        }
+        return grouped;
+    }
+
+    // --------------------------------------------------------------- fit
+
+    private static Model fit(List<SampleRow> rows, List<ColumnSpec> predictorColumns,
+                             boolean intercept, String robust, double alpha,
+                             List<Object> groupValues) {
+        int predictors = predictorColumns.size();
+        int parameters = predictors + (intercept ? 1 : 0);
+        long n = rows.size();
+        double dfResidual = n - parameters;
+        String[] terms = terms(predictorColumns, intercept);
+        if (n <= parameters) {
+            String where = groupValues.isEmpty() ? "" : " in group " + groupValues + "";
+            throw new IllegalArgumentException("linear_regression: need more rows than parameters, got "
+                    + n + " rows" + where + " and " + parameters + " parameters (including the intercept); "
+                    + "add rows, drop a predictor or set intercept=false");
+        }
+        double[][] design = new double[(int) n][parameters];
+        double[] y = new double[(int) n];
+        for (int i = 0; i < n; i++) {
+            int column = 0;
+            if (intercept) {
+                design[i][column++] = 1.0;
+            }
+            for (int j = 0; j < predictors; j++) {
+                design[i][column++] = rows.get(i).x()[j];
+            }
+            y[i] = rows.get(i).y();
+        }
+        double[][] xtx = new double[parameters][parameters];
+        double[] xty = new double[parameters];
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < parameters; j++) {
+                xty[j] += design[i][j] * y[i];
+                for (int k = 0; k < parameters; k++) {
+                    xtx[j][k] += design[i][j] * design[i][k];
                 }
             }
         }
-        if (rows.isEmpty()) {
-            // No rows in the input at all: keep the declared schema, return no rows.
-            rows.add(emptyRow(groups));
+        double[][] inverse;
+        try {
+            inverse = Matrix.invert(xtx);
+        } catch (IllegalArgumentException singular) {
+            return undefined(n, parameters, predictors, intercept, terms, dfResidual);
         }
-        return new LazyPlan(context.db(), String.join(" UNION ALL ", rows), output);
+        double[] beta = new double[parameters];
+        for (int j = 0; j < parameters; j++) {
+            beta[j] = dot(inverse[j], xty);
+        }
+        double[] residuals = new double[(int) n];
+        double sse = 0.0;
+        for (int i = 0; i < n; i++) {
+            residuals[i] = y[i] - dot(design[i], beta);
+            sse += residuals[i] * residuals[i];
+        }
+        double mean = 0.0;
+        for (double value : y) {
+            mean += value;
+        }
+        mean /= n;
+        double sst = 0.0;
+        for (double value : y) {
+            double centered = intercept ? value - mean : value;
+            sst += centered * centered;
+        }
+        double mse = sse / dfResidual;
+        Double r2 = sst > 0.0 ? 1.0 - sse / sst : null;
+        Double adjR2 = r2 == null ? null
+                : 1.0 - (1.0 - r2) * (intercept ? n - 1.0 : n) / dfResidual;
+        double df1 = parameters - (intercept ? 1.0 : 0.0);
+        Double fStatistic = null;
+        Double fPValue = null;
+        if (sse > 0.0 && df1 > 0.0) {
+            fStatistic = ((sst - sse) / df1) / mse;
+            fPValue = clamp(1.0 - Distributions.fCdf(fStatistic, df1, dfResidual));
+        }
+        Double rmse = Math.sqrt(mse);
+        double[][] covariance = covariance(design, inverse, residuals, sse, mse, n, parameters, robust);
+        double[] stdErrors = new double[parameters];
+        double[] tStatistics = new double[parameters];
+        Double[] pValues = new Double[parameters];
+        double[] ciLow = new double[parameters];
+        double[] ciHigh = new double[parameters];
+        double critical = Distributions.tQuantile(1.0 - alpha / 2.0, dfResidual);
+        for (int j = 0; j < parameters; j++) {
+            stdErrors[j] = Math.sqrt(Math.max(0.0, covariance[j][j]));
+            if (stdErrors[j] == 0.0) {
+                tStatistics[j] = Double.NaN;
+                pValues[j] = null;
+            } else {
+                tStatistics[j] = beta[j] / stdErrors[j];
+                pValues[j] = clamp(2.0 * (1.0 - Distributions.tCdf(Math.abs(tStatistics[j]),
+                        dfResidual)));
+            }
+            ciLow[j] = beta[j] - critical * stdErrors[j];
+            ciHigh[j] = beta[j] + critical * stdErrors[j];
+        }
+        Double[] vif = vif(rows, predictors, intercept);
+        Double durbinWatson = durbinWatson(residuals, sse);
+        Double aic = sse > 0.0 ? n * Math.log(sse / n) + 2.0 * parameters : null;
+        Double bic = sse > 0.0 ? n * Math.log(sse / n) + Math.log(n) * parameters : null;
+        return new Model(n, parameters, predictors, intercept, true, terms, beta, stdErrors,
+                tStatistics, pValues, ciLow, ciHigh, vif, covariance, mse, rmse, dfResidual, r2,
+                adjR2, fStatistic, fPValue, residuals, durbinWatson, aic, bic);
     }
 
-    private static String fittedSql(LazyPlan input, String x, String y, List<ColumnSpec> groups) {
-        String quotedX = NodeSql.quote(x);
-        String quotedY = NodeSql.quote(y);
-        String window = window(groups);
-        String projection = groupProjection(groups, "");
-        String groupKeys = groupProjection(groups, "");
-        String over = groups.isEmpty() ? "OVER ()" : "OVER dap_window";
-        String windowClause = groups.isEmpty() ? "" : " WINDOW dap_window AS (" + window + ")";
-        return "WITH dap_rows AS (SELECT " + (projection.isEmpty() ? "" : projection + ", ")
-                + "CAST(" + quotedX + " AS DOUBLE) AS dap_x, CAST(" + quotedY
-                + " AS DOUBLE) AS dap_y FROM " + input.asTable() + " AS dap_input"
-                + " WHERE " + quotedX + " IS NOT NULL AND " + quotedY + " IS NOT NULL),"
-                + " dap_fitted AS (SELECT " + (groupKeys.isEmpty() ? "" : groupKeys + ", ")
-                + "dap_x, dap_y,"
-                + " REGR_SLOPE(dap_y, dap_x) " + over + " AS dap_slope,"
-                + " REGR_INTERCEPT(dap_y, dap_x) " + over + " AS dap_intercept,"
-                + " REGR_R2(dap_y, dap_x) " + over + " AS dap_r2,"
-                + " REGR_COUNT(dap_y, dap_x) " + over + " AS dap_n,"
-                + " AVG(dap_x) " + over + " AS dap_mean_x"
-                + " FROM dap_rows" + windowClause + ")"
-                + " SELECT " + (groupKeys.isEmpty() ? "" : groupKeys + ", ")
-                + "MIN(dap_slope) AS dap_slope, MIN(dap_intercept) AS dap_intercept,"
-                + " MIN(dap_r2) AS dap_r2, MIN(dap_n) AS dap_n, MIN(dap_mean_x) AS dap_mean_x,"
-                + " SUM((dap_x - dap_mean_x) * (dap_x - dap_mean_x)) AS dap_sxx,"
-                + " SUM((dap_y - (dap_intercept + dap_slope * dap_x))"
-                + " * (dap_y - (dap_intercept + dap_slope * dap_x))) AS dap_sse"
-                + " FROM dap_fitted" + groupBy(groups) + orderBy(groups);
+    private static Model undefined(long n, int parameters, int predictors, boolean intercept,
+                                   String[] terms, double dfResidual) {
+        return new Model(n, parameters, predictors, intercept, false, terms, null, null, null,
+                null, null, null, null, null, Double.NaN, null, dfResidual, null, null, null,
+                null, null, null, null, null);
     }
 
-    private static String slopeOnlySql(LazyPlan input, String x, String y, List<ColumnSpec> groups) {
-        String quotedX = NodeSql.quote(x);
-        String quotedY = NodeSql.quote(y);
-        String window = window(groups);
-        String projection = groupProjection(groups, "");
-        String groupKeys = groupProjection(groups, "");
-        String over = groups.isEmpty() ? "OVER ()" : "OVER dap_window";
-        String windowClause = groups.isEmpty() ? "" : " WINDOW dap_window AS (" + window + ")";
-        return "WITH dap_rows AS (SELECT " + (projection.isEmpty() ? "" : projection + ", ")
-                + "CAST(" + quotedX + " AS DOUBLE) AS dap_x, CAST(" + quotedY
-                + " AS DOUBLE) AS dap_y FROM " + input.asTable() + " AS dap_input"
-                + " WHERE " + quotedX + " IS NOT NULL AND " + quotedY + " IS NOT NULL),"
-                + " dap_fitted AS (SELECT " + (groupKeys.isEmpty() ? "" : groupKeys + ", ")
-                + "dap_x, dap_y,"
-                + " SUM(dap_x * dap_y) " + over + " / NULLIF(SUM(dap_x * dap_x) " + over + ", 0)"
-                + " AS dap_slope, COUNT(dap_x) " + over + " AS dap_n"
-                + " FROM dap_rows" + windowClause + ")"
-                + " SELECT " + (groupKeys.isEmpty() ? "" : groupKeys + ", ")
-                + "MIN(dap_slope) AS dap_slope, MIN(dap_n) AS dap_n,"
-                + " SUM(dap_x * dap_x) AS dap_sxx, SUM(dap_y * dap_y) AS dap_syy,"
-                + " SUM((dap_y - dap_slope * dap_x) * (dap_y - dap_slope * dap_x)) AS dap_sse"
-                + " FROM dap_fitted" + groupBy(groups) + orderBy(groups);
-    }
-
-    private static Fit fit(ResultSet result, boolean intercept) throws SQLException {
-        long n = result.getObject("dap_n") == null ? 0 : result.getLong("dap_n");
-        Double slope = value(result, "dap_slope");
-        Double sxx = value(result, "dap_sxx");
-        Double sse = value(result, "dap_sse");
+    private static String[] terms(List<ColumnSpec> predictors, boolean intercept) {
+        String[] terms = new String[predictors.size() + (intercept ? 1 : 0)];
+        int at = 0;
         if (intercept) {
-            return new Fit(n, slope, value(result, "dap_intercept"), value(result, "dap_r2"),
-                    value(result, "dap_mean_x"), sxx, sse, null);
+            terms[at++] = "intercept";
         }
-        // Intercept-free model: R2 is the uncentered one, 1 - SSE / sum(y^2).
-        Double syy = value(result, "dap_syy");
-        Double r2 = sse == null || syy == null || syy == 0.0 ? null : 1.0 - Math.max(0.0, sse) / syy;
-        return new Fit(n, slope, 0.0, r2, null, sxx, sse, syy);
-    }
-
-    private record Term(String name, Double coefficient, Double stdError, Double tStatistic,
-                        Double pValue) {
-    }
-
-    private static List<Term> terms(Fit fit, String x, boolean intercept) {
-        List<Term> terms = new ArrayList<>(2);
-        if (intercept) {
-            terms.add(term("intercept", fit.intercept(), fit.n(), fit.sse(), fit.sxx(),
-                    fit.meanX(), true, true));
+        for (ColumnSpec predictor : predictors) {
+            terms[at++] = predictor.name();
         }
-        terms.add(term(x, fit.slope(), fit.n(), fit.sse(), fit.sxx(), fit.meanX(), intercept, false));
         return terms;
     }
 
-    /**
-     * One coefficient row: std_error from MSE and the design sums, p from the two-sided
-     * t tail. A zero standard error (perfect fit or undefined slope) leaves t and p NULL.
-     */
-    private static Term term(String name, Double coefficient, long n, Double sse, Double sxx,
-                             Double meanX, boolean modelIntercept, boolean interceptTerm) {
-        if (coefficient == null) {
-            return new Term(name, null, null, null, null);
+    /** (X'X)^-1 scaled by the residual variance, or by the HC1 sandwich estimator. */
+    private static double[][] covariance(double[][] design, double[][] inverse, double[] residuals,
+                                         double sse, double mse, long n, int parameters, String robust) {
+        if (!"hc1".equals(robust)) {
+            double[][] result = new double[parameters][parameters];
+            for (int j = 0; j < parameters; j++) {
+                for (int k = 0; k < parameters; k++) {
+                    result[j][k] = mse * inverse[j][k];
+                }
+            }
+            return result;
         }
-        int df = (int) (n - (modelIntercept ? 2 : 1));
-        if (df <= 0 || sse == null || sxx == null || sxx == 0.0) {
-            return new Term(name, coefficient, null, null, null);
+        double[][] meat = new double[parameters][parameters];
+        for (int i = 0; i < n; i++) {
+            double weight = residuals[i] * residuals[i];
+            for (int j = 0; j < parameters; j++) {
+                for (int k = 0; k < parameters; k++) {
+                    meat[j][k] += weight * design[i][j] * design[i][k];
+                }
+            }
         }
-        double mse = Math.max(0.0, sse) / df;
-        double stdError = interceptTerm
-                ? Math.sqrt(mse * (1.0 / n + meanX * meanX / sxx))
-                : Math.sqrt(mse / sxx);
-        if (stdError == 0.0) {
-            return new Term(name, coefficient, 0.0, null, null);
+        double[][] middle = Matrix.multiply(Matrix.multiply(inverse, meat), inverse);
+        double factor = (double) n / (n - parameters);
+        for (int j = 0; j < parameters; j++) {
+            for (int k = 0; k < parameters; k++) {
+                middle[j][k] *= factor;
+            }
         }
-        double t = coefficient / stdError;
-        double p = Math.max(0.0, Math.min(1.0, 2.0 * (1.0 - Distributions.tCdf(Math.abs(t), df))));
-        return new Term(name, coefficient, stdError, t, p);
+        return middle;
     }
 
-    private static String row(List<Object> groupValues, List<ColumnSpec> groups, Term term, Fit fit) {
-        StringJoiner select = new StringJoiner(", ");
-        for (int i = 0; i < groups.size(); i++) {
-            ColumnSpec column = groups.get(i);
-            select.add(literal(column, groupValues.get(i)) + " AS " + NodeSql.quote(column.name()));
+    /** VIF per predictor: 1 / (1 - R2) of the predictor regressed on the others. */
+    private static Double[] vif(List<SampleRow> rows, int predictors, boolean intercept) {
+        Double[] result = new Double[predictors];
+        if (!intercept) {
+            return result;
         }
-        select.add(NodeSql.literal(term.name()) + " AS " + NodeSql.quote("term"));
-        select.add(doubleLiteral(term.coefficient()) + " AS " + NodeSql.quote("coefficient"));
-        select.add(doubleLiteral(term.stdError()) + " AS " + NodeSql.quote("std_error"));
-        select.add(doubleLiteral(term.tStatistic()) + " AS " + NodeSql.quote("t_statistic"));
-        select.add(doubleLiteral(term.pValue()) + " AS " + NodeSql.quote("p_value"));
-        select.add(doubleLiteral(fit.r2()) + " AS " + NodeSql.quote("r2"));
-        select.add(fit.n() + " AS " + NodeSql.quote("n"));
-        return "SELECT " + select;
+        if (predictors == 1) {
+            result[0] = 1.0;
+            return result;
+        }
+        for (int j = 0; j < predictors; j++) {
+            List<double[]> others = new ArrayList<>();
+            for (int k = 0; k < predictors; k++) {
+                if (k != j) {
+                    others.add(column(rows, k));
+                }
+            }
+            Double r2 = rSquared(column(rows, j), others);
+            result[j] = r2 == null || r2 >= 1.0 - 1e-12 ? null : 1.0 / (1.0 - r2);
+        }
+        return result;
     }
 
-    private static String emptyRow(List<ColumnSpec> groups) {
-        StringJoiner select = new StringJoiner(", ");
-        for (ColumnSpec column : groups) {
-            select.add("CAST(NULL AS " + column.duckDbType() + ") AS " + NodeSql.quote(column.name()));
+    private static double[] column(List<SampleRow> rows, int predictor) {
+        double[] values = new double[rows.size()];
+        for (int i = 0; i < rows.size(); i++) {
+            values[i] = rows.get(i).x()[predictor];
         }
-        select.add("CAST(NULL AS VARCHAR) AS " + NodeSql.quote("term"));
-        for (String name : List.of("coefficient", "std_error", "t_statistic", "p_value", "r2")) {
-            select.add("CAST(NULL AS DOUBLE) AS " + NodeSql.quote(name));
-        }
-        select.add("CAST(NULL AS BIGINT) AS " + NodeSql.quote("n"));
-        return "SELECT " + select + " WHERE FALSE";
+        return values;
     }
 
-    // ---------------------------------------------------------------- predict
+    /** R2 of an intercept-only-plus-others regression, or null when it is singular. */
+    private static Double rSquared(double[] target, List<double[]> others) {
+        int n = target.length;
+        int parameters = others.size() + 1;
+        double[][] xtx = new double[parameters][parameters];
+        double[] xty = new double[parameters];
+        for (int i = 0; i < n; i++) {
+            double[] row = new double[parameters];
+            row[0] = 1.0;
+            for (int j = 0; j < others.size(); j++) {
+                row[j + 1] = others.get(j)[i];
+            }
+            for (int j = 0; j < parameters; j++) {
+                xty[j] += row[j] * target[i];
+                for (int k = 0; k < parameters; k++) {
+                    xtx[j][k] += row[j] * row[k];
+                }
+            }
+        }
+        double[][] inverse;
+        try {
+            inverse = Matrix.invert(xtx);
+        } catch (IllegalArgumentException singular) {
+            return null;
+        }
+        double[] beta = new double[parameters];
+        for (int j = 0; j < parameters; j++) {
+            beta[j] = dot(inverse[j], xty);
+        }
+        double mean = 0.0;
+        for (double value : target) {
+            mean += value;
+        }
+        mean /= n;
+        double sse = 0.0;
+        double sst = 0.0;
+        for (int i = 0; i < n; i++) {
+            double fitted = beta[0];
+            for (int j = 0; j < others.size(); j++) {
+                fitted += beta[j + 1] * others.get(j)[i];
+            }
+            sse += (target[i] - fitted) * (target[i] - fitted);
+            sst += (target[i] - mean) * (target[i] - mean);
+        }
+        return sst > 0.0 ? 1.0 - sse / sst : null;
+    }
 
-    private static LazyPlan predict(NodeContext context, LazyPlan input, JsonNode config, String x,
-                                    String y, List<ColumnSpec> groups, boolean intercept) {
+    private static Double durbinWatson(double[] residuals, double sse) {
+        if (sse <= 0.0) {
+            return null;
+        }
+        double sum = 0.0;
+        for (int i = 1; i < residuals.length; i++) {
+            double difference = residuals[i] - residuals[i - 1];
+            sum += difference * difference;
+        }
+        return sum / sse;
+    }
+
+    private static double dot(double[] left, double[] right) {
+        double sum = 0.0;
+        for (int i = 0; i < left.length; i++) {
+            sum += left[i] * right[i];
+        }
+        return sum;
+    }
+
+    // ------------------------------------------------------- coefficients
+
+    private static LazyPlan coefficients(NodeContext context, List<ColumnSpec> groups,
+                                         LinkedHashMap<List<Object>, Model> models) {
+        List<ColumnSpec> output = new ArrayList<>(groups);
+        output.addAll(COEFFICIENTS);
+        List<String> rows = new ArrayList<>();
+        for (Map.Entry<List<Object>, Model> entry : models.entrySet()) {
+            Model model = entry.getValue();
+            for (int term = 0; term < model.terms().length; term++) {
+                StringJoiner select = new StringJoiner(", ");
+                addGroupLiterals(select, groups, entry.getKey());
+                select.add(NodeSql.literal(model.terms()[term]) + " AS " + NodeSql.quote("term"));
+                select.add(doubleLiteral(model.defined() ? model.beta()[term] : null)
+                        + " AS " + NodeSql.quote("coefficient"));
+                select.add(doubleLiteral(model.defined() ? model.stdErrors()[term] : null)
+                        + " AS " + NodeSql.quote("std_error"));
+                select.add(doubleLiteral(model.defined() ? model.tStatistics()[term] : null)
+                        + " AS " + NodeSql.quote("t_statistic"));
+                select.add(doubleLiteral(model.defined() ? model.pValues()[term] : null)
+                        + " AS " + NodeSql.quote("p_value"));
+                select.add(doubleLiteral(model.r2()) + " AS " + NodeSql.quote("r2"));
+                select.add(model.n() + " AS " + NodeSql.quote("n"));
+                select.add(doubleLiteral(model.adjR2()) + " AS " + NodeSql.quote("adj_r2"));
+                select.add(doubleLiteral(model.fStatistic()) + " AS " + NodeSql.quote("f_statistic"));
+                select.add(doubleLiteral(model.fPValue()) + " AS " + NodeSql.quote("f_p_value"));
+                select.add(doubleLiteral(model.rmse()) + " AS " + NodeSql.quote("rmse"));
+                select.add(doubleLiteral(model.dfResidual()) + " AS " + NodeSql.quote("df_residual"));
+                select.add(doubleLiteral(vifValue(model, term)) + " AS " + NodeSql.quote("vif"));
+                select.add(doubleLiteral(model.defined() ? model.ciLow()[term] : null)
+                        + " AS " + NodeSql.quote("ci_low"));
+                select.add(doubleLiteral(model.defined() ? model.ciHigh()[term] : null)
+                        + " AS " + NodeSql.quote("ci_high"));
+                rows.add("SELECT " + select);
+            }
+        }
+        return literalPlan(context, rows, output);
+    }
+
+    private static Double vifValue(Model model, int term) {
+        if (!model.defined() || model.vif() == null) {
+            return null;
+        }
+        int offset = model.intercept() ? 1 : 0;
+        int index = term - offset;
+        return index < 0 || index >= model.vif().length ? null : model.vif()[index];
+    }
+
+    private static LazyPlan diagnostics(NodeContext context, List<ColumnSpec> groups,
+                                        LinkedHashMap<List<Object>, Model> models) {
+        List<ColumnSpec> output = new ArrayList<>(groups);
+        output.addAll(DIAGNOSTICS);
+        List<String> rows = new ArrayList<>();
+        for (Map.Entry<List<Object>, Model> entry : models.entrySet()) {
+            Model model = entry.getValue();
+            StringJoiner select = new StringJoiner(", ");
+            addGroupLiterals(select, groups, entry.getKey());
+            select.add(model.n() + " AS " + NodeSql.quote("n"));
+            select.add(doubleLiteral(model.dfResidual()) + " AS " + NodeSql.quote("df_residual"));
+            select.add(doubleLiteral(model.r2()) + " AS " + NodeSql.quote("r2"));
+            select.add(doubleLiteral(model.adjR2()) + " AS " + NodeSql.quote("adj_r2"));
+            select.add(doubleLiteral(model.fStatistic()) + " AS " + NodeSql.quote("f_statistic"));
+            select.add(doubleLiteral(model.fPValue()) + " AS " + NodeSql.quote("f_p_value"));
+            select.add(doubleLiteral(model.rmse()) + " AS " + NodeSql.quote("rmse"));
+            select.add(doubleLiteral(model.durbinWatson()) + " AS " + NodeSql.quote("durbin_watson"));
+            select.add(doubleLiteral(model.aic()) + " AS " + NodeSql.quote("aic"));
+            select.add(doubleLiteral(model.bic()) + " AS " + NodeSql.quote("bic"));
+            rows.add("SELECT " + select);
+        }
+        return literalPlan(context, rows, output);
+    }
+
+    // ------------------------------------------------------------ predict
+
+    private static String predictionName(LazyPlan input, JsonNode config) {
         String prediction = NodeSql.text(config, "output", "prediction");
         if (prediction.isBlank()) {
             throw new IllegalArgumentException("linear_regression: 'output' must not be blank");
         }
+        Set<String> reserved = Set.of(RESIDUAL, LOWER, UPPER);
         for (ColumnSpec column : input.columns()) {
-            if (column.name().equals(prediction) || column.name().equals(RESIDUAL)) {
+            if (column.name().equals(prediction) || reserved.contains(column.name())) {
                 throw new IllegalArgumentException("linear_regression: output column '" + column.name()
                         + "' already exists in the input");
             }
         }
-        if (prediction.equals(RESIDUAL)) {
-            throw new IllegalArgumentException("linear_regression: 'output' must not be 'residual'");
+        if (reserved.contains(prediction)) {
+            throw new IllegalArgumentException("linear_regression: 'output' must not be one of "
+                    + String.join(", ", reserved));
         }
-        String quotedX = NodeSql.quote(x);
-        String quotedY = NodeSql.quote(y);
-        String xExpression = "CAST(" + quotedX + " AS DOUBLE)";
-        String yExpression = "CAST(" + quotedY + " AS DOUBLE)";
-        String over = groups.isEmpty() ? "OVER ()"
-                : "OVER (PARTITION BY " + quotedGroupList(groups) + ")";
-        String fitted = intercept
-                ? "(REGR_INTERCEPT(" + yExpression + ", " + xExpression + ") " + over
-                        + " + REGR_SLOPE(" + yExpression + ", " + xExpression + ") " + over
-                        + " * " + xExpression + ")"
-                : "(SUM(" + xExpression + " * " + yExpression + ") " + over + " / NULLIF(SUM("
-                        + xExpression + " * " + xExpression + ") " + over + ", 0) * "
-                        + xExpression + ")";
+        return prediction;
+    }
+
+    private static LazyPlan predict(NodeContext context, LazyPlan input, String prediction,
+                                    List<ColumnSpec> predictors, ColumnSpec response,
+                                    List<ColumnSpec> groups,
+                                    LinkedHashMap<List<Object>, Model> models, boolean intercept) {
+        List<ColumnSpec> output = new ArrayList<>(input.columns());
+        output.add(ColumnSpec.of(prediction, "Float64"));
+        output.add(ColumnSpec.of(RESIDUAL, "Float64"));
+        output.add(ColumnSpec.of(LOWER, "Float64"));
+        output.add(ColumnSpec.of(UPPER, "Float64"));
+
+        String[] xExpressions = new String[predictors.size()];
+        for (int j = 0; j < predictors.size(); j++) {
+            xExpressions[j] = "CAST(" + NodeSql.quote(predictors.get(j).name()) + " AS DOUBLE)";
+        }
         StringJoiner projection = new StringJoiner(", ");
         for (ColumnSpec column : input.columns()) {
             projection.add(NodeSql.quote(column.name()));
         }
-        projection.add(fitted + " AS " + NodeSql.quote(prediction));
-        projection.add("(" + yExpression + " - " + fitted + ") AS " + NodeSql.quote(RESIDUAL));
-        List<ColumnSpec> output = new ArrayList<>(input.columns());
-        output.add(ColumnSpec.of(prediction, "Float64"));
-        output.add(ColumnSpec.of(RESIDUAL, "Float64"));
-        String sql = "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input";
+        String sql;
+        if (groups.isEmpty()) {
+            Model model = models.values().iterator().next();
+            if (model.defined()) {
+                String[] coefficientSql = new String[model.parameters()];
+                for (int j = 0; j < model.parameters(); j++) {
+                    coefficientSql[j] = Double.toString(model.beta()[j]);
+                }
+                String[][] covarianceSql = new String[model.parameters()][model.parameters()];
+                for (int j = 0; j < model.parameters(); j++) {
+                    for (int k = 0; k < model.parameters(); k++) {
+                        covarianceSql[j][k] = Double.toString(model.covariance()[j][k]);
+                    }
+                }
+                addPredictionColumns(projection, prediction, response.name(), xExpressions, intercept,
+                        coefficientSql, covarianceSql, Double.toString(model.mse()),
+                        Double.toString(Distributions.tQuantile(0.975, model.dfResidual())));
+            } else {
+                addNullPredictions(projection, prediction);
+            }
+            sql = "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input";
+        } else {
+            sql = groupedPredictSql(input, groups, models, projection, prediction, response.name(),
+                    xExpressions, intercept);
+        }
         return new LazyPlan(context.db(), sql, output);
     }
 
-    // ---------------------------------------------------------------- helpers
-
-    private static String window(List<ColumnSpec> groups) {
-        return "PARTITION BY " + quotedGroupList(groups);
-    }
-
-    private static String quotedGroupList(List<ColumnSpec> groups) {
-        StringJoiner joiner = new StringJoiner(", ");
-        for (ColumnSpec group : groups) {
-            joiner.add(NodeSql.quote(group.name()));
+    private static String groupedPredictSql(LazyPlan input, List<ColumnSpec> groups,
+                                            LinkedHashMap<List<Object>, Model> models,
+                                            StringJoiner projection, String prediction,
+                                            String response, String[] xExpressions,
+                                            boolean intercept) {
+        StringJoiner coefficientColumns = new StringJoiner(", ");
+        for (int g = 0; g < groups.size(); g++) {
+            coefficientColumns.add("CAST(NULL AS " + groups.get(g).duckDbType() + ") AS "
+                    + NodeSql.quote("dap_g" + g));
         }
-        return joiner.toString();
-    }
-
-    private static String groupProjection(List<ColumnSpec> groups, String suffix) {
-        StringJoiner joiner = new StringJoiner(", ");
-        for (ColumnSpec group : groups) {
-            joiner.add(NodeSql.quote(group.name()) + suffix);
+        int maxParameters = 0;
+        for (Model model : models.values()) {
+            maxParameters = Math.max(maxParameters, model.parameters());
         }
-        return joiner.toString();
-    }
-
-    private static String groupBy(List<ColumnSpec> groups) {
-        return groups.isEmpty() ? "" : " GROUP BY " + groupProjection(groups, "");
-    }
-
-    private static String orderBy(List<ColumnSpec> groups) {
-        return groups.isEmpty() ? "" : " ORDER BY " + groupProjection(groups, "");
-    }
-
-    /** Numeric column; NaN/Infinity (an undefined fit) is normalised to NULL. */
-    private static Double value(ResultSet result, String column) throws SQLException {
-        Object value = result.getObject(column);
-        if (value == null) {
-            return null;
+        for (int j = 0; j < maxParameters; j++) {
+            coefficientColumns.add("CAST(NULL AS DOUBLE) AS " + NodeSql.quote("dap_b" + j));
         }
-        double number = ((Number) value).doubleValue();
-        return Double.isFinite(number) ? number : null;
+        coefficientColumns.add("CAST(NULL AS DOUBLE) AS " + NodeSql.quote("dap_mse"));
+        coefficientColumns.add("CAST(NULL AS DOUBLE) AS " + NodeSql.quote("dap_tcrit"));
+        for (int j = 0; j < maxParameters; j++) {
+            for (int k = 0; k < maxParameters; k++) {
+                coefficientColumns.add("CAST(NULL AS DOUBLE) AS " + NodeSql.quote("dap_v" + j + "_" + k));
+            }
+        }
+        List<String> rows = new ArrayList<>();
+        for (Map.Entry<List<Object>, Model> entry : models.entrySet()) {
+            Model model = entry.getValue();
+            StringJoiner select = new StringJoiner(", ");
+            for (int g = 0; g < groups.size(); g++) {
+                select.add(literal(groups.get(g), entry.getKey().get(g)) + " AS "
+                        + NodeSql.quote("dap_g" + g));
+            }
+            for (int j = 0; j < maxParameters; j++) {
+                Double value = model.defined() && j < model.parameters() ? model.beta()[j] : null;
+                select.add(doubleLiteral(value) + " AS " + NodeSql.quote("dap_b" + j));
+            }
+            select.add(doubleLiteral(model.defined() ? model.mse() : null)
+                    + " AS " + NodeSql.quote("dap_mse"));
+            select.add(doubleLiteral(model.defined()
+                    ? Distributions.tQuantile(0.975, model.dfResidual()) : null)
+                    + " AS " + NodeSql.quote("dap_tcrit"));
+            for (int j = 0; j < maxParameters; j++) {
+                for (int k = 0; k < maxParameters; k++) {
+                    Double value = model.defined() && j < model.parameters() && k < model.parameters()
+                            ? model.covariance()[j][k] : null;
+                    select.add(doubleLiteral(value) + " AS " + NodeSql.quote("dap_v" + j + "_" + k));
+                }
+            }
+            rows.add("SELECT " + select);
+        }
+        String[] coefficientSql = new String[maxParameters];
+        String[][] covarianceSql = new String[maxParameters][maxParameters];
+        for (int j = 0; j < maxParameters; j++) {
+            coefficientSql[j] = "dap_coefs." + NodeSql.quote("dap_b" + j);
+            for (int k = 0; k < maxParameters; k++) {
+                covarianceSql[j][k] = "dap_coefs." + NodeSql.quote("dap_v" + j + "_" + k);
+            }
+        }
+        addPredictionColumns(projection, prediction, response, xExpressions, intercept,
+                coefficientSql, covarianceSql, "dap_coefs." + NodeSql.quote("dap_mse"),
+                "dap_coefs." + NodeSql.quote("dap_tcrit"));
+        StringJoiner join = new StringJoiner(" AND ");
+        for (int g = 0; g < groups.size(); g++) {
+            join.add("dap_input." + NodeSql.quote(groups.get(g).name()) + " IS NOT DISTINCT FROM "
+                    + "dap_coefs." + NodeSql.quote("dap_g" + g));
+        }
+        return "WITH dap_coefs AS (" + String.join(" UNION ALL ", rows) + ") "
+                + "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input"
+                + " LEFT JOIN dap_coefs ON " + join;
     }
 
-    private static String doubleLiteral(Double value) {
-        return value == null
-                ? "CAST(NULL AS DOUBLE)"
-                : "CAST(" + NodeSql.literal(Double.toString(value)) + " AS DOUBLE)";
+    private static void addPredictionColumns(StringJoiner projection, String prediction,
+                                             String response, String[] xExpressions,
+                                             boolean intercept, String[] coefficientSql,
+                                             String[][] covarianceSql, String mseSql,
+                                             String criticalSql) {
+        String fitted = prediction(coefficientSql, xExpressions, intercept);
+        String variance = predictionVariance(covarianceSql, xExpressions, intercept, mseSql);
+        projection.add(fitted + " AS " + NodeSql.quote(prediction));
+        projection.add("(CAST(dap_input." + NodeSql.quote(response) + " AS DOUBLE) - "
+                + fitted + ") AS " + NodeSql.quote(RESIDUAL));
+        projection.add("(" + fitted + " - " + criticalSql + " * sqrt(" + variance + ")) AS "
+                + NodeSql.quote(LOWER));
+        projection.add("(" + fitted + " + " + criticalSql + " * sqrt(" + variance + ")) AS "
+                + NodeSql.quote(UPPER));
+    }
+
+    private static void addNullPredictions(StringJoiner projection, String prediction) {
+        for (String name : List.of(prediction, RESIDUAL, LOWER, UPPER)) {
+            projection.add("CAST(NULL AS DOUBLE) AS " + NodeSql.quote(name));
+        }
+    }
+
+    private static String prediction(String[] coefficientSql, String[] xExpressions, boolean intercept) {
+        StringJoiner sum = new StringJoiner(" + ");
+        int offset = intercept ? 1 : 0;
+        if (intercept) {
+            sum.add(coefficientSql[0]);
+        }
+        for (int j = 0; j < xExpressions.length; j++) {
+            sum.add("(" + coefficientSql[offset + j] + " * " + xExpressions[j] + ")");
+        }
+        return "(" + sum + ")";
+    }
+
+    private static String predictionVariance(String[][] covarianceSql, String[] xExpressions,
+                                             boolean intercept, String mseSql) {
+        StringJoiner sum = new StringJoiner(" + ");
+        sum.add(mseSql);
+        int offset = intercept ? 1 : 0;
+        String[] design = new String[xExpressions.length + offset];
+        if (intercept) {
+            design[0] = "1.0";
+        }
+        for (int j = 0; j < xExpressions.length; j++) {
+            design[offset + j] = "(" + xExpressions[j] + ")";
+        }
+        for (int j = 0; j < design.length; j++) {
+            for (int k = 0; k < design.length; k++) {
+                sum.add("(" + covarianceSql[j][k] + " * " + design[j] + " * " + design[k] + ")");
+            }
+        }
+        return "(" + sum + ")";
+    }
+
+    private static LazyPlan emptyPlan(NodeContext context, LazyPlan input,
+                                      List<ColumnSpec> predictors, List<ColumnSpec> groups,
+                                      String mode, JsonNode config) {
+        List<ColumnSpec> output = new ArrayList<>();
+        if ("predict".equals(mode)) {
+            String prediction = NodeSql.text(config, "output", "prediction");
+            output.addAll(input.columns());
+            output.add(ColumnSpec.of(prediction, "Float64"));
+            output.add(ColumnSpec.of(RESIDUAL, "Float64"));
+            output.add(ColumnSpec.of(LOWER, "Float64"));
+            output.add(ColumnSpec.of(UPPER, "Float64"));
+        } else {
+            output.addAll(groups);
+            output.addAll("diagnostics".equals(mode) ? DIAGNOSTICS : COEFFICIENTS);
+        }
+        return literalPlan(context, List.of(), output);
+    }
+
+    // -------------------------------------------------------------- helpers
+
+    private static void addGroupLiterals(StringJoiner select, List<ColumnSpec> groups,
+                                         List<Object> groupValues) {
+        for (int i = 0; i < groups.size(); i++) {
+            select.add(literal(groups.get(i), groupValues.get(i)) + " AS "
+                    + NodeSql.quote(groups.get(i).name()));
+        }
     }
 
     private static String literal(ColumnSpec column, Object value) {
@@ -339,34 +756,69 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         return "CAST(" + NodeSql.literal(value.toString()) + " AS " + column.duckDbType() + ")";
     }
 
-    private static String predictor(LazyPlan input, JsonNode config) {
+    private static String groupProjection(List<ColumnSpec> groups) {
+        StringJoiner joiner = new StringJoiner(", ");
+        for (ColumnSpec group : groups) {
+            joiner.add(NodeSql.quote(group.name()));
+        }
+        return joiner.toString();
+    }
+
+    private static String doubleLiteral(Double value) {
+        return value == null || !Double.isFinite(value)
+                ? "CAST(NULL AS DOUBLE)"
+                : "CAST(" + NodeSql.literal(Double.toString(value)) + " AS DOUBLE)";
+    }
+
+    private static LazyPlan literalPlan(NodeContext context, List<String> rows,
+                                        List<ColumnSpec> columns) {
+        if (rows.isEmpty()) {
+            StringJoiner select = new StringJoiner(", ");
+            for (ColumnSpec column : columns) {
+                select.add("CAST(NULL AS " + column.duckDbType() + ") AS " + NodeSql.quote(column.name()));
+            }
+            return new LazyPlan(context.db(), "SELECT " + select + " WHERE FALSE", columns);
+        }
+        return new LazyPlan(context.db(), String.join(" UNION ALL ", rows), columns);
+    }
+
+    private static double clamp(double probability) {
+        return Math.max(0.0, Math.min(1.0, probability));
+    }
+
+    // ----------------------------------------------------------- validation
+
+    private static List<ColumnSpec> predictors(LazyPlan input, JsonNode config) {
         JsonNode node = config.get("x");
         if (node == null || !node.isArray() || node.isEmpty()) {
             throw new IllegalArgumentException("linear_regression: 'x' must be a non-empty array of column names");
         }
-        if (node.size() > 1) {
-            throw new IllegalArgumentException("linear_regression: exactly one 'x' column is supported, got "
-                    + node.size());
+        List<ColumnSpec> predictors = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (JsonNode item : node) {
+            if (!item.isTextual() || item.textValue().isBlank()) {
+                throw new IllegalArgumentException("linear_regression: 'x' must contain non-empty strings");
+            }
+            String name = item.textValue();
+            if (!seen.add(name)) {
+                throw new IllegalArgumentException("linear_regression: duplicate 'x' column '" + name + "'");
+            }
+            ColumnSpec column;
+            try {
+                column = NodeSql.column(input.columns(), name);
+            } catch (IllegalArgumentException unknown) {
+                throw new IllegalArgumentException("linear_regression: unknown 'x' column '" + name + "'");
+            }
+            if (!column.numeric()) {
+                throw new IllegalArgumentException("linear_regression: 'x' column '" + name
+                        + "' must be numeric, got " + column.arrowType());
+            }
+            predictors.add(column);
         }
-        JsonNode item = node.get(0);
-        if (!item.isTextual() || item.textValue().isBlank()) {
-            throw new IllegalArgumentException("linear_regression: 'x' must contain non-empty strings");
-        }
-        String name = item.textValue();
-        ColumnSpec column;
-        try {
-            column = NodeSql.column(input.columns(), name);
-        } catch (IllegalArgumentException unknown) {
-            throw new IllegalArgumentException("linear_regression: unknown 'x' column '" + name + "'");
-        }
-        if (!column.numeric()) {
-            throw new IllegalArgumentException("linear_regression: 'x' column '" + name
-                    + "' must be numeric, got " + column.arrowType());
-        }
-        return column.name();
+        return predictors;
     }
 
-    private static String numericColumn(LazyPlan input, JsonNode config, String field) {
+    private static ColumnSpec numericColumn(LazyPlan input, JsonNode config, String field) {
         String name = NodeSql.requiredText(config, field);
         ColumnSpec column;
         try {
@@ -379,7 +831,7 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             throw new IllegalArgumentException("linear_regression: '" + field + "' column '" + name
                     + "' must be numeric, got " + column.arrowType());
         }
-        return column.name();
+        return column;
     }
 
     private static List<ColumnSpec> groups(LazyPlan input, JsonNode config) {
@@ -403,5 +855,16 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             }
         }
         return groups;
+    }
+
+    private static double alpha(JsonNode config) {
+        JsonNode value = config.get("alpha");
+        if (value == null || value.isNull()) {
+            return 0.05;
+        }
+        if (!value.isNumber() || !(value.doubleValue() > 0.0) || !(value.doubleValue() < 1.0)) {
+            throw new IllegalArgumentException("linear_regression: 'alpha' must be a number in (0, 1)");
+        }
+        return value.doubleValue();
     }
 }

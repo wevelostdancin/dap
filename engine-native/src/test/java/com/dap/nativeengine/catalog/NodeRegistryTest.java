@@ -64,9 +64,23 @@ class NodeRegistryTest {
             "dap.data_quality",
             "dap.hypothesis_test",
             "dap.linear_regression",
+            "dap.logistic_regression",
+            "dap.cluster",
+            "dap.pca",
             "dap.sql_query",
             "dap.db_reader",
-            "dap.file_list");
+            "dap.file_list",
+            "dap.chart_grid",
+            "dap.file_reader",
+            "dap.db_writer",
+            "dap.text_normalize",
+            "dap.fuzzy_join",
+            "dap.geo_distance",
+            "dap.calendar",
+            "dap.resample_test",
+            "dap.survival",
+            "dap.ab_test",
+            "dap.time_series");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -120,7 +134,10 @@ class NodeRegistryTest {
         for (NodeSpec spec : registry.all()) {
             if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")
                     || spec.id().equals("dap.data_quality")
-                    || spec.id().equals("dap.sql_query")) {
+                    || spec.id().equals("dap.fuzzy_join")
+                    || spec.id().equals("dap.sql_query")
+                    || spec.id().equals("dap.markdown_report")
+                    || spec.id().equals("dap.chart_grid")) {
                 continue;
             }
             if (spec.type().equals("Source")) {
@@ -138,6 +155,15 @@ class NodeRegistryTest {
                         new NodeSpec.Port(0, "Data", "BufferedDataTable"),
                         new NodeSpec.Port(1, "Reference", "BufferedDataTable")),
                 registry.require("dap.data_quality").inPorts());
+    }
+
+    @Test
+    void markdownReportHasEightDataInputs() {
+        List<NodeSpec.Port> ports = new java.util.ArrayList<>();
+        for (int index = 0; index < 8; index++) {
+            ports.add(new NodeSpec.Port(index, "Data " + (index + 1), "BufferedDataTable"));
+        }
+        assertEquals(ports, registry.require("dap.markdown_report").inPorts());
     }
 
     @Test
@@ -160,7 +186,8 @@ class NodeRegistryTest {
         assertEquals(Set.of("file", "sheet", "header", "columns", "emptyStringIsNull"),
                 registry.require("dap.excel_reader").settingKeys());
         assertEquals(Set.of("keys", "aggregations"), registry.require("dap.group_by").settingKeys());
-        assertEquals(Set.of("how", "left_keys", "right_keys", "merge_keys"),
+        assertEquals(Set.of("how", "left_keys", "right_keys", "merge_keys",
+                        "left_time", "right_time", "asof_inequality"),
                 registry.require("dap.joiner").settingKeys());
         assertEquals(Set.of("column", "op", "mode", "search", "value"),
                 registry.require("dap.string_manipulation").settingKeys());
@@ -204,7 +231,7 @@ class NodeRegistryTest {
                 .path("items").path("properties").path("method")));
         assertEquals(List.of("mean", "sum", "count", "min", "max", "count_distinct", "median", "percentile"),
                 enumValues(property("dap.group_by", "aggregations").path("items").path("properties").path("fn")));
-        assertEquals(List.of("inner", "left", "right", "full", "semi", "anti"),
+        assertEquals(List.of("inner", "left", "right", "full", "semi", "anti", "asof", "cross"),
                 enumValues(property("dap.joiner", "how")));
         assertEquals(List.of("upper", "lower", "trim", "replace", "concat"),
                 enumValues(property("dap.string_manipulation", "op")));
@@ -258,25 +285,26 @@ class NodeRegistryTest {
     @Test
     void categoryPrefixFindsAllIoNodes() {
         List<NodeSpec> hits = registry.search(null, "/IO", 50);
-        assertEquals(11, hits.size());
-        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Excel Reader", "Excel Writer",
-                "File List", "JSON Reader", "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
+        assertEquals(13, hits.size());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Database Writer",
+                "Excel Reader", "Excel Writer", "File List", "File Reader", "JSON Reader",
+                "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
                 hits.stream().map(NodeSpec::name).toList());
-        assertEquals(6, registry.search(null, "/IO/Read", 50).size());
-        assertEquals(5, registry.search(null, "/IO/Write", 50).size());
+        assertEquals(7, registry.search(null, "/IO/Read", 50).size());
+        assertEquals(6, registry.search(null, "/IO/Write", 50).size());
     }
 
     @Test
     void searchTokensAreCombinedWithAnd() {
         assertEquals(1, registry.search("reader csv", null, 50).size());
         assertEquals(0, registry.search("reader zzz", null, 50).size());
-        assertEquals(5, registry.search("reader", "/IO", 50).size());
+        assertEquals(6, registry.search("reader", "/IO", 50).size());
     }
 
     @Test
     void limitCapsTheResultInNameOrder() {
         assertEquals(ALL_IDS.size(), registry.search(null, null, -1).size());
-        assertEquals(List.of("Binner", "Chart", "Column Filter"),
+        assertEquals(List.of("A/B Test", "Binner", "Calendar"),
                 registry.search(null, null, 3).stream().map(NodeSpec::name).toList());
         assertTrue(registry.search(null, null, 0).isEmpty());
     }

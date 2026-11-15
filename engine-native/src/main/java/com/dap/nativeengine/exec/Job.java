@@ -17,6 +17,9 @@ public final class Job {
     private volatile long finishedAt;
     private volatile String error;
     private volatile RunResult result;
+    private volatile int nodesTotal;
+    private volatile int nodesDone;
+    private volatile String currentNode;
     private volatile boolean cancelRequested;
     private volatile boolean timeoutRequested;
 
@@ -71,6 +74,35 @@ public final class Job {
         return "/v1/jobs/" + id;
     }
 
+    public int nodesTotal() {
+        return nodesTotal;
+    }
+
+    public int nodesDone() {
+        return nodesDone;
+    }
+
+    /** Node that started or just finished; null before the run and between levels. */
+    public String currentNode() {
+        return currentNode;
+    }
+
+    /** Whole-percent progress; 100 once the job is terminal and had nodes. */
+    public int percent() {
+        int total = nodesTotal;
+        if (total <= 0) {
+            return state.terminal() ? 100 : 0;
+        }
+        return Math.min(100, nodesDone * 100 / total);
+    }
+
+    /** Dag progress callback: called when a node starts and when one finishes. */
+    public synchronized void progress(int total, int done, String current) {
+        this.nodesTotal = total;
+        this.nodesDone = done;
+        this.currentNode = current;
+    }
+
     public boolean cancelRequested() {
         return cancelRequested;
     }
@@ -100,6 +132,11 @@ public final class Job {
         this.result = result;
         this.error = error;
         this.finishedAt = System.currentTimeMillis();
+        // A finished run is fully done even if the last progress callback was lost.
+        if (nodesTotal > 0) {
+            nodesDone = nodesTotal;
+        }
+        currentNode = null;
         done.countDown();
         return true;
     }

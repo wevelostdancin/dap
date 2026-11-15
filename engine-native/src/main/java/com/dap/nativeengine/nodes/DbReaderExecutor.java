@@ -6,6 +6,7 @@ import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
 import com.dap.nativeengine.exec.NodeContext;
 import com.dap.nativeengine.exec.NodeExecutor;
+import com.dap.nativeengine.io.PathGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.sql.Connection;
@@ -52,6 +53,9 @@ public final class DbReaderExecutor implements NodeExecutor {
                     "db_reader: exactly one of 'table' or 'query' is required");
         }
         String source = source(config, driver);
+        if ("duckdb".equals(driver) || "sqlite".equals(driver)) {
+            PathGuard.shared().checkRead(source);
+        }
         String alias = "ext_" + sanitize(context.workflowId()) + "_" + sanitize(context.nodeId());
         String target = "db_" + sanitize(context.workflowId()) + "_" + sanitize(context.nodeId());
         Connection connection = context.jobConnection();
@@ -170,6 +174,7 @@ public final class DbReaderExecutor implements NodeExecutor {
     private static String querySource(Connection connection, String alias, String query)
             throws SQLException {
         String guarded = SqlQueryExecutor.validateReadOnly(query);
+        PathGuard.shared().checkSql(guarded);
         List<String> ctes = new ArrayList<>();
         Set<String> names = new LinkedHashSet<>();
         try (Statement statement = connection.createStatement();

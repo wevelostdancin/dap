@@ -1,0 +1,93 @@
+{
+  "id": "wf-p6-correlation",
+  "title": "Correlation: Pearson p-value and Fisher confidence interval",
+  "rationale": "Pins the P6 long-format correlation contract: method, n, p_value, ci_low, ci_high and partial on iris.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "iris",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "corr",
+      "type": "correlation",
+      "config": {
+        "columns": [
+          "petal_length",
+          "petal_width"
+        ],
+        "method": "pearson",
+        "output": "long"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "iris",
+      "to": "corr"
+    }
+  ],
+  "checks": [
+    {
+      "node": "corr",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "column_a",
+          "type": "String"
+        },
+        {
+          "name": "column_b",
+          "type": "String"
+        },
+        {
+          "name": "method",
+          "type": "String"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "correlation",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_low",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_high",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "partial",
+          "type": "String"
+        }
+      ],
+      "data": [
+        [
+          "petal_length",
+          "petal_width",
+          "pearson",
+          150,
+          0.9627570970509662,
+          0,
+          0.9489048767247285,
+          0.972906098710965,
+          null
+        ]
+      ],
+      "order": "unordered"
+    }
+  ],
+  "notes": "r computed directly from iris.csv; Fisher z CI with n=150; t p-value underflows to 0.0."
+}
