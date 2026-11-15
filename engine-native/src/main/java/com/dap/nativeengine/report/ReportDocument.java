@@ -23,7 +23,8 @@ public record ReportDocument(Format format, String title, String subtitle, Strin
     /** Output format; the value of the node's {@code format} setting. */
     public enum Format {
         MD,
-        HTML
+        HTML,
+        PDF
     }
 
     /** Colour palette; HTML uses the full palette, PDF and PPTX only its accent colour. */

@@ -73,10 +73,11 @@
         "title": "Format",
         "enum": [
           "md",
-          "html"
+          "html",
+          "pdf"
         ],
         "default": "md",
-        "description": "Output format: md - Markdown; html - one self-contained HTML file with embedded CSS, tables, images and an optional table of contents."
+        "description": "Output format: md - Markdown; html - one self-contained HTML file with embedded CSS, tables, images and an optional table of contents; pdf - paginated A4/Letter document with text, tables and images."
       },
       "title": {
         "type": "string",

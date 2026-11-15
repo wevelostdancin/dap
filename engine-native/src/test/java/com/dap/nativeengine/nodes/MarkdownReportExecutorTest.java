@@ -373,4 +373,22 @@ class MarkdownReportExecutorTest {
             assertTrue(theme.getMessage().contains("theme"), theme.getMessage());
         }
     }
+
+    @Test
+    void pdfFormatWritesPdfFile() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            LazyPlan first = input(db);
+            Path file = dir.resolve("report.pdf");
+            LazyPlan plan = execute(db, job, file,
+                    ",\"format\":\"pdf\",\"title\":\"Report\",\"page_size\":\"letter\","
+                            + "\"orientation\":\"landscape\","
+                            + "\"sections\":[{\"kind\":\"text\",\"text\":\"hello\"}]",
+                    List.of(first));
+
+            assertSame(first, plan, "pdf reports still pass input port 0 through");
+            String content = new String(Files.readAllBytes(file), StandardCharsets.ISO_8859_1);
+            assertTrue(content.startsWith("%PDF-1.4"), content);
+            assertTrue(content.contains("/MediaBox [0 0 792 612]"), content);
+        }
+    }
 }

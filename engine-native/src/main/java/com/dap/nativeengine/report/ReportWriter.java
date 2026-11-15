@@ -2,6 +2,7 @@ package com.dap.nativeengine.report;
 
 import com.dap.nativeengine.report.ReportDocument.Section;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.StringJoiner;
@@ -15,10 +16,11 @@ public final class ReportWriter {
     private ReportWriter() {
     }
 
-    public static byte[] write(ReportDocument document) {
+    public static byte[] write(ReportDocument document) throws IOException {
         return switch (document.format()) {
             case MD -> markdown(document).getBytes(StandardCharsets.UTF_8);
             case HTML -> new HtmlWriter().write(document);
+            case PDF -> new PdfWriter().write(document);
         };
     }
 
