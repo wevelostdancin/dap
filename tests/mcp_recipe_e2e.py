@@ -12,6 +12,7 @@ resources, prompts, recipes and dap_sql:
     -> dap_recipe_run with dataset + params (2 tool calls, table + Markdown report)
     -> dap_recipe_list / dap_recipe_save
     -> dap_sql over the ingested table
+    -> dap_analyze, dap_report (table + Markdown + chart), dap_profile
 
 The measured scenario is two tool calls (the acceptance budget is three); the
 extra checks run afterwards. The whole run is bounded by --timeout.
@@ -37,6 +38,7 @@ import mcp_e2e as shared  # noqa: E402 - sibling e2e helpers (client, cleanup, p
 RECIPE_NAME = "sales_summary"
 REQUIRED_TOOLS = {
     "dap_ingest", "dap_recipe_list", "dap_recipe_save", "dap_recipe_run", "dap_sql", "dap_analyze",
+    "dap_report", "dap_profile",
 }
 
 
@@ -264,6 +266,48 @@ def scenario(client, source, home, report_path):
                  "dap_analyze cached=%r, expected False for a dataset source"
                  % (analyzed.get("cached"),))
     step("dap_analyze ok")
+
+    report_file = report_path.parent / "dap_report.md"
+    chart_file = report_path.parent / "dap_report.svg"
+    step("dap_report: table + Markdown + chart in one call")
+    reported = client.tool("dap_report", {
+        "dataset": cached,
+        "sql": "SELECT region, SUM(amount) AS total FROM src GROUP BY region ORDER BY region",
+        "report": str(report_file),
+        "chart": str(chart_file),
+        "chartType": "bar",
+        "x": "region",
+        "y": ["total"],
+        "title": "Sales summary",
+    }, 90)
+    report_table = reported.get("table") or {}
+    shared.check(report_table.get("rows") == 2,
+                 "dap_report rows=%r, expected 2" % (report_table.get("rows"),))
+    shared.check([row[0] for row in (report_table.get("data") or [])] == ["north", "south"],
+                 "dap_report rows: %r" % (report_table.get("data"),))
+    shared.check((reported.get("profile") or {}).get("rows") == 2,
+                 "dap_report profile rows=%r, expected 2"
+                 % ((reported.get("profile") or {}).get("rows"),))
+    shared.check(report_file.is_file(), "dap_report wrote no Markdown: %s" % report_file)
+    shared.check(chart_file.is_file(), "dap_report wrote no chart: %s" % chart_file)
+    shared.check((reported.get("bytes") or {}).get("report", 0) > 0,
+                 "dap_report reported no report bytes: %r" % (reported.get("bytes"),))
+    report_text = report_file.read_text(encoding="utf-8")
+    for expected in ("# Sales summary", "north", "south", "|"):
+        shared.check(expected in report_text, "dap_report Markdown is missing %r" % (expected,))
+    step("dap_report ok")
+
+    step("dap_profile: compact profile without a table")
+    profiled = client.tool("dap_profile", {"dataset": cached}, 90)
+    shared.check("table" not in profiled, "dap_profile returned a table: %r" % (profiled,))
+    shared.check(profiled.get("rows") == 3,
+                 "dap_profile rows=%r, expected 3" % (profiled.get("rows"),))
+    shared.check((profiled.get("profile") or {}).get("rows") == 3,
+                 "dap_profile profile rows=%r, expected 3"
+                 % ((profiled.get("profile") or {}).get("rows"),))
+    shared.check(profiled.get("columns") == 2,
+                 "dap_profile columns=%r, expected 2" % (profiled.get("columns"),))
+    step("dap_profile ok")
 
 
 def run(port, timeout):

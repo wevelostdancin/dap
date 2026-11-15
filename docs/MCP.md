@@ -137,11 +137,11 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 | данные | `dap_get_table`, `dap_profile_table`, `dap_ingest` |
 | рецепты | `dap_recipe_list`, `dap_recipe_save`, `dap_recipe_run` |
 | SQL | `dap_sql` |
-| одним вызовом | `dap_analyze` (файл → таблица + профиль, опционально SQL), `dap_workflow_build` (узлы + связи + run + таблицы выходов) |
+| одним вызовом | `dap_analyze` (файл → таблица + профиль, опционально SQL), `dap_report` (файл → таблица + Markdown + график), `dap_profile` (файл → только профиль), `dap_workflow_build` (узлы + связи + run + таблицы выходов) |
 | сервис | `dap_shutdown` |
 
-Всего 28 инструментов: 22 базовых, инструменты рецептов, `dap_sql`, `dap_analyze` и
-`dap_workflow_build`. Каталог
+Всего 30 инструментов: 22 базовых, инструменты рецептов, `dap_sql`, `dap_analyze`,
+`dap_report`, `dap_profile` и `dap_workflow_build`. Каталог
 движка — 52 узла `dap.*`: `dap_search_nodes` и `dap_node_dialog_schema` видят их все,
 включая узлы волн P2–P4 (`type_cast`, `duplicate_filter`, `pivot`, `window`,
 `concatenate`, `describe`, `value_counts`, `correlation`, `histogram`, `quantile`,
@@ -153,9 +153,10 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 через `dap_add_node`.
 
 Для типовой задачи хватает одного-двух вызовов: `dap_analyze` (файл → таблица и
-профиль, опционально SQL) или `dap_workflow_build` (весь граф, запуск и таблицы
-выходов одним вызовом). Ручная сборка `dap_workflow_create` → `dap_add_node` →
-`dap_connect` → `dap_run` → `dap_get_table` нужна только для нестандартного графа.
+профиль, опционально SQL), `dap_report` (файл → таблица, Markdown и график),
+`dap_profile` (только компактный профиль) или `dap_workflow_build` (весь граф, запуск
+и таблицы выходов одним вызовом). Ручная сборка `dap_workflow_create` → `dap_add_node`
+→ `dap_connect` → `dap_run` → `dap_get_table` нужна только для нестандартного графа.
 
 Для адаптации пайплайна под задачу вместо ручной сборки графа есть три пути:
 `dap_sql` (один read-only SQL по таблице узла), `dap_recipe_run` (сохранённый
@@ -249,6 +250,43 @@ tool call), библиотека рецептов читается с диска
 отклоняются адаптером с `-32602` до HTTP-запроса; строковые литералы и комментарии
 не считаются SQL. Узел остаётся в workflow — его таблицу можно дочитать
 `dap_get_table`; `limit` задаёт cap строк узла и размер превью.
+
+## dap_report и dap_profile
+
+Два инструмента закрывают типовую задачу одним вызовом и не оставляют workflow в сессии.
+
+`dap_report` принимает `file` или `dataset` (ровно один), опциональный read-only
+`sql` (вход как `src`), обязательный `report` — путь Markdown-файла, и опциональные
+`chart` (путь `.svg`/`.png`), `chartType` (`bar`/`line`/`scatter`/`histogram`,
+по умолчанию `bar`), `x`, `y`, `title`, `profile` (по умолчанию `true`), `limit`
+(20) и `timeoutSec`. Адаптер собирает временный workflow `parquet_reader` →
+[`sql_query`] → `markdown_report` → [`chart`], выполняет его, читает таблицу и профиль
+и удаляет workflow в `finally`. Секции отчёта — `table` (лимит `limit`) и `profile`
+(если `profile` не `false`). Ответ:
+
+```json
+{"source": "/cache/sales.parquet", "cached": false, "node": "1:2",
+ "table": {"rows": 2, "columns": [...], "data": [...]},
+ "profile": {"rows": 2, "columns": [...]},
+ "report": "/tmp/report.md", "chart": "/tmp/chart.svg",
+ "bytes": {"report": 512, "chart": 4096}}
+```
+
+`node` — узел, чья таблица возвращена (`sql_query` при `sql`, иначе `parquet_reader`).
+`bytes` — размеры записанных файлов, если они видны процессу адаптера.
+
+`dap_profile` — тот же вход без SQL, отчёта и графика: `file` или `dataset`, `format`,
+`limit` (10) и `timeoutSec`. Возвращает `{source, cached, profile, rows, columns}` без
+таблицы: `rows` — строк в источнике, `columns` — число колонок профиля. `limit`
+зарезервирован под value counts: `/profile` движка их пока не отдаёт, поэтому параметр
+проверяется и передаётся, но на ответ не влияет.
+
+```json
+{"name": "dap_report", "arguments": {"file": "/data/sales.csv",
+ "report": "/tmp/report.md", "chart": "/tmp/chart.svg",
+ "sql": "SELECT region, SUM(amount) AS total FROM src GROUP BY region",
+ "x": "region", "y": ["total"], "title": "Sales summary"}}
+```
 
 ## Локальные базы данных
 
@@ -402,7 +440,7 @@ DSH (`~/.dsh/profiles/desktop/cordis.patch.yml`):
 ```bash
 make check                       # JUnit + goldens + MCP launch + оба MCP e2e + lint
 make install-e2e                 # установка из dist/ во временный HOME + stdio preflight
-make mcp-recipe-e2e              # resources/prompts/recipes/dap_sql, 3 tool call
+make mcp-recipe-e2e              # resources/prompts/recipes/dap_sql/report/profile, 3 tool call
 python3 tests/mcp_e2e.py         # create/add/run/table через stdio
 python3 tests/mcp_recipe_e2e.py  # сценарий адаптивности через stdio
 ```

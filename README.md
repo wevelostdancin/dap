@@ -12,7 +12,7 @@
 
 - **Аналитика по запросу.** Адаптер поднимает движок при первом вызове; отдельного
   демона, Docker и внешней БД в ежедневном пути нет.
-- **Два интерфейса.** MCP (stdio, 28 инструментов `dap_*`) для агента и HTTP `/v1`
+- **Два интерфейса.** MCP (stdio, 30 инструментов `dap_*`) для агента и HTTP `/v1`
   для скриптов и тестов.
 - **Узлы как данные.** Узел описывается JSON-спекой: id, порты, `configSchema`.
   Агент читает схему настроек и собирает граф без XML и без GUI.
@@ -156,7 +156,7 @@ python3 adapters/mcp/dap_cli.py doctor --client hermes
 Инструменты: `dap_search_nodes`, `dap_node_dialog_schema`, `dap_workflow_create`,
 `dap_add_node`, `dap_connect`, `dap_run`, `dap_get_table`, `dap_profile_table`,
 `dap_ingest`, `dap_save_workflow`, `dap_load_workflow`, `dap_shutdown` и остальные
-`dap_*` — 28 штук, плюс MCP resources (`dap://catalog`, `dap://recipes`) и prompts. Полный список с аргументами —
+`dap_*` — 30 штук, плюс MCP resources (`dap://catalog`, `dap://recipes`) и prompts. Полный список с аргументами —
 [adapters/mcp/README.md](adapters/mcp/README.md).
 
 ## Проверки
