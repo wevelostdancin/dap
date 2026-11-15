@@ -1591,45 +1591,60 @@ Tukey — SQL-агрегаты, ранговые тесты считаются �
 
 ## 50. dap.linear_regression
 
-Парная линейная регрессия одной числовой колонки на ровно один числовой
-предиктор, при необходимости — отдельно по группам. В режиме `coefficients` —
-одна строка на терм (`intercept` и колонка `x`), в режиме `predict` — все
-входные строки плюс `prediction` и `residual`.
+Линейная регрессия одной числовой колонки на один или несколько числовых
+предикторов, при необходимости — отдельно по группам. В режиме `coefficients` —
+строка на терм (`intercept` и каждый предиктор), в режиме `diagnostics` — строка
+на подгонку, в режиме `predict` — все входные строки плюс предсказание, остаток и
+интервал предсказания.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `x` | array<string> | — | обязателен; ровно одна числовая колонка |
+| `x` | array<string> | — | обязателен; одна или несколько различных числовых колонок |
 | `y` | string | — | обязателен; числовая колонка отклика |
 | `group_by` | array<string> | — | необязательные колонки группировки: своя регрессия на группу |
-| `mode` | `coefficients` \| `predict` | `coefficients` | — |
-| `intercept` | boolean | `true` | `false` — модель `y = slope * x` без свободного члена |
+| `mode` | `coefficients` \| `predict` \| `diagnostics` | `coefficients` | — |
+| `intercept` | boolean | `true` | `false` — модель без свободного члена |
+| `robust` | `none` \| `hc1` | `none` | `hc1` — гетероскедастичность-устойчивая ковариация `(X'X)⁻¹·meat·(X'X)⁻¹·n/(n−p)` |
+| `alpha` | number | `0.05` | уровень значимости интервалов: `1 − alpha`; в `(0, 1)` |
 | `output` | string | `prediction` | имя колонки предсказания в режиме `predict` |
 
 Выход `coefficients`: `[group_by…]`, `term`, `coefficient`, `std_error`,
-`t_statistic`, `p_value`, `r2`, `n`. Коэффициенты — из `regr_slope`,
-`regr_intercept`, `regr_r2`, `regr_count`; стандартные ошибки и p-value — из
-`engine/Distributions` (`t` с `df = n - 2`, для модели без свободного члена
-`df = n - 1` и несцентрированный `r2 = 1 - SSE / sum(y^2)`).
+`t_statistic`, `p_value`, `r2`, `n`, `adj_r2`, `f_statistic`, `f_p_value`,
+`rmse`, `df_residual`, `vif`, `ci_low`, `ci_high`. Подгонка — обычный МНК по
+`X'X` и его обратной матрице; стандартные ошибки — классические или HC1, p-value
+из `engine/Distributions` (`t` с `df_residual = n − p`), интервал
+`coefficient ± t(1−α/2, df)·se`. `vif` — `1/(1−R²_j)` регрессии предиктора на
+остальные (только при `intercept`); у `intercept` — NULL.
 
-Выход `predict`: входные колонки, затем `output` и `residual`
-(`y - prediction`); при `group_by` коэффициенты считаются оконными агрегатами
-по каждой группе. `prediction` NULL, если NULL предиктор; `residual` NULL, если
-NULL отклик.
+Выход `diagnostics`: `[group_by…]`, `n`, `df_residual`, `r2`, `adj_r2`,
+`f_statistic`, `f_p_value`, `rmse`, `durbin_watson`, `aic`, `bic`.
+`f_statistic` — общий F модели (`df1 = p`, `df2 = n − p`), `rmse` — корень из
+`MSE`, `aic = n·ln(SSE/n) + 2p`, `bic = n·ln(SSE/n) + ln(n)·p`.
 
-Правила: строки с NULL в `x` или `y` исключаются из подгонки; меньше двух таких
-строк — ошибка; константный `x` даёт NULL-коэффициенты и NULL-`r2`; идеальная
-подгонка (`std_error = 0`) даёт NULL `t_statistic`/`p_value`; `r2` для модели
-без свободного члена может быть отрицательным. Режим `predict` ленивый (оконные
-агрегаты в SQL), `coefficients` считает подгонку на run.
+Выход `predict`: входные колонки, затем `output`, `residual` (`y − prediction`),
+`prediction_lower` и `prediction_upper` — интервал предсказания для нового
+наблюдения: `prediction ± t(1−α/2, df)·sqrt(MSE + x₀'·Cov(β)·x₀)`. При
+`group_by` коэффициенты подставляются через литеральную таблицу, соединённую по
+колонкам группировки (`IS NOT DISTINCT FROM`), поэтому порядок входных строк
+сохраняется. `prediction` и интервалы NULL, если NULL предиктор.
+
+Правила: строки с NULL в `x` или `y` исключаются из подгонки; `n ≤ p`
+(включая свободный член) — ошибка с подсказкой; вырожденная (сингулярная) матрица
+`X'X` — NULL-коэффициенты и NULL-статистики, `n` и `df_residual` заполнены;
+идеальная подгонка (`std_error = 0`) даёт NULL `t_statistic`/`p_value`; `r2`
+для модели без свободного члена считается по несцентрированному SST и может быть
+отрицательным. Категориальные предикторы не поддерживаются — сначала `dap.encoder`.
+Подгонка читает значения в память: не более 100 000 строк.
 
 ```json
 {
   "factory": "dap.linear_regression",
   "settings": {
-    "x": ["petal_length"],
+    "x": ["petal_length", "petal_width"],
     "y": "sepal_length",
     "group_by": ["species"],
-    "mode": "coefficients"
+    "mode": "coefficients",
+    "robust": "hc1"
   }
 }
 ```
