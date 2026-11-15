@@ -183,9 +183,11 @@ public final class WorkflowHandlers {
         if (!spec.available()) {
             throw ApiException.badRequest("node not available in native engine: " + factory);
         }
-        // Frozen contract quirk: the node exists before settings are validated.
+        // Validate before the node exists: a rejected request must not leave a ghost node.
+        JsonNode settings = request.get("settings");
+        validateSettings(spec, settings);
         WorkflowNode node = workflow.addNode(factory, spec.name(), Json.object());
-        applySettings(workflow, node, request.get("settings"));
+        storeSettings(workflow, node, settings);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("node", node.id());
         body.put("name", node.name());
@@ -283,12 +285,21 @@ public final class WorkflowHandlers {
         if (settings == null || settings.isNull()) {
             return;
         }
-        if (!settings.isObject()) {
-            throw ApiException.badRequest("settings must be an object");
-        }
         NodeSpec spec = state.registry().find(node.factory());
         if (spec == null) {
             throw ApiException.badRequest("unknown node: " + node.factory());
+        }
+        validateSettings(spec, settings);
+        storeSettings(workflow, node, settings);
+    }
+
+    /** Reject a settings object the spec does not know, before any node is created. */
+    private static void validateSettings(NodeSpec spec, JsonNode settings) {
+        if (settings == null || settings.isNull()) {
+            return;
+        }
+        if (!settings.isObject()) {
+            throw ApiException.badRequest("settings must be an object");
         }
         Iterator<String> keys = settings.fieldNames();
         while (keys.hasNext()) {
@@ -299,6 +310,12 @@ public final class WorkflowHandlers {
                         "remove '" + key + "' or check GET /v1/nodes/" + spec.id()
                                 + "/dialog for the available settings");
             }
+        }
+    }
+
+    private static void storeSettings(Workflow workflow, WorkflowNode node, JsonNode settings) {
+        if (settings == null || settings.isNull()) {
+            return;
         }
         workflow.setConfig(node.id(), ((ObjectNode) settings).deepCopy());
     }

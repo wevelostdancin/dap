@@ -42,6 +42,9 @@ START_WAIT = 60
 NATIVE_JAR = os.path.join(DAP_HOME, "engine-native", "target", "dap-native.jar")
 HEAP = (os.environ.get("DAP_HEAP") or "").strip() or "2g"
 _CHILD: subprocess.Popen | None = None
+# Boot generation of the engine we talked to last, and a pending restart notice.
+_GENERATION: str | None = None
+_RESTART_PENDING = False
 
 
 class DapError(Exception):
@@ -55,12 +58,44 @@ class DapError(Exception):
 
 # --------------------------------------------------------------------- сервис
 
-def health() -> bool:
+def probe() -> dict | None:
+    """GET /v1/health: the parsed body, or None when the engine does not answer."""
     try:
         with urllib.request.urlopen(f"{BASE}/v1/health", timeout=2) as r:
-            return r.status == 200
+            if r.status != 200:
+                return None
+            raw = r.read()
+            return json.loads(raw.decode("utf-8")) if raw else {}
     except Exception:
+        return None
+
+
+def health() -> bool:
+    """True when /v1/health answers 200; also records the boot generation."""
+    body = probe()
+    if body is None:
         return False
+    _note_generation(body.get("generation"))
+    return True
+
+
+def _note_generation(generation) -> None:
+    """Remember the engine boot id; a change means the engine restarted under us."""
+    global _GENERATION, _RESTART_PENDING
+    if not generation:
+        return
+    if _GENERATION is not None and generation != _GENERATION:
+        _RESTART_PENDING = True
+    _GENERATION = generation
+
+
+def _restart_note() -> str:
+    """Prefix for the next engine error after a restart; clears the pending note."""
+    global _RESTART_PENDING
+    if not _RESTART_PENDING:
+        return ""
+    _RESTART_PENDING = False
+    return "engine restarted; workflows lost: "
 
 
 def _java() -> str:
@@ -200,7 +235,15 @@ def call(method: str, path: str, body=None, timeout: int = TIMEOUT):
         message = payload.get("error") if isinstance(payload, dict) else None
         if not message and isinstance(payload, dict) and payload:
             message = json.dumps(payload, ensure_ascii=False)[:400]
-        raise DapError(str(message or f"HTTP {e.code}"), data={"status": e.code, "body": payload})
+        data = {"status": e.code, "body": payload}
+        # Surface the engine's machine-readable envelope at the top of error.data;
+        # the raw body stays for clients that already read data.body.
+        if isinstance(payload, dict):
+            if payload.get("code"):
+                data["code"] = payload["code"]
+            if payload.get("hint"):
+                data["hint"] = payload["hint"]
+        raise DapError(str(message or f"HTTP {e.code}"), data=data)
     except urllib.error.URLError as e:
         raise DapError(
             f"DAP недоступен по {BASE}: {e.reason}",
@@ -706,7 +749,7 @@ def handle(msg: dict) -> None:
                 ensure_service()
             result = handler(args)
         except DapError as e:
-            fail(msg_id, e.code, str(e), e.data)
+            fail(msg_id, e.code, _restart_note() + str(e), e.data)
         except (ValueError, TypeError) as e:
             fail(msg_id, -32602, f"неверные аргументы: {e}")
         except Exception as e:  # noqa: BLE001 — граница протокола

@@ -71,12 +71,26 @@ make install-e2e   # установка из dist/ во временный HOME 
 | `DAP_HEAP` | `2g` | `-Xmx` для jar |
 | `DAP_IDLE_TIMEOUT_SEC` | `900` | простой, после которого движок завершается; `0` — выключено |
 | `DAP_QUERY_TIMEOUT_SEC` | `60` | предел материализации `/table` и `/profile`, с; `0` — выключено |
+| `DAP_MAX_SESSIONS` | `64` | максимум открытых сессионных БД, LRU-эвикция |
+| `DAP_SESSION_TTL_SEC` | `1800` | простой сессии до эвикции, с; `0` — выключено |
+| `DAP_MAX_RETAINED_JOBS` | `200` | cap терминальных заданий на сессию |
 | `DAP_CACHE_DIR` | `$DAP_HOME/build/cache` | каталог Parquet-кэша `dap_ingest` |
 | `JAVA_HOME` | — | откуда брать `bin/java` |
 
 Адаптер выставляет `DAP_HOME`, поэтому кэш ingest по умолчанию лежит в
 `$DAP_HOME/build/cache`. Без `DAP_HOME` используется `~/.dap/cache`, а если
 каталог нельзя создать (sandbox) — `$TMPDIR/dap-cache`.
+
+### Рестарт движка и ошибки
+
+Адаптер запоминает `generation` из `GET /v1/health` при каждой проверке и, если
+она изменилась (движок перезапустился, например после `dap_shutdown`), добавляет
+к следующей ошибке префикс `engine restarted; workflows lost: ` — вместо
+молчаливого 404 на потерянный workflow.
+
+Тело ошибки движка `{"error","code","hint"}` адаптер передаёт в JSON-RPC
+`error.data`: `status` (HTTP-код), `code` и `hint` (если есть) лежат на верхнем
+уровне `data`, а исходное тело — в `data.body` (для совместимости).
 
 ## Жизненный цикл
 

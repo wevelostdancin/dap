@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Reads a delimited text file into a data table. Column names and types can be set explicitly or inferred from the header row.",
+  "description": "Reads a delimited text file into a data table. Column names and types can be set explicitly or inferred from the header row. A quoted empty string in a typed (numeric or date) column fails with a hint: set emptyStringIsNull=true or type the column as Utf8.",
   "inPorts": [],
   "outPorts": [
     {
@@ -77,7 +77,7 @@
       "emptyStringIsNull": {
         "type": "boolean",
         "title": "Empty string is null",
-        "description": "Unquoted empty fields are always NULL; set this to also treat quoted empty strings (\"\" ) as NULL.",
+        "description": "Unquoted empty fields are always NULL; set this to also treat quoted empty strings (\"\" ) as NULL. Without it a quoted empty string in a typed column is a parse error with a hint to set this flag.",
         "default": false
       }
     },

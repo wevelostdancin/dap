@@ -102,6 +102,37 @@ class NativeServiceSettingsTest {
     }
 
     @Test
+    void sessionLimitsDefaultAndAreConfigurable() {
+        assertEquals(64, NativeService.Settings.fromEnv(Map.of()).maxSessions());
+        assertEquals(1800, NativeService.Settings.fromEnv(Map.of()).sessionTtlSec());
+        assertEquals(4, NativeService.Settings.fromEnv(
+                Map.of("DAP_MAX_SESSIONS", "4")).maxSessions());
+        assertEquals(0, NativeService.Settings.fromEnv(
+                Map.of("DAP_SESSION_TTL_SEC", "0")).sessionTtlSec(), "0 disables the TTL");
+        assertEquals(1800, NativeService.Settings.fromEnv(
+                Map.of("DAP_SESSION_TTL_SEC", " ")).sessionTtlSec(), "blank keeps the default");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_MAX_SESSIONS", "0")));
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_SESSION_TTL_SEC", "-1")));
+    }
+
+    @Test
+    void retainedJobsDefaultTo200AndAreConfigurable() {
+        assertEquals(200, NativeService.Settings.fromEnv(Map.of()).maxRetainedJobs());
+        assertEquals(5, NativeService.Settings.fromEnv(
+                Map.of("DAP_MAX_RETAINED_JOBS", " 5 ")).maxRetainedJobs());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_MAX_RETAINED_JOBS", "0")));
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_MAX_RETAINED_JOBS", "-3")));
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_MAX_RETAINED_JOBS", "many")));
+    }
+
+    @Test
     void invalidThreadsEnvFailsLoudly() {
         IllegalArgumentException notANumber = assertThrows(IllegalArgumentException.class,
                 () -> NativeService.Settings.fromEnv(Map.of("DAP_DUCKDB_THREADS", "many")));

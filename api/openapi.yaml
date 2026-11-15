@@ -39,6 +39,8 @@ tags:
     description: Table previews and column profiles
   - name: ops
     description: Save and diagnostics
+  - name: sessions
+    description: Open session databases, TTL and LRU limits
   - name: datasets
     description: One-time conversion of source files into the Parquet cache
 paths:
@@ -73,6 +75,58 @@ paths:
                 $ref: '#/components/schemas/Health'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/sessions:
+    get:
+      tags: [sessions]
+      operationId: listSessions
+      summary: Open session databases
+      description: >-
+        Process-wide list, least recently used first. A session database is created on the
+        first data request of a session and evicted after DAP_SESSION_TTL_SEC of inactivity
+        or when the DAP_MAX_SESSIONS cap (LRU) is exceeded.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Session list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/sessions/{sessionId}:
+    delete:
+      tags: [sessions]
+      operationId: deleteSession
+      summary: Close one session
+      description: >-
+        Cancels the session jobs, deletes its workflows and closes its DuckDB database.
+        Unknown sessions return 404.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9._-]{1,64}$'
+          example: default
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Session closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkId'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/ServerError'
   /v1/nodes:
@@ -494,7 +548,10 @@ paths:
       tags: [jobs]
       operationId: listJobs
       summary: List jobs in the session
-      description: Newest first; results are omitted.
+      description: >-
+        Newest first; results are omitted. Only the last DAP_MAX_RETAINED_JOBS (default 200)
+        jobs of a session are retained: older terminal jobs are dropped and answer 404.
+        Active jobs are never dropped.
       parameters:
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'
@@ -861,7 +918,7 @@ components:
           type: string
     Health:
       type: object
-      required: [ok, name, version, api, nodes, coreNodes, workflows, sessions, jobs, memory]
+      required: [ok, name, version, api, generation, nodes, coreNodes, workflows, sessions, jobs, memory]
       properties:
         ok:
           type: boolean
@@ -871,6 +928,11 @@ components:
           type: string
         api:
           type: string
+        generation:
+          type: string
+          description: >-
+            Boot id (UUID) of this engine process; it changes on every restart, so clients
+            can tell a lost workflow apart from a plain 404.
         nodes:
           type: integer
         coreNodes:
@@ -1376,6 +1438,38 @@ components:
       properties:
         ok:
           type: boolean
+      additionalProperties: true
+    OkId:
+      type: object
+      required: [ok, id]
+      properties:
+        ok:
+          type: boolean
+        id:
+          type: string
+      additionalProperties: true
+    Session:
+      type: object
+      required: [id, lastAccess, workflows]
+      properties:
+        id:
+          type: string
+        lastAccess:
+          type: integer
+          description: Epoch milliseconds of the last data request of this session
+        workflows:
+          type: integer
+      additionalProperties: true
+    SessionList:
+      type: object
+      required: [count, sessions]
+      properties:
+        count:
+          type: integer
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
       additionalProperties: true
     OkNode:
       type: object
