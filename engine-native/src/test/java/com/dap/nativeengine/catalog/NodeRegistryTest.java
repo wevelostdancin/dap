@@ -120,7 +120,8 @@ class NodeRegistryTest {
         for (NodeSpec spec : registry.all()) {
             if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")
                     || spec.id().equals("dap.data_quality")
-                    || spec.id().equals("dap.sql_query")) {
+                    || spec.id().equals("dap.sql_query")
+                    || spec.id().equals("dap.markdown_report")) {
                 continue;
             }
             if (spec.type().equals("Source")) {
@@ -138,6 +139,15 @@ class NodeRegistryTest {
                         new NodeSpec.Port(0, "Data", "BufferedDataTable"),
                         new NodeSpec.Port(1, "Reference", "BufferedDataTable")),
                 registry.require("dap.data_quality").inPorts());
+    }
+
+    @Test
+    void markdownReportHasEightDataInputs() {
+        List<NodeSpec.Port> ports = new java.util.ArrayList<>();
+        for (int index = 0; index < 8; index++) {
+            ports.add(new NodeSpec.Port(index, "Data " + (index + 1), "BufferedDataTable"));
+        }
+        assertEquals(ports, registry.require("dap.markdown_report").inPorts());
     }
 
     @Test

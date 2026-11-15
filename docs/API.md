@@ -30,9 +30,10 @@
 
 Порты данных нумеруются с 0. У всех узлов один табличный выход (порт 0); у
 `dap.joiner` два входа (0 — Left, 1 — Right), у `dap.concatenate` — два входа
-(0 — Top, 1 — Bottom), у остальных один. Писатели (`dap.csv_writer`,
-`dap.parquet_writer`, `dap.json_writer`, `dap.excel_writer`) возвращают входную таблицу
-без изменений (pass-through).
+(0 — Top, 1 — Bottom), у `dap.markdown_report` восемь входов (0–7 — `Data 1`…`Data 8`,
+раздел отчёта выбирает вход через `sections[].input`), у остальных один. Писатели
+(`dap.csv_writer`, `dap.parquet_writer`, `dap.json_writer`, `dap.excel_writer`,
+`dap.markdown_report`) возвращают входную таблицу порта 0 без изменений (pass-through).
 
 ### Ошибки
 
