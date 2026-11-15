@@ -238,7 +238,7 @@ job-соединении, поэтому parse перекрывается, а `C
     cd engine-native
     export JAVA_HOME=$HOME/Projects/tools/jdk-21.0.13+9/Contents/Home
     export PATH="$JAVA_HOME/bin:$PATH"
-    ./mvnw -q -o test                 # 401 тест, 0 падений (проверка сборки)
+    ./mvnw -q -o test                 # 534 теста, 0 падений (проверка сборки)
     ./mvnw -q -o -DskipTests package  # engine-native/target/dap-native.jar
     cd ..
 
