@@ -7,7 +7,7 @@ Parquet-ingest, 16 узлов, 247 тестов. **P2 «Ядро аналити�
 17 новых узлов, 33 узла, 332 теста, 14 goldens. **P3 «Статистика и время» закрыт
 06.11.2026:** 11 новых узлов, 44 узла, 401 тест, 15 goldens. **P4 «Hardening» закрыт
 15.11.2026:** таймауты чтения, эвикция сессий и jobs, контракт ошибок, soak.
-**P5 «MCP-сервис» закрыт 15.11.2026:** 52 узла, 26 инструментов, resources/prompts,
+**P5 «MCP-сервис» закрыт 15.11.2026:** 52 узла, 28 инструментов, resources/prompts,
 рецепты, coverage-сьют 68/69, установка одной командой.
 **Цель:** лёгкий, быстрый и точный аналитический бэкенд для агента: локальный, по требованию,
 без KNIME.
@@ -116,7 +116,7 @@ Parquet.
 | **P2. Ядро аналитики** ✅ | 17 узлов: очистка (type_cast, duplicate_filter, value_replace, column_resorter, outlier_filter), преобразование (date_time, rule_engine, binner, normalizer, encoder, sample_rows), форма (row_aggregator, pivot, unpivot, window, top_n_per_group, concatenate) | закрыто 06.11.2026: 33 узла, 332 теста, 14 goldens, `make check` зелёный | 5 дней |
 | **P3. Статистика и время** ✅ | 11 узлов: describe, value_counts, correlation, histogram, quantile, outlier_detect, resample, rolling, diff, date_range, excel_writer | закрыто 06.11.2026: 44 узла, 401 тест, 15 goldens, `make check` зелёный | 5 дней |
 | **P4. Hardening** ✅ | таймауты чтения, эвикция сессий/jobs/таблиц, контракт `{error, code, hint}`, soak | закрыто 15.11.2026: 534 теста, 25 goldens, `make check` и `make soak` зелёные | 3 дня |
-| **P5. MCP-сервис** ✅ | 8 узлов, 3 расширения, 7 SQL-рецептов, `dap-mcp install/doctor`, resources/prompts, coverage harness | закрыто 15.11.2026: 52 узла, 26 инструментов, покрытие 68/69, `make install-e2e` | 1 день |
+| **P5. MCP-сервис** ✅ | 8 узлов, 3 расширения, 7 SQL-рецептов, `dap-mcp install/doctor`, resources/prompts, coverage harness | закрыто 15.11.2026: 52 узла, 28 инструментов, покрытие 68/69, `make install-e2e` | 1 день |
 
 **Веха:** после P1 (~1,5 недели) — ежедневное использование на CSV/Excel; после P2 —
 полноценная аналитика; после P4 — стабильный продукт.

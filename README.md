@@ -156,7 +156,7 @@ python3 adapters/mcp/dap_cli.py doctor --client hermes
 Инструменты: `dap_search_nodes`, `dap_node_dialog_schema`, `dap_workflow_create`,
 `dap_add_node`, `dap_connect`, `dap_run`, `dap_get_table`, `dap_profile_table`,
 `dap_ingest`, `dap_save_workflow`, `dap_load_workflow`, `dap_shutdown` и остальные
-`dap_*` — 26 штук, плюс MCP resources (`dap://catalog`, `dap://recipes`) и prompts. Полный список с аргументами —
+`dap_*` — 28 штук, плюс MCP resources (`dap://catalog`, `dap://recipes`) и prompts. Полный список с аргументами —
 [adapters/mcp/README.md](adapters/mcp/README.md).
 
 ## Проверки
@@ -169,9 +169,10 @@ make smoke          # чёрный smoke по HTTP против запущенн
 make mcp-e2e        # create → add_node → connect → run → table → delete через MCP
 make mcp-recipe-e2e # resources/prompts/recipes/dap_sql через MCP
 make install-e2e    # установка из dist/ во временный HOME + stdio preflight
-make extensions     # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext
+make extensions     # sqlite/postgres/mysql/httpfs в $DAP_HOME/build/duckdb-ext
 make soak           # 200 × create/run/table/delete
-make check          # test-native + goldens + MCP e2e + lint
+make lint           # статические проверки репозитория
+make check          # test-native + goldens + goldens-validate + test-mcp + mcp-e2e + mcp-recipe-e2e + lint
 ```
 
 ## Структура репозитория
