@@ -99,6 +99,9 @@ public final class DuckDbSession implements AutoCloseable {
                        String extensionDirectory) throws SQLException {
         try (Statement statement = base.createStatement()) {
             statement.execute("SET TimeZone='UTC'");
+            // Out-of-core default (spec §8): scans may reorder rows, which lets DuckDB stream
+            // and spill instead of buffering the insertion order of every table.
+            statement.execute("SET preserve_insertion_order=false");
         }
         applyExtensionDirectory(extensionDirectory);
         if (threads != null) {
@@ -350,6 +353,64 @@ public final class DuckDbSession implements AutoCloseable {
     }
 
     /**
+     * One page of a plan after an optional filter: {@code rows} is the total count after the
+     * filter, {@code data} is the projected page starting at {@code offset}.
+     */
+    public TableData page(String sql, List<ColumnSpec> columns, int limit, int offset,
+                          long timeoutMillis, String workflowId, String nodeId) throws SQLException {
+        int safeLimit = Math.max(0, limit);
+        int safeOffset = Math.max(0, offset);
+        DuckDBConnection connection = openRead(workflowId, nodeId);
+        try {
+            return bounded("table", timeoutMillis, workflowId,
+                    () -> readPage(connection, sql, columns, safeLimit, safeOffset));
+        } finally {
+            endRead(connection);
+        }
+    }
+
+    private static TableData readPage(DuckDBConnection connection, String sql,
+                                      List<ColumnSpec> columns, int limit, int offset)
+            throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            long rows = countWith(statement, sql);
+            List<List<String>> data = new ArrayList<>();
+            try (ResultSet result = statement.executeQuery("SELECT * FROM ("
+                    + LazyPlan.stripSemicolon(sql) + ") AS dap_page LIMIT " + limit
+                    + " OFFSET " + offset)) {
+                while (result.next()) {
+                    List<String> row = new ArrayList<>(columns.size());
+                    for (int column = 1; column <= columns.size(); column++) {
+                        row.add(format(result.getObject(column)));
+                    }
+                    data.add(row);
+                }
+            }
+            return new TableData(rows, columns, data);
+        }
+    }
+
+    /**
+     * The physical plan of a query as DuckDB's JSON array, without executing it.
+     * {@code EXPLAIN (FORMAT JSON)} returns (explain_key, explain_value) rows.
+     */
+    public String explainJson(String sql) throws SQLException {
+        try (DuckDBConnection connection = newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("EXPLAIN (FORMAT JSON) "
+                     + LazyPlan.stripSemicolon(sql))) {
+            int valueColumn = result.getMetaData().getColumnCount() >= 2 ? 2 : 1;
+            while (result.next()) {
+                String value = result.getString(valueColumn);
+                if (value != null && !value.isBlank()) {
+                    return value;
+                }
+            }
+            throw new SQLException("EXPLAIN returned no plan");
+        }
+    }
+
+    /**
      * Declared output columns of a query: {@code SELECT * FROM (<sql>) LIMIT 0} plus JDBC
      * metadata, mapped through {@link TypeMap}. Nested result types (LIST, STRUCT, MAP)
      * and TIMESTAMPTZ are rejected with the column name because the engine has no Arrow
@@ -575,6 +636,8 @@ public final class DuckDbSession implements AutoCloseable {
         prefixes.add("excel_" + sanitize(workflowId) + "_");
         prefixes.add("db_" + sanitize(workflowId) + "_");
         prefixes.add("files_" + sanitize(workflowId) + "_");
+        // text_normalize loads a distinct-value mapping table per selected column.
+        prefixes.add("textnorm_");
         List<String> names = new ArrayList<>();
         try (Statement statement = base.createStatement();
              ResultSet result = statement.executeQuery(

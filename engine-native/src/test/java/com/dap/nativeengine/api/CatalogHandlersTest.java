@@ -61,17 +61,19 @@ class CatalogHandlersTest {
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(53, body.path("count").asInt());
+        assertEquals(59, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(53, nodes.size());
+        assertEquals(59, nodes.size());
         assertEquals(List.of(
-                "Binner", "Chart", "Chart Grid", "Column Filter",
+                "Binner", "Calendar", "Chart", "Chart Grid", "Column Filter",
                 "Column Renamer", "Column Resorter", "Concatenate",
                 "Correlation", "CSV Reader", "CSV Writer",
-                "Data Quality", "Database Reader", "Date & Time",
+                "Data Quality", "Database Reader", "Database Writer",
+                "Date & Time",
                 "Date Range", "Describe", "Diff",
                 "Duplicate Filter", "Encoder", "Excel Reader",
-                "Excel Writer", "File List", "Group By",
+                "Excel Writer", "File List", "File Reader",
+                "Fuzzy Join", "Geo Distance", "Group By",
                 "Histogram", "Hypothesis Test", "Joiner",
                 "JSON Reader", "JSON Writer", "Linear Regression",
                 "Markdown Report", "Math Formula", "Missing Value",
@@ -80,13 +82,14 @@ class CatalogHandlersTest {
                 "Quantile", "Resample", "Rolling",
                 "Row Aggregator", "Row Filter", "Rule Engine",
                 "Sample Rows", "Sorter", "SQL Query",
-                "String Manipulation", "Top N per Group", "Type Cast",
+                "String Manipulation", "Text Normalize", "Top N per Group",
+                "Type Cast",
                 "Unpivot", "Value Counts", "Value Replace",
                 "Window"), names(nodes));
 
         JsonNode first = nodes.get(0);
         assertEquals("dap.binner", first.path("id").asText());
-        JsonNode csvNode = nodes.get(8);
+        JsonNode csvNode = nodes.get(9);
         assertEquals("dap.csv_reader", csvNode.path("id").asText());
         assertEquals("CSV Reader", csvNode.path("name").asText());
         assertEquals("/IO/Read", csvNode.path("category").asText());
@@ -109,20 +112,21 @@ class CatalogHandlersTest {
         assertEquals("dap.csv_writer", csv.path("nodes").get(1).path("id").asText());
 
         JsonNode io = body(fetch("/nodes?category=%2FIO", "s"));
-        assertEquals(11, io.path("count").asInt());
-        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Excel Reader", "Excel Writer",
-                "File List", "JSON Reader", "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
+        assertEquals(13, io.path("count").asInt());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Database Writer",
+                "Excel Reader", "Excel Writer", "File List", "File Reader", "JSON Reader",
+                "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
                 names(io.path("nodes")));
 
         JsonNode combined = body(fetch("/nodes?q=reader&category=%2FIO", "s"));
-        assertEquals(5, combined.path("count").asInt());
+        assertEquals(6, combined.path("count").asInt());
     }
 
     @Test
     void appliesLimitAndReturnsEmptyForUnknownValues() throws Exception {
         JsonNode limited = body(fetch("/nodes?limit=3", "s"));
         assertEquals(3, limited.path("count").asInt());
-        assertEquals(List.of("Binner", "Chart", "Chart Grid"), names(limited.path("nodes")));
+        assertEquals(List.of("Binner", "Calendar", "Chart"), names(limited.path("nodes")));
 
         HttpResponse<String> empty = fetch("/nodes?q=no-such-node", "s");
         assertEquals(200, empty.statusCode());

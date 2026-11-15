@@ -1,0 +1,103 @@
+{
+  "id": "dap.text_normalize",
+  "name": "Text Normalize",
+  "category": "/Manipulation/Column/String",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Normalizes text columns and keeps the original columns next to the normalized ones (or replaces them with 'replace'). Supports Unicode normalization forms NFC/NFD/NFKC/NFKD, accent stripping, lower/upper case, punctuation removal, whitespace collapsing and trimming. DuckDB 1.5.6 only has nfc_normalize, so NFD/NFKD/NFKC and accent stripping run in Java over the distinct values of the selected columns (bounded at 100000 distinct values; above that the node fails with a hint), and the result is joined back in SQL. The row count never enters the heap.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Text Normalize configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Text columns",
+        "description": "Utf8 columns to normalize.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "mode": {
+        "type": "string",
+        "title": "Unicode normalization",
+        "description": "Unicode normalization form; none leaves the text as it is.",
+        "enum": [
+          "none",
+          "nfc",
+          "nfd",
+          "nfkc",
+          "nfkd"
+        ],
+        "default": "none"
+      },
+      "case": {
+        "type": "string",
+        "title": "Case",
+        "description": "Lowercase or uppercase the text.",
+        "enum": [
+          "none",
+          "lower",
+          "upper"
+        ],
+        "default": "none"
+      },
+      "strip_accents": {
+        "type": "boolean",
+        "title": "Strip accents",
+        "description": "Remove combining marks, so Cafe becomes Cafe with plain letters.",
+        "default": false
+      },
+      "collapse_whitespace": {
+        "type": "boolean",
+        "title": "Collapse whitespace",
+        "description": "Replace every whitespace run with one space.",
+        "default": false
+      },
+      "trim": {
+        "type": "boolean",
+        "title": "Trim",
+        "description": "Strip leading and trailing whitespace.",
+        "default": false
+      },
+      "remove_punctuation": {
+        "type": "boolean",
+        "title": "Remove punctuation",
+        "description": "Remove Unicode punctuation characters.",
+        "default": false
+      },
+      "suffix": {
+        "type": "string",
+        "title": "Suffix",
+        "description": "Suffix of the normalized column when the original is kept.",
+        "default": "_normalized"
+      },
+      "replace": {
+        "type": "boolean",
+        "title": "Replace columns",
+        "description": "Replace the original values instead of adding normalized columns.",
+        "default": false
+      }
+    },
+    "required": [
+      "columns"
+    ]
+  }
+}

@@ -67,7 +67,13 @@ class NodeRegistryTest {
             "dap.sql_query",
             "dap.db_reader",
             "dap.file_list",
-            "dap.chart_grid");
+            "dap.chart_grid",
+            "dap.file_reader",
+            "dap.db_writer",
+            "dap.text_normalize",
+            "dap.fuzzy_join",
+            "dap.geo_distance",
+            "dap.calendar");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -121,6 +127,7 @@ class NodeRegistryTest {
         for (NodeSpec spec : registry.all()) {
             if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")
                     || spec.id().equals("dap.data_quality")
+                    || spec.id().equals("dap.fuzzy_join")
                     || spec.id().equals("dap.sql_query")
                     || spec.id().equals("dap.markdown_report")
                     || spec.id().equals("dap.chart_grid")) {
@@ -172,7 +179,8 @@ class NodeRegistryTest {
         assertEquals(Set.of("file", "sheet", "header", "columns", "emptyStringIsNull"),
                 registry.require("dap.excel_reader").settingKeys());
         assertEquals(Set.of("keys", "aggregations"), registry.require("dap.group_by").settingKeys());
-        assertEquals(Set.of("how", "left_keys", "right_keys", "merge_keys"),
+        assertEquals(Set.of("how", "left_keys", "right_keys", "merge_keys",
+                        "left_time", "right_time", "asof_inequality"),
                 registry.require("dap.joiner").settingKeys());
         assertEquals(Set.of("column", "op", "mode", "search", "value"),
                 registry.require("dap.string_manipulation").settingKeys());
@@ -216,7 +224,7 @@ class NodeRegistryTest {
                 .path("items").path("properties").path("method")));
         assertEquals(List.of("mean", "sum", "count", "min", "max", "count_distinct", "median", "percentile"),
                 enumValues(property("dap.group_by", "aggregations").path("items").path("properties").path("fn")));
-        assertEquals(List.of("inner", "left", "right", "full", "semi", "anti"),
+        assertEquals(List.of("inner", "left", "right", "full", "semi", "anti", "asof", "cross"),
                 enumValues(property("dap.joiner", "how")));
         assertEquals(List.of("upper", "lower", "trim", "replace", "concat"),
                 enumValues(property("dap.string_manipulation", "op")));
@@ -270,25 +278,26 @@ class NodeRegistryTest {
     @Test
     void categoryPrefixFindsAllIoNodes() {
         List<NodeSpec> hits = registry.search(null, "/IO", 50);
-        assertEquals(11, hits.size());
-        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Excel Reader", "Excel Writer",
-                "File List", "JSON Reader", "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
+        assertEquals(13, hits.size());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Database Writer",
+                "Excel Reader", "Excel Writer", "File List", "File Reader", "JSON Reader",
+                "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
                 hits.stream().map(NodeSpec::name).toList());
-        assertEquals(6, registry.search(null, "/IO/Read", 50).size());
-        assertEquals(5, registry.search(null, "/IO/Write", 50).size());
+        assertEquals(7, registry.search(null, "/IO/Read", 50).size());
+        assertEquals(6, registry.search(null, "/IO/Write", 50).size());
     }
 
     @Test
     void searchTokensAreCombinedWithAnd() {
         assertEquals(1, registry.search("reader csv", null, 50).size());
         assertEquals(0, registry.search("reader zzz", null, 50).size());
-        assertEquals(5, registry.search("reader", "/IO", 50).size());
+        assertEquals(6, registry.search("reader", "/IO", 50).size());
     }
 
     @Test
     void limitCapsTheResultInNameOrder() {
         assertEquals(ALL_IDS.size(), registry.search(null, null, -1).size());
-        assertEquals(List.of("Binner", "Chart", "Chart Grid"),
+        assertEquals(List.of("Binner", "Calendar", "Chart"),
                 registry.search(null, null, 3).stream().map(NodeSpec::name).toList());
         assertTrue(registry.search(null, null, 0).isEmpty());
     }

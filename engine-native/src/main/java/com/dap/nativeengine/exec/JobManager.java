@@ -263,7 +263,7 @@ public final class JobManager implements AutoCloseable {
             workflow.resetResults();
             Connection connection = db.newConnection();
             connections.put(job.id(), connection);
-            dag.execute(workflow, db, connection);
+            dag.execute(workflow, db, connection, job::progress);
             completeSuccess(job, workflow);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();

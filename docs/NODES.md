@@ -363,18 +363,27 @@ ISO-даты и даты по `numFmtId`; ошибки ячеек становя
 
 ## 10. dap.joiner
 
-Соединяет два входа по ключам: `inner`, `left` или `right`. Ключи сопоставляются
-позиционно; `left_keys` и `right_keys` должны быть одной длины. При `merge_keys`
-ключевые колонки сливаются в одну (`COALESCE(left, right)`, чтобы right-only строка
-не теряла ключ). Колонка правого входа, имя которой уже есть в выходе, получает
-суффикс `" (Right)"`.
+Соединяет два входа по ключам: `inner`, `left`, `right`, `full`, `semi`, `anti`,
+`asof` или `cross`. Ключи сопоставляются позиционно; `left_keys` и `right_keys`
+должны быть одной длины. При `merge_keys` ключевые колонки сливаются в одну
+(`COALESCE(left, right)`, чтобы right-only строка не теряла ключ). Колонка правого
+входа, имя которой уже есть в выходе, получает суффикс `" (Right)"`.
+`semi`/`anti` возвращают только колонки левого входа.
+`asof` — `ASOF LEFT JOIN` по времени: каждой левой строке достаётся ближайшая
+правая с `right_time` ≤ `left_time` (при `asof_inequality: ">="`) или ближайшая
+следующая (`"<="`); необязательные `left_keys`/`right_keys` ограничивают
+сопоставление равенством (например, по символу инструмента). Ключи `asof` не
+сливаются. `cross` — `CROSS JOIN`: все пары строк, ключи не нужны и не читаются.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `how` | `inner` \| `left` \| `right` | `inner` | режим соединения |
-| `left_keys` | array<string> | — | обязателен, непустой |
-| `right_keys` | array<string> | — | обязателен, та же длина |
+| `how` | `inner` \| `left` \| `right` \| `full` \| `semi` \| `anti` \| `asof` \| `cross` | `inner` | режим соединения |
+| `left_keys` | array<string> | — | обязателен для key-режимов, непустой |
+| `right_keys` | array<string> | — | обязателен для key-режимов, та же длина |
 | `merge_keys` | boolean | `true` | слить ключи в одну колонку |
+| `left_time` | string | — | колонка времени левого входа для `asof` |
+| `right_time` | string | — | колонка времени правого входа для `asof` |
+| `asof_inequality` | `>=` \| `<=` | `>=` | ближайшая предыдущая или следующая строка |
 
 Ключи сравниваются SQL-равенством: NULL-ключи не совпадают ни в одном режиме.
 
@@ -1660,7 +1669,10 @@ NULL отклик.
 Схема выхода определяется запросом через `SELECT * FROM (<sql>) LIMIT 0` +
 `ResultSetMetaData`; `LIST`, `STRUCT`, `MAP` и `TIMESTAMPTZ` отклоняются с именем
 колонки — у движка нет для них Arrow-представления.
-Порты: входы 0 — `Data`, 1 — `Data 2`; выход 0 — `Data`.
+Порты: входы 0–7 — `Data` … `Data 8` (до восьми таблиц); выход 0 — `Data`.
+Литералы путей в запросе (`read_parquet(...)`, `read_csv(...)`, `FROM '<path>'`)
+проверяются allowlist-ом путей: файл вне разрешённых корней — 400 `path_not_allowed`;
+URL `http(s)://`/`s3://` разрешены.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
@@ -1978,3 +1990,220 @@ Java2D; `format: html` — самодостаточная страница с `<
   }
 }
 ```
+## 56. dap.file_reader
+
+Читает много файлов как одну таблицу: список файлов (`paths`), glob или каталог
+(`path`). Форматы — `csv`, `parquet`, `json` (JSON-массив или newline-delimited).
+Файлы раскрываются в движке: glob — `Files.walk` + `PathMatcher`, каталог —
+`Files.walk` на глубину 1 или без ограничения при `recursive`; результат
+сортируется по пути, ограничен 10 000 файлов, каждый файл проходит allowlist путей
+(вне разрешённых корней — 400 `path_not_allowed`). Чтение всегда потоковое:
+DuckDB получает список файлов и читает их `read_csv`/`read_parquet`/
+`read_json_auto`, в heap ничего не загружается.
+ORC и Avro не поддерживаются (в DuckDB 1.5.6 нет ORC-расширения для darwin/arm64,
+Avro нет в ядре) — ошибка с подсказкой конвертировать в parquet/csv.
+Порты: входов нет; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `path` | string | — | файл, каталог или glob; ровно один из `path`/`paths` |
+| `paths` | array<string> | — | несколько файлов/каталогов/glob; ровно один из `path`/`paths` |
+| `format` | `csv` \| `parquet` \| `json` | — | обязателен |
+| `recursive` | boolean | `false` | обходить каталог рекурсивно |
+| `union_by_name` | boolean | `false` | объединять разные схемы по именам колонок |
+| `filename` | boolean | `false` | добавить колонку `filename` (Utf8) с путём файла |
+| `delimiter` | string | `,` | CSV-разделитель, один символ (`\t` — табуляция) |
+| `header` | boolean | `true` | первая строка CSV — заголовок |
+| `quote` | string | — | CSV-quote, один символ |
+| `escape` | string | — | CSV-escape, один символ |
+| `nullstr` | string | — | текст, читаемый как NULL |
+| `ignore_errors` | boolean | `false` | пропускать битые CSV-строки |
+
+Пустой набор файлов — ошибка с перечнем путей; неизвестный формат — ошибка со
+списком `csv`, `parquet`, `json`.
+
+```json
+{
+  "factory": "dap.file_reader",
+  "settings": {
+    "path": "/data/events/*.parquet",
+    "format": "parquet",
+    "recursive": true,
+    "union_by_name": true,
+    "filename": true
+  }
+}
+```
+
+## 57. dap.db_writer
+
+Пишет входную таблицу в DuckDB-файл, SQLite-файл или PostgreSQL/MySQL и возвращает
+вход без изменений (pass-through), поэтому узел можно ставить в середину графа.
+Цель подключается как DuckDB-база (`ATTACH ... (TYPE DUCKDB|SQLITE|POSTGRES|MYSQL)`),
+таблица создаётся (`create`), пересоздаётся (`replace`) или дополняется
+(`append`), затем `DETACH`. Локальный путь проверяется allowlist-ом
+(`checkWrite`, вне корней — 400 `path_not_allowed`); пароль в DSN маскируется в
+ошибках. Для sqlite/postgres/mysql нужно расширение DuckDB (`make extensions`),
+иначе — 500 `extension_missing` с hint.
+Порты: вход 0 — `Data`; выход 0 — `Data` (тот же вход).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `driver` | `duckdb` \| `sqlite` \| `postgres` \| `mysql` | — | обязателен |
+| `connection` | string | — | путь к файлу для duckdb/sqlite или DSN для postgres/mysql |
+| `table` | string | — | обязательна; `schema.table` допустим |
+| `mode` | `create` \| `replace` \| `append` | `create` | `create` падает, если таблица уже есть |
+
+```json
+{
+  "factory": "dap.db_writer",
+  "settings": {
+    "driver": "duckdb",
+    "connection": "/data/analytics.duckdb",
+    "table": "analytics.events",
+    "mode": "replace"
+  }
+}
+```
+
+## 58. dap.text_normalize
+
+Нормализует текстовые колонки и сохраняет исходные рядом с нормализованными
+(`suffix`, по умолчанию `_normalized`) либо заменяет их (`replace: true`).
+Поддержаны Unicode-формы NFC/NFD/NFKC/NFKD, снятие диакритики, регистр, удаление
+пунктуации, схлопывание пробелов и trim. DuckDB 1.5.6 умеет только
+`nfc_normalize`, поэтому NFC, регистр, пунктуация, пробелы и trim считаются SQL-ом,
+а NFD/NFKD/NFKC и снятие диакритики — в Java по **уникальным значениям** выбранных
+колонок (не более 100 000 уникальных; выше — ошибка с подсказкой отфильтровать
+таблицу), после чего отображение джойнится обратно в SQL: число строк в heap не
+попадает. Колонки должны быть `Utf8`.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `columns` | array<string> | — | обязателен, непустой; только `Utf8` |
+| `mode` | `none` \| `nfc` \| `nfd` \| `nfkc` \| `nfkd` | `none` | форма нормализации Unicode |
+| `case` | `none` \| `lower` \| `upper` | `none` | регистр |
+| `strip_accents` | boolean | `false` | снять диакритику (Café → Cafe) |
+| `collapse_whitespace` | boolean | `false` | серии пробелов → один пробел |
+| `trim` | boolean | `false` | обрезать пробелы по краям |
+| `remove_punctuation` | boolean | `false` | удалить Unicode-пунктуацию |
+| `suffix` | string | `_normalized` | суффикс новой колонки (когда `replace: false`) |
+| `replace` | boolean | `false` | заменить значения исходных колонок |
+
+```json
+{
+  "factory": "dap.text_normalize",
+  "settings": {
+    "columns": ["company"],
+    "mode": "nfkc",
+    "strip_accents": true,
+    "case": "lower",
+    "collapse_whitespace": true,
+    "trim": true
+  }
+}
+```
+
+## 59. dap.fuzzy_join
+
+Соединяет две таблицы по похожим текстовым ключам. Похожесть считает DuckDB:
+`jaro_winkler_similarity`, `levenshtein` или `damerau_levenshtein` (для
+расстояний — нормировка `1 - dist / max(length(l), length(r))`). Пары ниже
+`threshold` отбрасываются, на каждую левую строку остаётся до `max_matches`
+лучших правых (`row_number() OVER (PARTITION BY left_row ORDER BY similarity DESC)`);
+`how: left` сохраняет левые строки без пары (NULL в similarity и правых колонках).
+В выходе — все колонки обеих сторон плюс `similarity` (Float64); правая колонка с
+совпадающим именем получает `suffix`. Оба входа материализуются как CTE с
+синтетическим row id (`MATERIALIZED`), чтобы id были стабильны.
+Порты: вход 0 — `Left`, 1 — `Right`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `left_key` | string | — | обязателен; `Utf8`-колонка левого входа |
+| `right_key` | string | — | обязателен; `Utf8`-колонка правого входа |
+| `method` | `jaro_winkler` \| `levenshtein` \| `damerau` | `jaro_winkler` | мера похожести |
+| `threshold` | number | `0.8` | минимум похожести, 0..1 |
+| `how` | `inner` \| `left` | `inner` | сохранять ли левые строки без пары |
+| `max_matches` | integer | `1` | сколько правых строк может получить левая |
+| `suffix` | string | `" (Right)"` | суффикс совпадающей правой колонки |
+
+```json
+{
+  "factory": "dap.fuzzy_join",
+  "settings": {
+    "left_key": "name",
+    "right_key": "legal_name",
+    "method": "jaro_winkler",
+    "threshold": 0.9,
+    "how": "left",
+    "max_matches": 1
+  }
+}
+```
+
+## 60. dap.geo_distance
+
+Добавляет haversine-расстояние между двумя парами координат (широта/долгота в
+десятичных градусах). Считается SQL-ом, средний радиус Земли 6371.0088 км; `unit`
+`km` или `mi`. Нужны обе пары координат; колонки должны быть числовыми.
+Исходные колонки сохраняются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `lat` | string | — | обязателен; широта первой точки |
+| `lng` | string | — | обязателен; долгота первой точки |
+| `lat2` | string | — | обязателен; широта второй точки |
+| `lng2` | string | — | обязателен; долгота второй точки |
+| `unit` | `km` \| `mi` | `km` | единица расстояния |
+| `output` | string | `distance` | имя колонки с расстоянием |
+
+Париж (48.8566, 2.3522) — Лондон (51.5074, −0.1278) даёт ≈ 343.5 км.
+
+```json
+{
+  "factory": "dap.geo_distance",
+  "settings": {
+    "lat": "store_lat", "lng": "store_lng",
+    "lat2": "client_lat", "lng2": "client_lng",
+    "unit": "km", "output": "km_apart"
+  }
+}
+```
+
+## 61. dap.calendar
+
+Добавляет календарные признаки даты/времени с учётом таймзоны: `year`, `quarter`,
+`month`, `week` (ISO), `day` (день месяца), `dow` (0 = воскресенье), `doy`,
+`is_weekend`, `is_holiday`. Колонка `Timestamp` трактуется как UTC и переводится
+в `timezone` до взятия частей даты (2024-01-01 22:00 UTC — это уже 2024-01-02 в
+Europe/Moscow); у `Date32` времени суток нет. `holidays` — список дат ISO
+(`yyyy-MM-dd`), `holiday_column` — имя флага. Исходные колонки сохраняются.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `column` | string | — | обязателен; `Date32` или `Timestamp` |
+| `timezone` | string | — | IANA-таймзона (Europe/Moscow); для Timestamp — перевод из UTC |
+| `features` | array<string> | все, кроме `is_holiday` | какие признаки добавить |
+| `holidays` | array<string> | `[]` | даты-праздники ISO; включает `is_holiday` по умолчанию |
+| `holiday_column` | string | `<column>_is_holiday` | имя флага праздника |
+
+Неизвестная таймзона, неверная дата в `holidays`, `is_holiday` без `holidays` и
+неизвестный признак — ошибка с сообщением. 2024-01-01 — понедельник
+(`dow = 1`), `is_weekend = false`; 2024-01-06 — суббота, `is_weekend = true`.
+
+```json
+{
+  "factory": "dap.calendar",
+  "settings": {
+    "column": "created_at",
+    "timezone": "Europe/Moscow",
+    "features": ["year", "month", "dow", "is_weekend", "is_holiday"],
+    "holidays": ["2024-01-01", "2024-05-09"],
+    "holiday_column": "is_holiday"
+  }
+}
+```
+

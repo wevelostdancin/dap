@@ -117,8 +117,8 @@ class NativeServiceTest {
         assertEquals("DAP", body.path("name").asText());
         assertEquals("1.1.0", body.path("version").asText());
         assertEquals("1", body.path("api").asText());
-        assertEquals(53, body.path("nodes").asInt());
-        assertEquals(53, body.path("coreNodes").asInt());
+        assertEquals(59, body.path("nodes").asInt());
+        assertEquals(59, body.path("coreNodes").asInt());
         assertEquals(0, body.path("workflows").asInt());
         assertEquals(0, body.path("sessions").asInt());
         assertEquals(0, body.path("jobs").asInt());
@@ -136,7 +136,7 @@ class NativeServiceTest {
     void catalogRoutes() throws Exception {
         Resp list = get("/v1/nodes?limit=100");
         assertEquals(200, list.status());
-        assertEquals(53, list.body().path("count").asInt());
+        assertEquals(59, list.body().path("count").asInt());
 
         Resp node = get("/v1/nodes/dap.csv_reader");
         assertEquals(200, node.status());
@@ -378,6 +378,23 @@ class NativeServiceTest {
                 Map.of("settings", Map.of("keys", List.of(Map.of("column", "age", "direction", "asc")))));
         assertEquals(200, patchOk.status());
         assertEquals(nodeId, patchOk.body().path("node").asText());
+    }
+
+    @Test
+    void sqlQueryAcceptsEightInputsAndRejectsTheNinth() throws Exception {
+        String workflow = createWorkflow("sql-eight-ports");
+        String query = addNode(workflow, "dap.sql_query", Map.of("sql", "SELECT 1 AS one"));
+        for (int port = 0; port < 8; port++) {
+            String source = addNode(workflow, "dap.sorter", Map.of("keys", List.of()));
+            Resp connected = post("/v1/workflows/" + workflow + "/connect",
+                    Map.of("from", source, "to", query, "fromPort", 0, "toPort", port));
+            assertEquals(200, connected.status(), "port " + port + ": " + connected.raw().body());
+        }
+        String ninth = addNode(workflow, "dap.sorter", Map.of("keys", List.of()));
+        Resp rejected = post("/v1/workflows/" + workflow + "/connect",
+                Map.of("from", ninth, "to", query, "fromPort", 0, "toPort", 8));
+        assertEquals(400, rejected.status());
+        assertEquals("node has 8 in ports", rejected.error());
     }
 
     @Test
@@ -1004,6 +1021,103 @@ class NativeServiceTest {
 
         assertEquals(0, get("/v1/workflows").body().path("workflows").size(),
                 "failed loads must not leak workflows");
+    }
+
+    @Test
+    void tablePagingProjectionAndFilter() throws Exception {
+        String workflow = createWorkflow("table-page");
+        String node = addNode(workflow, "dap.sql_query", Map.of("sql",
+                "SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, 'c')) AS t(id, name) ORDER BY id"));
+        assertEquals(200, post("/v1/workflows/" + workflow + "/run", Map.of()).status());
+
+        String base = "/v1/workflows/" + workflow + "/nodes/" + node + "/table";
+        Resp first = get(base + "?limit=2&offset=0");
+        assertEquals(200, first.status(), first.raw().body());
+        assertEquals(3, first.body().path("rows").asInt());
+        assertEquals(0, first.body().path("offset").asInt());
+        assertEquals(2, first.body().path("nextOffset").asInt());
+        assertTrue(first.body().path("truncated").asBoolean());
+        assertEquals(2, first.body().path("data").size());
+        assertEquals("1", first.body().path("data").get(0).get(0).asText());
+
+        Resp second = get(base + "?limit=2&offset=2");
+        assertEquals(200, second.status());
+        assertEquals(1, second.body().path("data").size());
+        assertEquals("3", second.body().path("data").get(0).get(0).asText());
+        assertTrue(second.body().path("nextOffset").isNull());
+        assertFalse(second.body().path("truncated").asBoolean());
+
+        Resp projected = get(base + "?columns=name");
+        assertEquals(200, projected.status(), projected.raw().body());
+        assertEquals(1, projected.body().path("columns").size());
+        assertEquals("name", projected.body().path("columns").get(0).path("name").asText());
+        assertEquals("a", projected.body().path("data").get(0).get(0).asText());
+
+        Resp filtered = get(base + "?where=" + java.net.URLEncoder.encode("id > 1",
+                java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(200, filtered.status(), filtered.raw().body());
+        assertEquals(2, filtered.body().path("rows").asInt());
+        assertEquals(2, filtered.body().path("data").size());
+
+        Resp unknown = get(base + "?columns=nope");
+        assertEquals(400, unknown.status());
+        assertEquals("unknown_column", unknown.body().path("code").asText(), unknown.error());
+
+        for (String injection : List.of("1=1; DROP TABLE x", "1=1 -- x", "SELECT 1",
+                "read_csv('/etc/passwd')", "1=1 /* x")) {
+            Resp rejected = get(base + "?where=" + java.net.URLEncoder.encode(injection,
+                    java.nio.charset.StandardCharsets.UTF_8));
+            assertEquals(400, rejected.status(), injection);
+            assertEquals("invalid_filter", rejected.body().path("code").asText(), rejected.error());
+        }
+    }
+
+    @Test
+    void estimateReportsCardinalityForReaderAndQueryNodes() throws Exception {
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+        String workflow = createWorkflow("estimate");
+        String reader = addNode(workflow, "dap.csv_reader", Map.of("file", csv.toString()));
+        String query = addNode(workflow, "dap.sql_query",
+                Map.of("sql", "SELECT * FROM \"" + reader + "\" WHERE sepal_length > 5"));
+        assertEquals(200, post("/v1/workflows/" + workflow + "/connect",
+                Map.of("from", reader, "to", query)).status());
+
+        Resp before = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/estimate");
+        assertEquals(409, before.status());
+        assertEquals("estimate_unavailable", before.body().path("code").asText(), before.error());
+
+        assertEquals(200, post("/v1/workflows/" + workflow + "/run", Map.of()).status());
+
+        Resp readerEstimate = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/estimate");
+        assertEquals(200, readerEstimate.status(), readerEstimate.raw().body());
+        assertEquals(reader, readerEstimate.body().path("node").asText());
+        assertEquals(150, readerEstimate.body().path("rows").asInt());
+        assertFalse(readerEstimate.body().path("operators").isEmpty());
+        assertTrue(readerEstimate.body().path("plan").has("physical_plan"));
+
+        Resp queryEstimate = get("/v1/workflows/" + workflow + "/nodes/" + query + "/estimate");
+        assertEquals(200, queryEstimate.status(), queryEstimate.raw().body());
+        assertTrue(queryEstimate.body().path("rows").asInt() > 0);
+        assertTrue(queryEstimate.body().path("operators").size() >= 2);
+    }
+
+    @Test
+    void asyncRunReportsProgress() throws Exception {
+        String workflow = createWorkflow("progress");
+        String node = addNode(workflow, "dap.sql_query",
+                Map.of("sql", "SELECT * FROM range(5) AS t(i)"));
+        Resp submitted = post("/v1/workflows/" + workflow + "/run?async=true", Map.of());
+        assertEquals(202, submitted.status(), submitted.raw().body());
+        String jobId = submitted.body().path("id").asText();
+
+        JsonNode finished = awaitJobState(jobId, Set.of("succeeded"), Duration.ofSeconds(10));
+        JsonNode progress = finished.path("progress");
+        assertEquals(1, progress.path("nodesTotal").asInt());
+        assertEquals(1, progress.path("nodesDone").asInt());
+        assertEquals(100, progress.path("percent").asInt());
+        assertTrue(progress.has("currentNode"));
+        assertNotNull(node);
     }
 
     @Test

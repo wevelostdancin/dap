@@ -53,6 +53,12 @@ public final class Dag implements AutoCloseable {
 
     public Map<String, LazyPlan> execute(Workflow workflow, DuckDbSession db, java.sql.Connection jobConnection)
             throws Exception {
+        return execute(workflow, db, jobConnection, null);
+    }
+
+    /** Same as the three-argument execute, reporting node progress to the listener. */
+    public Map<String, LazyPlan> execute(Workflow workflow, DuckDbSession db, java.sql.Connection jobConnection,
+                                         ProgressListener progress) throws Exception {
         Workflow.Graph graph = workflow.snapshot();
         List<WorkflowNode> nodes = graph.nodes();
         List<Connection> connections = graph.connections();
@@ -90,6 +96,12 @@ public final class Dag implements AutoCloseable {
             validateInputPorts(node, incoming.get(node.id()));
         }
 
+        int total = nodes.size();
+        java.util.concurrent.atomic.AtomicInteger done = new java.util.concurrent.atomic.AtomicInteger();
+        if (progress != null) {
+            progress.progress(total, 0, null);
+        }
+
         Map<String, Integer> remaining = new LinkedHashMap<>();
         List<String> current = new ArrayList<>();
         for (WorkflowNode node : nodes) {
@@ -117,7 +129,15 @@ public final class Dag implements AutoCloseable {
                 Future<?>[] self = new Future<?>[1];
                 Future<LazyPlan> future = pool.submit((Callable<LazyPlan>) () -> {
                     try {
-                        return executeNode(workflow, nodeId, executor, nodeInputs, config, db, jobConnection, nodeInputIds);
+                        if (progress != null) {
+                            progress.progress(total, done.get(), nodeId);
+                        }
+                        LazyPlan plan = executeNode(workflow, nodeId, executor, nodeInputs, config, db,
+                                jobConnection, nodeInputIds);
+                        if (progress != null) {
+                            progress.progress(total, done.incrementAndGet(), null);
+                        }
+                        return plan;
                     } catch (Throwable failure) {
                         firstFailure.compareAndSet(null, failure);
                         for (Future<LazyPlan> sibling : pending) {

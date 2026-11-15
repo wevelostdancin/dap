@@ -5,6 +5,7 @@ import com.dap.nativeengine.engine.ColumnSpec;
 import com.dap.nativeengine.engine.LazyPlan;
 import com.dap.nativeengine.exec.NodeContext;
 import com.dap.nativeengine.exec.NodeExecutor;
+import com.dap.nativeengine.io.PathGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.sql.SQLException;
@@ -42,6 +43,9 @@ public final class SqlQueryExecutor implements NodeExecutor {
     public LazyPlan execute(NodeContext context, List<LazyPlan> inputs) {
         JsonNode config = context.config();
         String sql = validateReadOnly(NodeSql.requiredText(config, "sql"));
+        // File literals are checked after the syntax validation: a read_*() or FROM '...'
+        // argument must stay inside the path allowlist (spec §8).
+        PathGuard.shared().checkSql(sql);
         int limit = limit(config);
         List<String> aliases = aliases(config, inputs, context.inputNodeIds());
 

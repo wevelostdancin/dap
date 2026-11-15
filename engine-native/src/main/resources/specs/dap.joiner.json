@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Joins two tables on key columns using an inner, left, right, full, semi or anti join. Semi and anti joins keep only the left columns. Key columns can be merged into one output column. A right-side column whose name already appears in the output is renamed with the suffix \" (Right)\".",
+  "description": "Joins two tables on key columns using an inner, left, right, full, semi or anti join, as an asof join on a time column, or as a cross join. Semi and anti joins keep only the left columns. Key columns can be merged into one output column. An asof join matches every left row with the nearest right row whose time is before (asof_inequality >=) or after (<=) its own time, optionally restricted by equality keys. A cross join returns every combination and uses no keys. A right-side column whose name already appears in the output is renamed with the suffix \" (Right)\".",
   "inPorts": [
     {
       "index": 0,
@@ -42,7 +42,9 @@
           "right",
           "full",
           "semi",
-          "anti"
+          "anti",
+          "asof",
+          "cross"
         ],
         "default": "inner"
       },
@@ -67,11 +69,30 @@
         "title": "Merge keys",
         "description": "Merge the key columns into one output column.",
         "default": true
+      },
+      "left_time": {
+        "type": "string",
+        "title": "Left time column",
+        "description": "Time column of the left input for an asof join.",
+        "placeholder": "trade_time"
+      },
+      "right_time": {
+        "type": "string",
+        "title": "Right time column",
+        "description": "Time column of the right input for an asof join.",
+        "placeholder": "quote_time"
+      },
+      "asof_inequality": {
+        "type": "string",
+        "title": "Asof inequality",
+        "description": ">= matches the nearest previous right row, <= the nearest following one.",
+        "enum": [
+          ">=",
+          "<="
+        ],
+        "default": ">="
       }
     },
-    "required": [
-      "left_keys",
-      "right_keys"
-    ]
+    "required": []
   }
 }

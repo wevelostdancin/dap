@@ -1,0 +1,74 @@
+{
+  "id": "dap.geo_distance",
+  "name": "Geo Distance",
+  "category": "/Manipulation/Column/Geo",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Adds the haversine distance between two coordinate pairs to the table. Coordinates are latitude/longitude columns in decimal degrees; the distance is computed in SQL in kilometres or miles with the mean Earth radius 6371.0088 km, and the original columns are kept. Both coordinate pairs are required.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Geo Distance configuration",
+    "additionalProperties": false,
+    "properties": {
+      "lat": {
+        "type": "string",
+        "title": "Latitude",
+        "description": "Latitude column of the first point (decimal degrees)."
+      },
+      "lng": {
+        "type": "string",
+        "title": "Longitude",
+        "description": "Longitude column of the first point (decimal degrees)."
+      },
+      "lat2": {
+        "type": "string",
+        "title": "Latitude 2",
+        "description": "Latitude column of the second point (decimal degrees)."
+      },
+      "lng2": {
+        "type": "string",
+        "title": "Longitude 2",
+        "description": "Longitude column of the second point (decimal degrees)."
+      },
+      "unit": {
+        "type": "string",
+        "title": "Unit",
+        "description": "Distance unit.",
+        "enum": [
+          "km",
+          "mi"
+        ],
+        "default": "km"
+      },
+      "output": {
+        "type": "string",
+        "title": "Output column",
+        "description": "Name of the distance column.",
+        "default": "distance"
+      }
+    },
+    "required": [
+      "lat",
+      "lng",
+      "lat2",
+      "lng2"
+    ]
+  }
+}

@@ -17,6 +17,7 @@ import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.io.DatasetCatalog;
 import com.dap.nativeengine.nodes.BinnerExecutor;
+import com.dap.nativeengine.nodes.CalendarExecutor;
 import com.dap.nativeengine.nodes.ChartExecutor;
 import com.dap.nativeengine.nodes.ChartGridExecutor;
 import com.dap.nativeengine.nodes.ColumnResorterExecutor;
@@ -53,8 +54,12 @@ import com.dap.nativeengine.nodes.ColumnRenamerExecutor;
 import com.dap.nativeengine.nodes.CsvReaderExecutor;
 import com.dap.nativeengine.nodes.CsvWriterExecutor;
 import com.dap.nativeengine.nodes.DbReaderExecutor;
+import com.dap.nativeengine.nodes.DbWriterExecutor;
 import com.dap.nativeengine.nodes.FileListExecutor;
+import com.dap.nativeengine.nodes.FileReaderExecutor;
 import com.dap.nativeengine.nodes.ExcelReaderExecutor;
+import com.dap.nativeengine.nodes.FuzzyJoinExecutor;
+import com.dap.nativeengine.nodes.GeoDistanceExecutor;
 import com.dap.nativeengine.nodes.GroupByExecutor;
 import com.dap.nativeengine.nodes.JsonReaderExecutor;
 import com.dap.nativeengine.nodes.JsonWriterExecutor;
@@ -69,6 +74,7 @@ import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
 import com.dap.nativeengine.nodes.SqlQueryExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
+import com.dap.nativeengine.nodes.TextNormalizeExecutor;
 import io.javalin.Javalin;
 
 import java.sql.SQLException;
@@ -190,9 +196,9 @@ public final class NativeService implements AutoCloseable {
                     intEnv(env, "DAP_JOB_TIMEOUT", 600),
                     env.getOrDefault("DAP_BIND", "127.0.0.1"),
                     intEnv(env, "DAP_PORT", 7800),
-                    env.get("DAP_DUCKDB_MEMORY_LIMIT"),
+                    memoryLimit(env),
                     positiveIntEnv(env, "DAP_DUCKDB_THREADS"),
-                    env.get("DAP_DUCKDB_TEMP_DIR"),
+                    tempDirectory(env),
                     nonNegativeIntEnv(env, "DAP_IDLE_TIMEOUT_SEC", DEFAULT_IDLE_TIMEOUT_SEC),
                     nonNegativeIntEnv(env, "DAP_QUERY_TIMEOUT_SEC", DEFAULT_QUERY_TIMEOUT_SEC),
                     positiveIntEnv(env, "DAP_MAX_SESSIONS", DEFAULT_MAX_SESSIONS),
@@ -257,6 +263,34 @@ public final class NativeService implements AutoCloseable {
 
         private static String blankToNull(String value) {
             return value == null || value.isBlank() ? null : value.strip();
+        }
+
+        /** Out-of-core default: 512MB unless DAP_DUCKDB_MEMORY_LIMIT overrides it. */
+        private static String memoryLimit(Map<String, String> env) {
+            String configured = blankToNull(env.get("DAP_DUCKDB_MEMORY_LIMIT"));
+            return configured != null ? configured : "512MB";
+        }
+
+        /**
+         * Out-of-core spill directory: DAP_DUCKDB_TEMP_DIR, else $DAP_HOME/build/duckdb-tmp,
+         * else ~/.dap/tmp. The directory is created best effort; a session that still cannot
+         * use it reports the path in its own error.
+         */
+        private static String tempDirectory(Map<String, String> env) {
+            String configured = blankToNull(env.get("DAP_DUCKDB_TEMP_DIR"));
+            if (configured != null) {
+                return configured;
+            }
+            String home = blankToNull(env.get("DAP_HOME"));
+            java.nio.file.Path temp = home != null
+                    ? java.nio.file.Path.of(home, "build", "duckdb-tmp")
+                    : java.nio.file.Path.of(System.getProperty("user.home"), ".dap", "tmp");
+            try {
+                java.nio.file.Files.createDirectories(temp);
+            } catch (java.io.IOException | RuntimeException ignored) {
+                // A read-only home must not keep the engine from starting; DuckDB reports it.
+            }
+            return temp.toString();
         }
 
         /**
@@ -396,6 +430,7 @@ public final class NativeService implements AutoCloseable {
         app.delete("/v1/jobs/{jobId}", jobs::cancel);
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/table", data::table);
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/profile", data::profile);
+        app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/estimate", data::estimate);
         app.post("/v1/datasets", datasets::ingest);
         app.get("/v1/catalog/datasets", datasetCatalog::list);
         app.post("/v1/catalog/datasets", datasetCatalog::add);
@@ -702,7 +737,13 @@ public final class NativeService implements AutoCloseable {
                 .register(new DataQualityExecutor())
                 .register(new SqlQueryExecutor())
                 .register(new DbReaderExecutor())
-                .register(new FileListExecutor());
+                .register(new FileListExecutor())
+                .register(new FileReaderExecutor())
+                .register(new DbWriterExecutor())
+                .register(new TextNormalizeExecutor())
+                .register(new FuzzyJoinExecutor())
+                .register(new GeoDistanceExecutor())
+                .register(new CalendarExecutor());
     }
 
     /**
