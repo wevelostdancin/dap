@@ -638,6 +638,10 @@ public final class DuckDbSession implements AutoCloseable {
         prefixes.add("files_" + sanitize(workflowId) + "_");
         // text_normalize loads a distinct-value mapping table per selected column.
         prefixes.add("textnorm_");
+        // The in-memory statistics nodes (outlier methods, cluster, pca) materialize one
+        // per-row result mapping table named stats_<workflow>_<node>.
+        prefixes.add("stats_" + workflowId + "_");
+        prefixes.add("stats_" + sanitize(workflowId) + "_");
         List<String> names = new ArrayList<>();
         try (Statement statement = base.createStatement();
              ResultSet result = statement.executeQuery(
