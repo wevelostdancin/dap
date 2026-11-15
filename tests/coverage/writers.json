@@ -1,0 +1,717 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "H1",
+      "title": "Write a CSV file and read it back",
+      "kind": "node",
+      "requires": [],
+      "steps": [
+        {
+          "workflow": {
+            "id": "cov-csv-writer",
+            "nodes": [
+              {
+                "id": "src",
+                "type": "csv_reader",
+                "config": {
+                  "dataset": "P2"
+                }
+              },
+              {
+                "id": "w",
+                "type": "csv_writer",
+                "config": {
+                  "file": "{TMP}/h1.csv"
+                }
+              }
+            ],
+            "edges": [
+              {
+                "from": "src",
+                "to": "w"
+              }
+            ]
+          },
+          "checks": [
+            {
+              "node": "w",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        },
+        {
+          "workflow": {
+            "id": "cov-csv-reader",
+            "nodes": [
+              {
+                "id": "r",
+                "type": "csv_reader",
+                "config": {
+                  "file": "{TMP}/h1.csv"
+                }
+              }
+            ],
+            "edges": []
+          },
+          "checks": [
+            {
+              "node": "r",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "task": "H2",
+      "title": "Write an Excel workbook and read it back",
+      "kind": "node",
+      "requires": [],
+      "steps": [
+        {
+          "workflow": {
+            "id": "cov-excel-writer",
+            "nodes": [
+              {
+                "id": "src",
+                "type": "csv_reader",
+                "config": {
+                  "dataset": "P2"
+                }
+              },
+              {
+                "id": "w",
+                "type": "excel_writer",
+                "config": {
+                  "file": "{TMP}/h2.xlsx"
+                }
+              }
+            ],
+            "edges": [
+              {
+                "from": "src",
+                "to": "w"
+              }
+            ]
+          },
+          "checks": [
+            {
+              "node": "w",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        },
+        {
+          "workflow": {
+            "id": "cov-excel-reader",
+            "nodes": [
+              {
+                "id": "r",
+                "type": "excel_reader",
+                "config": {
+                  "file": "{TMP}/h2.xlsx"
+                }
+              }
+            ],
+            "edges": []
+          },
+          "checks": [
+            {
+              "node": "r",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "task": "H3",
+      "title": "Write a JSON file and read it back",
+      "kind": "node",
+      "requires": [],
+      "steps": [
+        {
+          "workflow": {
+            "id": "cov-json-writer",
+            "nodes": [
+              {
+                "id": "src",
+                "type": "csv_reader",
+                "config": {
+                  "dataset": "P2"
+                }
+              },
+              {
+                "id": "w",
+                "type": "json_writer",
+                "config": {
+                  "file": "{TMP}/h3.json"
+                }
+              }
+            ],
+            "edges": [
+              {
+                "from": "src",
+                "to": "w"
+              }
+            ]
+          },
+          "checks": [
+            {
+              "node": "w",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        },
+        {
+          "workflow": {
+            "id": "cov-json-reader",
+            "nodes": [
+              {
+                "id": "r",
+                "type": "json_reader",
+                "config": {
+                  "file": "{TMP}/h3.json"
+                }
+              }
+            ],
+            "edges": []
+          },
+          "checks": [
+            {
+              "node": "r",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "task": "H4",
+      "title": "Write a Parquet file and read it back",
+      "kind": "node",
+      "requires": [],
+      "steps": [
+        {
+          "workflow": {
+            "id": "cov-parquet-writer",
+            "nodes": [
+              {
+                "id": "src",
+                "type": "csv_reader",
+                "config": {
+                  "dataset": "P2"
+                }
+              },
+              {
+                "id": "w",
+                "type": "parquet_writer",
+                "config": {
+                  "file": "{TMP}/h4.parquet"
+                }
+              }
+            ],
+            "edges": [
+              {
+                "from": "src",
+                "to": "w"
+              }
+            ]
+          },
+          "checks": [
+            {
+              "node": "w",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        },
+        {
+          "workflow": {
+            "id": "cov-parquet-reader",
+            "nodes": [
+              {
+                "id": "r",
+                "type": "parquet_reader",
+                "config": {
+                  "file": "{TMP}/h4.parquet"
+                }
+              }
+            ],
+            "edges": []
+          },
+          "checks": [
+            {
+              "node": "r",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

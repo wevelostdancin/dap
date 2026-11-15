@@ -1,123 +1,129 @@
 {
-  "id": "wf-coverage-chart",
-  "task": "H6",
-  "node": "dap.chart",
-  "title": "Coverage H6: bar chart (SVG) over the P2 fixture",
-  "rationale": "Runs dap.chart end to end through /v1 for both formats and checks the pass-through table; the SVG is byte-deterministic and pinned by the golden suite, the PNG is a headless Java2D smoke check.",
-  "kind": "native",
-  "nodes": [
+  "format": "dap-coverage-scenario/1",
+  "cases": [
     {
-      "id": "src",
-      "type": "csv_reader",
-      "config": {
-        "dataset": "P2"
-      }
-    },
-    {
-      "id": "chart",
-      "type": "chart",
-      "config": {
-        "file": "/tmp/dap-goldens/coverage-chart.svg",
-        "format": "svg",
-        "type": "bar",
-        "x": "category",
-        "y": [
-          "score"
+      "task": "H6",
+      "title": "Coverage H6: bar chart (SVG) over the P2 fixture",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "wf-coverage-chart",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "chart",
+            "type": "chart",
+            "config": {
+              "file": "{TMP}/coverage-chart.svg",
+              "format": "svg",
+              "type": "bar",
+              "x": "category",
+              "y": [
+                "score"
+              ],
+              "title": "Score by category",
+              "width": 480,
+              "height": 320
+            }
+          },
+          {
+            "id": "chart_png",
+            "type": "chart",
+            "config": {
+              "file": "{TMP}/coverage-chart.png",
+              "format": "png",
+              "type": "line",
+              "x": "id",
+              "y": [
+                "score"
+              ],
+              "title": "Score over id",
+              "width": 320,
+              "height": 240
+            }
+          }
         ],
-        "title": "Score by category",
-        "width": 480,
-        "height": 320
-      }
-    },
-    {
-      "id": "chart_png",
-      "type": "chart",
-      "config": {
-        "file": "/tmp/dap-goldens/coverage-chart.png",
-        "format": "png",
-        "type": "line",
-        "x": "id",
-        "y": [
-          "score"
-        ],
-        "title": "Score over id",
-        "width": 320,
-        "height": 240
-      }
-    }
-  ],
-  "edges": [
-    {
-      "from": "src",
-      "to": "chart"
-    },
-    {
-      "from": "src",
-      "to": "chart_png"
-    }
-  ],
-  "checks": [
-    {
-      "node": "chart",
-      "kind": "expect",
-      "rows": 6,
-      "columns": [
-        {
-          "name": "id",
-          "type": "Number (Integer)"
-        },
-        {
-          "name": "name",
-          "type": "String"
-        },
-        {
-          "name": "score",
-          "type": "Number (Float)"
-        },
-        {
-          "name": "category",
-          "type": "String"
-        }
-      ],
-      "data": [
-        [
-          1,
-          "alpha",
-          1,
-          "A"
-        ],
-        [
-          2,
-          "beta",
-          2,
-          "B"
-        ],
-        [
-          3,
-          "gamma",
-          3,
-          "A"
-        ],
-        [
-          4,
-          "delta",
-          4,
-          "C"
-        ],
-        [
-          3,
-          "gamma",
-          3,
-          "A"
-        ],
-        [
-          5,
-          "epsilon",
-          5,
-          "B"
+        "edges": [
+          {
+            "from": "src",
+            "to": "chart"
+          },
+          {
+            "from": "src",
+            "to": "chart_png"
+          }
         ]
-      ],
-      "order": "ordered"
+      },
+      "checks": [
+        {
+          "node": "chart",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1,
+              "A"
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,508 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "D1",
+      "title": "Aggregate by group with mean/sum/count/min/max",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-group-by",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "g",
+            "type": "group_by",
+            "config": {
+              "keys": [
+                "category"
+              ],
+              "aggregations": [
+                {
+                  "column": "score",
+                  "fn": "mean"
+                },
+                {
+                  "column": "id",
+                  "fn": "count"
+                },
+                {
+                  "column": "score",
+                  "fn": "sum"
+                },
+                {
+                  "column": "score",
+                  "fn": "min"
+                },
+                {
+                  "column": "score",
+                  "fn": "max"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "g"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "g",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "Mean(score)",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "Count(id)",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "Sum(score)",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "Min(score)",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "Max(score)",
+              "type": "Number (Float)"
+            }
+          ],
+          "data": [
+            [
+              "A",
+              2.3333333333333335,
+              3,
+              7,
+              1,
+              3
+            ],
+            [
+              "B",
+              3.5,
+              2,
+              7,
+              2,
+              5
+            ],
+            [
+              "C",
+              4,
+              1,
+              4,
+              4,
+              4
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    },
+    {
+      "task": "D2",
+      "title": "Count distinct values per group",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-count-distinct",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "g",
+            "type": "group_by",
+            "config": {
+              "keys": [
+                "category"
+              ],
+              "aggregations": [
+                {
+                  "column": "name",
+                  "fn": "count_distinct"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "g"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "g",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "CountDistinct(name)",
+              "type": "Number (Integer)"
+            }
+          ],
+          "data": [
+            [
+              "A",
+              2
+            ],
+            [
+              "B",
+              2
+            ],
+            [
+              "C",
+              1
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    },
+    {
+      "task": "D3",
+      "title": "Median and percentile aggregates",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-median",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "g",
+            "type": "group_by",
+            "config": {
+              "keys": [
+                "category"
+              ],
+              "aggregations": [
+                {
+                  "column": "score",
+                  "fn": "median"
+                },
+                {
+                  "column": "score",
+                  "fn": "percentile",
+                  "p": 0.5
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "g"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "g",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "Median(score)",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "Percentile(score, 0.5)",
+              "type": "Number (Float)"
+            }
+          ],
+          "data": [
+            [
+              "A",
+              3,
+              3
+            ],
+            [
+              "B",
+              3.5,
+              3.5
+            ],
+            [
+              "C",
+              4,
+              4
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    },
+    {
+      "task": "D4",
+      "title": "Row-wise aggregates over numeric columns",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-row-aggregate",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "IRIS"
+            }
+          },
+          {
+            "id": "ra",
+            "type": "row_aggregator",
+            "config": {
+              "columns": [
+                "sepal_length",
+                "sepal_width",
+                "petal_length",
+                "petal_width"
+              ],
+              "aggregations": [
+                {
+                  "fn": "sum",
+                  "output": "total"
+                },
+                {
+                  "fn": "mean",
+                  "output": "avg"
+                },
+                {
+                  "fn": "min",
+                  "output": "lo"
+                },
+                {
+                  "fn": "max",
+                  "output": "hi"
+                },
+                {
+                  "fn": "count",
+                  "output": "cnt"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "ra"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "ra",
+          "kind": "expect",
+          "rows": 150,
+          "columns": [
+            {
+              "name": "sepal_length",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "sepal_width",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "petal_length",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "petal_width",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "species",
+              "type": "String"
+            },
+            {
+              "name": "total",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "avg",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "lo",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "hi",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "cnt",
+              "type": "Number (Integer)"
+            }
+          ],
+          "data": [
+            [
+              5.1,
+              3.5,
+              1.4,
+              0.2,
+              "setosa",
+              10.2,
+              2.55,
+              0.2,
+              5.1,
+              4
+            ],
+            [
+              4.9,
+              3,
+              1.4,
+              0.2,
+              "setosa",
+              9.5,
+              2.375,
+              0.2,
+              4.9,
+              4
+            ],
+            [
+              4.7,
+              3.2,
+              1.3,
+              0.2,
+              "setosa",
+              9.4,
+              2.35,
+              0.2,
+              4.7,
+              4
+            ]
+          ],
+          "order": "ordered",
+          "limit": 3
+        }
+      ]
+    },
+    {
+      "task": "D5",
+      "title": "Keep only distinct rows",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-distinct",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "d",
+            "type": "duplicate_filter",
+            "config": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "d"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "d",
+          "kind": "expect",
+          "rows": 5,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1,
+              "A"
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C"
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B"
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    }
+  ]
+}

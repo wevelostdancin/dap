@@ -1,0 +1,517 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "A1",
+      "title": "Read a CSV file with inferred column types",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-source-csv",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          }
+        ],
+        "edges": []
+      },
+      "checks": [
+        {
+          "node": "src",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1,
+              "A"
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    },
+    {
+      "task": "A2",
+      "title": "Read an Excel workbook",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-source-excel",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "excel_reader",
+            "config": {
+              "dataset": "IRIS"
+            }
+          }
+        ],
+        "edges": []
+      },
+      "checks": [
+        {
+          "node": "src",
+          "kind": "expect",
+          "rows": 150,
+          "columns": [
+            {
+              "name": "sepal_length",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "sepal_width",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "petal_length",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "petal_width",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "species",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              5.1,
+              3.5,
+              1.4,
+              0.2,
+              "setosa"
+            ],
+            [
+              4.9,
+              3,
+              1.4,
+              0.2,
+              "setosa"
+            ],
+            [
+              4.7,
+              3.2,
+              1.3,
+              0.2,
+              "setosa"
+            ]
+          ],
+          "order": "ordered",
+          "limit": 3
+        }
+      ]
+    },
+    {
+      "task": "A3",
+      "title": "Read JSON written by dap.json_writer",
+      "kind": "node",
+      "requires": [],
+      "steps": [
+        {
+          "workflow": {
+            "id": "cov-source-json-write",
+            "nodes": [
+              {
+                "id": "src",
+                "type": "csv_reader",
+                "config": {
+                  "dataset": "P2"
+                }
+              },
+              {
+                "id": "jw",
+                "type": "json_writer",
+                "config": {
+                  "file": "{TMP}/source-a3.json"
+                }
+              }
+            ],
+            "edges": [
+              {
+                "from": "src",
+                "to": "jw"
+              }
+            ]
+          },
+          "checks": [
+            {
+              "node": "jw",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        },
+        {
+          "workflow": {
+            "id": "cov-source-json-read",
+            "nodes": [
+              {
+                "id": "jr",
+                "type": "json_reader",
+                "config": {
+                  "file": "{TMP}/source-a3.json"
+                }
+              }
+            ],
+            "edges": []
+          },
+          "checks": [
+            {
+              "node": "jr",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "task": "A4",
+      "title": "Read Parquet written by dap.parquet_writer",
+      "kind": "node",
+      "requires": [],
+      "steps": [
+        {
+          "workflow": {
+            "id": "cov-source-parquet-write",
+            "nodes": [
+              {
+                "id": "src",
+                "type": "csv_reader",
+                "config": {
+                  "dataset": "P2"
+                }
+              },
+              {
+                "id": "pw",
+                "type": "parquet_writer",
+                "config": {
+                  "file": "{TMP}/source-a4.parquet"
+                }
+              }
+            ],
+            "edges": [
+              {
+                "from": "src",
+                "to": "pw"
+              }
+            ]
+          },
+          "checks": [
+            {
+              "node": "pw",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        },
+        {
+          "workflow": {
+            "id": "cov-source-parquet-read",
+            "nodes": [
+              {
+                "id": "pr",
+                "type": "parquet_reader",
+                "config": {
+                  "file": "{TMP}/source-a4.parquet"
+                }
+              }
+            ],
+            "edges": []
+          },
+          "checks": [
+            {
+              "node": "pr",
+              "kind": "expect",
+              "rows": 6,
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "Number (Integer)"
+                },
+                {
+                  "name": "name",
+                  "type": "String"
+                },
+                {
+                  "name": "score",
+                  "type": "Number (Float)"
+                },
+                {
+                  "name": "category",
+                  "type": "String"
+                }
+              ],
+              "data": [
+                [
+                  1,
+                  "alpha",
+                  1,
+                  "A"
+                ],
+                [
+                  2,
+                  "beta",
+                  2,
+                  "B"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  4,
+                  "delta",
+                  4,
+                  "C"
+                ],
+                [
+                  3,
+                  "gamma",
+                  3,
+                  "A"
+                ],
+                [
+                  5,
+                  "epsilon",
+                  5,
+                  "B"
+                ]
+              ],
+              "order": "ordered"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
