@@ -74,6 +74,7 @@ make install-e2e   # установка из dist/ во временный HOME 
 | `DAP_MAX_SESSIONS` | `64` | максимум открытых сессионных БД, LRU-эвикция |
 | `DAP_SESSION_TTL_SEC` | `1800` | простой сессии до эвикции, с; `0` — выключено |
 | `DAP_MAX_RETAINED_JOBS` | `200` | cap терминальных заданий на сессию |
+| `DAP_DUCKDB_EXTENSION_DIR` | `$DAP_HOME/build/duckdb-ext` | каталог расширений DuckDB; сеть только при `--install-extensions` |
 | `DAP_CACHE_DIR` | `$DAP_HOME/build/cache` | каталог Parquet-кэша `dap_ingest` |
 | `JAVA_HOME` | — | откуда брать `bin/java` |
 

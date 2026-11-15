@@ -18,6 +18,9 @@
     <arrow.version>19.0.0</arrow.version>
     <jackson.version>2.19.0</jackson.version>
     <junit.version>5.11.4</junit.version>
+    <!-- Default JUnit tag filter: the slow soak suite runs via "make soak"
+         (./mvnw -q -Dgroups=soak test), everything else runs in the normal suite. -->
+    <groups>!soak</groups>
     <!-- The shaded jar keeps one platform's duckdb_jdbc native library. Each of these
          properties holds the file to exclude, so a profile hides the build host's own
          library behind a sentinel pattern; -Ddap.duckdb.native=all|osx_universal|
@@ -87,6 +90,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.5.2</version>
         <configuration>
+          <groups>${groups}</groups>
           <argLine>--add-opens=java.base/java.nio=ALL-UNNAMED -Djava.awt.headless=true</argLine>
           <systemPropertyVariables>
             <dap.project.root>${project.basedir}/..</dap.project.root>

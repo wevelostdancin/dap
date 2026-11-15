@@ -1,9 +1,7 @@
 package com.dap.nativeengine.api;
 
 import com.dap.nativeengine.catalog.NodeSpec;
-import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Connection;
-import com.dap.nativeengine.exec.Job;
 import com.dap.nativeengine.exec.Workflow;
 import com.dap.nativeengine.exec.WorkflowNode;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -135,16 +133,7 @@ public final class WorkflowHandlers {
         String session = Http.session(ctx);
         String workflowId = ctx.pathParam("workflowId");
         Workflow workflow = state.requireWorkflow(session, workflowId);
-        for (Job job : state.jobs().activeForWorkflow(workflow.id())) {
-            state.jobs().cancel(job);
-        }
-        DuckDbSession database = state.sessionIfPresent(session);
-        if (database != null) {
-            // Drop the reader tables now: the workflow is gone, its data must not linger
-            // in the session database for the rest of the process.
-            database.dropTablesForWorkflow(workflow.id());
-        }
-        state.workflows().delete(session, workflowId);
+        state.deleteWorkflow(session, workflow.id());
         Http.ok(ctx, Map.of("ok", true));
     }
 

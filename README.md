@@ -71,6 +71,7 @@ Cold start — около 0.4–0.5 с от `java -jar` до первого `200
 выключает), `DAP_MAX_SESSIONS` (64; LRU-эвикция), `DAP_SESSION_TTL_SEC` (1800 с;
 `0` выключает TTL), `DAP_MAX_RETAINED_JOBS` (200; cap истории заданий на сессию),
 `DAP_DUCKDB_MEMORY_LIMIT`, `DAP_DUCKDB_THREADS`, `DAP_DUCKDB_TEMP_DIR`,
+`DAP_DUCKDB_EXTENSION_DIR` (расширения DuckDB; ставятся `--install-extensions`),
 `DAP_CACHE_DIR` (Parquet-кэш; по умолчанию `$DAP_HOME/build/cache` при заданном
 `DAP_HOME`, иначе `~/.dap/cache`; в sandbox — `$TMPDIR/dap-cache`).
 

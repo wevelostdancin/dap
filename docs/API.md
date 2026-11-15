@@ -79,13 +79,17 @@
 
 ```json
 {"ok":true,"name":"DAP","version":"1.0.0","api":"1",
- "generation":"0f8c2f7a-…","nodes":44,"coreNodes":44,
+ "generation":"0f8c2f7a-…","extensions":{"installed":["sqlite_scanner"]},
+ "nodes":44,"coreNodes":44,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
 `generation` — UUID запуска процесса: он меняется при рестарте движка, поэтому
 клиент (MCP-адаптер) отличает «движок перезапустился, workflow потеряны» от
-обычного 404. `nodes` и `coreNodes` — живые счётчики каталога (сейчас 44 и 44); `workflows` —
+обычного 404. `extensions.installed` — имена расширений DuckDB, установленных в
+`DAP_DUCKDB_EXTENSION_DIR` (ставятся явно:
+`java -jar dap-native.jar --install-extensions sqlite postgres httpfs`).
+`nodes` и `coreNodes` — живые счётчики каталога (сейчас 44 и 44); `workflows` —
 все workflow процесса; `sessions` — открытые сессионные БД; `jobs` — активные
 задания текущей сессии; `memory` — heap JVM.
 
@@ -197,8 +201,9 @@
 
 ### `DELETE /v1/workflows/{workflowId}`
 
-Удаляет workflow и отменяет его активные задания. Ответ `{"ok": true}`;
-неизвестный или чужой id — 404.
+Удаляет workflow: отменяет его активные задания, прерывает выполняющиеся чтения
+`/table`/`/profile` этого workflow, удаляет таблицы его reader-узлов и освобождает
+lock запуска. Ответ `{"ok": true}`; неизвестный или чужой id — 404.
 
 ### Узлы workflow
 

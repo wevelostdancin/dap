@@ -133,6 +133,19 @@ class NativeServiceSettingsTest {
     }
 
     @Test
+    void extensionDirectoryDefaultsToDapHomeThenUserHome() {
+        assertEquals("/tmp/dap/build/duckdb-ext", NativeService.Settings.fromEnv(
+                Map.of("DAP_HOME", "/tmp/dap")).duckdbExtensionDirectory());
+        assertEquals(System.getProperty("user.home") + "/.dap/extensions",
+                NativeService.Settings.fromEnv(Map.of()).duckdbExtensionDirectory());
+        assertEquals("/tmp/ext", NativeService.Settings.fromEnv(
+                Map.of("DAP_DUCKDB_EXTENSION_DIR", " /tmp/ext ")).duckdbExtensionDirectory());
+        assertEquals("/tmp/dap/build/duckdb-ext", NativeService.Settings.fromEnv(
+                Map.of("DAP_HOME", "/tmp/dap", "DAP_DUCKDB_EXTENSION_DIR", "  "))
+                .duckdbExtensionDirectory(), "a blank override keeps the default");
+    }
+
+    @Test
     void invalidThreadsEnvFailsLoudly() {
         IllegalArgumentException notANumber = assertThrows(IllegalArgumentException.class,
                 () -> NativeService.Settings.fromEnv(Map.of("DAP_DUCKDB_THREADS", "many")));

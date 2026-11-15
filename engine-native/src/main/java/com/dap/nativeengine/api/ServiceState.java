@@ -78,7 +78,8 @@ public final class ServiceState implements AutoCloseable {
         Session session = sessions.computeIfAbsent(sessionId, id -> {
             try {
                 return new Session(new DuckDbSession(settings.duckdbMemoryLimit(),
-                        settings.duckdbThreads(), settings.duckdbTempDirectory()),
+                        settings.duckdbThreads(), settings.duckdbTempDirectory(),
+                        settings.duckdbExtensionDirectory()),
                         sessionSequence.incrementAndGet(), System.currentTimeMillis());
             } catch (SQLException failure) {
                 throw new ApiException(500, "cannot open session database: " + failure.getMessage(),
@@ -131,6 +132,29 @@ public final class ServiceState implements AutoCloseable {
         }
         session.database.close();
         return true;
+    }
+
+    /**
+     * Delete a workflow and everything it owns: cancel its jobs, interrupt its in-flight
+     * /table and /profile reads, drop its reader tables and forget its run lock.
+     */
+    public boolean deleteWorkflow(String sessionId, String workflowId) {
+        Workflow workflow = workflows.find(sessionId, workflowId);
+        if (workflow == null) {
+            return false;
+        }
+        for (Job job : jobs.activeForWorkflow(workflow.id())) {
+            jobs.cancel(job);
+        }
+        DuckDbSession database = sessionIfPresent(sessionId);
+        if (database != null) {
+            // A read on its own connection survives the job cancel above; close it first so
+            // the table drop does not race a running scan of the workflow's data.
+            database.interruptReads(workflow.id());
+            database.dropTablesForWorkflow(workflow.id());
+        }
+        jobs.forgetWorkflow(workflow.id());
+        return workflows.delete(sessionId, workflowId);
     }
 
     /**

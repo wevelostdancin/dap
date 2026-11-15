@@ -55,6 +55,7 @@ JobManager ──► Dag (уровни Кана, параллельные вет
 | `DAP_MAX_SESSIONS` | `64` | максимум открытых сессионных БД, LRU-эвикция |
 | `DAP_SESSION_TTL_SEC` | `1800` | простой сессии до эвикции, с; `0` выключает |
 | `DAP_MAX_RETAINED_JOBS` | `200` | cap терминальных заданий на сессию, старейшие удаляются |
+| `DAP_DUCKDB_EXTENSION_DIR` | `$DAP_HOME/build/duckdb-ext`, иначе `~/.dap/extensions` | каталог расширений DuckDB (`--install-extensions`) |
 | `DAP_CACHE_DIR` | `$DAP_HOME/build/cache`, иначе `~/.dap/cache` | каталог Parquet-кэша `POST /v1/datasets` |
 | `DAP_DUCKDB_MEMORY_LIMIT` | умолчание DuckDB | `SET memory_limit` |
 | `DAP_DUCKDB_THREADS` | умолчание DuckDB | `SET threads` |
@@ -145,10 +146,18 @@ cached}`. Ключ кэша — SHA-256 от абсолютного пути, р
   | `DAP_DUCKDB_MEMORY_LIMIT` | `SET memory_limit` | `2GB` |
   | `DAP_DUCKDB_THREADS` | `SET threads`, положительное целое | `3` |
   | `DAP_DUCKDB_TEMP_DIR` | `SET temp_directory`; каталог создаётся | `/var/tmp/dap` |
+  | `DAP_DUCKDB_EXTENSION_DIR` | `SET extension_directory`, `SET autoinstall_known_extensions=false`; каталог создаётся | `~/.dap/extensions` |
 
   Незаданные переменные оставляют умолчания DuckDB. Эффективные значения (после
   нормализации, например `2GB` → `1.8 GiB`) читаются через `current_setting` и
   отдаются в `GET /v1/workflows/{id}/debug` полем `duckdb`.
+- Расширения DuckDB ставятся только явно: `java -jar dap-native.jar
+  --install-extensions sqlite postgres httpfs` кладёт их в
+  `DAP_DUCKDB_EXTENSION_DIR` (по умолчанию `$DAP_HOME/build/duckdb-ext`, иначе
+  `~/.dap/extensions`) и выходит с кодом 0/1. Сессионные БД указывают на этот
+  каталог и не включают autoinstall, поэтому в рантайме сеть не нужна.
+  `GET /v1/health` отдаёт `extensions.installed` — имена установленных
+  расширений.
 - `csv_reader`/`excel_reader` грузят таблицу на job-соединении под стабильным именем
   `csv_<wf>_<node>` / `excel_<wf>_<node>` через `CREATE OR REPLACE TABLE` и
   `DuckDBAppender`. Ре-ран заменяет ту же таблицу, а не копит копии; закрытие
@@ -162,8 +171,9 @@ cached}`. Ключ кэша — SHA-256 от абсолютного пути, р
   только буферы DuckDB. Замер на 10 млн строк: ingest требует ~4,65 ГБ heap при
   `-Xmx6g` ([BENCH.md](BENCH.md)).
 - Потолок памяти процесса — примерно `sessions × DAP_DUCKDB_MEMORY_LIMIT` плюс heap.
-  Сессионные БД и завершённые jobs не эвиктятся; таблицы исходников занимают одну
-  стабильную таблицу на узел.
+  Сессионные БД эвиктятся по `DAP_SESSION_TTL_SEC`/LRU-лимиту `DAP_MAX_SESSIONS`,
+  история завершённых jobs ограничена `DAP_MAX_RETAINED_JOBS`; таблицы исходников
+  занимают одну стабильную таблицу на узел и удаляются вместе с workflow.
 - Parquet-кэш `POST /v1/datasets` лежит на диске, в heap не учитывается и не
   эвиктится; каталог общий для всех сессий и переживает перезапуск процесса.
   По умолчанию это `$DAP_HOME/build/cache` (когда `DAP_HOME` задан, например
