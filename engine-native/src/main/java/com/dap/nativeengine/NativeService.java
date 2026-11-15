@@ -249,6 +249,8 @@ public final class NativeService implements AutoCloseable {
     private final CountDownLatch stopped = new CountDownLatch(1);
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean shuttingDown = new AtomicBoolean();
+    /** Boot id: a new value per process start, so clients can notice an engine restart. */
+    private final String generation = java.util.UUID.randomUUID().toString();
     private final AtomicLong lastActivity = new AtomicLong(System.currentTimeMillis());
     private final AtomicInteger inFlight = new AtomicInteger();
     private final ScheduledExecutorService idleWatchdog;
@@ -374,6 +376,7 @@ public final class NativeService implements AutoCloseable {
         body.put("name", NAME);
         body.put("version", VERSION);
         body.put("api", Http.API_VERSION);
+        body.put("generation", generation);
         body.put("nodes", state.registry().size());
         body.put("coreNodes", state.registry().coreCount());
         body.put("workflows", state.workflows().count());

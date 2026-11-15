@@ -197,8 +197,14 @@ printf '%s\n' \
 ```json
 {"jsonrpc":"2.0","id":77,
  "error":{"code":-32000,"message":"unknown node no.such.NodeFactory",
-          "data":{"status":404,"body":{"error":"unknown node no.such.NodeFactory"}}}}
+          "data":{"status":404,"code":"unknown_node","body":{"error":"unknown node no.such.NodeFactory"}}}}
 ```
+
+`data.code` и `data.hint` (если движок их прислал) лежат на верхнем уровне
+`data`, а исходное тело ответа — в `data.body` для совместимости.
+
+Если `generation` из `/v1/health` изменилась (движок перезапустился), к
+следующей ошибке добавляется префикс `engine restarted; workflows lost: `.
 
 | Код | Когда |
 |---|---|

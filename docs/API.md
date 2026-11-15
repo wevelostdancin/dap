@@ -78,11 +78,14 @@
 ### `GET /v1/health`
 
 ```json
-{"ok":true,"name":"DAP","version":"1.0.0","api":"1","nodes":44,"coreNodes":44,
+{"ok":true,"name":"DAP","version":"1.0.0","api":"1",
+ "generation":"0f8c2f7a-…","nodes":44,"coreNodes":44,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
-`nodes` и `coreNodes` — живые счётчики каталога (сейчас 44 и 44); `workflows` —
+`generation` — UUID запуска процесса: он меняется при рестарте движка, поэтому
+клиент (MCP-адаптер) отличает «движок перезапустился, workflow потеряны» от
+обычного 404. `nodes` и `coreNodes` — живые счётчики каталога (сейчас 44 и 44); `workflows` —
 все workflow процесса; `sessions` — открытые сессионные БД; `jobs` — активные
 задания текущей сессии; `memory` — heap JVM.
 

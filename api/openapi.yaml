@@ -918,7 +918,7 @@ components:
           type: string
     Health:
       type: object
-      required: [ok, name, version, api, nodes, coreNodes, workflows, sessions, jobs, memory]
+      required: [ok, name, version, api, generation, nodes, coreNodes, workflows, sessions, jobs, memory]
       properties:
         ok:
           type: boolean
@@ -928,6 +928,11 @@ components:
           type: string
         api:
           type: string
+        generation:
+          type: string
+          description: >-
+            Boot id (UUID) of this engine process; it changes on every restart, so clients
+            can tell a lost workflow apart from a plain 404.
         nodes:
           type: integer
         coreNodes:
