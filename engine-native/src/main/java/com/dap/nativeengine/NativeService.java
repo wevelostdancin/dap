@@ -58,7 +58,9 @@ import com.dap.nativeengine.nodes.SorterExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
 import io.javalin.Javalin;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
@@ -81,9 +83,12 @@ public final class NativeService implements AutoCloseable {
     /** Service configuration; production defaults come from the DAP_* environment. */
     public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
                            String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
-                           int idleTimeoutSec, int queryTimeoutSec) {
+                           int idleTimeoutSec, int queryTimeoutSec, int maxSessions,
+                           int sessionTtlSec) {
         private static final int DEFAULT_IDLE_TIMEOUT_SEC = 900;
         private static final int DEFAULT_QUERY_TIMEOUT_SEC = 60;
+        private static final int DEFAULT_MAX_SESSIONS = 64;
+        private static final int DEFAULT_SESSION_TTL_SEC = 1800;
 
         public Settings {
             duckdbMemoryLimit = blankToNull(duckdbMemoryLimit);
@@ -99,6 +104,14 @@ public final class NativeService implements AutoCloseable {
             if (queryTimeoutSec < 0) {
                 throw new IllegalArgumentException(
                         "DAP_QUERY_TIMEOUT_SEC must be a non-negative integer, got " + queryTimeoutSec);
+            }
+            if (maxSessions <= 0) {
+                throw new IllegalArgumentException(
+                        "DAP_MAX_SESSIONS must be a positive integer, got " + maxSessions);
+            }
+            if (sessionTtlSec < 0) {
+                throw new IllegalArgumentException(
+                        "DAP_SESSION_TTL_SEC must be a non-negative integer, got " + sessionTtlSec);
             }
         }
 
@@ -123,6 +136,15 @@ public final class NativeService implements AutoCloseable {
                     duckdbTempDirectory, idleTimeoutSec, DEFAULT_QUERY_TIMEOUT_SEC);
         }
 
+        /** Settings without explicit session limits keep the 64 sessions / 1800 s defaults. */
+        public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
+                        String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
+                        int idleTimeoutSec, int queryTimeoutSec) {
+            this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
+                    duckdbTempDirectory, idleTimeoutSec, queryTimeoutSec,
+                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC);
+        }
+
         public static Settings fromEnv() {
             return fromEnv(System.getenv());
         }
@@ -138,7 +160,9 @@ public final class NativeService implements AutoCloseable {
                     positiveIntEnv(env, "DAP_DUCKDB_THREADS"),
                     env.get("DAP_DUCKDB_TEMP_DIR"),
                     nonNegativeIntEnv(env, "DAP_IDLE_TIMEOUT_SEC", DEFAULT_IDLE_TIMEOUT_SEC),
-                    nonNegativeIntEnv(env, "DAP_QUERY_TIMEOUT_SEC", DEFAULT_QUERY_TIMEOUT_SEC));
+                    nonNegativeIntEnv(env, "DAP_QUERY_TIMEOUT_SEC", DEFAULT_QUERY_TIMEOUT_SEC),
+                    positiveIntEnv(env, "DAP_MAX_SESSIONS", DEFAULT_MAX_SESSIONS),
+                    nonNegativeIntEnv(env, "DAP_SESSION_TTL_SEC", DEFAULT_SESSION_TTL_SEC));
         }
 
         private static int intEnv(Map<String, String> env, String name, int fallback) {
@@ -164,6 +188,15 @@ public final class NativeService implements AutoCloseable {
                 throw new IllegalArgumentException(
                         name + " must be a positive integer, got '" + raw.strip() + "'", failure);
             }
+        }
+
+        /** Positive integer with a fallback; zero, negative and non-numeric values fail loudly. */
+        private static int positiveIntEnv(Map<String, String> env, String name, int fallback) {
+            int value = nonNegativeIntEnv(env, name, fallback);
+            if (value <= 0) {
+                throw new IllegalArgumentException(name + " must be a positive integer, got " + value);
+            }
+            return value;
         }
 
         /** Zero disables the idle watchdog; negative and non-numeric values are configuration errors. */
@@ -227,7 +260,7 @@ public final class NativeService implements AutoCloseable {
             context.attribute(IN_FLIGHT_ATTRIBUTE, Boolean.TRUE);
         });
         app.after(this::releaseInFlight);
-        this.idleWatchdog = settings.idleTimeoutSec() > 0
+        this.idleWatchdog = settings.idleTimeoutSec() > 0 || settings.sessionTtlSec() > 0
                 ? java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
                     Thread thread = new Thread(runnable, "dap-idle-watchdog");
                     thread.setDaemon(true);
@@ -268,6 +301,11 @@ public final class NativeService implements AutoCloseable {
 
         app.get("/v1", context -> Http.ok(context, meta()));
         app.get("/v1/health", context -> Http.ok(context, health(Http.session(context))));
+        app.get("/v1/sessions", context -> {
+            Http.session(context);
+            Http.ok(context, sessionList());
+        });
+        app.delete("/v1/sessions/{sessionId}", this::deleteSession);
 
         app.get("/v1/nodes", catalog::list);
         app.get("/v1/nodes/{nodeTypeId}", catalog::get);
@@ -326,6 +364,32 @@ public final class NativeService implements AutoCloseable {
         return body;
     }
 
+    /** GET /v1/sessions: every open session database with its last access and workflow count. */
+    private Map<String, Object> sessionList() {
+        List<Map<String, Object>> views = new ArrayList<>();
+        for (ServiceState.SessionView view : state.sessionViews()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", view.id());
+            item.put("lastAccess", view.lastAccess());
+            item.put("workflows", view.workflows());
+            views.add(item);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("count", views.size());
+        body.put("sessions", views);
+        return body;
+    }
+
+    /** DELETE /v1/sessions/{id}: cancel the session jobs, drop its workflows, close its DB. */
+    private void deleteSession(Context context) {
+        Http.session(context);
+        String sessionId = context.pathParam("sessionId");
+        if (!state.closeSession(sessionId)) {
+            throw ApiException.notFound("unknown session: " + sessionId);
+        }
+        Http.ok(context, Map.of("ok", true, "id", sessionId));
+    }
+
     public NativeService start(int requestedPort) {
         app.start(settings.bindHost(), requestedPort);
         // Port 0 lets the OS pick a free port (used by tests); ask Jetty for the real one.
@@ -339,14 +403,22 @@ public final class NativeService implements AutoCloseable {
         if (idleWatchdog == null) {
             return;
         }
-        long timeoutMs = settings.idleTimeoutSec() * 1000L;
-        long periodMs = Math.min(30_000L, Math.max(1_000L, timeoutMs / 2));
+        // The tick serves both the idle shutdown and the session TTL, so it also runs when
+        // only DAP_SESSION_TTL_SEC is configured (DAP_IDLE_TIMEOUT_SEC=0 disables shutdown).
+        long idleMs = settings.idleTimeoutSec() * 1000L;
+        long ttlMs = settings.sessionTtlSec() * 1000L;
+        long windowMs = idleMs > 0 && ttlMs > 0 ? Math.min(idleMs, ttlMs) : Math.max(idleMs, ttlMs);
+        long periodMs = Math.min(30_000L, Math.max(1_000L, windowMs / 2));
         idleWatchdog.scheduleAtFixedRate(this::checkIdle, periodMs, periodMs, TimeUnit.MILLISECONDS);
     }
 
     /** Idle shutdown is deferred while a job is running, so a long run is never cut short. */
     private void checkIdle() {
         if (closed.get() || shuttingDown.get()) {
+            return;
+        }
+        state.evictIdle(System.currentTimeMillis());
+        if (settings.idleTimeoutSec() <= 0) {
             return;
         }
         if (System.currentTimeMillis() - lastActivity.get() < settings.idleTimeoutSec() * 1000L) {
@@ -523,7 +595,8 @@ public final class NativeService implements AutoCloseable {
         }
         Settings settings = new Settings(defaults.maxWorkflows(), defaults.defaultJobTimeoutSec(), bind, port,
                 defaults.duckdbMemoryLimit(), defaults.duckdbThreads(), defaults.duckdbTempDirectory(),
-                defaults.idleTimeoutSec(), defaults.queryTimeoutSec());
+                defaults.idleTimeoutSec(), defaults.queryTimeoutSec(), defaults.maxSessions(),
+                defaults.sessionTtlSec());
         NativeService service = new NativeService(settings, new NodeRegistry(), defaultExecutors());
         Runtime.getRuntime().addShutdownHook(new Thread(service::close, "dap-shutdown-hook"));
         service.start(port);
