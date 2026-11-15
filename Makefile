@@ -7,7 +7,7 @@ export DAP_JDK
 JAR := engine-native/target/dap-native.jar
 
 .PHONY: help build-native test-native run-native goldens goldens-validate test-mcp smoke \
-        mcp mcp-e2e bench bench-full image-native run-native-image lint check clean-native
+        mcp mcp-e2e dist install-e2e bench bench-full image-native run-native-image lint check clean-native
 
 help:
 	@echo "DAP 1.0.0 — native analytics backend for agents"
@@ -20,6 +20,8 @@ help:
 	@echo "  make smoke          black-box smoke against a running engine (DAP_BASE)"
 	@echo "  make mcp            run the stdio MCP adapter (client-facing entrypoint)"
 	@echo "  make mcp-e2e        MCP create/add/run/table e2e"
+	@echo "  make dist           build the distributable dist/ (jar, adapter, CLI, checksums)"
+	@echo "  make install-e2e    install from dist/ into a temp HOME and run the stdio preflight"
 	@echo "  make bench          native 100k-row benchmark"
 	@echo "  make bench-full     native 10M-row benchmark -> build/bench.json"
 	@echo "  make image-native   build the dap-native image (Docker host required)"
@@ -55,6 +57,22 @@ mcp: build-native
 
 mcp-e2e: build-native
 	python3 tests/mcp_e2e.py
+
+DIST := dist
+
+dist: build-native
+	rm -rf $(DIST)
+	mkdir -p $(DIST)/engine-native/target $(DIST)/adapters/mcp $(DIST)/scripts
+	cp $(JAR) $(DIST)/engine-native/target/
+	ln -sfn engine-native/target/dap-native.jar $(DIST)/dap-native.jar
+	cp adapters/mcp/*.py adapters/mcp/README.md $(DIST)/adapters/mcp/
+	cp scripts/dap-mcp $(DIST)/scripts/
+	cp VERSION $(DIST)/
+	cd $(DIST) && find . -type f ! -name SHA256SUMS | LC_ALL=C sort | xargs shasum -a 256 > SHA256SUMS
+	@echo "dist: $(DIST)/"
+
+install-e2e: dist
+	python3 tests/install_e2e.py
 
 bench: build-native
 	python3 tests/bench.py --jar $(JAR) --rows 100000

@@ -1,5 +1,6 @@
 # Build outputs
 build/
+dist/
 engine-native/target/
 engine-native/.tools/
 .tools/
