@@ -1,5 +1,7 @@
 package com.dap.nativeengine.exec;
 
+import com.dap.nativeengine.api.ApiException;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,7 +38,10 @@ public final class WorkflowStore {
                 sessions.computeIfAbsent(session, ignored -> new LinkedHashMap<>());
         synchronized (workflows) {
             if (workflows.size() >= maxPerSession) {
-                throw new IllegalStateException("workflow limit for session");
+                throw new ApiException(409, "workflow_limit", "workflow limit for session",
+                        "the session already holds " + maxPerSession
+                                + " workflows; delete one or use another X-DAP-Session",
+                        Map.of("limit", maxPerSession));
             }
             workflows.put(workflow.id(), workflow);
         }

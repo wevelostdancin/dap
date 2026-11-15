@@ -82,7 +82,8 @@ public final class Http {
         try {
             return Integer.parseInt(raw);
         } catch (NumberFormatException exception) {
-            throw new ApiException(500, "invalid " + name + ": " + raw);
+            throw ApiException.badRequest("invalid_query_param", "invalid " + name + ": " + raw,
+                    "pass an integer for '" + name + "'");
         }
     }
 

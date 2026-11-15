@@ -55,15 +55,15 @@
 завершённого job — `CancelResult` (см. §5); в них тоже есть `code`
 (`node_failed` у упавшего run, `not_cancellable` у отмены завершённого job).
 
-| Код | Когда |
-|---|---|
-| 200 | успех |
-| 202 | асинхронный запуск принят |
-| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, узел без таблицы, неизвестный узел workflow в `/table`/`/profile`, отсутствующий `dir` |
-| 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут |
-| 408 | истёк `timeoutSec` синхронного run; тело — job со `state: "timeout"` |
-| 409 | отмена уже завершённого job |
-| 500 | ошибка исполнения, невалидное значение config, нечитаемый файл, битый JSON, лимит workflow, нецелый query-параметр |
+| Код | Когда | `code` |
+|---|---|---|
+| 200 | успех | — |
+| 202 | асинхронный запуск принят | — |
+| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, порт вне диапазона, отсутствующий `dir` | `bad_request`, `unknown_setting`, `invalid_query_param` |
+| 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `/table`/`/profile`/`PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут | `not_found`, `unknown_node` |
+| 408 | истёк `timeoutSec` синхронного run (тело — job со `state: "timeout"`); истёк `DAP_QUERY_TIMEOUT_SEC` у `/table`/`/profile` | `query_timeout` |
+| 409 | отмена уже завершённого job; лимит workflow на сессию; у узла ещё нет таблицы (до run); узел упал | `not_cancellable`, `workflow_limit`, `not_materialized`, `node_failed` |
+| 500 | ошибка исполнения, невалидное значение config, нечитаемый файл, битый JSON | `server_error`, `node_failed` |
 
 Метод, не поддержанный для маршрута, даёт 404 `no route: <METHOD> <path>`, а не 405.
 
@@ -143,8 +143,9 @@
 ### `POST /v1/workflows`
 
 Тело `{"name": "demo"}` необязательно. Ответ — объект workflow. Лимит на сессию
-(`DAP_MAX_WORKFLOWS`, по умолчанию 100) при превышении даёт 500
-`workflow limit for session`.
+(`DAP_MAX_WORKFLOWS`, по умолчанию 100) при превышении даёт 409
+`workflow_limit`: `error` — `workflow limit for session`, в `limit` — сам
+лимит, `hint` предлагает удалить workflow или взять другую сессию.
 
 ### `POST /v1/workflows/load`
 
@@ -268,8 +269,10 @@
 
 `rows` — всего строк, `data` — строки значениями-строками (`null` для NULL),
 `preview` — сколько строк вернулось. `limit < 0` даёт пустой `data`; `port`
-вне диапазона, узел без результата или неизвестный узел — 400; неизвестный
-workflow — 404.
+вне диапазона или нецелый query-параметр — 400; неизвестный узел workflow —
+404 `unknown_node`; узел ещё не исполнялся — 409 `not_materialized` (в теле
+есть `ports` и `hint` с командой run); узел упал — 409 `node_failed` с
+сообщением узла; неизвестный workflow — 404.
 
 ### `GET /v1/workflows/{workflowId}/nodes/{node}/profile`
 
@@ -283,7 +286,8 @@ workflow — 404.
 
 `missing` и `distinct` точные; `distinct` считается точно до 100 000 строк,
 выше — приблизительно с досчётом у границы. `min`/`max`/`mean` — только для
-числовых колонок; у колонки из одних NULL они опускаются.
+числовых колонок; у колонки из одних NULL они опускаются. Статусы те же, что у
+`/table`: 404 `unknown_node`, 409 `not_materialized`/`node_failed`.
 
 ### `POST /v1/datasets`
 

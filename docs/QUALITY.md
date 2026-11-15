@@ -178,11 +178,11 @@ goldens-native/
 |---|---|---|
 | 200 | успех | объект операции |
 | 202 | async run принят | job |
-| 400 | невалидная сессия, неизвестный ключ `settings`, неизвестный `factory` при добавлении, `settings` не объект, `PATCH` без `settings`, `from`/`to`/порт вне диапазона, дубль порта, самосвязь, цикл, удаление связанного узла, узел без табличного выхода, неизвестный узел workflow в `/table`/`/profile`, отсутствующий `dir` у save, отрицательный порт | `{"error": "...", "code": "..."}` |
-| 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут или метод | `{"error": "...", "code": "..."}` |
-| 408 | истёк `timeoutSec` sync-run | job со `state: "timeout"` |
-| 409 | отмена уже завершённого job | `{"ok": false, "id": ..., "job": {...}, "error": "...", "code": "not_cancellable"}` |
-| 500 | ошибка исполнения (узел `ERROR`), невалидное значение config, нечитаемый файл, битый JSON, лимит workflow на сессию, нецелый query-параметр | `{"error": "...", "code": "..."}` или job со `state: "failed"` и `code: "node_failed"` для sync-run |
+| 400 | невалидная сессия, неизвестный ключ `settings`, неизвестный `factory` при добавлении, `settings` не объект, `PATCH` без `settings`, `from`/`to`/порт вне диапазона, дубль порта, самосвязь, цикл, удаление связанного узла, отсутствующий `dir` у save, отрицательный порт, нецелый query-параметр | `{"error": "...", "code": "...", "hint": "..."}`; коды `bad_request`, `unknown_setting`, `invalid_query_param` |
+| 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `/table`/`/profile`/`PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут или метод | `{"error": "...", "code": "...", "hint": "..."}`; коды `not_found`, `unknown_node` |
+| 408 | истёк `timeoutSec` sync-run; истёк `DAP_QUERY_TIMEOUT_SEC` у `/table`/`/profile` | job со `state: "timeout"`; `{"error": "...", "code": "query_timeout", "hint": "..."}` |
+| 409 | отмена уже завершённого job; лимит workflow на сессию (`workflow_limit`, поле `limit`); у узла ещё нет таблицы (`not_materialized`); узел упал (`node_failed` с сообщением узла) | `{"ok": false, "id": ..., "job": {...}, "error": "...", "code": "not_cancellable"}` или `{"error": "...", "code": "...", "hint": "..."}` |
+| 500 | ошибка исполнения (узел `ERROR`), невалидное значение config, нечитаемый файл, битый JSON | `{"error": "...", "code": "server_error"}` или job со `state: "failed"` и `code: "node_failed"` для sync-run |
 
 Важно: неизвестный **ключ** настроек — 400 сразу; неверное **значение** (тип, имя
 колонки, диапазон) обнаруживает исполнитель при run, поэтому sync-run отвечает 500,

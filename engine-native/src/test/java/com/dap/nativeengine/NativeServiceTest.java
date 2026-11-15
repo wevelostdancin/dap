@@ -147,7 +147,9 @@ class NativeServiceTest {
         assertEquals(404, unknown.status());
         assertEquals("unknown node: dap.nope", unknown.error());
         assertEquals(400, get("/v1/nodes/dap.nope/dialog").status());
-        assertEquals(500, get("/v1/nodes?limit=not-a-number").status());
+        Resp badQuery = get("/v1/nodes?limit=not-a-number");
+        assertEquals(400, badQuery.status());
+        assertEquals("invalid_query_param", badQuery.body().path("code").asText());
     }
 
     // ------------------------------------------------- workfow happy path
@@ -431,14 +433,16 @@ class NativeServiceTest {
 
         assertEquals(404, get("/v1/workflows/wf-999999/nodes/" + reader + "/table").status());
         Resp beforeRun = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/table");
-        assertEquals(400, beforeRun.status());
+        assertEquals(409, beforeRun.status());
+        assertEquals("not_materialized", beforeRun.body().path("code").asText());
         assertEquals("node has no table output", beforeRun.error());
         assertEquals(1, beforeRun.body().path("ports").size());
         assertEquals(0, beforeRun.body().path("ports").get(0).path("index").asInt());
         assertEquals("Data", beforeRun.body().path("ports").get(0).path("name").asText());
-        assertEquals(400, get("/v1/workflows/" + workflow + "/nodes/999:9/table").status());
+        assertEquals(404, get("/v1/workflows/" + workflow + "/nodes/999:9/table").status());
         Resp beforeProfile = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/profile");
-        assertEquals(400, beforeProfile.status());
+        assertEquals(409, beforeProfile.status());
+        assertEquals("not_materialized", beforeProfile.body().path("code").asText());
         assertEquals("node has no table output", beforeProfile.error());
 
         assertEquals(200, post("/v1/workflows/" + workflow + "/run", Map.of()).status());
@@ -459,7 +463,7 @@ class NativeServiceTest {
         assertEquals(0, clamped.path("data").size());
 
         assertEquals(404, get("/v1/workflows/wf-999999/nodes/" + reader + "/profile").status());
-        assertEquals(400, get("/v1/workflows/" + workflow + "/nodes/999:9/profile").status());
+        assertEquals(404, get("/v1/workflows/" + workflow + "/nodes/999:9/profile").status());
         assertEquals(404, get("/v1/workflows/wf-999999/debug").status());
         assertEquals(404, get("/v1/workflows/" + workflow + "/nodes/999:9/dialog").status());
     }
@@ -637,7 +641,9 @@ class NativeServiceTest {
         try {
             assertEquals(200, post("/v1/workflows", Map.of("name", "one")).status());
             Resp second = post("/v1/workflows", Map.of("name", "two"));
-            assertEquals(500, second.status());
+            assertEquals(409, second.status());
+            assertEquals("workflow_limit", second.body().path("code").asText());
+            assertEquals(1, second.body().path("limit").asInt());
             assertEquals("workflow limit for session", second.error());
             Resp otherSession = send("POST", "/v1/workflows", "limit-other", Map.of("name", "three"));
             assertEquals(200, otherSession.status(), "the limit is per session");

@@ -191,7 +191,7 @@ public final class WorkflowHandlers {
         String nodeId = ctx.pathParam("workflowNodeId");
         WorkflowNode node = workflow.node(nodeId);
         if (node == null) {
-            throw ApiException.notFound("unknown node: " + nodeId);
+            throw unknownNode(workflow, nodeId);
         }
         JsonNode request = Json.parseBody(ctx.body());
         JsonNode settings = request.get("settings");
@@ -210,7 +210,7 @@ public final class WorkflowHandlers {
         Workflow workflow = state.requireWorkflow(session, ctx.pathParam("workflowId"));
         String nodeId = ctx.pathParam("workflowNodeId");
         if (workflow.node(nodeId) == null) {
-            throw ApiException.notFound("unknown node: " + nodeId);
+            throw unknownNode(workflow, nodeId);
         }
         workflow.removeNode(nodeId);
         Map<String, Object> body = new LinkedHashMap<>();
@@ -246,15 +246,21 @@ public final class WorkflowHandlers {
         String nodeId = ctx.pathParam("workflowNodeId");
         WorkflowNode node = workflow.node(nodeId);
         if (node == null) {
-            throw ApiException.notFound("unknown node: " + nodeId);
+            throw unknownNode(workflow, nodeId);
         }
         NodeSpec spec = state.registry().find(node.factory());
         if (spec == null) {
-            throw ApiException.notFound("unknown node: " + node.factory());
+            throw unknownNode(workflow, node.factory());
         }
         Map<String, Object> body = new LinkedHashMap<>(spec.dialog());
         body.put("node", node.id());
         Http.ok(ctx, body);
+    }
+
+    /** Unknown workflow node: 404 unknown_node in PATCH, DELETE and dialog. */
+    private static ApiException unknownNode(Workflow workflow, String nodeId) {
+        return ApiException.notFound("unknown_node", "unknown node: " + nodeId,
+                "GET /v1/workflows/" + workflow.id() + "/nodes lists the node ids");
     }
 
     private static Map<String, Object> view(Workflow workflow) {
