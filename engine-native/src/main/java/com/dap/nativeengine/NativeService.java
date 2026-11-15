@@ -35,6 +35,7 @@ import com.dap.nativeengine.nodes.DescribeExecutor;
 import com.dap.nativeengine.nodes.DiffExecutor;
 import com.dap.nativeengine.nodes.ExcelWriterExecutor;
 import com.dap.nativeengine.nodes.HistogramExecutor;
+import com.dap.nativeengine.nodes.HypothesisTestExecutor;
 import com.dap.nativeengine.nodes.OutlierDetectExecutor;
 import com.dap.nativeengine.nodes.QuantileExecutor;
 import com.dap.nativeengine.nodes.ResampleExecutor;
@@ -475,6 +476,7 @@ public final class NativeService implements AutoCloseable {
                 .register(new DescribeExecutor())
                 .register(new ValueCountsExecutor())
                 .register(new CorrelationExecutor())
+                .register(new HypothesisTestExecutor())
                 .register(new HistogramExecutor())
                 .register(new QuantileExecutor())
                 .register(new OutlierDetectExecutor())

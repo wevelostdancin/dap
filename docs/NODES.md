@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 44 узла `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (44 строки);
+Каталог нативного движка: 45 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (45 строк);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 44 узла имеют `available: true` и `tier: core`.
+спеке. Все 45 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -125,6 +125,7 @@
 | `dap.histogram` | Histogram | `/Statistics` | 1 |
 | `dap.quantile` | Quantile | `/Statistics` | 1 |
 | `dap.outlier_detect` | Outlier Detect | `/Statistics` | 1 |
+| `dap.hypothesis_test` | Hypothesis Test | `/Statistics` | 1 |
 | `dap.resample` | Resample | `/Time Series` | 1 |
 | `dap.rolling` | Rolling | `/Time Series` | 1 |
 | `dap.diff` | Diff | `/Time Series` | 1 |
@@ -1314,7 +1315,54 @@ Apache POI не используется: книга собирается сре
 }
 ```
 
-## 46. Порядок для агента
+## 46. dap.hypothesis_test
+
+Один статистический тест над входом: выход — ровно одна строка `test`,
+`statistic`, `df`, `p_value`, `n`. p-value считается движком
+(`engine/Distributions`, неполная бета/гамма), потому что в DuckDB нет
+`erf`/`beta`; статистика и `df` считаются SQL-агрегатами.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `test` | `t_test_two_sample` \| `t_test_paired` \| `t_test_one_sample` \| `chi_square` \| `anova` | — | обязателен |
+| `value` | string | — | числовая колонка для t-тестов и ANOVA, категориальная для `chi_square` |
+| `group` | string | — | категориальная колонка для `t_test_two_sample`, `chi_square`, `anova` |
+| `group_a` | string | — | для `t_test_two_sample`/`chi_square` — значение `group` (сравнивается как текст); для `t_test_paired` — первая числовая колонка |
+| `group_b` | string | — | вторая группа или вторая числовая колонка (paired) |
+| `mu` | number | `0` | нулевая гипотеза для `t_test_one_sample` |
+| `alpha` | number | — | проверяется, что в `(0, 1)`; на выход не влияет |
+| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост t-тестов; `chi_square`/`anova` всегда верхний |
+
+Правила:
+
+- `t_test_two_sample` — Welch (как `t.test` в R по умолчанию), `df` дробный; без
+  `group_a`/`group_b` берутся ровно две различные группы колонки, иначе ошибка.
+- `t_test_paired` — `group_a`/`group_b` задают имена двух числовых колонок; пары
+  строятся по строкам, строки с NULL в любой из них исключаются.
+- `t_test_one_sample` — `(mean(value) - mu) / (sd / sqrt(n))`, `df = n - 1`.
+- `chi_square` — тест независимости по таблице сопряжённости `value` × `group`
+  (NULL-категории исключаются), `df = (r-1)(c-1)`.
+- `anova` — однофакторный: `df` — числитель `k - 1`, знаменатель `n - k`
+  восстанавливается из `n` и числа групп; `n` — число строк.
+- `n` — число использованных наблюдений (сумма по группам).
+- Меньше двух наблюдений в выборке, меньше двух групп/категорий, ноль строк —
+  ошибка конфигурации; при нулевой дисперсии `statistic` и `p_value` — NULL,
+  `df` и `n` заполнены.
+
+```json
+{
+  "factory": "dap.hypothesis_test",
+  "settings": {
+    "test": "t_test_two_sample",
+    "value": "sepal_length",
+    "group": "species",
+    "group_a": "setosa",
+    "group_b": "versicolor"
+  }
+}
+```
+
+## 47. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.

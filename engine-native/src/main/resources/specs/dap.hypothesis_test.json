@@ -1,0 +1,91 @@
+{
+  "id": "dap.hypothesis_test",
+  "name": "Hypothesis Test",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Runs one hypothesis test over the input and returns a single row: test, statistic, df, p_value, n. Supported tests: two-sample (Welch) and paired Student's t, one-sample t, chi-square test of independence and one-way ANOVA. p-values are computed by the engine's own incomplete beta/gamma implementation because DuckDB has no erf/beta.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Hypothesis Test configuration",
+    "additionalProperties": false,
+    "properties": {
+      "test": {
+        "type": "string",
+        "title": "Test",
+        "description": "Hypothesis test to run.",
+        "enum": [
+          "t_test_two_sample",
+          "t_test_paired",
+          "t_test_one_sample",
+          "chi_square",
+          "anova"
+        ]
+      },
+      "value": {
+        "type": "string",
+        "title": "Value column",
+        "description": "Numeric measurement column for the t tests and ANOVA, categorical column for chi_square."
+      },
+      "group": {
+        "type": "string",
+        "title": "Group column",
+        "description": "Categorical grouping column for t_test_two_sample, chi_square and anova."
+      },
+      "group_a": {
+        "type": "string",
+        "title": "First group",
+        "description": "t_test_two_sample/chi_square: a value of the group column, compared as text. t_test_paired: the first numeric column."
+      },
+      "group_b": {
+        "type": "string",
+        "title": "Second group",
+        "description": "t_test_two_sample/chi_square: a value of the group column, compared as text. t_test_paired: the second numeric column."
+      },
+      "mu": {
+        "type": "number",
+        "title": "Hypothesised mean",
+        "description": "Null-hypothesis mean for t_test_one_sample.",
+        "default": 0
+      },
+      "alpha": {
+        "type": "number",
+        "title": "Significance level",
+        "description": "Validated to be in (0, 1); the p_value is returned and the caller compares it.",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "alternative": {
+        "type": "string",
+        "title": "Alternative hypothesis",
+        "description": "Tail used by the t tests; chi_square and anova always use the upper tail.",
+        "enum": [
+          "two-sided",
+          "less",
+          "greater"
+        ],
+        "default": "two-sided"
+      }
+    },
+    "required": [
+      "test"
+    ]
+  }
+}
