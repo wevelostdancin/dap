@@ -7,7 +7,7 @@ export DAP_JDK
 JAR := engine-native/target/dap-native.jar
 
 .PHONY: help build-native test-native run-native goldens goldens-validate test-mcp smoke \
-        mcp mcp-e2e bench bench-full image-native run-native-image lint check clean-native
+        mcp mcp-e2e bench bench-full image-native run-native-image lint check soak clean-native
 
 help:
 	@echo "DAP 1.0.0 — native analytics backend for agents"
@@ -25,6 +25,7 @@ help:
 	@echo "  make image-native   build the dap-native image (Docker host required)"
 	@echo "  make lint           static checks (scripts/check_repo.py)"
 	@echo "  make check          JUnit + goldens + validate + MCP launch/e2e + lint"
+	@echo "  make soak           nightly soak: 200 x create/run/table/delete"
 	@echo ""
 	@echo "Env: DAP_PORT DAP_BIND DAP_HEAP DAP_JDK DAP_DUCKDB_MEMORY_LIMIT DAP_DUCKDB_TEMP_DIR"
 	@echo "Docs: README.md, docs/ROADMAP.md, docs/ARCHITECTURE.md, docs/NODES.md"
@@ -69,6 +70,9 @@ image-native:
 
 run-native-image: image-native
 	docker run --rm -p 7800:7800 $(DAP_NATIVE_IMAGE)
+
+soak:
+	cd engine-native && ./mvnw -q -Dgroups=soak test
 
 lint:
 	python3 scripts/check_repo.py

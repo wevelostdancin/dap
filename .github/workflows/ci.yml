@@ -5,6 +5,9 @@ on:
     branches: [main, phase3-native]
   pull_request:
   workflow_dispatch:
+  schedule:
+    # Nightly soak: 200 daily loops on the built engine.
+    - cron: "0 3 * * *"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,6 +17,20 @@ permissions:
   contents: read
 
 jobs:
+  soak:
+    name: nightly soak
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Soak (200 x create/run/table/delete)
+        run: make soak
+
   native:
     name: native engine
     runs-on: ubuntu-latest
