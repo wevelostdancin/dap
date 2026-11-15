@@ -136,7 +136,7 @@ class NodeRegistryTest {
 
     @Test
     void configSchemasExposeTheNativeVocabulary() {
-        assertEquals(Set.of("file", "delimiter", "header", "columns", "emptyStringIsNull"),
+        assertEquals(Set.of("file", "delimiter", "compression", "header", "columns", "emptyStringIsNull"),
                 registry.require("dap.csv_reader").settingKeys());
         assertEquals(Set.of("logic", "where"), registry.require("dap.row_filter").settingKeys());
         assertEquals(Set.of("include", "exclude"), registry.require("dap.column_filter").settingKeys());

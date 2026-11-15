@@ -4,7 +4,9 @@ import com.dap.nativeengine.engine.ArrowTable;
 import com.dap.nativeengine.engine.ColumnSpec;
 import com.dap.nativeengine.engine.TypeMap;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -17,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
 
 /**
  * Turns RFC 4180 CSV text into an Arrow table. NULL semantics follow the DAP
@@ -27,10 +30,27 @@ public final class CsvTableReader {
     private static final Pattern INTEGER = Pattern.compile("[+-]?\\d+");
     private static final Pattern DECIMAL = Pattern.compile("[+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?");
 
+    /** How the file bytes are decoded before parsing. */
+    public enum Compression {
+        /** Detect gzip by magic bytes; plain CSV stays plain. */
+        AUTO,
+        /** Read the bytes as UTF-8 text. */
+        NONE,
+        /** Decompress with GZIPInputStream. */
+        GZIP
+    }
+
     /** Parsed node configuration. */
-    public record Options(char delimiter, boolean header, List<ColumnSpec> columns, boolean emptyStringIsNull) {
+    public record Options(char delimiter, boolean header, List<ColumnSpec> columns,
+                          boolean emptyStringIsNull, Compression compression) {
         public Options {
             columns = columns == null ? List.of() : List.copyOf(columns);
+            compression = compression == null ? Compression.AUTO : compression;
+        }
+
+        public Options(char delimiter, boolean header, List<ColumnSpec> columns,
+                       boolean emptyStringIsNull) {
+            this(delimiter, header, columns, emptyStringIsNull, Compression.AUTO);
         }
     }
 
@@ -38,13 +58,52 @@ public final class CsvTableReader {
     }
 
     public static ArrowTable read(Path file, Options options) {
-        String content;
+        byte[] bytes;
         try {
-            content = Files.readString(file, StandardCharsets.UTF_8);
+            bytes = Files.readAllBytes(file);
         } catch (IOException failure) {
             throw new IllegalArgumentException("cannot read CSV file " + file + ": " + failure.getMessage(), failure);
         }
-        return parse(content, options);
+        return parse(decode(bytes, file.toString(), options.compression()), options);
+    }
+
+    /**
+     * Decode the raw file bytes according to {@code compression}. {@code AUTO} detects
+     * gzip by its 1f 8b magic bytes; zstd (28 b5 2f fd) is out of scope and rejected
+     * with a message instead of a parse error.
+     */
+    private static String decode(byte[] bytes, String label, Compression compression) {
+        boolean gzip = isGzip(bytes);
+        if (isZstd(bytes)) {
+            throw new IllegalArgumentException("CSV file " + label + " is zstd-compressed; "
+                    + "zstd is not supported (decompress it to plain CSV or .csv.gz)");
+        }
+        if (compression == Compression.NONE && gzip) {
+            throw new IllegalArgumentException("CSV file " + label + " is gzip-compressed but "
+                    + "compression is 'none'; set compression to 'auto' or 'gzip'");
+        }
+        if (compression == Compression.GZIP || (compression == Compression.AUTO && gzip)) {
+            if (!gzip) {
+                throw new IllegalArgumentException("CSV file " + label + " is not gzip-compressed "
+                        + "but compression is 'gzip'; set compression to 'auto' or 'none'");
+            }
+            try (InputStream input = new GZIPInputStream(new ByteArrayInputStream(bytes))) {
+                bytes = input.readAllBytes();
+            } catch (IOException failure) {
+                throw new IllegalArgumentException("cannot decompress gzip CSV file " + label + ": "
+                        + failure.getMessage(), failure);
+            }
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    private static boolean isGzip(byte[] bytes) {
+        return bytes.length >= 2 && (bytes[0] & 0xff) == 0x1f && (bytes[1] & 0xff) == 0x8b;
+    }
+
+    private static boolean isZstd(byte[] bytes) {
+        return bytes.length >= 4 && (bytes[0] & 0xff) == 0x28 && (bytes[1] & 0xff) == 0xb5
+                && (bytes[2] & 0xff) == 0x2f && (bytes[3] & 0xff) == 0xfd;
     }
 
     public static ArrowTable parse(String content, Options options) {

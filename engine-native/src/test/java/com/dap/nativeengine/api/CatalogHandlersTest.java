@@ -162,7 +162,7 @@ class CatalogHandlersTest {
         assertTrue(body.path("settingsXml").isNull());
         assertTrue(body.path("settingsUnavailable").asText().contains("/v1/nodes/dap.csv_reader/dialog"));
         assertFalse(body.path("description").asText().isBlank());
-        assertEquals(List.of("columns", "delimiter", "emptyStringIsNull", "file", "header"), texts(body.path("settings")));
+        assertEquals(List.of("columns", "compression", "delimiter", "emptyStringIsNull", "file", "header"), texts(body.path("settings")));
         assertEquals(1, body.path("outPorts").size());
     }
 
@@ -197,11 +197,11 @@ class CatalogHandlersTest {
 
         JsonNode schema = body.path("schema");
         assertEquals("dap.csv_reader", schema.path("class").asText());
-        assertEquals("5/5", schema.path("labelCoverage").asText());
+        assertEquals("6/6", schema.path("labelCoverage").asText());
         assertTrue(schema.path("warnings").isArray());
         assertEquals(0, schema.path("warnings").size());
         JsonNode fields = schema.path("fields");
-        assertEquals(5, fields.size());
+        assertEquals(6, fields.size());
 
         JsonNode file = fields.get(0);
         assertEquals("file", file.path("field").asText());
@@ -210,8 +210,8 @@ class CatalogHandlersTest {
         assertEquals("string", file.path("type").asText());
         assertFalse(file.path("optional").asBoolean());
         assertEquals(",", fields.get(1).path("default").asText());
-        assertEquals("array", fields.get(3).path("type").asText());
-        assertEquals("object", fields.get(3).path("items").path("type").asText());
+        assertEquals("array", fields.get(4).path("type").asText());
+        assertEquals("object", fields.get(4).path("items").path("type").asText());
     }
 
     @Test

@@ -41,7 +41,7 @@ class NodeSpecTest {
         Map<String, Object> full = csv.full();
         assertEquals("dap-native", full.get("contributor"));
         assertEquals(true, full.get("configurable"));
-        assertEquals(List.of("columns", "delimiter", "emptyStringIsNull", "file", "header"),
+        assertEquals(List.of("columns", "compression", "delimiter", "emptyStringIsNull", "file", "header"),
                 full.get("settings"));
         assertTrue(full.containsKey("settingsXml"));
         assertNull(full.get("settingsXml"));
@@ -77,12 +77,12 @@ class NodeSpecTest {
 
         JsonNode schema = schema(dialog);
         assertEquals("dap.csv_reader", schema.path("class").asText());
-        assertEquals("5/5", schema.path("labelCoverage").asText());
+        assertEquals("6/6", schema.path("labelCoverage").asText());
         assertTrue(schema.path("warnings").isArray());
         assertEquals(0, schema.path("warnings").size());
 
         JsonNode fields = schema.path("fields");
-        assertEquals(List.of("file", "delimiter", "header", "columns", "emptyStringIsNull"),
+        assertEquals(List.of("file", "delimiter", "compression", "header", "columns", "emptyStringIsNull"),
                 texts(fields, "field"));
 
         JsonNode file = fields.get(0);
@@ -97,15 +97,15 @@ class NodeSpecTest {
         assertEquals(",", delimiter.path("default").asText());
         assertTrue(delimiter.path("optional").asBoolean());
 
-        JsonNode header = fields.get(2);
+        JsonNode header = fields.get(3);
         assertEquals("boolean", header.path("type").asText());
         assertTrue(header.path("default").asBoolean());
 
-        JsonNode columns = fields.get(3);
+        JsonNode columns = fields.get(4);
         assertEquals("array", columns.path("type").asText());
         assertEquals("object", columns.path("items").path("type").asText());
 
-        JsonNode empty = fields.get(4);
+        JsonNode empty = fields.get(5);
         assertEquals("boolean", empty.path("type").asText());
         assertFalse(empty.path("default").asBoolean());
     }
