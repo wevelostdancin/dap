@@ -60,21 +60,51 @@
             {
               "name": "n",
               "type": "Number (Integer)"
+            },
+            {
+              "name": "comparison",
+              "type": "String"
+            },
+            {
+              "name": "p_adjusted",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "effect_size",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "effect_size_name",
+              "type": "String"
+            },
+            {
+              "name": "ci_low",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "ci_high",
+              "type": "Number (Float)"
             }
           ],
           "data": [
             [
               "t_test_two_sample",
-              -10.52098626754911,
-              86.53800179765493,
-              3.530509218307998e-14,
-              100
+              -10.52098626754912,
+              86.53800179765496,
+              0.0,
+              100,
+              "setosa vs versicolor",
+              0.0,
+              -2.104197253509824,
+              "cohens_d",
+              -2.5988761933676154,
+              -1.6095183136520326
             ]
           ],
           "order": "ordered"
         }
       ],
-      "notes": "E8: Welch t-test (setosa vs versicolor) of iris sepal_length. Reference values from R t.test; p-values are computed by engine/Distributions."
+      "notes": "E8: Welch t-test (setosa vs versicolor) of iris sepal_length with Cohen's d and its CI. Reference values from R t.test; p-values are computed by engine/Distributions."
     },
     {
       "task": "E9",
@@ -153,15 +183,45 @@
             {
               "name": "n",
               "type": "Number (Integer)"
+            },
+            {
+              "name": "comparison",
+              "type": "String"
+            },
+            {
+              "name": "p_adjusted",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "effect_size",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "effect_size_name",
+              "type": "String"
+            },
+            {
+              "name": "ci_low",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "ci_high",
+              "type": "Number (Float)"
             }
           ],
           "data": [
             [
               "anova",
-              119.2645021845045,
-              2,
-              1.1457501614131615e-13,
-              150
+              119.26450218450452,
+              2.0,
+              0.0,
+              150,
+              "sepal_length ~ species",
+              0.0,
+              0.6187057307384869,
+              "eta_squared",
+              null,
+              null
             ]
           ],
           "order": "ordered"
@@ -190,21 +250,51 @@
             {
               "name": "n",
               "type": "Number (Integer)"
+            },
+            {
+              "name": "comparison",
+              "type": "String"
+            },
+            {
+              "name": "p_adjusted",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "effect_size",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "effect_size_name",
+              "type": "String"
+            },
+            {
+              "name": "ci_low",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "ci_high",
+              "type": "Number (Float)"
             }
           ],
           "data": [
             [
               "chi_square",
-              8.333333333333334,
-              8,
-              0.4016048373243397,
-              6
+              8.333333333333336,
+              8.0,
+              0.4016048373243376,
+              6,
+              "name vs category",
+              0.4016048373243376,
+              0.8333333333333335,
+              "cramers_v",
+              null,
+              null
             ]
           ],
           "order": "ordered"
         }
       ],
-      "notes": "E9: one-way ANOVA of iris sepal_length and chi-square of independence for p2 name x category. Reference values from R aov/chisq.test."
+      "notes": "E9: one-way ANOVA of iris sepal_length (eta squared) and chi-square of independence for p2 name x category (Cramer's V). Reference values from R aov/chisq.test."
     }
   ]
 }

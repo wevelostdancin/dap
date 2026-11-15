@@ -1513,47 +1513,78 @@ smoke-тестом (файл существует, размеры совпада
 
 ## 49. dap.hypothesis_test
 
-Один статистический тест над входом: выход — ровно одна строка `test`,
-`statistic`, `df`, `p_value`, `n`. p-value считается движком
-(`engine/Distributions`, неполная бета/гамма), потому что в DuckDB нет
-`erf`/`beta`; статистика и `df` считаются SQL-агрегатами.
+Один или несколько статистических тестов над входом: строка на сравнение с полями
+`test`, `statistic`, `df`, `p_value`, `n`, `comparison`, `p_adjusted`,
+`effect_size`, `effect_size_name`, `ci_low`, `ci_high`. p-value считается
+движком (`engine/Distributions`: неполная бета/гамма и квадратура studentized
+range), потому что в DuckDB нет `erf`/`beta`; статистики параметрических тестов и
+Tukey — SQL-агрегаты, ранговые тесты считаются в Java с поправкой на связи.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `test` | `t_test_two_sample` \| `t_test_paired` \| `t_test_one_sample` \| `chi_square` \| `anova` | — | обязателен |
-| `value` | string | — | числовая колонка для t-тестов и ANOVA, категориальная для `chi_square` |
-| `group` | string | — | категориальная колонка для `t_test_two_sample`, `chi_square`, `anova` |
-| `group_a` | string | — | для `t_test_two_sample`/`chi_square` — значение `group` (сравнивается как текст); для `t_test_paired` — первая числовая колонка |
-| `group_b` | string | — | вторая группа или вторая числовая колонка (paired) |
+| `test` | `t_test_two_sample` \| `t_test_paired` \| `t_test_one_sample` \| `chi_square` \| `anova` \| `mann_whitney` \| `kruskal_wallis` \| `wilcoxon_signed_rank` \| `tukey_hsd` | — | обязателен |
+| `value` | string | — | числовая колонка для t-тестов, ANOVA, Tukey и ранговых тестов; категориальная для `chi_square` |
+| `group` | string | — | категориальная колонка для `t_test_two_sample`, `chi_square`, `anova`, `mann_whitney`, `kruskal_wallis`, `tukey_hsd` |
+| `group_a` | string | — | для `t_test_two_sample`/`mann_whitney` — значение `group` (сравнивается как текст); для `t_test_paired`/`wilcoxon_signed_rank` — первая числовая колонка |
+| `group_b` | string | — | вторая группа или вторая числовая колонка (paired/wilcoxon) |
 | `mu` | number | `0` | нулевая гипотеза для `t_test_one_sample` |
-| `alpha` | number | — | проверяется, что в `(0, 1)`; на выход не влияет |
-| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост t-тестов; `chi_square`/`anova` всегда верхний |
+| `alpha` | number | `0.05` | проверяется, что в `(0, 1)`; задаёт уровень доверия интервала эффекта |
+| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост t-тестов, `mann_whitney` и `wilcoxon_signed_rank`; `chi_square`/`anova`/`kruskal_wallis`/`tukey_hsd` всегда верхний |
+| `correction` | `none` \| `bonferroni` \| `holm` \| `bh` | `none` | поправка на множественные сравнения для `p_adjusted` по всем строкам узла |
+
+Схема выхода: `test`, `comparison`, `effect_size_name` (`String`), `n`
+(`Number (Integer)`), `statistic`, `df`, `p_value`, `p_adjusted`,
+`effect_size`, `ci_low`, `ci_high` (`Number (Float)`). `comparison` —
+`"A vs B"` для двухвыборочных/парных тестов, `"value vs group"` для
+`chi_square`, `"value ~ group"` для `anova`/`kruskal_wallis`,
+`"value vs mu"` для одновыборочного t.
 
 Правила:
 
 - `t_test_two_sample` — Welch (как `t.test` в R по умолчанию), `df` дробный; без
   `group_a`/`group_b` берутся ровно две различные группы колонки, иначе ошибка.
+  Эффект — Cohen's `d` по объединённому sd, интервал `d ± t(1−α/2, n1+n2−2)·se`.
 - `t_test_paired` — `group_a`/`group_b` задают имена двух числовых колонок; пары
-  строятся по строкам, строки с NULL в любой из них исключаются.
-- `t_test_one_sample` — `(mean(value) - mu) / (sd / sqrt(n))`, `df = n - 1`.
+  строятся по строкам, строки с NULL в любой из них исключаются; эффект —
+  `cohens_dz` (средняя разность / sd разностей).
+- `t_test_one_sample` — `(mean(value) − mu) / (sd / sqrt(n))`, `df = n − 1`,
+  эффект — Cohen's `d`.
 - `chi_square` — тест независимости по таблице сопряжённости `value` × `group`
-  (NULL-категории исключаются), `df = (r-1)(c-1)`.
-- `anova` — однофакторный: `df` — числитель `k - 1`, знаменатель `n - k`
-  восстанавливается из `n` и числа групп; `n` — число строк.
-- `n` — число использованных наблюдений (сумма по группам).
-- Меньше двух наблюдений в выборке, меньше двух групп/категорий, ноль строк —
-  ошибка конфигурации; при нулевой дисперсии `statistic` и `p_value` — NULL,
-  `df` и `n` заполнены.
+  (NULL-категории исключаются), `df = (r−1)(c−1)`, эффект — Cramér's `V`.
+- `anova` — однофакторный: `df` — числитель `k − 1`, знаменатель `n − k`;
+  эффект — eta squared; интервала нет.
+- `mann_whitney` — U по рангам (средние ранги для связей), нормальная
+  аппроксимация с поправкой на связи и continuity; `statistic` — U первой группы,
+  `df` NULL, эффект — rank-biserial `2U/(n1·n2) − 1`.
+- `kruskal_wallis` — H с поправкой на связи, `df = k − 1`, p по χ²; эффект —
+  epsilon squared `H/(N−1)`.
+- `wilcoxon_signed_rank` — `group_a − group_b`, нулевые разности отбрасываются,
+  `statistic` — W+, `df` NULL, нормальная аппроксимация с поправкой на связи;
+  эффект — matched-pairs rank-biserial.
+- `tukey_hsd` — строка на пару групп (в порядке имён групп), `statistic` — q
+  studentized range (`Tukey-Kramer`: `se = sqrt(MSE/2·(1/n_i + 1/n_j))`),
+  `p_value` — `1 − studentizedRangeCdf(q, k, N−k)` (уже учитывает множественность),
+  `p_adjusted` — дополнительно поправленный p; эффект — Cohen's `d` по
+  `sqrt(MSE)`, интервал через `t(1−α/2, N−k)`.
+- `n` — число использованных наблюдений (сумма по группам; для Wilcoxon — число
+  ненулевых пар).
+- Меньше двух наблюдений в выборке/группе, меньше двух групп/категорий, ноль строк —
+  ошибка конфигурации; при нулевой дисперсии/нулевом MSE `statistic`, `p_value`,
+  `effect_size` и интервал — NULL, `df` и `n` заполнены.
+- Ранговые тесты и Tukey читают значения в память: не более 100 000 строк, иначе
+  ошибка с подсказкой.
+- Поправки: `bonferroni` — `p·m`; `holm` — step-down с монотонностью;
+  `bh` — Benjamini-Hochberg step-up с монотонностью. Для одной строки
+  `p_adjusted = p_value`.
 
 ```json
 {
   "factory": "dap.hypothesis_test",
   "settings": {
-    "test": "t_test_two_sample",
+    "test": "tukey_hsd",
     "value": "sepal_length",
     "group": "species",
-    "group_a": "setosa",
-    "group_b": "versicolor"
+    "correction": "bh"
   }
 }
 ```
