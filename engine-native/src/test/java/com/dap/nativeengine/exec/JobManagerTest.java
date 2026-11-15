@@ -56,6 +56,19 @@ class JobManagerTest {
         assertEquals(0, jobs.totalCount(), "a rejected submit must not create a job");
     }
 
+    @Test
+    void jobReportsProgressWhenTheRunFinishes() throws Exception {
+        Workflow workflow = singleNodeWorkflow("s1", "dap.one");
+
+        Job job = jobs.submit(workflow, db, 0);
+        assertTrue(job.await(10_000), "job did not finish");
+
+        assertEquals(1, job.nodesTotal());
+        assertEquals(1, job.nodesDone());
+        assertEquals(100, job.percent());
+        assertNull(job.currentNode());
+    }
+
     private Workflow singleNodeWorkflow(String session, String factory) {
         Workflow workflow = workflows.create(session, "wf");
         workflow.addNode(factory, factory, null);

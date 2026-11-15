@@ -133,6 +133,12 @@ public final class JobHandlers {
         if (withResult && job.result() != null) {
             view.put("result", job.result());
         }
+        Map<String, Object> progress = new LinkedHashMap<>();
+        progress.put("nodesTotal", job.nodesTotal());
+        progress.put("nodesDone", job.nodesDone());
+        progress.put("currentNode", job.currentNode());
+        progress.put("percent", job.percent());
+        view.put("progress", progress);
         view.put("statusUrl", job.statusUrl());
         return view;
     }
