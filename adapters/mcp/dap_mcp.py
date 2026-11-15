@@ -1470,7 +1470,11 @@ def _add_sql_node(workflow: str, plan: dict) -> str:
     return str(node)
 
 
-def _estimate_node(workflow: str, node: str) -> dict:
+def _estimate_node(workflow: str, node: str, body=None, run: bool = True) -> dict:
+    # /estimate reads the node plan the run built; the run itself does not materialize
+    # a table, so this stays cheap (EXPLAIN only, no /table). A batch runs once.
+    if run:
+        call("POST", f"/v1/workflows/{_seg(workflow)}/run", body or {})
     estimate = call("GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/estimate")
     return estimate if isinstance(estimate, dict) else {}
 
@@ -1494,12 +1498,14 @@ def tool_sql(args: dict):
         if single:
             node = _add_sql_node(workflow, plans[0])
             return {"workflow": workflow, "node": node,
-                    "estimate": _estimate_node(workflow, node)}
-        estimates = []
-        for index, plan in enumerate(plans):
-            node = _add_sql_node(workflow, plan)
-            estimates.append({"index": index, "node": node,
-                              "estimate": _estimate_node(workflow, node)})
+                    "estimate": _estimate_node(workflow, node, _timeout_body(args))}
+        nodes = [_add_sql_node(workflow, plan) for plan in plans]
+        call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
+        estimates = [
+            {"index": index, "node": node,
+             "estimate": _estimate_node(workflow, node, run=False)}
+            for index, node in enumerate(nodes)
+        ]
         return {"workflow": workflow, "estimates": estimates}
     nodes = [_add_sql_node(workflow, plan) for plan in plans]
     call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
@@ -1723,6 +1729,7 @@ def tool_estimate(args: dict):
                 settings["limit"] = limit
             node = _add_node(workflow, "dap.sql_query", settings)
             _connect(workflow, reader, node)
+        call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
         estimate = call(
             "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/estimate")
         _emit_progress(2, 2, "estimate")

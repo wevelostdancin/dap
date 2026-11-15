@@ -335,6 +335,7 @@ class ExplainSqlTest(_SqlToolBase):
         self.assertEqual(engine.paths(), [
             ("POST", "/v1/workflows/wf-1/nodes"),
             ("POST", "/v1/workflows/wf-1/connect"),
+            ("POST", "/v1/workflows/wf-1/run"),
             ("GET", "/v1/workflows/wf-1/nodes/1:2/estimate"),
         ])
 
@@ -347,7 +348,8 @@ class ExplainSqlTest(_SqlToolBase):
         self.assertEqual([entry["index"] for entry in result["estimates"]], [0, 1])
         self.assertEqual([entry["node"] for entry in result["estimates"]], ["1:2", "1:3"])
         self.assertEqual(len(result["estimates"]), 2)
-        self.assertNotIn(("POST", "/v1/workflows/wf-1/run"), engine.paths())
+        self.assertEqual([path for method, path in engine.paths() if path.endswith("/run")],
+                         ["/v1/workflows/wf-1/run"])
         self.assertEqual([path for method, path in engine.paths()
                           if path.endswith("/estimate")],
                          ["/v1/workflows/wf-1/nodes/1:2/estimate",

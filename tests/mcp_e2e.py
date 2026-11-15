@@ -387,6 +387,58 @@ def scenario(client, source, base):
     check(ages == ["34", "41", "28"], "unexpected age values: %r" % (ages,))
     step("table: rows=3 columns=%s order=%s" % (columns, names))
 
+    step("P6: dap_get_table paging + projection + csv format")
+    page = client.tool("dap_get_table", {
+        "workflow": workflow, "node": sorter, "port": 0,
+        "offset": 1, "limit": 1, "columns": ["name", "score"], "format": "csv",
+    }, 15)
+    check(page.get("format") == "csv", "expected csv format: %r" % (page,))
+    check("carol" in (page.get("text") or ""), "page text misses carol: %r" % (page.get("text"),))
+    check(page.get("offset") == 1, "expected offset 1: %r" % (page.get("offset"),))
+    check(page.get("truncated") is True, "expected truncated page: %r" % (page.get("truncated"),))
+
+    step("P6: dap_estimate")
+    estimate = client.tool("dap_estimate", {
+        "file": str(source),
+        "sql": "SELECT name, score FROM src WHERE score > 7",
+    }, 30)
+    check(estimate.get("rows") is not None, "estimate misses rows: %r" % (estimate,))
+    check(len(estimate.get("operators") or []) > 0,
+          "estimate misses operators: %r" % (estimate,))
+
+    step("P6: dap_explore")
+    explored = client.tool("dap_explore", {"file": str(source)}, 60)
+    report = explored.get("report") or {}
+    check(report.get("rows") == 3, "explore rows=%r, expected 3" % (report.get("rows"),))
+    check(len(report.get("columns") or []) == 3,
+          "explore columns=%r" % (report.get("columns"),))
+    check(len(report.get("hypotheses") or []) >= 1,
+          "explore produced no hypotheses: %r" % (report.get("hypotheses"),))
+
+    step("P6: dap_dataset add/list/show/remove")
+    added = client.tool("dap_dataset", {
+        "action": "add", "name": "e2e", "file": str(source),
+        "description": "mcp e2e fixture",
+    }, 30)
+    check(added.get("name") == "e2e", "dataset add returned %r" % (added,))
+    listed = client.tool("dap_dataset", {"action": "list"}, 15)
+    check(any(item.get("name") == "e2e" for item in listed.get("datasets") or []),
+          "dataset e2e is not listed: %r" % (listed,))
+    shown = client.tool("dap_dataset", {"action": "show", "name": "e2e"}, 15)
+    check(shown.get("name") == "e2e", "dataset show returned %r" % (shown,))
+    client.tool("dap_dataset", {"action": "remove", "name": "e2e"}, 15)
+
+    step("P6: dap_report html")
+    html = str(pathlib.Path(source).parent / "p6-report.html")
+    reported = client.tool("dap_report", {
+        "file": str(source), "report": html, "format": "html", "title": "P6 e2e",
+    }, 60)
+    check((reported.get("bytes") or {}).get("report", 0) > 0,
+          "report bytes missing: %r" % (reported.get("bytes"),))
+    check(pathlib.Path(html).is_file(), "report file not written: %s" % html)
+    check(pathlib.Path(html).read_text(encoding="utf-8").lstrip().startswith("<!DOCTYPE html>"),
+          "report is not html")
+
     step("dap_delete_workflow")
     deleted = client.tool("dap_delete_workflow", {"workflow": workflow}, 10)
     check(deleted.get("ok") is True, "delete was not ok: %r" % (deleted,))

@@ -93,6 +93,8 @@ class FakeEngine:
             raise AssertionError("unexpected factory: %r" % (factory,))
         if method == "POST" and path == "/v1/workflows/wf-1/connect":
             return {"ok": True}
+        if method == "POST" and path == "/v1/workflows/wf-1/run":
+            return {"ok": True, "durationMs": 1, "nodes": []}
         if method == "GET" and path == "/v1/workflows/wf-1/nodes/1:1/estimate":
             if self.fail_estimate is not None:
                 raise self.fail_estimate
@@ -147,6 +149,7 @@ class EstimateTest(unittest.TestCase):
             ("POST", "/v1/datasets"),
             ("POST", "/v1/workflows"),
             ("POST", "/v1/workflows/wf-1/nodes"),
+            ("POST", "/v1/workflows/wf-1/run"),
             ("GET", "/v1/workflows/wf-1/nodes/1:1/estimate"),
             ("DELETE", "/v1/workflows/wf-1"),
         ])
@@ -164,6 +167,7 @@ class EstimateTest(unittest.TestCase):
                          {"sql": "SELECT region, COUNT(*) AS n FROM src GROUP BY region",
                           "inputs": ["src"]})
         self.assertIn(("POST", "/v1/workflows/wf-1/connect"), engine.paths())
+        self.assertIn(("POST", "/v1/workflows/wf-1/run"), engine.paths())
         self.assertIn(("DELETE", "/v1/workflows/wf-1"), engine.paths())
         self.assertNotIn(("POST", "/v1/datasets"), engine.paths())
 
