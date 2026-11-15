@@ -247,3 +247,19 @@ Expected: FAIL (500/400 instead of 409/404).
 - [ ] **Step 3: Add the `soak` Makefile target and CI job; adjust assertions only to measured, justified bounds.**
 - [ ] **Step 4: Run `make soak` and `./mvnw -q -Dtest=FaultInjectionTest test`; both pass.**
 - [ ] **Step 5: Commit** `test(engine): add fault-injection and soak coverage`
+
+### Task 11: DuckDB extension directory and installer (independent, can run in parallel with Task 10)
+
+**Files:**
+- Modify: `engine-native/src/main/java/com/dap/nativeengine/NativeService.java` (Settings, `--install-extensions` main mode)
+- Modify: `engine-native/src/main/java/com/dap/nativeengine/engine/DuckDbSession.java` (apply `extension_directory`)
+- Test: `engine-native/src/test/java/com/dap/nativeengine/engine/DuckDbExtensionSettingsTest.java`
+
+**Interfaces:**
+- Produces: `Settings.duckdbExtensionDirectory()` (`DAP_DUCKDB_EXTENSION_DIR`, default `$DAP_HOME/build/duckdb-ext`, else `~/.dap/extensions`); `DuckDbSession` executes `SET extension_directory` on open and never relies on autoinstall; `java -jar dap-native.jar --install-extensions sqlite postgres httpfs` installs into that directory and exits 0/1; `GET /v1/health` adds `extensions: {installed: [names]}`.
+
+- [ ] **Step 1: Write the failing test** — `current_setting("extension_directory")` equals the configured path; health lists the installed names; `--install-extensions` into a temp dir creates `v1.5.6/<platform>/sqlite_scanner.duckdb_extension` (tag `network`, skipped when offline).
+- [ ] **Step 2: Run it and watch it fail.**
+- [ ] **Step 3: Implement** the setting, the CLI mode and the health field.
+- [ ] **Step 4: Run it and watch it pass** (network-tagged test may be skipped offline).
+- [ ] **Step 5: Commit** `feat(engine): add a configurable DuckDB extension directory and installer`
