@@ -746,6 +746,25 @@ TOOLS = [
         ),
     },
     {
+        "name": "dap_explore",
+        "description": (
+            "Разведочный анализ одним вызовом: ingest (для file), POST /v1/explore — "
+            "профиль, качество, связи, групповые различия, гипотезы и рекомендации. "
+            "Возвращает source, cached и report."
+        ),
+        "inputSchema": _obj(
+            {
+                "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
+                "dataset": _str(
+                    "путь к готовому Parquet-датасету или имя из каталога датасетов"),
+                "format": _str("формат входного файла: csv, excel, json или parquet"),
+                "sql": _str("read-only SELECT/WITH; вход доступен как src"),
+                "maxColumns": _int("сколько колонок профилировать (по умолчанию движка)"),
+                "sampleRows": _int("сколько строк сэмплировать (по умолчанию движка)"),
+            },
+        ),
+    },
+    {
         "name": "dap_estimate",
         "description": (
             "Оценить стоимость запроса до запуска: ingest (для file), временный workflow "
@@ -1631,6 +1650,41 @@ def tool_analyze(args: dict):
                   file=sys.stderr, flush=True)
 
 
+def _positive_int(args: dict, key: str) -> int | None:
+    value = args.get(key)
+    if value is None or value == "":
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        raise DapError(f"'{key}' должен быть целым числом > 0", code=-32602)
+    if number < 1:
+        raise DapError(f"'{key}' должен быть > 0", code=-32602)
+    return number
+
+
+def tool_explore(args: dict):
+    """One POST /v1/explore: profile, anomalies, relationships and hypotheses."""
+    has_file, _ = _source_args(args)
+    sql = args.get("sql")
+    sql = _read_only_sql(sql) if sql else None
+    max_columns = _positive_int(args, "maxColumns")
+    sample_rows = _positive_int(args, "sampleRows")
+    ensure_service()
+    source, cached = _source(args, has_file)
+    _emit_progress(1, 2, "ingest")
+    body = {"dataset": source}
+    if sql:
+        body["sql"] = sql
+    if max_columns is not None:
+        body["maxColumns"] = max_columns
+    if sample_rows is not None:
+        body["sampleRows"] = sample_rows
+    report = call("POST", "/v1/explore", body)
+    _emit_progress(2, 2, "explore")
+    return {"source": source, "cached": cached, "report": report}
+
+
 def tool_estimate(args: dict):
     """Rows/operators/plan of a node's EXPLAIN without materializing it."""
     has_file, _ = _source_args(args)
@@ -1966,6 +2020,7 @@ HANDLERS = {
     "dap_sql": tool_sql,
     "dap_workflow_build": tool_workflow_build,
     "dap_analyze": tool_analyze,
+    "dap_explore": tool_explore,
     "dap_estimate": tool_estimate,
     "dap_report": tool_report,
     "dap_profile": tool_profile,
@@ -2102,8 +2157,8 @@ def handle(msg: dict) -> None:
         _PROGRESS_TOKEN = meta.get("progressToken") if isinstance(meta, dict) else None
         try:
             if name not in ("dap_shutdown", "dap_analyze", "dap_estimate",
-                            "dap_dataset", "dap_workflow_build", "dap_report",
-                            "dap_profile"):
+                            "dap_explore", "dap_dataset", "dap_workflow_build",
+                            "dap_report", "dap_profile"):
                 ensure_service()
             result = handler(args)
         except DapError as e:
