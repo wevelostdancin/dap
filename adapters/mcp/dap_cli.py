@@ -513,7 +513,7 @@ def _check_preflight(home: pathlib.Path) -> Check:
     return Check("preflight", False, f"tools/list returned {count} tools (need >= {MIN_TOOLS})")
 
 
-EXTENSIONS = ("sqlite_scanner", "postgres_scanner", "httpfs")
+EXTENSIONS = ("sqlite_scanner", "postgres_scanner", "mysql_scanner", "httpfs")
 
 
 def _extension_dir(home: pathlib.Path) -> pathlib.Path:

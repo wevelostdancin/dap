@@ -248,6 +248,71 @@ tool call), библиотека рецептов читается с диска
 не считаются SQL. Узел остаётся в workflow — его таблицу можно дочитать
 `dap_get_table`; `limit` задаёт cap строк узла и размер превью.
 
+## Локальные базы данных
+
+SQLite/Postgres/MySQL читаются через расширения DuckDB — один раз ставим их в
+каталог расширений, дальше всё работает офлайн:
+
+```bash
+make extensions   # sqlite, postgres, mysql, httpfs -> $DAP_HOME/build/duckdb-ext
+```
+
+```json
+{"factory": "dap.db_reader", "settings": {"driver": "postgres",
+  "url": "postgresql://dap@127.0.0.1:5432/analytics", "table": "orders"}}
+```
+
+Для MySQL — `driver: mysql` и `url: mysql://user@127.0.0.1:3306/db`. Логин и
+пароль задаются полями `user`/`password` и никогда не попадают в `workflow.json`;
+вместо `table` можно передать read-only `query`. Локальный Postgres 17 проверен
+(таблица, профиль, агрегирующий запрос); MySQL использует тот же механизм — нужен
+свой сервер.
+
+## Сценарий за два вызова
+
+Цель — из файла получить таблицу, статистику, отчёт и график без ручной сборки графа:
+
+1. `dap_ingest {"file": "/data/sales.csv"}` — один раз конвертирует CSV/Excel/JSON в
+   Parquet-кэш и возвращает путь.
+2. `dap_recipe_run {"name": "local_analyst", "dataset": "<путь из шага 1>",
+   "params": {"report": "/tmp/report.md", "chart": "/tmp/chart.svg"}}` — применяет
+   датасет и параметры к сохранённому рецепту, запускает его и возвращает таблицу;
+   отчёт и график пишутся как побочный эффект.
+
+Рецепт — обычный `workflow.json` плюс блок `recipe`:
+
+```json
+{
+  "format": "dap-native-workflow/1",
+  "nodes": [
+    {"id": "src", "factory": "dap.parquet_reader", "settings": {"file": "/data/sales.parquet"}},
+    {"id": "q", "factory": "dap.sql_query", "settings": {
+      "sql": "SELECT region, COUNT(*) AS orders, ROUND(SUM(amount), 2) AS total FROM src GROUP BY region ORDER BY total DESC",
+      "inputs": ["src"]}},
+    {"id": "report", "factory": "dap.markdown_report", "settings": {
+      "file": "/tmp/report.md", "title": "Sales summary",
+      "sections": [{"kind": "table"}, {"kind": "profile"}, {"kind": "metrics", "columns": ["total"]}]}},
+    {"id": "chart", "factory": "dap.chart", "settings": {
+      "file": "/tmp/chart.svg", "format": "svg", "type": "bar", "x": "region", "y": ["total"]}}
+  ],
+  "connections": [
+    {"from": "src", "fromPort": 0, "to": "q", "toPort": 0},
+    {"from": "q", "fromPort": 0, "to": "report", "toPort": 0},
+    {"from": "report", "fromPort": 0, "to": "chart", "toPort": 0}
+  ],
+  "recipe": {
+    "name": "local_analyst",
+    "dataset": {"node": "src", "setting": "file"},
+    "params": {"report": {"node": "report", "setting": "file"},
+               "chart": {"node": "chart", "setting": "file"}},
+    "output": "chart"
+  }
+}
+```
+
+Проверено end-to-end: 600 строк CSV → ingest → `dap_recipe_run` = таблица по
+регионам (4 строки), `report.md` с таблицей/профилем/метриками и `chart.svg`.
+
 ## Как подключить в DSH
 
 DSH подключает MCP-серверы плагином: плагин запускает `scripts/dap-mcp` как

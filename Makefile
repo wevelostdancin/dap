@@ -89,7 +89,7 @@ install-e2e: dist
 	python3 tests/install_e2e.py
 
 extensions: build-native
-	DAP_HOME="$(CURDIR)" "$(DAP_JDK)/bin/java" -jar $(JAR) --install-extensions sqlite postgres httpfs
+	DAP_HOME="$(CURDIR)" "$(DAP_JDK)/bin/java" -jar $(JAR) --install-extensions sqlite postgres mysql httpfs
 
 bench: build-native
 	python3 tests/bench.py --jar $(JAR) --rows 100000
