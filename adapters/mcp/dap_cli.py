@@ -26,6 +26,7 @@ import importlib.util
 import os
 import pathlib
 import re
+import shutil
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -97,6 +98,56 @@ def _client_config_path(client: str, explicit: str | None, home_flag: str | None
     return base / CLIENT_CONFIGS[client]
 
 
+# -------------------------------------------------------------------- entry
+
+def _python() -> str:
+    """Absolute interpreter path: both clients scrub the child environment."""
+    if sys.executable and os.path.isabs(sys.executable):
+        return sys.executable
+    found = shutil.which("python3") or shutil.which("python")
+    return found or "python3"
+
+
+def _java_home() -> str:
+    for key in ("JAVA_HOME", "DAP_JDK"):
+        value = (os.environ.get(key) or "").strip()
+        if value and (pathlib.Path(value) / "bin" / "java").is_file():
+            return value
+    candidate = pathlib.Path.home() / "Projects" / "tools" / "jdk-21.0.13+9" / "Contents" / "Home"
+    if (candidate / "bin" / "java").is_file():
+        return str(candidate)
+    return ""
+
+
+def _entry_env(home: pathlib.Path) -> dict:
+    env = {
+        "DAP_HOME": str(home),
+        "DAP_PORT": (os.environ.get("DAP_PORT") or "7800").strip(),
+        "DAP_HEAP": (os.environ.get("DAP_HEAP") or "2g").strip(),
+    }
+    java_home = _java_home()
+    if java_home:
+        env["JAVA_HOME"] = java_home
+    return env
+
+
+def _adapter_path(home: pathlib.Path) -> str:
+    return str(home / "adapters" / "mcp" / "dap_mcp.py")
+
+
+def _hermes_entry(home: pathlib.Path) -> dict:
+    return {
+        "command": _python(),
+        "args": [_adapter_path(home)],
+        "env": _entry_env(home),
+        "cwd": str(home),
+        "enabled": True,
+        "timeout": 300,
+        "connect_timeout": 60,
+        "tools": {"resources": True, "prompts": True},
+    }
+
+
 # ------------------------------------------------------------------ commands
 
 def _cmd_run(_args: argparse.Namespace, home: pathlib.Path) -> int:
@@ -111,9 +162,44 @@ def _cmd_version(_args: argparse.Namespace, home: pathlib.Path) -> int:
     return 0
 
 
-def _cmd_install(_args: argparse.Namespace, _home: pathlib.Path) -> int:
-    print("dap-mcp: install is not implemented yet", file=sys.stderr)
-    return 2
+def _print_fragment(path: pathlib.Path, limit: int = 20) -> None:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        print(f"dap-mcp: cannot read {path}: {exc}", file=sys.stderr)
+        return
+    shown = min(limit, len(lines))
+    print(f"--- {path} (first {shown} of {len(lines)} lines) ---", file=sys.stderr)
+    for number, line in enumerate(lines[:limit], start=1):
+        print(f"{number:4d}  {line}", file=sys.stderr)
+
+
+def _cmd_install(args: argparse.Namespace, home: pathlib.Path) -> int:
+    config_module = _load_config()
+    config_path = _client_config_path(args.client, args.config, getattr(args, "home", None))
+    if not config_path.is_file() and not args.force:
+        print(
+            f"dap-mcp: client config not found: {config_path} (use --force to create it)",
+            file=sys.stderr,
+        )
+        return 2
+    if args.client == "hermes":
+        writer = config_module.write_hermes
+        entry = _hermes_entry(home)
+    else:
+        print("dap-mcp: install --client dsh is not implemented yet", file=sys.stderr)
+        return 2
+    try:
+        text = writer(config_path, entry, dry_run=args.dry_run)
+    except config_module.ConfigError as exc:
+        print(f"dap-mcp: {exc}", file=sys.stderr)
+        _print_fragment(config_path)
+        return 2
+    if args.dry_run:
+        sys.stdout.write(text)
+        return 0
+    print(f"dap-mcp: installed dap into {config_path}")
+    return 0
 
 
 def _cmd_doctor(_args: argparse.Namespace, _home: pathlib.Path) -> int:
