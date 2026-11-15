@@ -54,3 +54,4 @@ dap.file_reader.json
 dap.db_writer.json
 dap.text_normalize.json
 dap.fuzzy_join.json
+dap.geo_distance.json

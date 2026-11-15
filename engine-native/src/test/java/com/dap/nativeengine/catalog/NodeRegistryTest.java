@@ -70,7 +70,8 @@ class NodeRegistryTest {
             "dap.file_reader",
             "dap.db_writer",
             "dap.text_normalize",
-            "dap.fuzzy_join");
+            "dap.fuzzy_join",
+            "dap.geo_distance");
 
     private final NodeRegistry registry = new NodeRegistry();
 
