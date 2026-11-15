@@ -73,6 +73,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -283,6 +284,7 @@ public final class NativeService implements AutoCloseable {
     private final AtomicLong lastActivity = new AtomicLong(System.currentTimeMillis());
     private final AtomicInteger inFlight = new AtomicInteger();
     private final ScheduledExecutorService idleWatchdog;
+    private final CompletableFuture<Void> warmUpDone = new CompletableFuture<>();
     private volatile int port;
 
     /** Production service: environment settings, classpath catalog, five Phase-1 executors. */
@@ -449,7 +451,46 @@ public final class NativeService implements AutoCloseable {
         int bound = app.jettyServer().port();
         this.port = bound > 0 ? bound : app.port();
         scheduleIdleWatchdog();
+        startWarmUp();
         return this;
+    }
+
+    /**
+     * Pay the first-run JIT and driver costs off the request path: health and every
+     * other route are already served when this daemon thread starts. One warm-up per
+     * process, best effort, and never a reason to fail startup.
+     */
+    private void startWarmUp() {
+        if (!WarmUp.enabled()) {
+            System.err.println("dap-native: warm-up disabled by " + WarmUp.PROPERTY
+                    + "/" + WarmUp.ENV);
+            warmUpDone.complete(null);
+            return;
+        }
+        if (!WarmUp.claim()) {
+            warmUpDone.complete(null);
+            return;
+        }
+        Thread thread = new Thread(() -> {
+            try {
+                WarmUp.Outcome outcome = WarmUp.run(settings);
+                System.err.println("dap-native: warm-up completed in " + outcome.elapsedMs()
+                        + " ms (" + outcome.rows() + " rows)");
+            } catch (Throwable failure) {
+                String message = failure.getMessage();
+                System.err.println("dap-native: warm-up skipped: "
+                        + (message == null ? failure.getClass().getSimpleName() : message));
+            } finally {
+                warmUpDone.complete(null);
+            }
+        }, "dap-warm-up");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    /** Test seam: completes once warm-up finished, was disabled, or already ran. */
+    CompletableFuture<Void> warmUpDone() {
+        return warmUpDone;
     }
 
     private void scheduleIdleWatchdog() {
