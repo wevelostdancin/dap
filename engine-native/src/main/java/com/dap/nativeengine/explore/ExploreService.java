@@ -780,7 +780,7 @@ public final class ExploreService {
                     "Does " + difference.value() + " differ across " + difference.group()
                             + " groups?",
                     difference.test(), List.of(difference.value(), difference.group()),
-                    capitalised(difference.test()) + " (statistic="
+                    testName(difference.test()) + " (statistic="
                             + decimal(difference.statistic()) + ", " + pText(difference.pValue())
                             + ", " + effect + "=" + decimal(difference.effectSize()) + ").",
                     priority));
@@ -941,7 +941,7 @@ public final class ExploreService {
                 break;
             }
             result.add("Compare " + difference.value() + " across " + difference.group()
-                    + " groups (" + difference.test() + " " + pText(difference.pValue())
+                    + " groups (" + testName(difference.test()) + " " + pText(difference.pValue())
                     + ", effect size " + decimal(difference.effectSize()) + ").");
             differenceAdded++;
         }
@@ -1010,6 +1010,15 @@ public final class ExploreService {
 
     private static String capitalised(String text) {
         return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
+    }
+
+    /** Display name of a group-difference test for human-readable rationales. */
+    private static String testName(String test) {
+        return switch (test) {
+            case "anova" -> "ANOVA";
+            case "kruskal" -> "Kruskal-Wallis";
+            default -> test;
+        };
     }
 
     private static String decimal(Double value) {

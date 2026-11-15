@@ -1685,6 +1685,7 @@ components:
           type: number
         p_value:
           type: number
+          description: May be 0.0 when the true p-value underflows a double
         n:
           type: integer
         strength:
@@ -1705,6 +1706,7 @@ components:
           type: number
         p_value:
           type: number
+          description: May be 0.0 when the true p-value underflows a double
         effect_size:
           type: number
           description: Eta squared for anova, epsilon squared for kruskal
