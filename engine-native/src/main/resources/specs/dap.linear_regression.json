@@ -1,0 +1,79 @@
+{
+  "id": "dap.linear_regression",
+  "name": "Linear Regression",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Simple least-squares regression of one numeric column on exactly one numeric predictor, optionally per group. coefficients mode returns one row per term (intercept and slope) with std_error, t_statistic, p_value, r2 and n; predict mode keeps every input row and adds the prediction and residual columns.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Linear Regression configuration",
+    "additionalProperties": false,
+    "properties": {
+      "x": {
+        "type": "array",
+        "title": "Predictor",
+        "description": "Numeric predictor columns; exactly one column is supported.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "y": {
+        "type": "string",
+        "title": "Response",
+        "description": "Numeric response column."
+      },
+      "group_by": {
+        "type": "array",
+        "title": "Group by",
+        "description": "Optional grouping columns: one fit per group.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "coefficients returns one row per term; predict returns the input rows plus prediction and residual.",
+        "enum": [
+          "coefficients",
+          "predict"
+        ],
+        "default": "coefficients"
+      },
+      "intercept": {
+        "type": "boolean",
+        "title": "Fit intercept",
+        "description": "When false the model is y = slope * x (no intercept term).",
+        "default": true
+      },
+      "output": {
+        "type": "string",
+        "title": "Prediction column",
+        "description": "Name of the prediction column added by predict mode.",
+        "default": "prediction"
+      }
+    },
+    "required": [
+      "x",
+      "y"
+    ]
+  }
+}

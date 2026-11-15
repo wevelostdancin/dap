@@ -388,5 +388,41 @@
         "missing": 0
       }
     ]
+  },
+  "JOIN_LEFT": {
+    "file": "join_left.csv",
+    "rows": 4,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "id",
+        "arrow": "Int64",
+        "missing": 1
+      },
+      {
+        "name": "name",
+        "arrow": "Utf8",
+        "missing": 0
+      }
+    ]
+  },
+  "JOIN_RIGHT": {
+    "file": "join_right.csv",
+    "rows": 5,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "id",
+        "arrow": "Int64",
+        "missing": 1
+      },
+      {
+        "name": "name",
+        "arrow": "Utf8",
+        "missing": 0
+      }
+    ]
   }
 }

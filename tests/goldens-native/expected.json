@@ -491,6 +491,37 @@
      "order": "unordered",
      "rows": 3
     },
+    "med:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "species",
+       "type": "String"
+      },
+      {
+       "index": 1,
+       "name": "Median(sepal_length)",
+       "type": "Number (Float)"
+      }
+     ],
+     "data": [
+      [
+       "setosa",
+       "5.0"
+      ],
+      [
+       "versicolor",
+       "5.9"
+      ],
+      [
+       "virginica",
+       "6.5"
+      ]
+     ],
+     "kind": "table",
+     "order": "unordered",
+     "rows": 3
+    },
     "sort:profile": {
      "columns": [
       {

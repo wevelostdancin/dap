@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Groups rows by key columns and computes aggregate values per group. Aggregate columns are named like Mean(age).",
+  "description": "Groups rows by key columns and computes aggregate values per group. Aggregate columns are named like Mean(age), Median(age) or Percentile(age, 0.9).",
   "inPorts": [
     {
       "index": 0,
@@ -38,7 +38,7 @@
       "aggregations": {
         "type": "array",
         "title": "Aggregations",
-        "description": "Aggregate expressions computed per group; output columns are named like Mean(age).",
+        "description": "Aggregate expressions computed per group; output columns are named like Mean(age) or Percentile(age, 0.9).",
         "items": {
           "type": "object",
           "title": "Aggregation",
@@ -52,14 +52,24 @@
             "fn": {
               "type": "string",
               "title": "Function",
-              "description": "Aggregate function.",
+              "description": "Aggregate function; count_distinct works on any column type, median and percentile need a numeric column.",
               "enum": [
                 "mean",
                 "sum",
                 "count",
                 "min",
-                "max"
+                "max",
+                "count_distinct",
+                "median",
+                "percentile"
               ]
+            },
+            "p": {
+              "type": "number",
+              "title": "Percentile probability",
+              "description": "Probability in [0, 1]; required by fn=percentile and ignored by the other functions.",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "required": [

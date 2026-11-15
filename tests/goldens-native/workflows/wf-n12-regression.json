@@ -1,0 +1,271 @@
+{
+  "id": "wf-n12-regression",
+  "title": "Linear regression: coefficients, per-group fits and predictions",
+  "rationale": "Pins dap.linear_regression end to end: iris sepal_length on petal_length (one fit, per-species fits) and an exact predict fit on p2.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "iris",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "p2",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "fit",
+      "type": "linear_regression",
+      "config": {
+        "x": [
+          "petal_length"
+        ],
+        "y": "sepal_length"
+      }
+    },
+    {
+      "id": "fit_group",
+      "type": "linear_regression",
+      "config": {
+        "x": [
+          "petal_length"
+        ],
+        "y": "sepal_length",
+        "group_by": [
+          "species"
+        ]
+      }
+    },
+    {
+      "id": "predict",
+      "type": "linear_regression",
+      "config": {
+        "x": [
+          "id"
+        ],
+        "y": "score",
+        "mode": "predict"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "iris",
+      "to": "fit"
+    },
+    {
+      "from": "iris",
+      "to": "fit_group"
+    },
+    {
+      "from": "p2",
+      "to": "predict"
+    }
+  ],
+  "checks": [
+    {
+      "node": "fit",
+      "kind": "expect",
+      "rows": 2,
+      "columns": [
+        {
+          "name": "term",
+          "type": "String"
+        },
+        {
+          "name": "coefficient",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "std_error",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "t_statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "r2",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "intercept",
+          4.3055654562920465,
+          0.0784322568448215,
+          54.89534063530294,
+          0.0,
+          0.7599553107783268,
+          150
+        ],
+        [
+          "petal_length",
+          0.4091258984678842,
+          0.01890071085219996,
+          21.646058799966443,
+          0.0,
+          0.7599553107783268,
+          150
+        ]
+      ],
+      "order": "unordered"
+    },
+    {
+      "node": "fit_group",
+      "kind": "expect",
+      "rows": 6,
+      "columns": [
+        {
+          "name": "species",
+          "type": "String"
+        },
+        {
+          "name": "term",
+          "type": "String"
+        },
+        {
+          "name": "coefficient",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "std_error",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "t_statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "r2",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "setosa",
+          "intercept",
+          4.221203904555313,
+          0.4169041499738387,
+          10.125118459051558,
+          1.6830981053317373e-13,
+          0.06962953691365999,
+          50
+        ],
+        [
+          "setosa",
+          "petal_length",
+          0.5360629067245122,
+          0.2828305655406357,
+          1.8953499799422964,
+          0.06407651344005694,
+          0.06962953691365999,
+          50
+        ],
+        [
+          "versicolor",
+          "intercept",
+          2.407523105360442,
+          0.4462583405456024,
+          5.394908927454368,
+          2.0752940064205916e-06,
+          0.5685898319537044,
+          50
+        ],
+        [
+          "versicolor",
+          "petal_length",
+          0.8282809611829949,
+          0.10413643454583574,
+          7.953805647325349,
+          2.5861890406986277e-10,
+          0.5685898319537044,
+          50
+        ],
+        [
+          "virginica",
+          "intercept",
+          1.0596590909090915,
+          0.4667664542544801,
+          2.2702126111474317,
+          0.027722891150937512,
+          0.7468843890175678,
+          50
+        ],
+        [
+          "virginica",
+          "petal_length",
+          0.995738636363636,
+          0.08366763915213585,
+          11.901120271280142,
+          6.661338147750939e-16,
+          0.7468843890175678,
+          50
+        ]
+      ],
+      "order": "unordered"
+    },
+    {
+      "node": "predict",
+      "kind": "expect",
+      "rows": 6,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "score",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "category",
+          "type": "String"
+        },
+        {
+          "name": "prediction",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "residual",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [1, "alpha", 1.0, "A", 1.0, 0.0],
+        [2, "beta", 2.0, "B", 2.0, 0.0],
+        [3, "gamma", 3.0, "A", 3.0, 0.0],
+        [4, "delta", 4.0, "C", 4.0, 0.0],
+        [3, "gamma", 3.0, "A", 3.0, 0.0],
+        [5, "epsilon", 5.0, "B", 5.0, 0.0]
+      ],
+      "order": "unordered"
+    }
+  ],
+  "notes": "R lm(sepal_length ~ petal_length) on iris: intercept 4.305565, slope 0.409126, R2 0.759955; per species the same fit; p2 is an exact line score = id, so predict residuals are 0."
+}

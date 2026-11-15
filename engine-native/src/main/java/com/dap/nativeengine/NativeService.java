@@ -38,6 +38,7 @@ import com.dap.nativeengine.nodes.DescribeExecutor;
 import com.dap.nativeengine.nodes.DiffExecutor;
 import com.dap.nativeengine.nodes.ExcelWriterExecutor;
 import com.dap.nativeengine.nodes.HistogramExecutor;
+import com.dap.nativeengine.nodes.HypothesisTestExecutor;
 import com.dap.nativeengine.nodes.OutlierDetectExecutor;
 import com.dap.nativeengine.nodes.QuantileExecutor;
 import com.dap.nativeengine.nodes.ResampleExecutor;
@@ -51,6 +52,7 @@ import com.dap.nativeengine.nodes.ExcelReaderExecutor;
 import com.dap.nativeengine.nodes.GroupByExecutor;
 import com.dap.nativeengine.nodes.JsonReaderExecutor;
 import com.dap.nativeengine.nodes.JsonWriterExecutor;
+import com.dap.nativeengine.nodes.LinearRegressionExecutor;
 import com.dap.nativeengine.nodes.JoinerExecutor;
 import com.dap.nativeengine.nodes.MarkdownReportExecutor;
 import com.dap.nativeengine.nodes.MathFormulaExecutor;
@@ -595,6 +597,7 @@ public final class NativeService implements AutoCloseable {
                 .register(new DescribeExecutor())
                 .register(new ValueCountsExecutor())
                 .register(new CorrelationExecutor())
+                .register(new HypothesisTestExecutor())
                 .register(new HistogramExecutor())
                 .register(new QuantileExecutor())
                 .register(new OutlierDetectExecutor())
@@ -607,6 +610,7 @@ public final class NativeService implements AutoCloseable {
                 .register(new CsvWriterExecutor())
                 .register(new JsonReaderExecutor())
                 .register(new JsonWriterExecutor())
+                .register(new LinearRegressionExecutor())
                 .register(new ParquetReaderExecutor())
                 .register(new ParquetWriterExecutor())
                 .register(new RowFilterExecutor())

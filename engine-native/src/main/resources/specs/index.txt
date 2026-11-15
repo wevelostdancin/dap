@@ -45,3 +45,5 @@ dap.excel_writer.json
 dap.markdown_report.json
 dap.chart.json
 dap.data_quality.json
+dap.hypothesis_test.json
+dap.linear_regression.json

@@ -1,0 +1,179 @@
+{
+  "id": "wf-n11-hypothesis",
+  "title": "Hypothesis tests: Welch t, ANOVA and chi-square",
+  "rationale": "Pins dap.hypothesis_test end to end: two-sample t on iris, one-way ANOVA on iris, chi-square on the tiny p2 fixture.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "iris",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "p2",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "ttest",
+      "type": "hypothesis_test",
+      "config": {
+        "test": "t_test_two_sample",
+        "value": "sepal_length",
+        "group": "species",
+        "group_a": "setosa",
+        "group_b": "versicolor"
+      }
+    },
+    {
+      "id": "anova",
+      "type": "hypothesis_test",
+      "config": {
+        "test": "anova",
+        "value": "sepal_length",
+        "group": "species"
+      }
+    },
+    {
+      "id": "chi",
+      "type": "hypothesis_test",
+      "config": {
+        "test": "chi_square",
+        "value": "name",
+        "group": "category"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "iris",
+      "to": "ttest"
+    },
+    {
+      "from": "iris",
+      "to": "anova"
+    },
+    {
+      "from": "p2",
+      "to": "chi"
+    }
+  ],
+  "checks": [
+    {
+      "node": "ttest",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "test",
+          "type": "String"
+        },
+        {
+          "name": "statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "df",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "t_test_two_sample",
+          -10.52098626754911,
+          86.53800179765493,
+          3.530509218307998e-14,
+          100
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "anova",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "test",
+          "type": "String"
+        },
+        {
+          "name": "statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "df",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "anova",
+          119.2645021845045,
+          2.0,
+          1.1457501614131615e-13,
+          150
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "chi",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "test",
+          "type": "String"
+        },
+        {
+          "name": "statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "df",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "chi_square",
+          8.333333333333334,
+          8.0,
+          0.4016048373243397,
+          6
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "Welch t for setosa vs versicolor sepal_length (R t.test), one-way ANOVA of sepal_length over the three species (R aov), chi-square of name x category on p2.csv (R chisq.test, df=(5-1)*(3-1)=8)."
+}

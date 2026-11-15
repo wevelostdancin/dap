@@ -1,0 +1,178 @@
+{
+  "id": "E8E9-hypothesis-test",
+  "title": "t-test, ANOVA and chi-square",
+  "kind": "node",
+  "nodes": [
+    {
+      "id": "iris",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "p2",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "ttest",
+      "type": "hypothesis_test",
+      "config": {
+        "test": "t_test_two_sample",
+        "value": "sepal_length",
+        "group": "species",
+        "group_a": "setosa",
+        "group_b": "versicolor"
+      }
+    },
+    {
+      "id": "anova",
+      "type": "hypothesis_test",
+      "config": {
+        "test": "anova",
+        "value": "sepal_length",
+        "group": "species"
+      }
+    },
+    {
+      "id": "chi",
+      "type": "hypothesis_test",
+      "config": {
+        "test": "chi_square",
+        "value": "name",
+        "group": "category"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "iris",
+      "to": "ttest"
+    },
+    {
+      "from": "iris",
+      "to": "anova"
+    },
+    {
+      "from": "p2",
+      "to": "chi"
+    }
+  ],
+  "checks": [
+    {
+      "node": "ttest",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "test",
+          "type": "String"
+        },
+        {
+          "name": "statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "df",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "t_test_two_sample",
+          -10.52098626754911,
+          86.53800179765493,
+          3.530509218307998e-14,
+          100
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "anova",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "test",
+          "type": "String"
+        },
+        {
+          "name": "statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "df",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "anova",
+          119.2645021845045,
+          2.0,
+          1.1457501614131615e-13,
+          150
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "chi",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "test",
+          "type": "String"
+        },
+        {
+          "name": "statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "df",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "chi_square",
+          8.333333333333334,
+          8.0,
+          0.4016048373243397,
+          6
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "E8: Welch t-test (setosa vs versicolor) and one-way ANOVA of iris sepal_length. E9: chi-square of independence for p2 name x category. Reference values from R t.test/aov/chisq.test; p-values are computed by engine/Distributions."
+}

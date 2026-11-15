@@ -58,7 +58,7 @@ def load_corpus(only=None):
 
 
 ROW_FILTER_OPS = {"eq", "ne", "lt", "le", "gt", "ge", "is_null", "not_null"}
-AGGREGATIONS = {"mean", "count", "sum"}
+AGGREGATIONS = {"mean", "count", "sum", "min", "max", "count_distinct", "median", "percentile"}
 LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "sorter",
                  "group_by", "joiner", "column_filter", "column_renamer", "missing_value",
                  "string_manipulation", "math_formula",
@@ -69,7 +69,8 @@ LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "so
                  "top_n_per_group", "concatenate",
                  "describe", "value_counts", "correlation", "histogram", "quantile",
                  "outlier_detect", "resample", "rolling", "diff", "date_range", "excel_writer",
-                 "markdown_report", "chart", "data_quality"}
+                 "markdown_report", "chart", "data_quality",
+                 "hypothesis_test", "linear_regression"}
 CHECK_KINDS = {"table", "profile", "equivalent", "expect", "expect_profile", "file"}
 
 

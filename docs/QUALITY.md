@@ -69,16 +69,20 @@ goldens-native/
   runner.py            # прогон и сравнение
   expected.json        # замороженные ожидания baseline-workflow
   data/                # входные фикстуры + datasets.json
-  workflows/           # 15 workflow: wf-*.json
+  workflows/           # 18 workflow: wf-*.json
 ```
 
-Сейчас 15 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 7
+Сейчас 18 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 10
 `kind: "native"` (литеральные проверки или эквивалентность). Фикстуры данных:
 `iris.csv`/`iris.xlsx`, `adult.csv`, `air_quality.csv`, `worldbank_countries.csv`,
-`p2.csv`; `datasets.json` задаёт файл, разделитель, заголовок, схему (`arrow`) и
+`p2.csv`, `join_left.csv`/`join_right.csv`; `datasets.json` задаёт файл, разделитель, заголовок, схему (`arrow`) и
 число пропусков по колонкам. `wf-n4-p2-clean` — golden волны P2: `type_cast` →
 `value_replace` → `duplicate_filter` → `sorter` на `p2.csv`; `wf-n5-p3-stats` — golden
-волны P3: `value_counts` по колонке `category` из `p2.csv` (A=3, B=2, C=1).
+волны P3: `value_counts` по колонке `category` из `p2.csv` (A=3, B=2, C=1);
+`wf-n10-joiner-modes` — golden волны P5: `full`/`semi`/`anti` джойны на
+`join_left.csv`/`join_right.csv`; `wf-n11-hypothesis` — Welch t-тест и ANOVA на
+`iris.csv`, χ² на `p2.csv`; `wf-n12-regression` — коэффициенты и predict
+`dap.linear_regression` на `iris.csv` и `p2.csv`.
 
 ### Формат workflow
 

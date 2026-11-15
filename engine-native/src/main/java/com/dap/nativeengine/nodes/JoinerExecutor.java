@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
-/** dap.joiner: Joins two inputs on key columns (inner/left/right) with optional merged keys. */
+/** dap.joiner: Joins two inputs on key columns (inner/left/right/full/semi/anti) with optional merged keys. */
 public final class JoinerExecutor implements NodeExecutor {
     /** KNIME Joiner3 duplicateHandling=APPEND_SUFFIX with suffix " (Right)". */
     private static final String RIGHT_SUFFIX = " (Right)";
@@ -38,9 +38,14 @@ public final class JoinerExecutor implements NodeExecutor {
             case "inner" -> "INNER JOIN";
             case "left" -> "LEFT JOIN";
             case "right" -> "RIGHT JOIN";
+            case "full" -> "FULL OUTER JOIN";
+            case "semi" -> "SEMI JOIN";
+            case "anti" -> "ANTI JOIN";
             default -> throw new IllegalArgumentException(
-                    "joiner: unsupported how '" + how + "' (expected inner, left, right)");
+                    "joiner: unsupported how '" + how + "' (expected inner, left, right, full, semi, anti)");
         };
+        // Semi and anti joins only decide which left rows survive: the output is the left schema.
+        boolean leftOnly = "semi".equals(how) || "anti".equals(how);
         List<String> leftKeys = keys(config, "left_keys", "left", left.columns());
         List<String> rightKeys = keys(config, "right_keys", "right", right.columns());
         if (leftKeys.size() != rightKeys.size()) {
@@ -48,6 +53,22 @@ public final class JoinerExecutor implements NodeExecutor {
                     + leftKeys.size() + " and " + rightKeys.size());
         }
         boolean mergeKeys = NodeSql.bool(config, "merge_keys", true);
+
+        StringJoiner on = new StringJoiner(" AND ");
+        for (int i = 0; i < leftKeys.size(); i++) {
+            on.add("l." + NodeSql.quote(leftKeys.get(i)) + " = r." + NodeSql.quote(rightKeys.get(i)));
+        }
+        if (leftOnly) {
+            StringJoiner projection = new StringJoiner(", ");
+            for (ColumnSpec column : left.columns()) {
+                projection.add("l." + NodeSql.quote(column.name()) + " AS " + NodeSql.quote(column.name()));
+            }
+            String sql = "SELECT " + projection
+                    + " FROM " + left.asTable() + " AS l"
+                    + " " + join + " " + right.asTable() + " AS r"
+                    + " ON " + on;
+            return new LazyPlan(context.db(), sql, new ArrayList<>(left.columns()));
+        }
 
         List<ColumnSpec> output = new ArrayList<>(left.columns());
         Set<String> outputNames = new HashSet<>();
@@ -77,10 +98,6 @@ public final class JoinerExecutor implements NodeExecutor {
             output.add(new ColumnSpec(name, column.arrowType(), column.knimeType()));
         }
 
-        StringJoiner on = new StringJoiner(" AND ");
-        for (int i = 0; i < leftKeys.size(); i++) {
-            on.add("l." + NodeSql.quote(leftKeys.get(i)) + " = r." + NodeSql.quote(rightKeys.get(i)));
-        }
         String sql = "SELECT " + projection
                 + " FROM " + left.asTable() + " AS l"
                 + " " + join + " " + right.asTable() + " AS r"

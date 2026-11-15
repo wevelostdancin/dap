@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 47 узлов `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (47 строк);
+Каталог нативного движка: 49 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (49 строк);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 47 узлов имеют `available: true` и `tier: core`.
+спеке. Все 49 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -128,6 +128,8 @@
 | `dap.quantile` | Quantile | `/Statistics` | 1 |
 | `dap.outlier_detect` | Outlier Detect | `/Statistics` | 1 |
 | `dap.data_quality` | Data Quality | `/Statistics` | 2 (1 — опционален) |
+| `dap.hypothesis_test` | Hypothesis Test | `/Statistics` | 1 |
+| `dap.linear_regression` | Linear Regression | `/Statistics` | 1 |
 | `dap.resample` | Resample | `/Time Series` | 1 |
 | `dap.rolling` | Rolling | `/Time Series` | 1 |
 | `dap.diff` | Diff | `/Time Series` | 1 |
@@ -1473,7 +1475,99 @@ smoke-тестом (файл существует, размеры совпада
 }
 ```
 
-## 49. Порядок для агента
+## 49. dap.hypothesis_test
+
+Один статистический тест над входом: выход — ровно одна строка `test`,
+`statistic`, `df`, `p_value`, `n`. p-value считается движком
+(`engine/Distributions`, неполная бета/гамма), потому что в DuckDB нет
+`erf`/`beta`; статистика и `df` считаются SQL-агрегатами.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `test` | `t_test_two_sample` \| `t_test_paired` \| `t_test_one_sample` \| `chi_square` \| `anova` | — | обязателен |
+| `value` | string | — | числовая колонка для t-тестов и ANOVA, категориальная для `chi_square` |
+| `group` | string | — | категориальная колонка для `t_test_two_sample`, `chi_square`, `anova` |
+| `group_a` | string | — | для `t_test_two_sample`/`chi_square` — значение `group` (сравнивается как текст); для `t_test_paired` — первая числовая колонка |
+| `group_b` | string | — | вторая группа или вторая числовая колонка (paired) |
+| `mu` | number | `0` | нулевая гипотеза для `t_test_one_sample` |
+| `alpha` | number | — | проверяется, что в `(0, 1)`; на выход не влияет |
+| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост t-тестов; `chi_square`/`anova` всегда верхний |
+
+Правила:
+
+- `t_test_two_sample` — Welch (как `t.test` в R по умолчанию), `df` дробный; без
+  `group_a`/`group_b` берутся ровно две различные группы колонки, иначе ошибка.
+- `t_test_paired` — `group_a`/`group_b` задают имена двух числовых колонок; пары
+  строятся по строкам, строки с NULL в любой из них исключаются.
+- `t_test_one_sample` — `(mean(value) - mu) / (sd / sqrt(n))`, `df = n - 1`.
+- `chi_square` — тест независимости по таблице сопряжённости `value` × `group`
+  (NULL-категории исключаются), `df = (r-1)(c-1)`.
+- `anova` — однофакторный: `df` — числитель `k - 1`, знаменатель `n - k`
+  восстанавливается из `n` и числа групп; `n` — число строк.
+- `n` — число использованных наблюдений (сумма по группам).
+- Меньше двух наблюдений в выборке, меньше двух групп/категорий, ноль строк —
+  ошибка конфигурации; при нулевой дисперсии `statistic` и `p_value` — NULL,
+  `df` и `n` заполнены.
+
+```json
+{
+  "factory": "dap.hypothesis_test",
+  "settings": {
+    "test": "t_test_two_sample",
+    "value": "sepal_length",
+    "group": "species",
+    "group_a": "setosa",
+    "group_b": "versicolor"
+  }
+}
+```
+
+## 50. dap.linear_regression
+
+Парная линейная регрессия одной числовой колонки на ровно один числовой
+предиктор, при необходимости — отдельно по группам. В режиме `coefficients` —
+одна строка на терм (`intercept` и колонка `x`), в режиме `predict` — все
+входные строки плюс `prediction` и `residual`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `x` | array<string> | — | обязателен; ровно одна числовая колонка |
+| `y` | string | — | обязателен; числовая колонка отклика |
+| `group_by` | array<string> | — | необязательные колонки группировки: своя регрессия на группу |
+| `mode` | `coefficients` \| `predict` | `coefficients` | — |
+| `intercept` | boolean | `true` | `false` — модель `y = slope * x` без свободного члена |
+| `output` | string | `prediction` | имя колонки предсказания в режиме `predict` |
+
+Выход `coefficients`: `[group_by…]`, `term`, `coefficient`, `std_error`,
+`t_statistic`, `p_value`, `r2`, `n`. Коэффициенты — из `regr_slope`,
+`regr_intercept`, `regr_r2`, `regr_count`; стандартные ошибки и p-value — из
+`engine/Distributions` (`t` с `df = n - 2`, для модели без свободного члена
+`df = n - 1` и несцентрированный `r2 = 1 - SSE / sum(y^2)`).
+
+Выход `predict`: входные колонки, затем `output` и `residual`
+(`y - prediction`); при `group_by` коэффициенты считаются оконными агрегатами
+по каждой группе. `prediction` NULL, если NULL предиктор; `residual` NULL, если
+NULL отклик.
+
+Правила: строки с NULL в `x` или `y` исключаются из подгонки; меньше двух таких
+строк — ошибка; константный `x` даёт NULL-коэффициенты и NULL-`r2`; идеальная
+подгонка (`std_error = 0`) даёт NULL `t_statistic`/`p_value`; `r2` для модели
+без свободного члена может быть отрицательным. Режим `predict` ленивый (оконные
+агрегаты в SQL), `coefficients` считает подгонку на run.
+
+```json
+{
+  "factory": "dap.linear_regression",
+  "settings": {
+    "x": ["petal_length"],
+    "y": "sepal_length",
+    "group_by": ["species"],
+    "mode": "coefficients"
+  }
+}
+```
+
+## 51. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.

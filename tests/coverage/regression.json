@@ -1,0 +1,151 @@
+{
+  "id": "E10-linear-regression",
+  "title": "Linear regression coefficients and predictions",
+  "kind": "node",
+  "nodes": [
+    {
+      "id": "iris",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "IRIS"
+      }
+    },
+    {
+      "id": "p2",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "fit",
+      "type": "linear_regression",
+      "config": {
+        "x": [
+          "petal_length"
+        ],
+        "y": "sepal_length"
+      }
+    },
+    {
+      "id": "predict",
+      "type": "linear_regression",
+      "config": {
+        "x": [
+          "id"
+        ],
+        "y": "score",
+        "mode": "predict"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "iris",
+      "to": "fit"
+    },
+    {
+      "from": "p2",
+      "to": "predict"
+    }
+  ],
+  "checks": [
+    {
+      "node": "fit",
+      "kind": "expect",
+      "rows": 2,
+      "columns": [
+        {
+          "name": "term",
+          "type": "String"
+        },
+        {
+          "name": "coefficient",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "std_error",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "t_statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "r2",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "intercept",
+          4.3055654562920465,
+          0.0784322568448215,
+          54.89534063530294,
+          0.0,
+          0.7599553107783268,
+          150
+        ],
+        [
+          "petal_length",
+          0.4091258984678842,
+          0.01890071085219996,
+          21.646058799966443,
+          0.0,
+          0.7599553107783268,
+          150
+        ]
+      ],
+      "order": "unordered"
+    },
+    {
+      "node": "predict",
+      "kind": "expect",
+      "rows": 6,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "score",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "category",
+          "type": "String"
+        },
+        {
+          "name": "prediction",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "residual",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [1, "alpha", 1.0, "A", 1.0, 0.0],
+        [2, "beta", 2.0, "B", 2.0, 0.0],
+        [3, "gamma", 3.0, "A", 3.0, 0.0],
+        [4, "delta", 4.0, "C", 4.0, 0.0],
+        [3, "gamma", 3.0, "A", 3.0, 0.0],
+        [5, "epsilon", 5.0, "B", 5.0, 0.0]
+      ],
+      "order": "unordered"
+    }
+  ],
+  "notes": "E10: R lm(sepal_length ~ petal_length) on iris (coefficients mode) and an exact predict fit on p2 (score = id, residuals 0)."
+}
