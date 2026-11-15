@@ -238,6 +238,19 @@
         "type": "string",
         "title": "Bubble label column",
         "description": "map only: text drawn next to each bubble when there are at most 40 points."
+      },
+      "facet": {
+        "type": "string",
+        "title": "Facet column",
+        "description": "Split the chart into small multiples, one panel per value of this column, in one SVG/PNG. Every panel keeps its own axes; the title is shared."
+      },
+      "facet_columns": {
+        "type": "integer",
+        "title": "Facet columns",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 12,
+        "description": "Panels per row in a faceted chart; rows follow from the number of facet values."
       }
     },
     "required": [

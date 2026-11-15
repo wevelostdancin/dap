@@ -49,6 +49,10 @@ final class ChartConfig {
         String label = text(config, "label", node);
 
         validateColumns(node, type, columns, x, y, series, lat, lng, size, color, label);
+        String facet = text(config, "facet", node);
+        if (facet != null) {
+            NodeSql.column(columns, facet);
+        }
 
         boolean logX = bool(config, "log_x", false, node);
         boolean logY = bool(config, "log_y", false, node);
@@ -75,7 +79,7 @@ final class ChartConfig {
                 bool(config, "grid", true, node),
                 bool(config, "data_labels", false, node),
                 annotations(config, node),
-                text(config, "facet", node),
+                facet,
                 integer(config, "facet_columns", DEFAULT_FACET_COLUMNS, 1, MAX_FACET_COLUMNS, node),
                 lat, lng, size, color, label);
     }

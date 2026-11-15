@@ -101,6 +101,16 @@ class ChartExecutorTest {
         return -1;
     }
 
+    /** Y position of a middle-anchored label, or NaN. */
+    private static double yOfMiddle(String document, String label) {
+        for (Text text : texts(document, MIDDLE_TEXT)) {
+            if (text.label().equals(label)) {
+                return text.y();
+            }
+        }
+        return Double.NaN;
+    }
+
     /** Y position of the first end-anchored (y axis) tick with the given label, or NaN. */
     private static double yOfTick(String document, String label) {
         for (Text text : texts(document, END_TEXT)) {
@@ -363,6 +373,66 @@ class ChartExecutorTest {
                 () -> svg(columns, rows, ",\"type\":\"heatmap\",\"x\":\"region\","
                         + "\"y\":[\"value\"]"));
         assertTrue(noSeries.getMessage().contains("series"), noSeries.getMessage());
+    }
+
+    @Test
+    void facetsSplitTheChartIntoSmallMultiples() throws Exception {
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("region", "Utf8"),
+                ColumnSpec.of("category", "Utf8"),
+                ColumnSpec.of("score", "Float64"));
+        List<Object[]> rows = List.<Object[]>of(
+                new Object[]{"X", "A", 1.0},
+                new Object[]{"X", "B", 2.0},
+                new Object[]{"Y", "A", 3.0},
+                new Object[]{"Y", "C", 4.0});
+        String document = svg(columns, rows, ",\"type\":\"bar\",\"x\":\"category\","
+                + "\"y\":[\"score\"],\"facet\":\"region\",\"title\":\"By region\"");
+        assertTrue(document.contains(">By region</text>"), "shared title: " + document);
+        double x = xOf(document, "X");
+        double y = xOf(document, "Y");
+        assertTrue(x >= 0 && y >= 0, "one panel title per facet value: " + document);
+        assertTrue(x < y, "default layout puts two panels side by side: X=" + x + " Y=" + y);
+        assertEquals(4, count(document, "stroke=\"#333333\" stroke-width=\"1\""),
+                "every panel draws its own axes: " + document);
+
+        String stacked = svg(columns, rows, ",\"type\":\"bar\",\"x\":\"category\","
+                + "\"y\":[\"score\"],\"facet\":\"region\",\"facet_columns\":1");
+        assertEquals(xOf(stacked, "X"), xOf(stacked, "Y"), 0.01,
+                "one column stacks the panels vertically");
+        double firstY = yOfMiddle(stacked, "X");
+        double secondY = yOfMiddle(stacked, "Y");
+        assertTrue(firstY < secondY, "stacked panels: X=" + firstY + " Y=" + secondY);
+
+        IllegalArgumentException unknown = assertThrows(IllegalArgumentException.class,
+                () -> svg(columns, rows, ",\"type\":\"bar\",\"x\":\"category\","
+                        + "\"y\":[\"score\"],\"facet\":\"nope\""));
+        assertTrue(unknown.getMessage().contains("nope"), unknown.getMessage());
+    }
+
+    @Test
+    void facetedPngIsWritten() throws Exception {
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("region", "Utf8"),
+                ColumnSpec.of("category", "Utf8"),
+                ColumnSpec.of("score", "Float64"));
+        List<Object[]> rows = List.<Object[]>of(
+                new Object[]{"X", "A", 1.0},
+                new Object[]{"Y", "A", 3.0});
+        Path file = dir.resolve("facet.png");
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            LazyPlan input = NodeTestSupport.table(db, columns, rows);
+            NodeContext context = NodeTestSupport.context(db, job, config(file,
+                    ",\"format\":\"png\",\"type\":\"bar\",\"x\":\"category\",\"y\":[\"score\"],"
+                            + "\"facet\":\"region\",\"width\":320,\"height\":240"));
+            new ChartExecutor().execute(context, List.of(input));
+        }
+        byte[] bytes = Files.readAllBytes(file);
+        assertTrue(bytes.length > 1000, "faceted PNG is not empty");
+        assertEquals((byte) 0x89, bytes[0]);
+        BufferedImage image = ImageIO.read(file.toFile());
+        assertEquals(320, image.getWidth());
+        assertEquals(240, image.getHeight());
     }
 
     @Test
