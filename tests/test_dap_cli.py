@@ -16,9 +16,13 @@ import json
 import os
 import pathlib
 import re
+import shutil
+import socket
 import tempfile
 import threading
+import time
 import unittest
+import urllib.request
 from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -174,6 +178,51 @@ def start_fake_engine():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
+
+
+
+JAR = ROOT / "engine-native" / "target" / "dap-native.jar"
+DEFAULT_JAVA_HOME = pathlib.Path.home() / "Projects" / "tools" / "jdk-21.0.13+9" / "Contents" / "Home"
+
+
+def java_home():
+    for candidate in (
+        os.environ.get("JAVA_HOME"),
+        os.environ.get("DAP_JDK"),
+        str(DEFAULT_JAVA_HOME),
+    ):
+        if candidate and (pathlib.Path(candidate) / "bin" / "java").is_file():
+            return str(candidate)
+    return ""
+
+
+def free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+def engine_healthy(port):
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/v1/health", timeout=2) as response:
+            return response.status == 200
+    except OSError:
+        return False
+
+
+def shutdown_engine(port):
+    try:
+        request = urllib.request.Request(f"http://127.0.0.1:{port}/v1/shutdown", method="POST")
+        urllib.request.urlopen(request, timeout=5).close()
+    except OSError:
+        pass
+
+
+def wait_engine_stopped(port, timeout=15.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and engine_healthy(port):
+        time.sleep(0.2)
+    return not engine_healthy(port)
 
 SIBLING_CONFIG = "mcp_servers:\n  other:\n    command: other\n"
 
@@ -437,4 +486,54 @@ class DoctorTest(unittest.TestCase):
         cli = load_cli()
         adapter = cli._load_adapter()
         self.assertEqual(cli.MIN_TOOLS, len(adapter.TOOLS))
+
+@unittest.skipUnless(JAR.is_file(), "dap-native.jar not built")
+@unittest.skipUnless(java_home(), "JDK 21 not found")
+class DoctorStartsEngineTest(unittest.TestCase):
+    """A fresh install: no engine running, doctor must start it through the adapter."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(prefix="dap-doctor-engine-")
+        self.addCleanup(self._tmp.cleanup)
+        self.home = pathlib.Path(self._tmp.name)
+        adapter = self.home / "adapters" / "mcp" / "dap_mcp.py"
+        adapter.parent.mkdir(parents=True)
+        shutil.copyfile(ROOT / "adapters" / "mcp" / "dap_mcp.py", adapter)
+        jar = self.home / "engine-native" / "target" / "dap-native.jar"
+        jar.parent.mkdir(parents=True)
+        jar.symlink_to(JAR)
+        config = self.home / ".hermes" / "config.yaml"
+        config.parent.mkdir(parents=True)
+        config.write_text("mcp_servers:\n  dap:\n    command: python3\n", encoding="utf-8")
+        self.port = free_port()
+        patched = mock.patch.dict(
+            os.environ,
+            {
+                "HOME": str(self.home),
+                "DAP_HOME": str(self.home),
+                "DAP_PORT": str(self.port),
+                "JAVA_HOME": java_home(),
+            },
+        )
+        patched.start()
+        self.addCleanup(wait_engine_stopped, self.port)
+        self.addCleanup(shutdown_engine, self.port)
+        self.addCleanup(patched.stop)
+
+    def doctor(self):
+        return run_cli(["doctor", "--client", "hermes", "--home", str(self.home)])
+
+    def test_doctor_starts_engine_and_second_run_is_fast(self):
+        self.assertFalse(engine_healthy(self.port))
+        code, out, err = self.doctor()
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("started by doctor", out)
+        self.assertTrue(engine_healthy(self.port))
+        started = time.monotonic()
+        code, out, err = self.doctor()
+        elapsed = time.monotonic() - started
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("healthy at", out)
+        self.assertLess(elapsed, 10.0)
+
 

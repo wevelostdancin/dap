@@ -33,6 +33,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 
@@ -48,6 +49,7 @@ CLIENT_CONFIGS = {
 # recipes stage lands. test_min_tools_matches_declared_tools keeps this honest.
 MIN_TOOLS = 22
 PREFLIGHT_TIMEOUT = 10.0
+ENGINE_START_TIMEOUT = 60.0
 PROTOCOL_VERSION = "2024-11-05"
 
 Check = collections.namedtuple("Check", "name ok detail")
@@ -281,15 +283,91 @@ def _check_jar(home: pathlib.Path) -> Check:
     return Check("jar", False, f"missing {jar} (run make build-native)")
 
 
-def _check_engine() -> Check:
+def _check_engine(home: pathlib.Path) -> Check:
     port = _port()
     if _engine_healthy():
         return Check("engine", True, f"healthy at 127.0.0.1:{port}")
-    return Check(
-        "engine",
-        False,
-        f"no /v1/health at 127.0.0.1:{port}; run make run-native or let the adapter start it",
+    started, detail = _start_engine(home)
+    if started:
+        return Check("engine", True, f"{detail} at 127.0.0.1:{port}")
+    return Check("engine", False, detail)
+
+
+def _adapter_stderr(stream) -> str:
+    try:
+        stream.seek(0)
+        return stream.read().strip()[-1500:]
+    except (OSError, ValueError):
+        return ""
+
+
+def _start_engine(home: pathlib.Path, timeout: float = ENGINE_START_TIMEOUT):
+    """Start the engine the way the first tool call would; return (ok, detail).
+
+    Spawns the adapter, runs initialize and one tools/call (dap_search_nodes),
+    which triggers the adapter's ensure_service(), then stops the adapter. The
+    engine it started keeps running for the next real call.
+    """
+    adapter = pathlib.Path(_adapter_path(home))
+    if not adapter.is_file():
+        return False, f"adapter not found: {adapter}"
+    environment = dict(os.environ, DAP_HOME=str(home))
+    stderr = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
+    process = subprocess.Popen(
+        [_python(), str(adapter)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=stderr,
+        cwd=str(home),
+        env=environment,
+        text=True,
+        bufsize=1,
     )
+    deadline = time.monotonic() + timeout
+    error = ""
+    try:
+        _send(
+            process,
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": PROTOCOL_VERSION,
+                    "capabilities": {},
+                    "clientInfo": {"name": "dap-mcp-doctor", "version": _read_version(home)},
+                },
+            },
+        )
+        _read_reply(process, 1, min(deadline, time.monotonic() + PREFLIGHT_TIMEOUT))
+        _send(process, {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
+        _send(
+            process,
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {"name": "dap_search_nodes", "arguments": {}},
+            },
+        )
+        _read_reply(process, 2, deadline)
+    except Exception as exc:  # noqa: BLE001 - every failure is a failed check
+        error = f"{type(exc).__name__}: {exc}"
+    finally:
+        _stop_process(process)
+        tail = _adapter_stderr(stderr)
+        stderr.close()
+    if error:
+        detail = f"cannot start engine: {error}"
+        if tail:
+            detail = f"{detail}; adapter stderr: {tail}"
+        return False, detail
+    if _engine_healthy():
+        return True, "started by doctor"
+    detail = "adapter returned but /v1/health is still down"
+    if tail:
+        detail = f"{detail}; adapter stderr: {tail}"
+    return False, detail
 
 
 def _check_port() -> Check:
@@ -439,7 +517,7 @@ def doctor(client: str | None, home: pathlib.Path) -> list:
     return [
         _check_python(),
         _check_jar(home),
-        _check_engine(),
+        _check_engine(home),
         _check_preflight(home),
         _check_config(client),
         _check_port(),

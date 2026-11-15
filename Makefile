@@ -68,7 +68,11 @@ dist: build-native
 	cp adapters/mcp/*.py adapters/mcp/README.md $(DIST)/adapters/mcp/
 	cp scripts/dap-mcp $(DIST)/scripts/
 	cp VERSION $(DIST)/
-	cd $(DIST) && find . -type f ! -name SHA256SUMS | LC_ALL=C sort | xargs shasum -a 256 > SHA256SUMS
+	@cd $(DIST) && if command -v shasum >/dev/null 2>&1; then \
+		find . -type f ! -name SHA256SUMS | LC_ALL=C sort | xargs shasum -a 256 > SHA256SUMS; \
+	else \
+		find . -type f ! -name SHA256SUMS | LC_ALL=C sort | xargs sha256sum > SHA256SUMS; \
+	fi
 	@echo "dist: $(DIST)/"
 
 install-e2e: dist

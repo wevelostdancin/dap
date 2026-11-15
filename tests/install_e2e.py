@@ -16,9 +16,12 @@ import importlib.util
 import os
 import pathlib
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 FAILURES: list[str] = []
@@ -39,6 +42,72 @@ def load_cli(dist: pathlib.Path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def resolve_java_home() -> str:
+    candidates = [
+        os.environ.get("JAVA_HOME"),
+        os.environ.get("DAP_JDK"),
+        str(pathlib.Path.home() / "Projects" / "tools" / "jdk-21.0.13+9" / "Contents" / "Home"),
+    ]
+    for candidate in candidates:
+        if candidate and (pathlib.Path(candidate) / "bin" / "java").is_file():
+            return str(candidate)
+    return ""
+
+
+def free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+def engine_healthy(port: int) -> bool:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/v1/health", timeout=2) as response:
+            return response.status == 200
+    except OSError:
+        return False
+
+
+def shutdown_engine(port: int) -> None:
+    try:
+        request = urllib.request.Request(f"http://127.0.0.1:{port}/v1/shutdown", method="POST")
+        urllib.request.urlopen(request, timeout=5).close()
+    except OSError:
+        pass
+
+
+def wait_engine_stopped(port: int, timeout: float = 15.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and engine_healthy(port):
+        time.sleep(0.2)
+    return not engine_healthy(port)
+
+
+def run_doctor(cli_path: pathlib.Path, dist: pathlib.Path, env: dict):
+    return subprocess.run(
+        [
+            sys.executable,
+            str(cli_path),
+            "doctor",
+            "--client",
+            "hermes",
+            "--home",
+            str(dist),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=180,
+    )
+
+
+def tail(result) -> str:
+    lines = (result.stdout or "").strip().splitlines()
+    if lines:
+        return lines[-1]
+    return (result.stderr or "").strip()
 
 
 def run_install(cli_path: pathlib.Path, client: str, dist: pathlib.Path, env: dict):
@@ -119,6 +188,26 @@ def main(argv=None) -> int:
                 count >= cli.MIN_TOOLS,
                 f"tools/list returned {count} tools (need >= {cli.MIN_TOOLS})",
             )
+
+        java_home = resolve_java_home()
+        check("java home", bool(java_home), java_home or "set JAVA_HOME or DAP_JDK")
+        port = free_port()
+        environment["DAP_PORT"] = str(port)
+        if java_home:
+            environment["JAVA_HOME"] = java_home
+        try:
+            if java_home and not engine_healthy(port):
+                fresh = run_doctor(cli_path, dist, environment)
+                check("doctor fresh install", fresh.returncode == 0, tail(fresh))
+                check("engine started by doctor", engine_healthy(port), f"port {port}")
+                live = run_doctor(cli_path, dist, environment)
+                check("doctor live engine", live.returncode == 0, tail(live))
+            elif java_home:
+                live = run_doctor(cli_path, dist, environment)
+                check("doctor live engine", live.returncode == 0, tail(live))
+        finally:
+            shutdown_engine(port)
+            check("engine stopped", wait_engine_stopped(port))
 
     print()
     if FAILURES:
