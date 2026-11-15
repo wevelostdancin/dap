@@ -71,7 +71,8 @@ class NodeRegistryTest {
             "dap.db_writer",
             "dap.text_normalize",
             "dap.fuzzy_join",
-            "dap.geo_distance");
+            "dap.geo_distance",
+            "dap.calendar");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -284,7 +285,7 @@ class NodeRegistryTest {
     @Test
     void limitCapsTheResultInNameOrder() {
         assertEquals(ALL_IDS.size(), registry.search(null, null, -1).size());
-        assertEquals(List.of("Binner", "Chart", "Column Filter"),
+        assertEquals(List.of("Binner", "Calendar", "Chart"),
                 registry.search(null, null, 3).stream().map(NodeSpec::name).toList());
         assertTrue(registry.search(null, null, 0).isEmpty());
     }

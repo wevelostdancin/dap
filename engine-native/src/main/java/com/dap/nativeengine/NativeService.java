@@ -14,6 +14,7 @@ import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.nodes.BinnerExecutor;
+import com.dap.nativeengine.nodes.CalendarExecutor;
 import com.dap.nativeengine.nodes.ChartExecutor;
 import com.dap.nativeengine.nodes.ColumnResorterExecutor;
 import com.dap.nativeengine.nodes.ConcatenateExecutor;
@@ -717,7 +718,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new DbWriterExecutor())
                 .register(new TextNormalizeExecutor())
                 .register(new FuzzyJoinExecutor())
-                .register(new GeoDistanceExecutor());
+                .register(new GeoDistanceExecutor())
+                .register(new CalendarExecutor());
     }
 
     /**

@@ -1,0 +1,78 @@
+{
+  "id": "dap.calendar",
+  "name": "Calendar",
+  "category": "/Manipulation/Column/Date",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Adds timezone-aware calendar features of a date or timestamp column: year, quarter, month, week, day of month, day of week (0 = Sunday), day of year, is_weekend and is_holiday. A timestamp column is treated as UTC and converted to the requested timezone before the date parts are taken; a date column has no time of day. 'holidays' is a list of ISO dates and 'holiday_column' names the boolean flag. The original columns are kept.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Calendar configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Date column",
+        "description": "Date or timestamp column to derive the features from."
+      },
+      "timezone": {
+        "type": "string",
+        "title": "Timezone",
+        "description": "IANA timezone such as Europe/Moscow; timestamp columns are converted from UTC.",
+        "placeholder": "Europe/Moscow"
+      },
+      "features": {
+        "type": "array",
+        "title": "Features",
+        "description": "Calendar features to add; all except is_holiday by default.",
+        "items": {
+          "type": "string",
+          "enum": [
+            "year",
+            "quarter",
+            "month",
+            "week",
+            "day",
+            "dow",
+            "doy",
+            "is_weekend",
+            "is_holiday"
+          ]
+        }
+      },
+      "holidays": {
+        "type": "array",
+        "title": "Holidays",
+        "description": "ISO dates (yyyy-MM-dd) that count as holidays.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "holiday_column": {
+        "type": "string",
+        "title": "Holiday column",
+        "description": "Name of the is_holiday flag; defaults to <column>_is_holiday."
+      }
+    },
+    "required": [
+      "column"
+    ]
+  }
+}
