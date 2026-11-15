@@ -766,6 +766,7 @@ def handle(msg: dict) -> None:
                 "capabilities": {
                     "tools": {"listChanged": False},
                     "resources": {"listChanged": False},
+                    "prompts": {"listChanged": False},
                 },
                 "serverInfo": {"name": "dap-mcp", "version": "1.0.0"},
             },
@@ -774,6 +775,31 @@ def handle(msg: dict) -> None:
 
     if method == "ping":
         respond(msg_id, {})
+        return
+
+    if method == "prompts/list":
+        respond(msg_id, {"prompts": RESOURCES.list_prompts()})
+        return
+
+    if method == "prompts/get":
+        name = params.get("name")
+        if not isinstance(name, str) or not name.strip():
+            fail(msg_id, -32602, "prompts/get: 'name' is required")
+            return
+        try:
+            prompt = RESOURCES.render_prompt(name, params.get("arguments"))
+        except RESOURCES.PromptError as e:
+            fail(msg_id, -32602, str(e), e.data)
+            return
+        respond(
+            msg_id,
+            {
+                "description": prompt["description"],
+                "messages": [
+                    {"role": "user", "content": {"type": "text", "text": prompt["text"]}}
+                ],
+            },
+        )
         return
 
     if method == "resources/list":
