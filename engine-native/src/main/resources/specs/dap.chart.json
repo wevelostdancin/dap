@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Renders a bar, line, scatter, histogram, pie, boxplot, heatmap or world map chart from the input table and passes the table through unchanged. A visible title, subtitle, axis labels and units are drawn on the canvas; axes get 5% headroom, bars start at 0 and sort by value by default. SVG is hand-written XML with rounded coordinates and no timestamps, so the same input produces byte-identical output; PNG is drawn with Java2D in headless mode.",
+  "description": "Renders a bar, line, scatter, histogram, pie, boxplot or heatmap chart from the input table and passes the table through unchanged. A visible title, subtitle, axis labels and units are drawn on the canvas; axes get 5% headroom, bars start at 0 and sort by value by default. Pie slices show shares with percentages, boxplots draw quartiles with whiskers and outliers, heatmaps aggregate means per cell with a colour legend. SVG is hand-written XML with rounded coordinates and no timestamps, so the same input produces byte-identical output; PNG is drawn with Java2D in headless mode.",
   "inPorts": [
     {
       "index": 0,
@@ -50,9 +50,12 @@
           "bar",
           "line",
           "scatter",
-          "histogram"
+          "histogram",
+          "pie",
+          "boxplot",
+          "heatmap"
         ],
-        "description": "bar - summed values per category; line/scatter - points over a numeric x; histogram - distribution of the x column."
+        "description": "bar - summed values per category; line/scatter - points over a numeric x; histogram - distribution of the x column; pie - shares of one y column per category; boxplot - quartiles and outliers of one y column per category; heatmap - mean of one y column per x/series cell."
       },
       "x": {
         "type": "string",
@@ -66,12 +69,12 @@
           "type": "string",
           "title": "Column"
         },
-        "description": "Numeric value columns. bar takes exactly one; line and scatter take one or more (one series each); histogram takes none."
+        "description": "Numeric value columns. bar, pie, boxplot and heatmap take exactly one; line and scatter take one or more (one series each); histogram takes none."
       },
       "series": {
         "type": "string",
         "title": "Series column",
-        "description": "Optional column that splits values into series (one bar group, line or point colour per value); with series, y must contain exactly one column."
+        "description": "Column that splits values into series: one bar group, line or point colour per value, or the heatmap row axis. bar/line/scatter take at most one y column with series; heatmap requires it."
       },
       "title": {
         "type": "string",

@@ -281,6 +281,126 @@ class ChartExecutorTest {
     }
 
     @Test
+    void pieDrawsSlicesLegendAndPercentages() throws Exception {
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("category", "Utf8"),
+                ColumnSpec.of("score", "Float64"));
+        List<Object[]> rows = List.<Object[]>of(
+                new Object[]{"A", 1.0},
+                new Object[]{"B", 3.0});
+        String document = svg(columns, rows, ",\"type\":\"pie\",\"x\":\"category\","
+                + "\"y\":[\"score\"],\"title\":\"Share\"");
+        assertEquals(2, count(document, "<path "), "one arc per slice");
+        assertTrue(document.contains(">B 75.0%</text>"), document);
+        assertTrue(document.contains(">A 25.0%</text>"), document);
+        assertTrue(document.indexOf("B 75.0%") < document.indexOf("A 25.0%"),
+                "slices and legend sort by value, largest first");
+
+        String labelled = svg(columns, rows, ",\"type\":\"pie\",\"x\":\"category\","
+                + "\"y\":[\"score\"],\"data_labels\":true");
+        assertEquals(4, count(labelled, "%"), "percentages on the slices and in the legend");
+
+        IllegalArgumentException negative = assertThrows(IllegalArgumentException.class,
+                () -> svg(columns, List.<Object[]>of(new Object[]{"A", -1.0}),
+                        ",\"type\":\"pie\",\"x\":\"category\",\"y\":[\"score\"]"));
+        assertTrue(negative.getMessage().contains("pie"), negative.getMessage());
+
+        IllegalArgumentException empty = assertThrows(IllegalArgumentException.class,
+                () -> svg(columns, List.<Object[]>of(new Object[]{"A", null}),
+                        ",\"type\":\"pie\",\"x\":\"category\",\"y\":[\"score\"]"));
+        assertTrue(empty.getMessage().contains("pie"), empty.getMessage());
+    }
+
+    @Test
+    void boxplotDrawsQuartilesWhiskersAndOutliers() throws Exception {
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("category", "Utf8"),
+                ColumnSpec.of("score", "Float64"));
+        List<Object[]> rows = new ArrayList<>();
+        for (double value : new double[]{1, 2, 3, 4, 5}) {
+            rows.add(new Object[]{"A", value});
+        }
+        for (double value : new double[]{1, 2, 3, 4, 100}) {
+            rows.add(new Object[]{"B", value});
+        }
+        String document = svg(columns, rows, ",\"type\":\"boxplot\",\"x\":\"category\","
+                + "\"y\":[\"score\"]");
+        assertEquals(2, count(document, "fill=\"#1f77b4\""), "one box per category");
+        assertEquals(1, count(document, "<circle "), "100 is an outlier of category B");
+        assertTrue(document.contains(">A</text>") && document.contains(">B</text>"), document);
+
+        String empty = svg(columns, List.<Object[]>of(new Object[]{"A", null}),
+                ",\"type\":\"boxplot\",\"x\":\"category\",\"y\":[\"score\"]");
+        assertTrue(empty.endsWith("</svg>\n"), "an empty boxplot still writes a valid SVG");
+        assertEquals(0, count(empty, "fill=\"#1f77b4\""), empty);
+    }
+
+    @Test
+    void heatmapAggregatesMeansAndDrawsAColorLegend() throws Exception {
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("region", "Utf8"),
+                ColumnSpec.of("month", "Utf8"),
+                ColumnSpec.of("value", "Float64"));
+        List<Object[]> rows = List.<Object[]>of(
+                new Object[]{"N", "Jan", 1.0},
+                new Object[]{"N", "Jan", 4.0},
+                new Object[]{"N", "Feb", 4.25},
+                new Object[]{"S", "Jan", 6.0},
+                new Object[]{"S", "Feb", 8.75});
+        String document = svg(columns, rows, ",\"type\":\"heatmap\",\"x\":\"region\","
+                + "\"series\":\"month\",\"y\":[\"value\"],\"data_labels\":true");
+        assertTrue(document.contains(">2.5</text>"), "cell value is the mean of 1 and 4: " + document);
+        assertTrue(document.contains(">8.75</text>"), "legend and cell show the maximum");
+        assertTrue(document.contains(">Jan</text>") && document.contains(">Feb</text>"), document);
+        assertTrue(document.contains(">N</text>") && document.contains(">S</text>"), document);
+
+        String empty = svg(columns, List.<Object[]>of(new Object[]{"N", "Jan", null}),
+                ",\"type\":\"heatmap\",\"x\":\"region\",\"series\":\"month\","
+                        + "\"y\":[\"value\"]");
+        assertTrue(empty.endsWith("</svg>\n"), empty);
+
+        IllegalArgumentException noSeries = assertThrows(IllegalArgumentException.class,
+                () -> svg(columns, rows, ",\"type\":\"heatmap\",\"x\":\"region\","
+                        + "\"y\":[\"value\"]"));
+        assertTrue(noSeries.getMessage().contains("series"), noSeries.getMessage());
+    }
+
+    @Test
+    void newChartTypesRenderPng() throws Exception {
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("category", "Utf8"),
+                ColumnSpec.of("series", "Utf8"),
+                ColumnSpec.of("score", "Float64"));
+        List<Object[]> rows = List.<Object[]>of(
+                new Object[]{"A", "X", 1.0},
+                new Object[]{"B", "X", 2.0},
+                new Object[]{"A", "Y", 3.0});
+        for (String type : List.of("pie", "boxplot", "heatmap")) {
+            Path file = dir.resolve("type-" + type + ".png");
+            String extra = switch (type) {
+                case "heatmap" -> ",\"format\":\"png\",\"type\":\"heatmap\","
+                        + "\"x\":\"category\",\"series\":\"series\",\"y\":[\"score\"],"
+                        + "\"width\":320,\"height\":240";
+                default -> ",\"format\":\"png\",\"type\":\"" + type + "\","
+                        + "\"x\":\"category\",\"y\":[\"score\"],"
+                        + "\"width\":320,\"height\":240";
+            };
+            try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+                LazyPlan input = NodeTestSupport.table(db, columns, rows);
+                NodeContext context = NodeTestSupport.context(db, job, config(file, extra));
+                new ChartExecutor().execute(context, List.of(input));
+            }
+            assertTrue(Files.isRegularFile(file), file.toString());
+            byte[] bytes = Files.readAllBytes(file);
+            assertTrue(bytes.length > 1000, type + " PNG is not empty");
+            assertEquals((byte) 0x89, bytes[0]);
+            BufferedImage image = ImageIO.read(file.toFile());
+            assertEquals(320, image.getWidth());
+            assertEquals(240, image.getHeight());
+        }
+    }
+
+    @Test
     void pngIsWrittenWithTheRequestedSize() throws Exception {
         Path file = dir.resolve("chart.png");
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {

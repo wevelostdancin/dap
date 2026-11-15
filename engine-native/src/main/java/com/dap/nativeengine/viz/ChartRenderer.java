@@ -22,6 +22,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.ToDoubleFunction;
 
 /**
@@ -150,6 +151,9 @@ public final class ChartRenderer {
             case "bar" -> bar(spec, columns, rows, body, shapes);
             case "line", "scatter" -> points(spec, columns, rows, body, shapes);
             case "histogram" -> histogram(spec, columns, rows, body, shapes);
+            case "pie" -> pie(spec, columns, rows, body, shapes);
+            case "boxplot" -> boxplot(spec, columns, rows, body, shapes);
+            case "heatmap" -> heatmap(spec, columns, rows, body, shapes);
             default -> throw new IllegalArgumentException("chart: unsupported type '" + spec.type()
                     + "'");
         }
@@ -190,8 +194,8 @@ public final class ChartRenderer {
         return new Plot(frame.left() + left, frame.top() + top, width, height);
     }
 
-    /** One numeric axis: raw data bounds plus an optional log10 transform. */
-    private record Axis(double min, double max, boolean log) {
+    /** One numeric axis: raw data bounds, an optional log10 transform and the tick step. */
+    private record Axis(double min, double max, boolean log, double step) {
         double t(double value) {
             return log ? Math.log10(value) : value;
         }
@@ -212,19 +216,38 @@ public final class ChartRenderer {
             max = min + 1;
         }
         double span = max - min;
+        double lower = min;
+        double upper = max;
         if (includeZero && dataMin >= 0) {
             // Bars start at 0, so only the top needs 5% headroom above the tallest bar.
-            return new Axis(min, max + span * 0.05, false);
+            upper = max + span * 0.05;
+        } else {
+            lower = min - span * 0.05;
+            upper = max + span * 0.05;
         }
-        return new Axis(min - span * 0.05, max + span * 0.05, false);
+        return snapped(lower, upper, dataMin >= 0);
     }
 
     private static Axis paddedAxis(double dataMin, double dataMax) {
         if (dataMax - dataMin < 1e-12) {
-            return new Axis(dataMin - 1, dataMax + 1, false);
+            dataMin -= 1;
+            dataMax += 1;
         }
         double pad = (dataMax - dataMin) * 0.05;
-        return new Axis(dataMin - pad, dataMax + pad, false);
+        return snapped(dataMin - pad, dataMax + pad, dataMin >= 0);
+    }
+
+    /**
+     * Widen a padded domain to whole tick steps: ticks then land inside the plot and the top
+     * tick is always above the largest value (the headroom is never lost to tick rounding).
+     */
+    private static Axis snapped(double lower, double upper, boolean keepNonNegative) {
+        double step = niceStep((upper - lower) / Y_TICKS);
+        double min = Math.floor(lower / step + 1e-9) * step;
+        if (keepNonNegative && min < 0) {
+            min = 0;
+        }
+        return new Axis(min, Math.ceil(upper / step - 1e-9) * step, false, step);
     }
 
     private static Axis logAxis(double dataMin, double dataMax, String axisName, String column) {
@@ -240,7 +263,7 @@ public final class ChartRenderer {
             high += 0.5;
         }
         double pad = (high - low) * 0.05;
-        return new Axis(Math.pow(10, low - pad), Math.pow(10, high + pad), true);
+        return new Axis(Math.pow(10, low - pad), Math.pow(10, high + pad), true, 0);
     }
 
     private static Axis valueAxis(ChartSpec spec, double dataMin, double dataMax,
@@ -254,16 +277,17 @@ public final class ChartRenderer {
             return logTicks(axis);
         }
         double span = axis.max() - axis.min();
-        double step = niceStep(span / Y_TICKS);
-        double first = Math.floor(axis.min() / step + 1e-9) * step;
-        double last = Math.ceil(axis.max() / step - 1e-9) * step;
+        double step = axis.step();
+        double first = Math.ceil(axis.min() / step - 1e-9) * step;
+        double last = Math.floor(axis.max() / step + 1e-9) * step;
         List<Double> values = new ArrayList<>();
         for (int index = 0; index < 200; index++) {
             double value = first + step * index;
             if (value > last + step * 1e-9) {
                 break;
             }
-            values.add(Math.abs(value) < step * 1e-9 ? 0 : value);
+            double rounded = Math.round(value / step) * step;
+            values.add(Math.abs(rounded) < step * 1e-9 ? 0 : rounded);
         }
         if (values.size() < 2) {
             values.clear();
@@ -630,6 +654,294 @@ public final class ChartRenderer {
         }
         axisTitles(shapes, spec, plot);
         annotations(shapes, spec, plot, null, yAxis, null);
+    }
+
+    // ------------------------------------------------------------------ pie
+
+    private static void pie(ChartSpec spec, List<ColumnSpec> columns, List<List<String>> rows,
+                            Frame frame, List<Shape> shapes) {
+        int xIndex = indexOf(columns, spec.x());
+        int yIndex = indexOf(columns, spec.y().get(0));
+        Map<String, Double> sums = new LinkedHashMap<>();
+        for (List<String> row : rows) {
+            Double value = number(cell(row, yIndex));
+            if (value == null) {
+                continue;
+            }
+            if (value < 0) {
+                throw new IllegalArgumentException("chart: pie requires non-negative values, column '"
+                        + spec.y().get(0) + "' contains " + format(value));
+            }
+            sums.merge(cell(row, xIndex), value, Double::sum);
+        }
+        List<String> categories = order(spec, new ArrayList<>(sums.keySet()),
+                category -> sums.get(category));
+        double total = 0;
+        for (double value : sums.values()) {
+            total += value;
+        }
+        if (total <= 0) {
+            throw new IllegalArgumentException("chart: pie requires a positive total, got "
+                    + format(total));
+        }
+        Plot plot = plot(frame, false, false, false, 0);
+        double pieWidth = plot.width() * 0.58;
+        double radius = Math.max(8, Math.min(pieWidth, plot.height()) / 2 - 6);
+        double cx = plot.left() + pieWidth / 2;
+        double cy = plot.top() + plot.height() / 2;
+        double angle = 0;
+        for (int index = 0; index < categories.size(); index++) {
+            String category = categories.get(index);
+            double share = sums.get(category) / total;
+            double end = angle + share * 360;
+            String colour = PALETTE[index % PALETTE.length];
+            if (end - angle >= 359.999) {
+                shapes.add(new Shape.Circle(cx, cy, radius, colour));
+            } else {
+                shapes.add(new Shape.Arc(cx, cy, radius, angle, end, colour));
+            }
+            if (spec.dataLabels() && share >= 0.03) {
+                double middle = Math.toRadians((angle + end) / 2);
+                shapes.add(new Shape.Label(cx + radius * 0.62 * Math.sin(middle),
+                        cy - radius * 0.62 * Math.cos(middle) + 4, percent(share), "middle",
+                        DATA_LABEL_SIZE, "#ffffff"));
+            }
+            angle = end;
+        }
+        double legendX = plot.left() + pieWidth + 16;
+        double legendTop = plot.top() + 20;
+        for (int index = 0; index < categories.size(); index++) {
+            String category = categories.get(index);
+            shapes.add(new Shape.Rect(legendX, legendTop - 9 + index * 20, 10, 10,
+                    PALETTE[index % PALETTE.length]));
+            shapes.add(new Shape.Label(legendX + 14, legendTop + index * 20,
+                    category + " " + percent(sums.get(category) / total), "start", LEGEND_SIZE,
+                    TEXT));
+        }
+        annotations(shapes, spec, plot, null, null, categories);
+    }
+
+    private static String percent(double share) {
+        return String.format(Locale.ROOT, "%.1f%%", share * 100);
+    }
+
+    // ------------------------------------------------------------------ boxplot
+
+    private record Box(double q1, double median, double q3, double low, double high,
+                       List<Double> outliers) {
+    }
+
+    private static void boxplot(ChartSpec spec, List<ColumnSpec> columns, List<List<String>> rows,
+                                Frame frame, List<Shape> shapes) {
+        int xIndex = indexOf(columns, spec.x());
+        int yIndex = indexOf(columns, spec.y().get(0));
+        Map<String, List<Double>> groups = new LinkedHashMap<>();
+        for (List<String> row : rows) {
+            Double value = number(cell(row, yIndex));
+            if (value == null) {
+                continue;
+            }
+            groups.computeIfAbsent(cell(row, xIndex), key -> new ArrayList<>()).add(value);
+        }
+        List<String> categories = order(spec, new ArrayList<>(groups.keySet()),
+                category -> median(groups.get(category)));
+        Map<String, Box> boxes = new LinkedHashMap<>();
+        double dataMin = Double.POSITIVE_INFINITY;
+        double dataMax = Double.NEGATIVE_INFINITY;
+        for (String category : categories) {
+            boxes.put(category, box(groups.get(category)));
+            for (double value : groups.get(category)) {
+                dataMin = Math.min(dataMin, value);
+                dataMax = Math.max(dataMax, value);
+            }
+        }
+        if (dataMin > dataMax) {
+            dataMin = 0;
+            dataMax = 1;
+        }
+        Axis yAxis = valueAxis(spec, dataMin, dataMax, false, spec.y().get(0));
+        Plot plot = plot(frame, hasYTitle(spec), hasXTitle(spec), false, 0);
+        yTicks(shapes, plot, yAxis, spec.grid());
+        axes(shapes, plot);
+        double slot = categories.isEmpty() ? plot.width() : plot.width() / categories.size();
+        double boxWidth = Math.min(60, slot * 0.5);
+        int step = categoryStep(categories.size());
+        for (int index = 0; index < categories.size(); index++) {
+            String category = categories.get(index);
+            Box box = boxes.get(category);
+            double centre = plot.left() + slot * (index + 0.5);
+            if (index % step == 0) {
+                shapes.add(new Shape.Label(centre, plot.bottom() + 16, category, "middle",
+                        TICK_SIZE, TEXT));
+            }
+            double yQ1 = plot.py(1 - yAxis.fraction(box.q1()));
+            double yQ3 = plot.py(1 - yAxis.fraction(box.q3()));
+            double yMedian = plot.py(1 - yAxis.fraction(box.median()));
+            double yLow = plot.py(1 - yAxis.fraction(box.low()));
+            double yHigh = plot.py(1 - yAxis.fraction(box.high()));
+            shapes.add(new Shape.Rect(centre - boxWidth / 2, yQ3, boxWidth,
+                    Math.max(1, yQ1 - yQ3), PALETTE[0]));
+            shapes.add(new Shape.Line(centre - boxWidth / 2, yMedian, centre + boxWidth / 2,
+                    yMedian, AXIS, 2));
+            shapes.add(new Shape.Line(centre, yQ1, centre, yLow, AXIS, 1));
+            shapes.add(new Shape.Line(centre, yQ3, centre, yHigh, AXIS, 1));
+            double cap = boxWidth * 0.25;
+            shapes.add(new Shape.Line(centre - cap, yLow, centre + cap, yLow, AXIS, 1));
+            shapes.add(new Shape.Line(centre - cap, yHigh, centre + cap, yHigh, AXIS, 1));
+            for (double outlier : box.outliers()) {
+                shapes.add(new Shape.Circle(centre, plot.py(1 - yAxis.fraction(outlier)), 2.5,
+                        TEXT));
+            }
+            if (spec.dataLabels()) {
+                shapes.add(new Shape.Label(centre, yQ3 - 4, format(box.median()), "middle",
+                        DATA_LABEL_SIZE, TEXT));
+            }
+        }
+        axisTitles(shapes, spec, plot);
+        annotations(shapes, spec, plot, null, yAxis, categories);
+    }
+
+    private static Box box(List<Double> values) {
+        List<Double> sorted = new ArrayList<>(values);
+        sorted.sort(Double::compare);
+        double q1 = quantile(sorted, 0.25);
+        double median = quantile(sorted, 0.5);
+        double q3 = quantile(sorted, 0.75);
+        double iqr = q3 - q1;
+        double lowFence = q1 - 1.5 * iqr;
+        double highFence = q3 + 1.5 * iqr;
+        double low = q1;
+        double high = q3;
+        List<Double> outliers = new ArrayList<>();
+        for (double value : sorted) {
+            if (value < lowFence || value > highFence) {
+                outliers.add(value);
+            } else {
+                low = Math.min(low, value);
+                high = Math.max(high, value);
+            }
+        }
+        return new Box(q1, median, q3, low, high, outliers);
+    }
+
+    private static double quantile(List<Double> sorted, double fraction) {
+        if (sorted.isEmpty()) {
+            return 0;
+        }
+        if (sorted.size() == 1) {
+            return sorted.get(0);
+        }
+        double index = fraction * (sorted.size() - 1);
+        int lower = (int) Math.floor(index);
+        int upper = Math.min(sorted.size() - 1, lower + 1);
+        return sorted.get(lower) + (sorted.get(upper) - sorted.get(lower)) * (index - lower);
+    }
+
+    private static double median(List<Double> values) {
+        List<Double> sorted = new ArrayList<>(values);
+        sorted.sort(Double::compare);
+        return quantile(sorted, 0.5);
+    }
+
+    // ------------------------------------------------------------------ heatmap
+
+    private static void heatmap(ChartSpec spec, List<ColumnSpec> columns, List<List<String>> rows,
+                                Frame frame, List<Shape> shapes) {
+        int xIndex = indexOf(columns, spec.x());
+        int seriesIndex = indexOf(columns, spec.series());
+        int yIndex = indexOf(columns, spec.y().get(0));
+        Map<String, Map<String, double[]>> cells = new LinkedHashMap<>();
+        for (List<String> row : rows) {
+            Double value = number(cell(row, yIndex));
+            if (value == null) {
+                continue;
+            }
+            double[] cell = cells.computeIfAbsent(cell(row, xIndex), key -> new LinkedHashMap<>())
+                    .computeIfAbsent(cell(row, seriesIndex), key -> new double[2]);
+            cell[0] += value;
+            cell[1] += 1;
+        }
+        List<String> xs = order(spec, new ArrayList<>(cells.keySet()), category -> {
+            double total = 0;
+            for (double[] cell : cells.get(category).values()) {
+                total += cell[0] / cell[1];
+            }
+            return total;
+        });
+        Set<String> seriesNames = new LinkedHashSet<>();
+        cells.values().forEach(map -> seriesNames.addAll(map.keySet()));
+        List<String> ys = categoryOrder(seriesNames);
+        double minimum = Double.POSITIVE_INFINITY;
+        double maximum = Double.NEGATIVE_INFINITY;
+        for (Map<String, double[]> map : cells.values()) {
+            for (double[] cell : map.values()) {
+                double mean = cell[0] / cell[1];
+                minimum = Math.min(minimum, mean);
+                maximum = Math.max(maximum, mean);
+            }
+        }
+        if (minimum > maximum) {
+            minimum = 0;
+            maximum = 1;
+        }
+        Plot plot = plot(frame, hasYTitle(spec), hasXTitle(spec), false, 96);
+        double cellWidth = plot.width() / Math.max(1, xs.size());
+        double cellHeight = plot.height() / Math.max(1, ys.size());
+        for (int row = 0; row < ys.size(); row++) {
+            shapes.add(new Shape.Label(plot.left() - 8, plot.top() + cellHeight * (row + 0.5) + 4,
+                    ys.get(row), "end", TICK_SIZE, TEXT));
+            for (int column = 0; column < xs.size(); column++) {
+                double[] cell = cells.get(xs.get(column)).get(ys.get(row));
+                if (cell == null) {
+                    continue;
+                }
+                double mean = cell[0] / cell[1];
+                double fraction = maximum - minimum < 1e-12 ? 0.5
+                        : (mean - minimum) / (maximum - minimum);
+                double x = plot.left() + cellWidth * column + 1;
+                double y = plot.top() + cellHeight * row + 1;
+                shapes.add(new Shape.Rect(x, y, Math.max(1, cellWidth - 2),
+                        Math.max(1, cellHeight - 2), heatColour(fraction)));
+                if (spec.dataLabels()) {
+                    shapes.add(new Shape.Label(x + Math.max(1, cellWidth - 2) / 2,
+                            y + cellHeight / 2 + 4, format(mean), "middle", DATA_LABEL_SIZE,
+                            fraction > 0.55 ? "#ffffff" : TEXT));
+                }
+            }
+        }
+        int step = categoryStep(xs.size());
+        for (int column = 0; column < xs.size(); column++) {
+            if (column % step == 0) {
+                shapes.add(new Shape.Label(plot.left() + cellWidth * (column + 0.5),
+                        plot.bottom() + 16, xs.get(column), "middle", TICK_SIZE, TEXT));
+            }
+        }
+        axes(shapes, plot);
+        axisTitles(shapes, spec, plot);
+        double legendX = plot.right() + 28;
+        double legendHeight = plot.height() * 0.6;
+        int steps = 5;
+        for (int index = 0; index < steps; index++) {
+            double fraction = 1 - (double) index / (steps - 1);
+            shapes.add(new Shape.Rect(legendX, plot.top() + legendHeight * index / steps, 14,
+                    legendHeight / steps, heatColour(fraction)));
+        }
+        shapes.add(new Shape.Label(legendX + 20, plot.top() + 8, format(maximum), "start",
+                TICK_SIZE, TEXT));
+        shapes.add(new Shape.Label(legendX + 20, plot.top() + legendHeight, format(minimum), "start",
+                TICK_SIZE, TEXT));
+        annotations(shapes, spec, plot, null, null, xs);
+    }
+
+    /** Sequential blue scale: light for the minimum, dark for the maximum. */
+    private static String heatColour(double fraction) {
+        double value = Math.max(0, Math.min(1, fraction));
+        int[] low = {232, 241, 251};
+        int[] high = {8, 81, 156};
+        int red = (int) Math.round(low[0] + (high[0] - low[0]) * value);
+        int green = (int) Math.round(low[1] + (high[1] - low[1]) * value);
+        int blue = (int) Math.round(low[2] + (high[2] - low[2]) * value);
+        return String.format(Locale.ROOT, "#%02x%02x%02x", red, green, blue);
     }
 
     // ------------------------------------------------------------------ svg
