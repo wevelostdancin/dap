@@ -97,8 +97,8 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 
 ## Жизненный цикл
 
-1. Первый `tools/call` → адаптер проверяет `GET /v1/health`; если движка нет —
-   запускает jar и ждёт health до 60 с.
+1. Первый `tools/call` (или `resources/read` каталога) → адаптер проверяет
+   `GET /v1/health`; если движка нет — запускает jar и ждёт health до 60 с.
 2. Движок работает, пока есть запросы. После `DAP_IDLE_TIMEOUT_SEC` простоя (и при
    отсутствии активных jobs) он завершается сам.
 3. `dap_shutdown` останавливает движок явно; следующий `tools/call` поднимает его
@@ -108,10 +108,13 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 
 ## Протокол
 
-- `initialize` → `protocolVersion: "2024-11-05"`, `serverInfo.name: "dap-mcp"`;
+- `initialize` → `protocolVersion: "2024-11-05"`, `serverInfo.name: "dap-mcp"`,
+  capabilities `tools`, `resources` и `prompts` (у всех `listChanged: false`);
 - `notifications/initialized` → без ответа;
 - `tools/list` → массив инструментов `dap_*`;
-- `tools/call` → `{"content":[{"type":"text","text":"<json>"}]}`.
+- `tools/call` → `{"content":[{"type":"text","text":"<json>"}]}`;
+- `resources/list` / `resources/read` → каталог узлов и библиотека рецептов;
+- `prompts/list` / `prompts/get` → готовые user-сообщения для типовых анализов.
 
 Ошибки — JSON-RPC `error`:
 
@@ -119,7 +122,7 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 |---|---|
 | `-32000` | движок вернул ошибку (`data.status`, `data.body`) |
 | `-32001` | движок недоступен/упал/не поднялся; `data.log`, `data.tail` |
-| `-32602` | неверные аргументы инструмента |
+| `-32602` | неверные аргументы инструмента; неизвестный URI ресурса, рецепт или промпт; отсутствует обязательный аргумент |
 
 Логи и трассировки — только в stderr, stdout занят протоколом.
 
@@ -132,13 +135,17 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 | граф | `dap_add_node`, `dap_configure_node`, `dap_connect`, `dap_disconnect`, `dap_remove_node` |
 | запуск | `dap_run`, `dap_run_async`, `dap_job_status`, `dap_job_cancel`, `dap_list_jobs` |
 | данные | `dap_get_table`, `dap_profile_table`, `dap_ingest` |
+| рецепты | `dap_recipe_list`, `dap_recipe_save`, `dap_recipe_run` |
+| SQL | `dap_sql` |
 | сервис | `dap_shutdown` |
 
-Всего 22 инструмента, их состав не менялся. Каталог движка — 44 узла `dap.*`:
-`dap_search_nodes` и `dap_node_dialog_schema` видят их все, включая узлы волн P2 и P3
-(`type_cast`, `duplicate_filter`, `pivot`, `window`, `concatenate`, `describe`,
-`value_counts`, `correlation`, `histogram`, `quantile`, `outlier_detect`, `resample`,
-`rolling`, `diff`, `date_range`, `excel_writer`). `dap_ingest`
+Всего 26 инструментов: 22 базовых плюс инструменты рецептов и `dap_sql`. Каталог
+движка — 52 узла `dap.*`: `dap_search_nodes` и `dap_node_dialog_schema` видят их все,
+включая узлы волн P2–P4 (`type_cast`, `duplicate_filter`, `pivot`, `window`,
+`concatenate`, `describe`, `value_counts`, `correlation`, `histogram`, `quantile`,
+`outlier_detect`, `resample`, `rolling`, `diff`, `date_range`, `excel_writer`,
+`sql_query`, `db_reader`, `file_list`, `hypothesis_test`, `linear_regression`,
+`markdown_report`, `chart`, `data_quality`). `dap_ingest`
 один раз конвертирует CSV/Excel/JSON/Parquet в Parquet-кэш и возвращает `path`,
 `rows`, `columns` и `cached`; `path` можно сразу передать в `dap.parquet_reader`
 через `dap_add_node`.
@@ -147,6 +154,99 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 `dap_workflow_create` → `dap_add_node` → `dap_connect` → `dap_run` →
 `dap_get_table`/`dap_profile_table` → `dap_save_workflow`. Для повторяющегося
 файла перед `dap_add_node` вызывается `dap_ingest`.
+
+Для адаптации пайплайна под задачу вместо ручной сборки графа есть три пути:
+`dap_sql` (один read-only SQL по таблице узла), `dap_recipe_run` (сохранённый
+пайплайн с параметрами) и промпты `analyze_csv`/`quality_check`/`profile_report`
+(готовый план в три шага). Сценарий приёмки — ingest, ресурс `dap://recipes`,
+рецепт или `dap_sql` — укладывается в три tool call и проверяется
+`make mcp-recipe-e2e`.
+
+## Ресурсы
+
+Адаптер объявляет capability `resources` и отдаёт три вида URI:
+
+| URI | Содержимое |
+|---|---|
+| `dap://catalog` | JSON каталога: `{"count":52,"nodes":[{"id","name","category","type","tier"}]}` |
+| `dap://recipes` | JSON библиотеки: `{"recipes":[{"name","description","tags","params","dataset"}]}` |
+| `dap://recipes/{name}` | workflow JSON рецепта (`dap-native-workflow/1`) с блоком `recipe` |
+
+`resources/list` возвращает `dap://catalog` и `dap://recipes`; имена рецептов
+берутся из `dap://recipes`. `resources/read` возвращает `contents[0]` с
+`mimeType: application/json`. Чтение `dap://catalog` поднимает движок (как первый
+tool call), библиотека рецептов читается с диска без движка. Неизвестный URI или
+имя рецепта — JSON-RPC `-32602` с `data.uri` / `data.name`.
+
+## Промпты
+
+Адаптер объявляет capability `prompts`; `prompts/list` отдаёт три промпта, а
+`prompts/get` — одно user-сообщение с готовым планом и подставленными аргументами:
+
+| Промпт | Аргументы | Что делает |
+|---|---|---|
+| `analyze_csv` | `path` (обязательный), `question` | ingest → profile → опционально `dap_sql` под вопрос |
+| `quality_check` | `path` | ingest → profile → SQL-проверки NULL/дублей/диапазонов |
+| `profile_report` | `path`, `output` (по умолчанию `profile.md`) | ingest → `dap.markdown_report` → pass-through таблица |
+
+Пропущенный обязательный аргумент — JSON-RPC `-32602` с `data.missing`.
+
+## Рецепты
+
+Рецепт — сохранённый workflow (`dap-native-workflow/1`), в который добавлен блок
+`recipe`; файлы лежат в `$DAP_HOME/recipes/<name>.json`:
+
+```json
+{
+  "format": "dap-native-workflow/1",
+  "nodes": [
+    {"id": "src", "factory": "dap.parquet_reader", "settings": {"file": "/data/sales.parquet"}},
+    {"id": "q", "factory": "dap.sql_query", "settings": {"sql": "SELECT region, SUM(amount) AS total FROM src GROUP BY region", "inputs": ["src"]}},
+    {"id": "report", "factory": "dap.markdown_report", "settings": {"file": "report.md", "title": "Sales summary", "sections": [{"kind": "table"}]}}
+  ],
+  "connections": [{"from": "src", "to": "q"}, {"from": "q", "to": "report"}],
+  "recipe": {
+    "name": "sales_summary",
+    "description": "Aggregate sales by region and write a Markdown report",
+    "tags": ["sales", "report"],
+    "dataset": {"node": "src", "setting": "file"},
+    "params": {"report": {"node": "report", "setting": "file"}},
+    "output": "report"
+  }
+}
+```
+
+- `dataset` — узел и настройка, куда `dap_recipe_run` пишет аргумент `dataset`;
+  без блока берётся первый reader с настройкой `file`.
+- `params` — именованные переопределения настроек; `dap_recipe_run` применяет
+  только объявленные имена и отвечает `-32602`, если имя неизвестно.
+- `output` — узел, чья таблица возвращается; по умолчанию последний узел.
+- `dap_recipe_save` принимает workflow JSON или id workflow (движок сохраняет его
+  через `/v1/workflows/{id}/save`) и пишет файл; имя не может содержать `/`,
+  обратный слэш, начинаться с точки или быть `.`/`..`.
+- `dap_recipe_run` загружает копию рецепта через `/v1/workflows/load`, применяет
+  параметры, выполняет workflow, возвращает `{recipe, workflow, node, table, applied}`
+  и удаляет загруженный workflow; сохранённый файл не меняется, поэтому два
+  параллельных запуска не делят состояние.
+- `dap_recipe_list` возвращает `{recipes:[{name,description,tags,params,dataset}]}`.
+
+## dap_sql
+
+`dap_sql` добавляет в существующий workflow узел `dap.sql_query`, связывает его с
+`node` (если передан), выполняет workflow и возвращает таблицу узла:
+
+```json
+{"workflow": "wf-1", "node": "1:1",
+ "sql": "SELECT region, SUM(amount) AS total FROM \"1:1\" GROUP BY region"}
+```
+
+Ответ — `{"workflow":"wf-1","node":"1:2","table":{...}}`. Таблица входа
+доступна в SQL под именем `node` (id узла; id вида `1:1` нужно взять в кавычки).
+Принимается ровно один read-only `SELECT`/`WITH`: DDL/DML (`DROP`, `CREATE`,
+`INSERT`, `ATTACH`, `COPY`, `PRAGMA` и т. п.) и несколько стейтментов через `;`
+отклоняются адаптером с `-32602` до HTTP-запроса; строковые литералы и комментарии
+не считаются SQL. Узел остаётся в workflow — его таблицу можно дочитать
+`dap_get_table`; `limit` задаёт cap строк узла и размер превью.
 
 ## Как подключить в DSH
 
@@ -233,7 +333,9 @@ DSH (`~/.dsh/profiles/desktop/cordis.patch.yml`):
 ## Проверка
 
 ```bash
-make check                 # JUnit + goldens + MCP launch + MCP e2e + lint
-make install-e2e           # установка из dist/ во временный HOME + stdio preflight
-python3 tests/mcp_e2e.py   # полный сценарий через stdio
+make check                       # JUnit + goldens + MCP launch + оба MCP e2e + lint
+make install-e2e                 # установка из dist/ во временный HOME + stdio preflight
+make mcp-recipe-e2e              # resources/prompts/recipes/dap_sql, 3 tool call
+python3 tests/mcp_e2e.py         # create/add/run/table через stdio
+python3 tests/mcp_recipe_e2e.py  # сценарий адаптивности через stdio
 ```
