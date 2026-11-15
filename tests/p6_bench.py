@@ -996,7 +996,10 @@ def regression_settings(entry):
     predictors = [column for column in numeric if column != value]
     if not predictors:
         return None
-    settings = {"x": predictors, "y": value, "mode": "coefficients"}
+    # Large tables: fit on a deterministic first-N sample instead of failing at the
+    # in-memory 100k cap (dap.linear_regression sample_rows).
+    settings = {"x": predictors, "y": value, "mode": "coefficients",
+                "sample_rows": 100000}
     group = entry.get("group_column")
     if group and group not in predictors and group != value:
         settings["group_by"] = [group]

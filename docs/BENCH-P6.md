@@ -142,77 +142,124 @@ MCP-режим поднимает `adapters/mcp/dap_mcp.py` (stdio JSON-RPC, `DA
 
 | Что | Значение |
 |---|---|
-| Машина | — |
-| ОС / arch | — |
-| JDK | — |
-| Python | — |
-| Jar | — |
-| JVM | `-Xmx` — |
-| DuckDB | memory limit — |
+| Машина | MacBook (Apple silicon), локальный диск |
+| ОС / arch | macOS-27.2-arm64-arm-64bit-Mach-O |
+| JDK | openjdk version "21.0.13" 2026-10-20 LTS |
+| Python | 3.13.18 |
+| Jar | DAP 1.2.0, 44.8 МиБ |
+| JVM | -Xmx6g |
+| DuckDB | memory limit 2GB, temp dir в --out |
 
 ## 5. Датасеты
 
-| Датасет | Строк | Колонок | Файл | Parquet | cached |
+| Датасет | Строк | Колонок | CSV, МБ | Parquet, МБ | cached |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| amazon-fine-food | 568454 | 10 | 287 | 168 | False |
+| amazon-reviews | 3600000 | 3 | 1512 | 943 | False |
+| chicago-crimes | 2688710 | 23 | 631 | 184 | False |
+| flight-delays | 5819079 | 31 | 565 | 138 | False |
+| h1b-visa | 2895203 | 11 | 431 | 80 | False |
+| home-credit | 13605401 | 8 | 690 | 325 | False |
+| lending-club | 27648741 | 9 | 1700 | 191 | False |
+| nyc-taxi | 12748986 | 19 | 1894 | 368 | False |
+| santander | 200000 | 202 | 288 | 221 | False |
+| us-accidents | 7728394 | 46 | 2917 | 775 | False |
 
 ## 6. Ingest
 
-| Датасет | wall ms | МБ/с | rows | columns | cached |
-|---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| Датасет | DAP ms | МБ/с | DuckDB ms | DAP/DuckDB | rows | columns |
+|---|---|---|---|---|---|---|
+| amazon-fine-food | 530 | 542 | 988 | 0.54 | 568454 | 10 |
+| amazon-reviews | 2330 | 649 | 3049 | 0.76 | 3600000 | 3 |
+| chicago-crimes | 1383 | 456 | 1652 | 0.84 | 2688710 | 23 |
+| flight-delays | 2383 | 237 | 2642 | 0.90 | 5819079 | 31 |
+| h1b-visa | 819 | 526 | 916 | 0.89 | 2895203 | 11 |
+| home-credit | 2050 | 336 | 1673 | 1.23 | 13605401 | 8 |
+| lending-club | 3558 | 478 | 4205 | 0.85 | 27648741 | 9 |
+| nyc-taxi | 3567 | 531 | 3957 | 0.90 | 12748986 | 19 |
+| santander | 1751 | 165 | 5981 | 0.29 | 200000 | 202 |
+| us-accidents | 7203 | 405 | 8736 | 0.82 | 7728394 | 46 |
 
-Первый ingest в прогоне включает холодный старт DuckDB/JIT и конвертацию;
-повторный ingest того же файла в тот же `--out` вернёт `cached: true` и меряет
-только хэш/стат. Для «холодных» чисел нужен свежий `--out`.
+DAP и DuckDB читают один и тот же CSV; DuckDB-число — read_csv_auto → COPY в Parquet в отдельном процессе, DAP — POST /v1/datasets. Разница в пределах page cache/JIT: DAP быстрее или на уровне DuckDB на 9 из 10 датасетов (0.29–0.90x); home-credit — 1.23x, это единственный случай медленнее baseline.
 
 ## 7. Query / profile / explore latency
 
-| Датасет | reader_build | reader_run | table 20 | table page | profile | estimate | explore | sql_run |
-|---|---|---|---|---|---|---|---|---|
-| — | — | — | — | — | — | — | — | — |
+| Датасет | reader_build | reader_run | table_first | table_page | profile | estimate | explore | sql_run | correlation_run | regression_run |
+|---|---|---|---|---|---|---|---|---|---|---|
+| amazon-fine-food | 2 | 2 | 30 | 32 | 105 | 2 | 278 | 4 | 12 | 17 |
+| amazon-reviews | 8 | 6 | 58 | 52 | 566 | 3 | 638 | 3 | — | — |
+| chicago-crimes | 2 | 2 | 16 | 15 | 171 | 3 | 534 | 3 | 380 | 212 |
+| flight-delays | 3 | 3 | 12 | 11 | 334 | 5 | 2510 | 7 | 225 | 328 |
+| h1b-visa | 1 | 2 | 9 | 8 | 99 | 3 | 234 | 3 | 60 | 184 |
+| home-credit | 2 | 3 | 11 | 12 | 408 | 3 | 998 | 5 | 539 | 298 |
+| lending-club | 2 | 4 | 12 | 13 | 548 | 5 | 959 | 7 | 193 | 319 |
+| nyc-taxi | 2 | 4 | 16 | 14 | 678 | 5 | 3386 | 9 | 680 | 180 |
+| santander | 2 | 3 | 76 | 86 | 806 | 4 | 1139 | 8 | 109 | 209 |
+| us-accidents | 8 | 28 | 40 | 31 | 1016 | 7 | 2195 | 10 | 1590 | 607 |
+
+Все значения — миллисекунды, один прогон. profile — весь источник; explore — sampleRows=1000 для связей/гипотез, профиль/quality по всему источнику, quality-сканы (квартили/выбросы/дубликаты) на больших таблицах — по первым 100 000 строк.
 
 ## 8. Память и RSS
 
-| Датасет | RSS до | RSS после ingest | RSS после explore | heap до, МБ | heap после, МБ |
+| Датасет | heap до, МБ | heap после reader | heap после explore | heap после heavy | RSS |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| amazon-fine-food | 103 | 104 | 124 | 39 | null (sandbox) |
+| amazon-reviews | 88 | 89 | 97 | 98 | null (sandbox) |
+| chicago-crimes | 98 | 100 | 56 | 107 | null (sandbox) |
+| flight-delays | 107 | 109 | 45 | 54 | null (sandbox) |
+| h1b-visa | 113 | 114 | 39 | 103 | null (sandbox) |
+| home-credit | 39 | 41 | 44 | 55 | null (sandbox) |
+| lending-club | 87 | 88 | 100 | 88 | null (sandbox) |
+| nyc-taxi | 65 | 67 | 83 | 87 | null (sandbox) |
+| santander | 54 | 59 | 28 | 113 | null (sandbox) |
+| us-accidents | 17 | 23 | 24 | 65 | null (sandbox) |
 
-RSS берётся `ps -o rss= -p <pid>` у своего движка; heap — `memory.usedMb` из
-`/v1/health`. Если `ps` запрещён средой (DSH sandbox), в JSON пишется
-`rssBytes: null` и причина в `rssNote`, а heap остаётся доступен.
+RSS недоступен: DSH sandbox запрещает ps (rssNote в JSON); heap — memory.usedMb из /v1/health. Вне песочницы харнесс снимает RSS.
 
 ## 9. MCP overhead
 
 | Инструмент | wall ms | bytes | ≈tokens | ok |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| dap_explore | 2356 | 15621 | 3905 | yes |
+| dap_analyze | 1178 | 5737 | 1434 | yes |
+| dap_workflow_create | 5 | 67 | 16 | yes |
+| dap_add_node | 4 | 42 | 10 | yes |
+| dap_run | 8 | 126 | 31 | yes |
+| dap_get_table | 19 | 432 | 108 | yes |
+| dap_delete_workflow | 4 | 12 | 3 | yes |
+| dap_estimate | 23 | 939 | 234 | yes |
+| dap_report | 4580 | 17764 | 4441 | yes |
+| **итого** | **8177** | **40740** | **10185** | **9/9** |
 
 | Инструмент | MCP ms | HTTP ms | HTTP шагов | speedup |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| dap_explore | 2356 | 2195 | 1 | 0.93 |
+| dap_analyze | 1178 | 1092 | 4 | 0.93 |
+| dap_get_table | 19 | 31 | 1 | 1.63 |
+| dap_estimate | 23 | 7 | 1 | 0.31 |
+| dap_report | 4580 | 1092 | 4 | 0.24 |
+
+speedup = HTTP/MCP; >1 — MCP быстрее. dap_report дороже HTTP-набора из-за повторного profile/describe и записи HTML; для таблицы без отчёта дешевле dap_analyze.
 
 ## 10. Точность vs reference
 
-Если `<data-dir>/reference.json` существует, харнесс сравнивает с ним
-`profile`/`table`/`explore` и пишет абсолютные/относительные расхождения:
+Reference посчитан независимо в DuckDB Python (read_csv_auto/read_parquet), сравнение — с /profile (средние) и group counts. rel — относительная ошибка; rows и group counts совпали точно.
 
-```json
-{
-  "iris": {
-    "rows": 150,
-    "numeric_means": {"sepal_length": 5.8433, "petal_length": 3.7587},
-    "group_counts": {"setosa": 50, "versicolor": 50, "virginica": 50}
-  }
-}
-```
+| Датасет | rows ref/obs | max rel средних | max rel group counts |
+|---|---|---|---|
+| amazon-fine-food | 568454/568454 | 0.00e+00 | 0.00e+00 |
+| amazon-reviews | 3600000/3600000 | 0.00e+00 | 0.00e+00 |
+| chicago-crimes | 2688710/2688710 | 0.00e+00 | 0.00e+00 |
+| flight-delays | 5819079/5819079 | 0.00e+00 | 0.00e+00 |
+| h1b-visa | 2895203/2895203 | 4.67e-14 | 0.00e+00 |
+| home-credit | 13605401/13605401 | 0.00e+00 | 0.00e+00 |
+| lending-club | 27648741/27648741 | 1.39e-16 | 0.00e+00 |
+| nyc-taxi | 12748986/12748986 | 2.78e-14 | 0.00e+00 |
+| santander | 200000/200000 | 4.97e-15 | 0.00e+00 |
+| us-accidents | 7728394/7728394 | 1.45e-14 | 0.00e+00 |
 
-| Датасет | Метрика | reference | observed | abs | rel |
-|---|---|---|---|---|---|
-| — | — | — | — | — | — |
+Максимальная относительная ошибка по всем 10 датасетам — 4.7e-14 (средняя wage на h1b-visa); это ошибка double-арифметики, не логики. Rows и group counts — точные.
 
-Без `reference.json` секция содержит note «accuracy skipped» — это штатный режим
-smoke-прогона.
 
 ## 11. Smoke-прогон (example-манифест)
 
@@ -238,41 +285,17 @@ smoke-прогона.
 - ingest iris 1,6 с — это первый ingest прогона (холодный DuckDB + warm-up),
   а не стоимость CSV на 150 строк.
 
-## 12. Слабые места и что чинить
+## 12. Слабые места, найденные бенчмарком, и что исправлено
 
-1. **RSS в песочнице.** `ps` запрещён DSH sandbox → `rssBytes: null`. Вне
-   песочницы работает. Чинить: отдавать RSS в `/v1/health` (движок знает
-   процесс) или снимать замер на хосте; пока в отчёте честно стоит `rssNote`.
-2. **Один прогон без повторов.** Тайминги шумят (JIT, page cache); медианы по
-   N прогонам не считаются. Чинить: `--repeat N` и `timing()` по выборке.
-3. **Холодный/тёплый ingest.** Повторный запуск в тот же `--out` даёт
-   `cached: true`. Для больших данных нужен свежий `--out` или отдельный
-   прогон «тёплого» кэша; поле `cached` фиксирует режим.
-4. **explore семплирован.** Профиль/quality — по всему источнику, связи и
-   гипотезы — по первым `sampleRows=1000`; точность связей на больших данных
-   ограничена этим сэмплом.
-5. **Корреляция только pearson.** `spearman`/`kendall` не меряются (kendall
-   к тому же ограничен 100k строк).
-6. **Регрессия — только при `value_column`.** Категориальные предикторы движок
-   не поддерживает; на датасете с 2 строками на группу движок законно падает
-   (см. §11: поэтому у p2 в example-манифесте нет `value_column`).
-7. **MCP меряется на одном датасете** (первом) — это цена адаптера, не датасета;
-   setup-вызовы `dap_get_table` входят в `callCount` и в `totalMs`.
-8. **HTTP-накладные харнесса.** В `ms` входит json-сериализация/парсинг
-   stdlib-харнесса (одинаково для всех шагов) и один keep-alive сокет.
-9. **Нет изоляции JIT-прогрева.** Первый датасет платит за прогрев движка;
-   для честного сравнения датасетов нужен warm-up-шаг до замеров.
-10. **Лимиты движка по умолчанию.** `DAP_QUERY_TIMEOUT_SEC=60` может резать
-    `/table`/`/profile` на очень больших таблицах; харнесс его не переопределяет
-    (план не просил) — при необходимости задать в окружении.
-11. **Диск.** `<out>/cache`, `<out>/duckdb-tmp` и Parquet-кэш не чистятся между
-    прогонами; на 10M+ строках нужен запас места.
-12. **Порт.** Харнесс не проверяет, свободен ли `--port`; занятый порт даёт
-    ошибку старта движка (код 2).
-13. **Точность неполная.** Сравниваются rows, средние и group counts; связи и
-    quality из `/explore` не сверяются (нет в reference-контракте). Group counts
-    читаются через `/table?limit=1000`, поэтому при > 1000 групп хвост не
-    сверяется (в JSON он тоже усечён).
+1. **Explore падал по OOM на 7.7M x 46 (US Accidents) при DuckDB 1 GB.** Точный COUNT(DISTINCT) по 46 колонкам и SELECT DISTINCT * не помещались в память. Исправлено: выше 100 000 строк — APPROX_COUNT_DISTINCT, quality-сканы (квартили/выбросы/дубликаты) по первым 100 000 строк, дубликаты — по hash-сэмплу. Explore: US 8.2 с → 2.2 с, NYC 19.4 с → 3.1 с; ошибка 500 заменена на 400 explore_too_large с подсказкой.
+2. **/profile делал отдельный запрос на каждую колонку (46 сканов).** Исправлено: один агрегатный запрос на все колонки + один запрос на точный distinct для колонок ниже порога (только до 1M строк). Profile: US 2.9 с → 1.0 с, NYC 2.6 с → 0.7 с.
+3. **CSV ingest не умел header=false, битые строки и null-строки NA.** h1b падал на PREVAILING_WAGE/NA, amazon-reviews не имел заголовка. Исправлено: POST /v1/datasets и dap_ingest принимают header, delimiter, quote, escape, ignoreErrors, nullPadding, strictMode, nullStrings; опции входят в ключ кэша. Для h1b нужны nullStrings=[NA] + ignoreErrors=true (или предварительная типизация), для amazon-reviews — header=false.
+4. **Linear regression падал на 9 из 10 датасетов из-за cap 100k строк.** Исправлено: настройка sample_rows=N — детерминированные первые N строк; ошибка подсказывает sample_rows. Харнесс ставит 100 000; финальный прогон — 194 шага, 0 ошибок (было 9).
+5. **Explore считал IQR-выбросы для Severity (1..4) и давал 1.57M ложных выбросов.** Исправлено: IQR-выбросы пропускаются для числовых колонок с <=10 различными значениями; quality/hypotheses/recommendations это учитывают.
+6. **dap_report остаётся дорогим (4.6 с на US Accidents против 1.1 с у dap_analyze).** Причина — повторный profile/describe и запись HTML; для таблицы без отчёта дешевле dap_analyze. Кандидат на оптимизацию: переиспользовать профиль между секциями отчёта.
+7. **Широкие таблицы в JSON.** 20 строк x 46 колонок — 12 КБ; MCP dap_get_table с проекцией/CSV/offset даёт 452 байта на страницу. Рекомендация агенту: columns + format=csv/markdown + offset.
+8. **RSS в песочнице недоступен** — ps запрещён, в отчёте null и heap из /v1/health. Вне песочницы харнесс снимает RSS.
+9. **Остаточные ограничения.** In-memory stats (hypothesis/cluster/PCA/resample/survival) по-прежнему cap 100k/50k строк с явной ошибкой; для больших данных — SQL-агрегация или sample_rows (пока только regression). Kendall p-value и ADF — приближения, задокументированы в NODES.md. ORC/Avro не поддерживаются DuckDB 1.5.6.
 
 ## 13. Воспроизведение
 
