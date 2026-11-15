@@ -70,7 +70,8 @@
     значения; `limit` (по умолчанию 20) обрезает хвост.
   - `dap.correlation` — только пары `i < j` в порядке `columns`; `pearson` считает
     `CORR` по сырым значениям, `spearman` — по `RANK()` (равные значения делят ранг),
-    строки с NULL в любой колонке пары исключены.
+    `kendall` — tau-b; строки с NULL в любой колонке пары исключены. P6 добавил
+    `partial`, `output` long/matrix, p-value и доверительный интервал (см. §37).
   - `dap.histogram` — выдаются все бины, включая пустые (`count: 0`); последний бин
     включает максимум; константная колонка попадает целиком в первый бин.
   - `dap.quantile` — вероятности в `[0, 1]` включительно; `QUANTILE_CONT` интерполирует
@@ -131,6 +132,7 @@
 | `dap.data_quality` | Data Quality | `/Statistics` | 2 (1 — опционален) |
 | `dap.hypothesis_test` | Hypothesis Test | `/Statistics` | 1 |
 | `dap.linear_regression` | Linear Regression | `/Statistics` | 1 |
+| `dap.logistic_regression` | Logistic Regression | `/Statistics` | 1 |
 | `dap.resample` | Resample | `/Time Series` | 1 |
 | `dap.rolling` | Rolling | `/Time Series` | 1 |
 | `dap.diff` | Diff | `/Time Series` | 1 |
@@ -1067,26 +1069,60 @@ NULL в любой выбранной колонке делает `sum`, `mean`,
 
 ## 37. dap.correlation
 
-Считает парные корреляции двух и более числовых колонок в длинном формате: одна строка
-на неупорядоченную пару `i < j` в порядке `columns`. `pearson` — `CORR` по сырым
-значениям; `spearman` — `CORR` по `RANK()` каждой колонки, причём равные значения
-делят ранг. Строки с NULL хотя бы в одной колонке пары исключены.
+Считает парные корреляции двух и более числовых колонок в длинном формате (одна строка
+на неупорядоченную пару `i < j` в порядке `columns`) или матрицей. `pearson` —
+`CORR` по сырым значениям; `spearman` — `CORR` по `RANK()` каждой колонки, причём
+равные значения делят ранг; `kendall` — tau-b с поправкой на связи (Fenwick-дерево
+по рангам, `O(n log n)`). Строки с NULL хотя бы в одной колонке пары исключены; при
+`partial` статистика считается по полным строкам всех участвующих колонок.
 Порты: вход 0 — `Data`; выход 0 — `Data`.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
 | `columns` | array<string> | — | обязателен; не менее двух различных числовых колонок |
-| `method` | `pearson` \| `spearman` | `pearson` | по умолчанию `pearson`; `pearson` — сырые значения, `spearman` — ранги |
+| `method` | `pearson` \| `spearman` \| `kendall` | `pearson` | `pearson` — сырые значения, `spearman` — ранги, `kendall` — tau-b |
+| `partial` | array<string> | — | необязательные числовые контрольные колонки; не должны пересекаться с `columns` |
+| `output` | `long` \| `matrix` | `long` | `matrix` — строка на переменную, колонка на переменную |
+| `alpha` | number | `0.05` | уровень значимости для интервала: `1 − alpha`; в `(0, 1)` |
 
-Схема выхода: `column_a`, `column_b` (`String`), `correlation` (`Number (Float)`).
-Число строк — `n·(n−1)/2`. Меньше двух колонок, дубль, неизвестная или нечисловая
-колонка и неизвестный `method` — ошибка run; на вырожденной паре (меньше двух полных
-строк или нулевой разброс) `CORR` даёт NULL.
+Схема выхода `long`: `column_a`, `column_b`, `method`, `partial` (`String`),
+`n` (`Number (Integer)`), `correlation`, `p_value`, `ci_low`, `ci_high`
+(`Number (Float)`). `partial` — контрольные колонки через запятую (NULL, если
+частичной корреляции нет). Число строк — `n·(n−1)/2`.
+
+Схема выхода `matrix`: `column` (`String`) и по одной `Number (Float)` колонке на
+каждую переменную `columns`, имя колонки — имя переменной; строк столько же, сколько
+переменных, диагональ 1, матрица симметрична. При `partial` матрица содержит частичные
+корреляции (обратная корреляционная матрица пар с контролем).
+
+Правила:
+
+- p-value: для Pearson/Spearman `t = r·sqrt(df/(1−r²))`, `df = n−2−k` (`k` —
+  число контрольных колонок), двусторонний хвост t; для Kendall
+  `z = 3τ·sqrt(n(n−1))/(2·sqrt(2n+5))`, двусторонний нормальный хвост.
+- Интервал: Fisher `atanh` с `se = 1/sqrt(n−3−k)` для Pearson/Spearman; для Kendall
+  асимптотическая `se = sqrt(2(2n+5)/(9n(n−1)))`; значения обрезаны в `[−1, 1]`.
+- `n < 3` (для Pearson/Spearman `df ≤ 0` или `n−3−k ≤ 0`) оставляет `p_value`
+  и/или `ci_low`/`ci_high` NULL; `|r| = 1` даёт `p_value = 0` и вырожденный
+  интервал.
+- Меньше двух колонок, дубль, неизвестная или нечисловая колонка, пересечение
+  `columns` и `partial`, неизвестный `method`/`output`, `alpha` вне `(0, 1)` —
+  ошибка run.
+- Kendall читает значения в память: не более 100 000 строк, иначе ошибка с подсказкой
+  использовать `spearman`.
+- На вырожденной паре (нулевой разброс) корреляция NULL; если корреляционная матрица
+  вырождена, частичная корреляция NULL.
 
 ```json
 {
   "factory": "dap.correlation",
-  "settings": {"columns": ["sepal_length", "sepal_width", "petal_length"], "method": "spearman"}
+  "settings": {
+    "columns": ["sepal_length", "sepal_width", "petal_length"],
+    "method": "spearman",
+    "partial": ["petal_width"],
+    "output": "long",
+    "alpha": 0.05
+  }
 }
 ```
 
@@ -1568,92 +1604,138 @@ smoke-тестом (файл существует, размеры совпада
 
 ## 49. dap.hypothesis_test
 
-Один статистический тест над входом: выход — ровно одна строка `test`,
-`statistic`, `df`, `p_value`, `n`. p-value считается движком
-(`engine/Distributions`, неполная бета/гамма), потому что в DuckDB нет
-`erf`/`beta`; статистика и `df` считаются SQL-агрегатами.
+Один или несколько статистических тестов над входом: строка на сравнение с полями
+`test`, `statistic`, `df`, `p_value`, `n`, `comparison`, `p_adjusted`,
+`effect_size`, `effect_size_name`, `ci_low`, `ci_high`. p-value считается
+движком (`engine/Distributions`: неполная бета/гамма и квадратура studentized
+range), потому что в DuckDB нет `erf`/`beta`; статистики параметрических тестов и
+Tukey — SQL-агрегаты, ранговые тесты считаются в Java с поправкой на связи.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `test` | `t_test_two_sample` \| `t_test_paired` \| `t_test_one_sample` \| `chi_square` \| `anova` | — | обязателен |
-| `value` | string | — | числовая колонка для t-тестов и ANOVA, категориальная для `chi_square` |
-| `group` | string | — | категориальная колонка для `t_test_two_sample`, `chi_square`, `anova` |
-| `group_a` | string | — | для `t_test_two_sample`/`chi_square` — значение `group` (сравнивается как текст); для `t_test_paired` — первая числовая колонка |
-| `group_b` | string | — | вторая группа или вторая числовая колонка (paired) |
+| `test` | `t_test_two_sample` \| `t_test_paired` \| `t_test_one_sample` \| `chi_square` \| `anova` \| `mann_whitney` \| `kruskal_wallis` \| `wilcoxon_signed_rank` \| `tukey_hsd` | — | обязателен |
+| `value` | string | — | числовая колонка для t-тестов, ANOVA, Tukey и ранговых тестов; категориальная для `chi_square` |
+| `group` | string | — | категориальная колонка для `t_test_two_sample`, `chi_square`, `anova`, `mann_whitney`, `kruskal_wallis`, `tukey_hsd` |
+| `group_a` | string | — | для `t_test_two_sample`/`mann_whitney` — значение `group` (сравнивается как текст); для `t_test_paired`/`wilcoxon_signed_rank` — первая числовая колонка |
+| `group_b` | string | — | вторая группа или вторая числовая колонка (paired/wilcoxon) |
 | `mu` | number | `0` | нулевая гипотеза для `t_test_one_sample` |
-| `alpha` | number | — | проверяется, что в `(0, 1)`; на выход не влияет |
-| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост t-тестов; `chi_square`/`anova` всегда верхний |
+| `alpha` | number | `0.05` | проверяется, что в `(0, 1)`; задаёт уровень доверия интервала эффекта |
+| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост t-тестов, `mann_whitney` и `wilcoxon_signed_rank`; `chi_square`/`anova`/`kruskal_wallis`/`tukey_hsd` всегда верхний |
+| `correction` | `none` \| `bonferroni` \| `holm` \| `bh` | `none` | поправка на множественные сравнения для `p_adjusted` по всем строкам узла |
+
+Схема выхода: `test`, `comparison`, `effect_size_name` (`String`), `n`
+(`Number (Integer)`), `statistic`, `df`, `p_value`, `p_adjusted`,
+`effect_size`, `ci_low`, `ci_high` (`Number (Float)`). `comparison` —
+`"A vs B"` для двухвыборочных/парных тестов, `"value vs group"` для
+`chi_square`, `"value ~ group"` для `anova`/`kruskal_wallis`,
+`"value vs mu"` для одновыборочного t.
 
 Правила:
 
 - `t_test_two_sample` — Welch (как `t.test` в R по умолчанию), `df` дробный; без
   `group_a`/`group_b` берутся ровно две различные группы колонки, иначе ошибка.
+  Эффект — Cohen's `d` по объединённому sd, интервал `d ± t(1−α/2, n1+n2−2)·se`.
 - `t_test_paired` — `group_a`/`group_b` задают имена двух числовых колонок; пары
-  строятся по строкам, строки с NULL в любой из них исключаются.
-- `t_test_one_sample` — `(mean(value) - mu) / (sd / sqrt(n))`, `df = n - 1`.
+  строятся по строкам, строки с NULL в любой из них исключаются; эффект —
+  `cohens_dz` (средняя разность / sd разностей).
+- `t_test_one_sample` — `(mean(value) − mu) / (sd / sqrt(n))`, `df = n − 1`,
+  эффект — Cohen's `d`.
 - `chi_square` — тест независимости по таблице сопряжённости `value` × `group`
-  (NULL-категории исключаются), `df = (r-1)(c-1)`.
-- `anova` — однофакторный: `df` — числитель `k - 1`, знаменатель `n - k`
-  восстанавливается из `n` и числа групп; `n` — число строк.
-- `n` — число использованных наблюдений (сумма по группам).
-- Меньше двух наблюдений в выборке, меньше двух групп/категорий, ноль строк —
-  ошибка конфигурации; при нулевой дисперсии `statistic` и `p_value` — NULL,
-  `df` и `n` заполнены.
+  (NULL-категории исключаются), `df = (r−1)(c−1)`, эффект — Cramér's `V`.
+- `anova` — однофакторный: `df` — числитель `k − 1`, знаменатель `n − k`;
+  эффект — eta squared; интервала нет.
+- `mann_whitney` — U по рангам (средние ранги для связей), нормальная
+  аппроксимация с поправкой на связи и continuity; `statistic` — U первой группы,
+  `df` NULL, эффект — rank-biserial `2U/(n1·n2) − 1`.
+- `kruskal_wallis` — H с поправкой на связи, `df = k − 1`, p по χ²; эффект —
+  epsilon squared `H/(N−1)`.
+- `wilcoxon_signed_rank` — `group_a − group_b`, нулевые разности отбрасываются,
+  `statistic` — W+, `df` NULL, нормальная аппроксимация с поправкой на связи;
+  эффект — matched-pairs rank-biserial.
+- `tukey_hsd` — строка на пару групп (в порядке имён групп), `statistic` — q
+  studentized range (`Tukey-Kramer`: `se = sqrt(MSE/2·(1/n_i + 1/n_j))`),
+  `p_value` — `1 − studentizedRangeCdf(q, k, N−k)` (уже учитывает множественность),
+  `p_adjusted` — дополнительно поправленный p; эффект — Cohen's `d` по
+  `sqrt(MSE)`, интервал через `t(1−α/2, N−k)`.
+- `n` — число использованных наблюдений (сумма по группам; для Wilcoxon — число
+  ненулевых пар).
+- Меньше двух наблюдений в выборке/группе, меньше двух групп/категорий, ноль строк —
+  ошибка конфигурации; при нулевой дисперсии/нулевом MSE `statistic`, `p_value`,
+  `effect_size` и интервал — NULL, `df` и `n` заполнены.
+- Ранговые тесты и Tukey читают значения в память: не более 100 000 строк, иначе
+  ошибка с подсказкой.
+- Поправки: `bonferroni` — `p·m`; `holm` — step-down с монотонностью;
+  `bh` — Benjamini-Hochberg step-up с монотонностью. Для одной строки
+  `p_adjusted = p_value`.
 
 ```json
 {
   "factory": "dap.hypothesis_test",
   "settings": {
-    "test": "t_test_two_sample",
+    "test": "tukey_hsd",
     "value": "sepal_length",
     "group": "species",
-    "group_a": "setosa",
-    "group_b": "versicolor"
+    "correction": "bh"
   }
 }
 ```
 
 ## 50. dap.linear_regression
 
-Парная линейная регрессия одной числовой колонки на ровно один числовой
-предиктор, при необходимости — отдельно по группам. В режиме `coefficients` —
-одна строка на терм (`intercept` и колонка `x`), в режиме `predict` — все
-входные строки плюс `prediction` и `residual`.
+Линейная регрессия одной числовой колонки на один или несколько числовых
+предикторов, при необходимости — отдельно по группам. В режиме `coefficients` —
+строка на терм (`intercept` и каждый предиктор), в режиме `diagnostics` — строка
+на подгонку, в режиме `predict` — все входные строки плюс предсказание, остаток и
+интервал предсказания.
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `x` | array<string> | — | обязателен; ровно одна числовая колонка |
+| `x` | array<string> | — | обязателен; одна или несколько различных числовых колонок |
 | `y` | string | — | обязателен; числовая колонка отклика |
 | `group_by` | array<string> | — | необязательные колонки группировки: своя регрессия на группу |
-| `mode` | `coefficients` \| `predict` | `coefficients` | — |
-| `intercept` | boolean | `true` | `false` — модель `y = slope * x` без свободного члена |
+| `mode` | `coefficients` \| `predict` \| `diagnostics` | `coefficients` | — |
+| `intercept` | boolean | `true` | `false` — модель без свободного члена |
+| `robust` | `none` \| `hc1` | `none` | `hc1` — гетероскедастичность-устойчивая ковариация `(X'X)⁻¹·meat·(X'X)⁻¹·n/(n−p)` |
+| `alpha` | number | `0.05` | уровень значимости интервалов: `1 − alpha`; в `(0, 1)` |
 | `output` | string | `prediction` | имя колонки предсказания в режиме `predict` |
 
 Выход `coefficients`: `[group_by…]`, `term`, `coefficient`, `std_error`,
-`t_statistic`, `p_value`, `r2`, `n`. Коэффициенты — из `regr_slope`,
-`regr_intercept`, `regr_r2`, `regr_count`; стандартные ошибки и p-value — из
-`engine/Distributions` (`t` с `df = n - 2`, для модели без свободного члена
-`df = n - 1` и несцентрированный `r2 = 1 - SSE / sum(y^2)`).
+`t_statistic`, `p_value`, `r2`, `n`, `adj_r2`, `f_statistic`, `f_p_value`,
+`rmse`, `df_residual`, `vif`, `ci_low`, `ci_high`. Подгонка — обычный МНК по
+`X'X` и его обратной матрице; стандартные ошибки — классические или HC1, p-value
+из `engine/Distributions` (`t` с `df_residual = n − p`), интервал
+`coefficient ± t(1−α/2, df)·se`. `vif` — `1/(1−R²_j)` регрессии предиктора на
+остальные (только при `intercept`); у `intercept` — NULL.
 
-Выход `predict`: входные колонки, затем `output` и `residual`
-(`y - prediction`); при `group_by` коэффициенты считаются оконными агрегатами
-по каждой группе. `prediction` NULL, если NULL предиктор; `residual` NULL, если
-NULL отклик.
+Выход `diagnostics`: `[group_by…]`, `n`, `df_residual`, `r2`, `adj_r2`,
+`f_statistic`, `f_p_value`, `rmse`, `durbin_watson`, `aic`, `bic`.
+`f_statistic` — общий F модели (`df1 = p`, `df2 = n − p`), `rmse` — корень из
+`MSE`, `aic = n·ln(SSE/n) + 2p`, `bic = n·ln(SSE/n) + ln(n)·p`.
 
-Правила: строки с NULL в `x` или `y` исключаются из подгонки; меньше двух таких
-строк — ошибка; константный `x` даёт NULL-коэффициенты и NULL-`r2`; идеальная
-подгонка (`std_error = 0`) даёт NULL `t_statistic`/`p_value`; `r2` для модели
-без свободного члена может быть отрицательным. Режим `predict` ленивый (оконные
-агрегаты в SQL), `coefficients` считает подгонку на run.
+Выход `predict`: входные колонки, затем `output`, `residual` (`y − prediction`),
+`prediction_lower` и `prediction_upper` — интервал предсказания для нового
+наблюдения: `prediction ± t(1−α/2, df)·sqrt(MSE + x₀'·Cov(β)·x₀)`. При
+`group_by` коэффициенты подставляются через литеральную таблицу, соединённую по
+колонкам группировки (`IS NOT DISTINCT FROM`), поэтому порядок входных строк
+сохраняется. `prediction` и интервалы NULL, если NULL предиктор.
+
+Правила: строки с NULL в `x` или `y` исключаются из подгонки; `n ≤ p`
+(включая свободный член) — ошибка с подсказкой; вырожденная (сингулярная) матрица
+`X'X` — NULL-коэффициенты и NULL-статистики, `n` и `df_residual` заполнены;
+идеальная подгонка (`std_error = 0`) даёт NULL `t_statistic`/`p_value`; `r2`
+для модели без свободного члена считается по несцентрированному SST и может быть
+отрицательным. Категориальные предикторы не поддерживаются — сначала `dap.encoder`.
+Подгонка читает значения в память: не более 100 000 строк.
 
 ```json
 {
   "factory": "dap.linear_regression",
   "settings": {
-    "x": ["petal_length"],
+    "x": ["petal_length", "petal_width"],
     "y": "sepal_length",
     "group_by": ["species"],
-    "mode": "coefficients"
+    "mode": "coefficients",
+    "robust": "hc1"
   }
 }
 ```
@@ -2207,3 +2289,51 @@ Europe/Moscow); у `Date32` времени суток нет. `holidays` — с�
 }
 ```
 
+## 56. dap.logistic_regression
+
+Бинарная логистическая регрессия: отклик `y` — 0/1 (числовой) или boolean, предикторы
+`x` — одна или несколько числовых колонок. Подгонка — IRLS (Newton-Raphson) по
+`X'WX`; режим `coefficients` возвращает строку на терм (`intercept` и каждый
+предиктор), режим `predict` — все входные строки плюс вероятность и класс.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `x` | array<string> | — | обязателен; одна или несколько различных числовых колонок |
+| `y` | string | — | обязателен; бинарная колонка 0/1 или boolean, должны быть оба класса |
+| `mode` | `coefficients` \| `predict` | `coefficients` | — |
+| `robust` | `none` \| `hc1` | `none` | `hc1` — сэндвич-оценка `(X'WX)⁻¹·[Σ(y−p)²xx']·(X'WX)⁻¹·n/(n−p)` |
+| `max_iterations` | integer | `50` | положительное; предел итераций Ньютона |
+| `tolerance` | number | `1e-8` | положительное; остановка по максимальному изменению коэффициента |
+| `l2` | number | `0` | необязательный ridge-штраф на диагональ `X'WX` для не-свободных термов |
+| `alpha` | number | `0.05` | уровень значимости интервала лог-шансов: `1 − alpha` |
+| `output` | string | `probability` | имя колонки вероятности в режиме `predict` |
+
+Выход `coefficients`: `term`, `coefficient` (лог-шансы), `std_error`,
+`z_statistic`, `p_value` (Wald, нормальный хвост), `ci_low`, `ci_high`
+(интервал лог-шансов `coefficient ± z(1−α/2)·se`), `odds_ratio` (`exp(coefficient)`),
+`n`, `pseudo_r2` (McFadden: `1 − LL/LL₀`), `auc` (ранговая, Манн-Уитни по
+вероятностям), `iterations`, `converged`.
+
+Выход `predict`: входные колонки, затем `output` (`Number (Float)` — сигмоида
+линейного предиктора) и `prediction` (`Number (Integer)` — 1 при вероятности
+`≥ 0.5`, иначе 0). `probability` и `prediction` NULL, если NULL предиктор.
+
+Правила: строки с NULL в `x` или `y` исключаются; `y` вне `{0, 1}` — ошибка
+`binary`; один класс в `y` — ошибка (нужны оба); `n ≤ p` (включая свободный
+член) — ошибка с подсказкой; при идеальном разделении без `l2` итерации Ньютона
+могут не сойтись — `converged = false`, `l2 > 0` даёт конечное решение; сингулярная
+матрица `X'WX` оставляет коэффициенты NULL, `n` и `iterations` заполнены.
+Подгонка читает значения в память: не более 100 000 строк.
+
+```json
+{
+  "factory": "dap.logistic_regression",
+  "settings": {
+    "x": ["sepal_length", "sepal_width"],
+    "y": "is_big",
+    "robust": "hc1",
+    "max_iterations": 100,
+    "tolerance": 1e-8
+  }
+}
+```

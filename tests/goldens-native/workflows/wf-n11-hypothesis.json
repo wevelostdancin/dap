@@ -1,7 +1,7 @@
 {
   "id": "wf-n11-hypothesis",
-  "title": "Hypothesis tests: Welch t, ANOVA and chi-square",
-  "rationale": "Pins dap.hypothesis_test end to end: two-sample t on iris, one-way ANOVA on iris, chi-square on the tiny p2 fixture.",
+  "title": "Hypothesis tests: Welch t, ANOVA and chi-square with effect sizes",
+  "rationale": "Pins dap.hypothesis_test end to end: two-sample t on iris, one-way ANOVA on iris, chi-square on the tiny p2 fixture, including comparison labels, p_adjusted and effect sizes.",
   "kind": "native",
   "nodes": [
     {
@@ -87,15 +87,45 @@
         {
           "name": "n",
           "type": "Number (Integer)"
+        },
+        {
+          "name": "comparison",
+          "type": "String"
+        },
+        {
+          "name": "p_adjusted",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "effect_size",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "effect_size_name",
+          "type": "String"
+        },
+        {
+          "name": "ci_low",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_high",
+          "type": "Number (Float)"
         }
       ],
       "data": [
         [
           "t_test_two_sample",
-          -10.52098626754911,
-          86.53800179765493,
-          3.530509218307998e-14,
-          100
+          -10.52098626754912,
+          86.53800179765496,
+          0.0,
+          100,
+          "setosa vs versicolor",
+          0.0,
+          -2.104197253509824,
+          "cohens_d",
+          -2.5988761933676154,
+          -1.6095183136520326
         ]
       ],
       "order": "ordered"
@@ -124,15 +154,45 @@
         {
           "name": "n",
           "type": "Number (Integer)"
+        },
+        {
+          "name": "comparison",
+          "type": "String"
+        },
+        {
+          "name": "p_adjusted",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "effect_size",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "effect_size_name",
+          "type": "String"
+        },
+        {
+          "name": "ci_low",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_high",
+          "type": "Number (Float)"
         }
       ],
       "data": [
         [
           "anova",
-          119.2645021845045,
+          119.26450218450452,
           2.0,
-          1.1457501614131615e-13,
-          150
+          0.0,
+          150,
+          "sepal_length ~ species",
+          0.0,
+          0.6187057307384869,
+          "eta_squared",
+          null,
+          null
         ]
       ],
       "order": "ordered"
@@ -161,19 +221,49 @@
         {
           "name": "n",
           "type": "Number (Integer)"
+        },
+        {
+          "name": "comparison",
+          "type": "String"
+        },
+        {
+          "name": "p_adjusted",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "effect_size",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "effect_size_name",
+          "type": "String"
+        },
+        {
+          "name": "ci_low",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_high",
+          "type": "Number (Float)"
         }
       ],
       "data": [
         [
           "chi_square",
-          8.333333333333334,
+          8.333333333333336,
           8.0,
-          0.4016048373243397,
-          6
+          0.4016048373243376,
+          6,
+          "name vs category",
+          0.4016048373243376,
+          0.8333333333333335,
+          "cramers_v",
+          null,
+          null
         ]
       ],
       "order": "ordered"
     }
   ],
-  "notes": "Welch t for setosa vs versicolor sepal_length (R t.test), one-way ANOVA of sepal_length over the three species (R aov), chi-square of name x category on p2.csv (R chisq.test, df=(5-1)*(3-1)=8)."
+  "notes": "Welch t for setosa vs versicolor sepal_length (R t.test) with Cohen's d and its CI; one-way ANOVA of sepal_length over the three species (R aov) with eta squared; chi-square of name x category on p2.csv (R chisq.test, df=(5-1)*(3-1)=8) with Cramer's V. p-values below 1e-15 are pinned as 0.0 because the two-sided tail is computed as 2*(1 - tCdf) and rounds to zero."
 }

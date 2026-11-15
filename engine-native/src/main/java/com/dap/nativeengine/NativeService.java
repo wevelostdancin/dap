@@ -18,6 +18,7 @@ import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.io.DatasetCatalog;
 import com.dap.nativeengine.nodes.BinnerExecutor;
 import com.dap.nativeengine.nodes.CalendarExecutor;
+import com.dap.nativeengine.nodes.LogisticRegressionExecutor;
 import com.dap.nativeengine.nodes.ChartExecutor;
 import com.dap.nativeengine.nodes.ChartGridExecutor;
 import com.dap.nativeengine.nodes.ColumnResorterExecutor;
@@ -719,6 +720,7 @@ public final class NativeService implements AutoCloseable {
                 .register(new JsonReaderExecutor())
                 .register(new JsonWriterExecutor())
                 .register(new LinearRegressionExecutor())
+                .register(new LogisticRegressionExecutor())
                 .register(new ParquetReaderExecutor())
                 .register(new ParquetWriterExecutor())
                 .register(new RowFilterExecutor())
