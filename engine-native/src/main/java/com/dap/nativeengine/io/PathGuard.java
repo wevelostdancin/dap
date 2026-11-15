@@ -201,7 +201,9 @@ public final class PathGuard {
         if (!allowed) {
             throw notAllowed(raw, action);
         }
-        return real != null ? real : candidate;
+        // Validation uses the symlink-free path; callers keep the normalized path they passed,
+        // so responses and catalog entries do not silently change /var/... into /private/var/....
+        return candidate;
     }
 
     /** True for a URL DuckDB reads through httpfs; those are not local paths. */

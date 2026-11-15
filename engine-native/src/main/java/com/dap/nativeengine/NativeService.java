@@ -398,7 +398,7 @@ public final class NativeService implements AutoCloseable {
         DataHandlers data = new DataHandlers(state);
         DatasetHandlers datasets = new DatasetHandlers();
         DatasetCatalogHandlers datasetCatalog = new DatasetCatalogHandlers(catalog);
-        ExploreHandlers explore = new ExploreHandlers();
+        ExploreHandlers explore = new ExploreHandlers(state.settings());
         OpsHandlers ops = new OpsHandlers(state, this::shutdownAsync);
 
         app.get("/v1", context -> Http.ok(context, meta()));

@@ -13,6 +13,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
+import com.dap.nativeengine.io.PathGuard;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -355,7 +357,8 @@ public final class MarkdownReportExecutor implements NodeExecutor {
     }
 
     private static ReportDocument.Section.Image image(Spec spec) {
-        Path path = Path.of(spec.path()).toAbsolutePath();
+        Path path = PathGuard.shared().checkRead(
+                Path.of(spec.path()).toAbsolutePath().toString());
         if (!Files.isRegularFile(path)) {
             throw new IllegalArgumentException(NODE + ": image not found: " + path);
         }

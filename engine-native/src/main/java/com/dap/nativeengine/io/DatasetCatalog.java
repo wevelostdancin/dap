@@ -53,11 +53,6 @@ public final class DatasetCatalog {
     private static final String NAME_HINT =
             "use 1..64 characters from A-Z a-z 0-9 . _ - (the name is the path parameter "
                     + "/v1/catalog/datasets/{name})";
-    /** Always denied, as in the P6 path allowlist; DAP_ALLOWED_ROOTS can widen the allowlist. */
-    private static final List<String> DENIED_ROOTS = List.of(
-            ".ssh", ".gnupg", ".dsh", ".aws", ".kube", ".config/gcloud", "Library/Keychains",
-            ".netrc", ".docker/config.json");
-
     /** One column of the cached profile. Numeric fields are null for non-numeric columns. */
     public record ProfileColumn(String name, String type, long missing, long distinct,
                                 Double min, Double max, Double mean) {
@@ -337,25 +332,14 @@ public final class DatasetCatalog {
         return name;
     }
 
-    /** Local guard until the WS-1 PathGuard lands; same error code and hint as its contract. */
+    /** The catalog source goes through the same path allowlist as every other reader. */
     private static Path checkSource(Path source) {
         if (source == null) {
             throw ApiException.badRequest("dataset_source_required",
                     "'file' or 'dataset' is required",
                     "pass a CSV/Excel/JSON/Parquet file path or an ingested Parquet path");
         }
-        Path absolute = source.toAbsolutePath().normalize();
-        Path home = Path.of(System.getProperty("user.home", ""));
-        for (String denied : DENIED_ROOTS) {
-            Path deniedRoot = home.resolve(denied).normalize();
-            if (absolute.equals(deniedRoot) || absolute.startsWith(deniedRoot)) {
-                throw ApiException.badRequest("path_not_allowed",
-                        "dataset source is inside a protected directory: " + absolute,
-                        "P6 path allowlist forbids " + deniedRoot
-                                + "; set DAP_ALLOWED_ROOTS to widen the allowlist");
-            }
-        }
-        return absolute;
+        return PathGuard.shared().checkRead(source.toAbsolutePath().normalize().toString());
     }
 
     private static String normalizeFormat(String raw, Path source) {

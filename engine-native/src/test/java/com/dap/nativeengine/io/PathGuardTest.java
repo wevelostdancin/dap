@@ -40,7 +40,7 @@ class PathGuardTest {
 
         Path checked = PathGuard.fromEnv().checkRead(file.toString());
 
-        assertEquals(file.toRealPath(), checked);
+        assertEquals(file.toAbsolutePath().normalize(), checked);
     }
 
     @Test
@@ -129,7 +129,7 @@ class PathGuardTest {
             PathGuard guard = new PathGuard(List.of(dir), List.of());
 
             assertPathNotAllowed(rejection(() -> guard.checkRead(file.toString())), "x.csv");
-            assertEquals(dir.toRealPath(), guard.checkRead(dir.resolve("..").resolve(dir.getFileName()).toString()));
+            assertEquals(dir.toAbsolutePath().normalize(), guard.checkRead(dir.resolve("..").resolve(dir.getFileName()).toString()));
         } finally {
             Files.deleteIfExists(other.resolve("x.csv"));
             Files.deleteIfExists(other);
@@ -144,7 +144,7 @@ class PathGuardTest {
         PathGuard guard = new PathGuard(List.of(dir), List.of(secretDir));
 
         assertPathNotAllowed(rejection(() -> guard.checkRead(secret.toString())), "token");
-        assertEquals(fine.toRealPath(), guard.checkRead(fine.toString()));
+        assertEquals(fine.toAbsolutePath().normalize(), guard.checkRead(fine.toString()));
     }
 
     @Test
@@ -170,7 +170,7 @@ class PathGuardTest {
 
         Path fine = Files.writeString(allowed.resolve("a.csv"), "a\n1\n");
         Path bad = Files.writeString(denied.resolve("b.csv"), "b\n1\n");
-        assertEquals(fine.toRealPath(), guard.checkRead(fine.toString()));
+        assertEquals(fine.toAbsolutePath().normalize(), guard.checkRead(fine.toString()));
         assertPathNotAllowed(rejection(() -> guard.checkRead(bad.toString())), "b.csv");
         assertPathNotAllowed(rejection(() -> guard.checkRead("/etc/passwd")), "/etc/passwd");
     }

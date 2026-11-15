@@ -1,8 +1,10 @@
 package com.dap.nativeengine.api;
 
+import com.dap.nativeengine.NativeService;
 import com.dap.nativeengine.explore.ExploreResult;
 import com.dap.nativeengine.explore.ExploreService;
 import com.dap.nativeengine.io.IngestService;
+import com.dap.nativeengine.io.PathGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.javalin.http.Context;
 
@@ -21,6 +23,13 @@ public final class ExploreHandlers {
 
     public ExploreHandlers() {
         this(new ExploreService(), new IngestService());
+    }
+
+    /** Production wiring: explore inherits the engine's DuckDB resource settings. */
+    public ExploreHandlers(NativeService.Settings settings) {
+        this(new ExploreService(settings.duckdbMemoryLimit(), settings.duckdbThreads(),
+                settings.duckdbTempDirectory(), settings.duckdbExtensionDirectory()),
+                new IngestService());
     }
 
     /** Test seam: explicit services. */
@@ -62,7 +71,8 @@ public final class ExploreHandlers {
                 }
                 parquet = ingest.ingest(path, resolved).path();
             } else {
-                Path path = Path.of(dataset).toAbsolutePath().normalize();
+                Path path = PathGuard.shared().checkRead(
+                        Path.of(dataset).toAbsolutePath().normalize().toString());
                 source = path.toString();
                 parquet = path;
             }

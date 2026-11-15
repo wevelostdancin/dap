@@ -4,6 +4,7 @@ import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.engine.ColumnSpec;
 import com.dap.nativeengine.engine.Distributions;
 import com.dap.nativeengine.engine.DuckDbSession;
+import com.dap.nativeengine.io.PathGuard;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +50,25 @@ public final class ExploreService {
     private static final double HIGH_CARDINALITY_RATIO = 0.9;
     private static final double OUTLIER_FENCE = 1.5;
 
+    private final String memoryLimit;
+    private final Integer threads;
+    private final String tempDirectory;
+    private final String extensionDirectory;
+
+    /** Production service: DuckDB resources stay at their defaults. */
+    public ExploreService() {
+        this(null, null, null, null);
+    }
+
+    /** Service with the engine's DuckDB resource settings, so explore respects memory/temp limits. */
+    public ExploreService(String memoryLimit, Integer threads, String tempDirectory,
+                          String extensionDirectory) {
+        this.memoryLimit = memoryLimit;
+        this.threads = threads;
+        this.tempDirectory = tempDirectory;
+        this.extensionDirectory = extensionDirectory;
+    }
+
     /** Profile the source as-is (no SQL refinement). */
     public ExploreResult explore(Path source, String sql, int maxColumns, int sampleRows)
             throws SQLException {
@@ -63,6 +83,12 @@ public final class ExploreService {
                                  int maxColumns, int sampleRows) throws SQLException {
         validateMaxColumns(maxColumns);
         validateSampleRows(sampleRows);
+        if (source != null) {
+            PathGuard.shared().checkRead(source.toAbsolutePath().toString());
+        }
+        if (sql != null && !sql.isBlank()) {
+            PathGuard.shared().checkSql(sql);
+        }
         if (source == null && (sql == null || sql.isBlank())) {
             throw ApiException.badRequest(
                     "explore: pass a Parquet source or a read-only sql query");
@@ -73,7 +99,7 @@ public final class ExploreService {
                     "POST /v1/datasets converts a source file into the Parquet cache; "
                             + "pass the returned path as 'dataset'");
         }
-        try (DuckDbSession db = new DuckDbSession();
+        try (DuckDbSession db = new DuckDbSession(memoryLimit, threads, tempDirectory, extensionDirectory);
              Connection connection = db.newConnection()) {
             String base = baseSql(connection, source, sql);
             List<ColumnSpec> described;
