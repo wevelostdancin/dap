@@ -161,7 +161,8 @@ class NodeRegistryTest {
         assertEquals(Set.of("file", "sheet", "header", "columns", "emptyStringIsNull"),
                 registry.require("dap.excel_reader").settingKeys());
         assertEquals(Set.of("keys", "aggregations"), registry.require("dap.group_by").settingKeys());
-        assertEquals(Set.of("how", "left_keys", "right_keys", "merge_keys"),
+        assertEquals(Set.of("how", "left_keys", "right_keys", "merge_keys",
+                        "left_time", "right_time", "asof_inequality"),
                 registry.require("dap.joiner").settingKeys());
         assertEquals(Set.of("column", "op", "mode", "search", "value"),
                 registry.require("dap.string_manipulation").settingKeys());
@@ -205,7 +206,7 @@ class NodeRegistryTest {
                 .path("items").path("properties").path("method")));
         assertEquals(List.of("mean", "sum", "count", "min", "max", "count_distinct", "median", "percentile"),
                 enumValues(property("dap.group_by", "aggregations").path("items").path("properties").path("fn")));
-        assertEquals(List.of("inner", "left", "right", "full", "semi", "anti"),
+        assertEquals(List.of("inner", "left", "right", "full", "semi", "anti", "asof", "cross"),
                 enumValues(property("dap.joiner", "how")));
         assertEquals(List.of("upper", "lower", "trim", "replace", "concat"),
                 enumValues(property("dap.string_manipulation", "op")));

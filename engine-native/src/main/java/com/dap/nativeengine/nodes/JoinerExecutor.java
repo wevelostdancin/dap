@@ -12,7 +12,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
-/** dap.joiner: Joins two inputs on key columns (inner/left/right/full/semi/anti) with optional merged keys. */
+/**
+ * dap.joiner: joins two inputs on key columns (inner/left/right/full/semi/anti) with optional
+ * merged keys, as an asof join on a time column, or as a cross join.
+ */
 public final class JoinerExecutor implements NodeExecutor {
     /** KNIME Joiner3 duplicateHandling=APPEND_SUFFIX with suffix " (Right)". */
     private static final String RIGHT_SUFFIX = " (Right)";
@@ -34,6 +37,12 @@ public final class JoinerExecutor implements NodeExecutor {
         LazyPlan right = inputs.get(1);
         JsonNode config = context.config();
         String how = NodeSql.text(config, "how", "inner");
+        if ("asof".equals(how)) {
+            return asof(context, left, right, config);
+        }
+        if ("cross".equals(how)) {
+            return cross(context, left, right);
+        }
         String join = switch (how) {
             case "inner" -> "INNER JOIN";
             case "left" -> "LEFT JOIN";
@@ -41,8 +50,8 @@ public final class JoinerExecutor implements NodeExecutor {
             case "full" -> "FULL OUTER JOIN";
             case "semi" -> "SEMI JOIN";
             case "anti" -> "ANTI JOIN";
-            default -> throw new IllegalArgumentException(
-                    "joiner: unsupported how '" + how + "' (expected inner, left, right, full, semi, anti)");
+            default -> throw new IllegalArgumentException("joiner: unsupported how '" + how
+                    + "' (expected inner, left, right, full, semi, anti, asof, cross)");
         };
         // Semi and anti joins only decide which left rows survive: the output is the left schema.
         boolean leftOnly = "semi".equals(how) || "anti".equals(how);
@@ -103,6 +112,110 @@ public final class JoinerExecutor implements NodeExecutor {
                 + " " + join + " " + right.asTable() + " AS r"
                 + " ON " + on;
         return new LazyPlan(context.db(), sql, output);
+    }
+
+    /**
+     * ASOF LEFT JOIN: every left row gets the nearest right row whose time is before (>=)
+     * or after (<=) its own time; optional equality keys restrict the match to one group.
+     */
+    private static LazyPlan asof(NodeContext context, LazyPlan left, LazyPlan right, JsonNode config) {
+        String leftTime = timeColumn(config, "left_time", left.columns(), "left");
+        String rightTime = timeColumn(config, "right_time", right.columns(), "right");
+        String inequality = NodeSql.text(config, "asof_inequality", ">=").strip();
+        if (!">=".equals(inequality) && !"<=".equals(inequality)) {
+            throw new IllegalArgumentException("joiner: 'asof_inequality' must be >= or <=, got '"
+                    + inequality + "'");
+        }
+        StringJoiner on = new StringJoiner(" AND ");
+        List<String> leftKeys = optionalKeys(config, "left_keys");
+        if (!leftKeys.isEmpty()) {
+            List<String> rightKeys = keys(config, "right_keys", "right", right.columns());
+            List<String> checkedLeft = keys(config, "left_keys", "left", left.columns());
+            if (checkedLeft.size() != rightKeys.size()) {
+                throw new IllegalArgumentException("joiner: 'left_keys' and 'right_keys' must have "
+                        + "the same length, got " + checkedLeft.size() + " and " + rightKeys.size());
+            }
+            for (int index = 0; index < checkedLeft.size(); index++) {
+                on.add("l." + NodeSql.quote(checkedLeft.get(index)) + " = r."
+                        + NodeSql.quote(rightKeys.get(index)));
+            }
+        }
+        // DuckDB requires the inequality to be the last ASOF condition.
+        on.add("l." + NodeSql.quote(leftTime) + " " + inequality + " r." + NodeSql.quote(rightTime));
+
+        List<ColumnSpec> output = new ArrayList<>();
+        Set<String> outputNames = new HashSet<>();
+        StringJoiner projection = new StringJoiner(", ");
+        for (ColumnSpec column : left.columns()) {
+            projection.add("l." + NodeSql.quote(column.name()));
+            output.add(column);
+            outputNames.add(column.name());
+        }
+        appendRight(projection, output, outputNames, right, List.of());
+        String sql = "SELECT " + projection
+                + " FROM " + left.asTable() + " AS l"
+                + " ASOF LEFT JOIN " + right.asTable() + " AS r"
+                + " ON " + on;
+        return new LazyPlan(context.db(), sql, output);
+    }
+
+    /** CROSS JOIN: every combination of the two inputs; keys are not used. */
+    private static LazyPlan cross(NodeContext context, LazyPlan left, LazyPlan right) {
+        List<ColumnSpec> output = new ArrayList<>();
+        Set<String> outputNames = new HashSet<>();
+        StringJoiner projection = new StringJoiner(", ");
+        for (ColumnSpec column : left.columns()) {
+            projection.add("l." + NodeSql.quote(column.name()));
+            output.add(column);
+            outputNames.add(column.name());
+        }
+        appendRight(projection, output, outputNames, right, List.of());
+        String sql = "SELECT " + projection
+                + " FROM " + left.asTable() + " AS l"
+                + " CROSS JOIN " + right.asTable() + " AS r";
+        return new LazyPlan(context.db(), sql, output);
+    }
+
+    /** Right columns with the " (Right)" suffix on a name clash; names in skipNames are merged. */
+    private static void appendRight(StringJoiner projection, List<ColumnSpec> output,
+                                    Set<String> outputNames, LazyPlan right, List<String> skipNames) {
+        for (ColumnSpec column : right.columns()) {
+            if (skipNames.contains(column.name())) {
+                continue;
+            }
+            String name = outputNames.contains(column.name())
+                    ? column.name() + RIGHT_SUFFIX
+                    : column.name();
+            projection.add("r." + NodeSql.quote(column.name()) + " AS " + NodeSql.quote(name));
+            outputNames.add(name);
+            output.add(new ColumnSpec(name, column.arrowType(), column.knimeType()));
+        }
+    }
+
+    private static String timeColumn(JsonNode config, String field, List<ColumnSpec> columns,
+                                     String side) {
+        String name = NodeSql.requiredText(config, field);
+        for (ColumnSpec column : columns) {
+            if (column.name().equals(name)) {
+                return name;
+            }
+        }
+        throw new IllegalArgumentException("joiner: unknown " + side + " time column '" + name + "'");
+    }
+
+    /** The optional equality keys of an asof join; absent or empty means "no equality keys". */
+    private static List<String> optionalKeys(JsonNode config, String field) {
+        JsonNode node = config == null ? null : config.get(field);
+        if (node == null || node.isNull() || !node.isArray() || node.isEmpty()) {
+            return List.of();
+        }
+        List<String> names = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (item.isTextual() && !item.textValue().isBlank()) {
+                names.add(item.textValue());
+            }
+        }
+        return names;
     }
 
     private static List<String> keys(JsonNode config, String field, String side, List<ColumnSpec> columns) {

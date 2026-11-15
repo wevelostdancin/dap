@@ -159,7 +159,7 @@ class JoinerModesTest {
 
             IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
                     () -> join(db, left, right, "outer", true));
-            for (String mode : List.of("inner", "left", "right", "full", "semi", "anti")) {
+            for (String mode : List.of("inner", "left", "right", "full", "semi", "anti", "asof", "cross")) {
                 assertTrue(failure.getMessage().contains(mode), failure.getMessage());
             }
         }
