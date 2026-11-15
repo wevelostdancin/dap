@@ -218,7 +218,8 @@ smoke-прогона.
 
 Запуск: `tests/p6_bench_manifest.example.json`, `--data-dir build/p6-bench/smoke-data`
 (iris + p2 + `reference.json`), свежий `--out`, `--start`, heap 4g, DuckDB 1GB.
-Движок DAP 1.2.0, jar 44,8 МиБ, старт 504,5 мс, health 3,2 мс.
+Движок DAP 1.2.0, jar 44,8 МиБ, старт 504,5 мс, health 3,2 мс. Числа ниже — один
+прогон; между прогонами разброс заметный (JIT, page cache, порядок шагов).
 
 | Датасет | ingest | reader_run | table 20 | table page | profile | estimate | explore |
 |---|---|---|---|---|---|---|---|
