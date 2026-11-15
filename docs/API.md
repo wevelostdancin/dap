@@ -59,10 +59,10 @@
 |---|---|---|
 | 200 | успех | — |
 | 202 | асинхронный запуск принят | — |
-| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, порт вне диапазона, отсутствующий `dir` | `bad_request`, `unknown_setting`, `invalid_query_param` |
+| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, порт вне диапазона, отсутствующий `dir`, путь вне allowlist, неизвестная колонка в `/table?columns=`, запрещённый `/table?where=` | `bad_request`, `unknown_setting`, `invalid_query_param`, `path_not_allowed`, `unknown_column`, `invalid_filter` |
 | 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `/table`/`/profile`/`PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут | `not_found`, `unknown_node` |
 | 408 | истёк `timeoutSec` синхронного run (тело — job со `state: "timeout"`); истёк `DAP_QUERY_TIMEOUT_SEC` у `/table`/`/profile` | `query_timeout` |
-| 409 | отмена уже завершённого job; лимит workflow на сессию; у узла ещё нет таблицы (до run); узел упал | `not_cancellable`, `workflow_limit`, `not_materialized`, `node_failed` |
+| 409 | отмена уже завершённого job; лимит workflow на сессию; у узла ещё нет таблицы или плана (до run); узел упал | `not_cancellable`, `workflow_limit`, `not_materialized`, `estimate_unavailable`, `node_failed` |
 | 500 | ошибка исполнения, невалидное значение config, нечитаемый файл, битый JSON | `server_error`, `node_failed` |
 
 Метод, не поддержанный для маршрута, даёт 404 `no route: <METHOD> <path>`, а не 405.
@@ -291,14 +291,19 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 
 Поля job: `id`, `workflow`, `state`, `createdAt`, `timeoutSec`,
 `startedAt`/`finishedAt`/`durationMs` (когда известны), `error`, `code`
-(у упавшего run), `result`, `statusUrl`. Состояния: `queued`, `running`,
+(у упавшего run), `result`, `progress`, `statusUrl`. Состояния: `queued`, `running`,
 `succeeded`, `failed`, `cancelled`, `timeout`.
+
+`progress` — прогресс по узлам: `{nodesTotal, nodesDone, currentNode, percent}`.
+Dag обновляет его на старте и финише каждого узла; `currentNode` — узел, который
+стартовал или только что закончился (`null` между уровнями), `percent` — целые
+проценты (100 у завершённого job).
 
 ## 6. Данные
 
-### `GET /v1/workflows/{workflowId}/nodes/{node}/table?port=0&limit=1`
+### `GET /v1/workflows/{workflowId}/nodes/{node}/table?port=0&limit=1&offset=0&columns=&where=`
 
-Материализует сохранённый план узла: `COUNT(*)` и первые `limit` строк (по
+Материализует сохранённый план узла: `COUNT(*)` и страницу строк (по
 умолчанию 50). Материализация ограничена `DAP_QUERY_TIMEOUT_SEC` (по умолчанию
 60 с; `0` выключает): по истечении соединение закрывается, ответ — 408
 `query_timeout` с `hint`, следующий запрос работает как обычно. Пример ниже
@@ -308,11 +313,25 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 {"rows":150,
  "columns":[{"index":0,"name":"sepal_length","type":"Number (Float)"}],
  "data":[["5.1"]],
- "preview":1}
+ "preview":1,
+ "offset":0,
+ "nextOffset":1,
+ "truncated":true}
 ```
 
-`rows` — всего строк, `data` — строки значениями-строками (`null` для NULL),
-`preview` — сколько строк вернулось. `limit < 0` даёт пустой `data`; `port`
+Параметры пагинации, проекции и фильтра (все опциональные):
+
+| Параметр | Тип | Смысл |
+|---|---|---|
+| `offset` | int ≥ 0 | пропустить N строк после фильтра |
+| `columns` | csv | проекция: имена через запятую; неизвестное имя — 400 `unknown_column` с подсказкой |
+| `where` | string | SQL-предикат над выходными колонками; запрещены `;`, `--`, `/*`, `SELECT`, `FROM`, `read_`, `ATTACH`, `COPY`, `PRAGMA` (регистр не важен); нарушение или несвязываемый предикат — 400 `invalid_filter` |
+
+`rows` — всего строк после фильтра, `data` — строки значениями-строками (`null`
+для NULL), `preview` — сколько строк вернулось, `offset` — запрошенное смещение,
+`nextOffset` — смещение следующей страницы (`null`, если страница последняя),
+`truncated` — есть ли ещё строки после этой страницы. Проекция меняет
+`columns` и порядок значений в `data`. `limit < 0` даёт пустой `data`; `port`
 вне диапазона или нецелый query-параметр — 400; неизвестный узел workflow —
 404 `unknown_node`; узел ещё не исполнялся — 409 `not_materialized` (в теле
 есть `ports` и `hint` с командой run); узел упал — 409 `node_failed` с
@@ -332,6 +351,24 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 выше — приблизительно с досчётом у границы. `min`/`max`/`mean` — только для
 числовых колонок; у колонки из одних NULL они опускаются. Статусы те же, что у
 `/table`: 404 `unknown_node`, 409 `not_materialized`/`node_failed`.
+
+### `GET /v1/workflows/{workflowId}/nodes/{node}/estimate`
+
+Выполняет `EXPLAIN (FORMAT JSON)` над сохранённым планом узла (без исполнения
+запроса) и отдаёт оценку стоимости:
+
+```json
+{"node":"1:2","rows":95,
+ "operators":[{"name":"PROJECTION","rows":95},{"name":"FILTER","rows":95},
+              {"name":"SEQ_SCAN","rows":150}],
+ "plan":{"physical_plan":[...]}}
+```
+
+`rows` — оценка корневого оператора (для projection без оценки — первый оператор,
+у которого она есть, то есть скан); `operators` — дерево операторов в порядке
+обхода (имя и оценка строк); `plan` — исходный JSON DuckDB.
+До run узла плана нет — 409 `estimate_unavailable` (у упавшего узла — 409
+`node_failed`); неизвестный узел — 404 `unknown_node`.
 
 ### `POST /v1/datasets`
 

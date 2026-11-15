@@ -640,11 +640,36 @@ paths:
           schema:
             type: integer
             default: 50
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip after the optional where filter (>= 0).
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: columns
+          in: query
+          required: false
+          description: >-
+            Comma-separated projection of output column names; the response columns and the
+            value order follow it. An unknown name is 400 unknown_column.
+          schema:
+            type: string
+        - name: where
+          in: query
+          required: false
+          description: >-
+            Boolean SQL predicate over the output columns. ;, --, /*, SELECT, FROM, read_,
+            ATTACH, COPY and PRAGMA are rejected with 400 invalid_filter; an unboundable
+            predicate is 400 invalid_filter too.
+          schema:
+            type: string
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'
       responses:
         '200':
-          description: Table preview
+          description: Table preview page
           content:
             application/json:
               schema:
@@ -687,6 +712,36 @@ paths:
           $ref: '#/components/responses/NotFound'
         '408':
           $ref: '#/components/responses/Timeout'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/workflows/{workflowId}/nodes/{workflowNodeId}/estimate:
+    get:
+      tags: [data]
+      operationId: estimateNodePlan
+      summary: Estimated plan cost of a materialized node
+      description: >-
+        Runs EXPLAIN (FORMAT JSON) over the node plan without executing it and returns the
+        estimated row count of the root operator, the operator tree and the raw DuckDB plan.
+        Before a run the node has no plan: 409 estimate_unavailable; a failed node is
+        409 node_failed; an unknown workflow node is 404 unknown_node.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+        - $ref: '#/components/parameters/WorkflowNodeId'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Plan estimate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estimate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
         '500':
@@ -1291,6 +1346,8 @@ components:
           oneOf:
             - $ref: '#/components/schemas/RunResult'
             - type: 'null'
+        progress:
+          $ref: '#/components/schemas/JobProgress'
         statusUrl:
           type: string
       additionalProperties: true
@@ -1351,10 +1408,64 @@ components:
               type: [string, 'null']
         preview:
           type: integer
+        offset:
+          type: integer
+          description: Requested row offset after the where filter.
+        nextOffset:
+          type: integer
+          nullable: true
+          description: Offset of the next page; null when this page is the last one.
+        truncated:
+          type: boolean
+          description: Whether more rows follow this page.
         note:
           type: string
         port:
           type: integer
+      additionalProperties: true
+    EstimateOperator:
+      type: object
+      required: [name, rows]
+      properties:
+        name:
+          type: string
+        rows:
+          type: integer
+      additionalProperties: true
+    Estimate:
+      type: object
+      required: [node, rows, operators, plan]
+      properties:
+        node:
+          type: string
+        rows:
+          type: integer
+          description: Estimated rows of the root operator (the first estimated one when the root has none).
+        operators:
+          type: array
+          items:
+            $ref: '#/components/schemas/EstimateOperator'
+        plan:
+          type: object
+          description: Raw DuckDB EXPLAIN (FORMAT JSON) output.
+          additionalProperties: true
+      additionalProperties: true
+    JobProgress:
+      type: object
+      required: [nodesTotal, nodesDone, currentNode, percent]
+      properties:
+        nodesTotal:
+          type: integer
+        nodesDone:
+          type: integer
+        currentNode:
+          type: string
+          nullable: true
+          description: Node that started or just finished; null between levels.
+        percent:
+          type: integer
+          minimum: 0
+          maximum: 100
       additionalProperties: true
     ProfileColumn:
       type: object
