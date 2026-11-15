@@ -71,7 +71,8 @@ public final class HtmlWriter {
         out.append("<style>\n")
                 .append(STYLE.replace("@PAGE@", pageSize.css() + " " + orientation.css()))
                 .append("</style>\n</head>\n");
-        out.append("<body class=\"theme-").append(document.theme().name().toLowerCase())
+        out.append("<body class=\"theme-")
+                .append(document.theme().name().toLowerCase(java.util.Locale.ROOT))
                 .append("\">\n<main>\n");
 
         if (document.title() != null && !document.title().isBlank()) {
