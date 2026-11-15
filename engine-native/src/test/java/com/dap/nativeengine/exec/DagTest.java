@@ -3,6 +3,7 @@ package com.dap.nativeengine.exec;
 import com.dap.nativeengine.api.Json;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
+import com.dap.nativeengine.nodes.SqlQueryExecutor;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -322,5 +323,22 @@ class DagTest {
         assertEquals("before", configSeen.get(), "downstream node must use the snapshot config");
         assertEquals("after", workflow.node(check.id()).config().path("value").asText());
         assertEquals("IDLE", workflow.node(late.id()).state(), "node added mid-run must not execute");
+    }
+
+    @Test
+    void sqlQueryWithoutInputsSeesTheSourceNodeId() throws Exception {
+        LazyPlan source = ExecTestSupport.plan(db, "SELECT 1 AS n UNION ALL SELECT 2 AS n", "n");
+        Executors registry = new Executors()
+                .register(ExecTestSupport.fake("dap.src", (context, inputs) -> source))
+                .register(new SqlQueryExecutor());
+        Workflow workflow = new Workflow("wf-1", "sql", "s1");
+        WorkflowNode reader = workflow.addNode("dap.src", "Src", null);
+        WorkflowNode query = workflow.addNode("dap.sql_query", "SQL",
+                (ObjectNode) Json.parse("{\"sql\":\"SELECT COUNT(*) AS n FROM \\\"1:1\\\"\"}"));
+        workflow.connect(new com.dap.nativeengine.exec.Connection(reader.id(), 0, query.id(), 0));
+
+        Map<String, LazyPlan> results = new Dag(registry).execute(workflow, db, jobConnection);
+
+        assertEquals(List.of(List.of("2")), results.get(query.id()).preview(10).data());
     }
 }

@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Runs one read-only SELECT/WITH query over the connected input tables. Each connected input is exposed under its source node id (quote it: FROM \"1:1\"); 'inputs' may name or rename a subset, and only named inputs are exposed. The output schema is read with SELECT * FROM (<sql>) LIMIT 0; LIST, STRUCT, MAP and TIMESTAMPTZ columns are rejected. DDL/DML (INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, ATTACH, DETACH, COPY, INSTALL, LOAD, PRAGMA, SET, EXPORT, IMPORT, CALL) and multiple statements are rejected before the query runs; the result is capped by 'limit'.",
+  "description": "Runs one read-only SELECT/WITH query over the connected input tables. Each connected input is exposed under its source node id (quote it: FROM \"1:1\"); 'inputs' names every connected input in port order. The output schema is read with SELECT * FROM (<sql>) LIMIT 0; LIST, STRUCT, MAP and TIMESTAMPTZ columns are rejected. DDL/DML (INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, ATTACH, DETACH, COPY, INSTALL, LOAD, PRAGMA, SET, EXPORT, IMPORT, CALL) and multiple statements are rejected before the query runs; the result is capped by 'limit'.",
   "inPorts": [
     {
       "index": 0,
@@ -41,7 +41,7 @@
       "inputs": {
         "type": "array",
         "title": "Input tables",
-        "description": "Optional table names for the connected inputs: a source node id or a free alias assigned in port order. Omit to expose every connected input under its node id; naming a subset exposes only those tables.",
+        "description": "Optional names for the connected inputs in port order; a source node id is a valid name. Omit to expose every connected input under its node id.",
         "items": {
           "type": "string",
           "title": "Node id or alias"

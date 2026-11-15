@@ -36,7 +36,7 @@ import mcp_e2e as shared  # noqa: E402 - sibling e2e helpers (client, cleanup, p
 
 RECIPE_NAME = "sales_summary"
 REQUIRED_TOOLS = {
-    "dap_ingest", "dap_recipe_list", "dap_recipe_save", "dap_recipe_run", "dap_sql",
+    "dap_ingest", "dap_recipe_list", "dap_recipe_save", "dap_recipe_run", "dap_sql", "dap_analyze",
 }
 
 
@@ -246,6 +246,24 @@ def scenario(client, source, home, report_path):
     finally:
         client.tool("dap_delete_workflow", {"workflow": workflow}, 10)
     step("dap_sql table ok")
+
+    step("dap_analyze over the ingested parquet")
+    analyzed = client.tool("dap_analyze", {
+        "dataset": cached,
+        "sql": "SELECT region, SUM(amount) AS total FROM src GROUP BY region ORDER BY region",
+    }, 90)
+    analyzed_table = analyzed.get("table") or {}
+    shared.check(analyzed_table.get("rows") == 2,
+                 "dap_analyze rows=%r, expected 2" % (analyzed_table.get("rows"),))
+    shared.check([row[0] for row in (analyzed_table.get("data") or [])] == ["north", "south"],
+                 "dap_analyze rows: %r" % (analyzed_table.get("data"),))
+    shared.check((analyzed.get("profile") or {}).get("rows") == 3,
+                 "dap_analyze profile rows=%r, expected 3"
+                 % ((analyzed.get("profile") or {}).get("rows"),))
+    shared.check(analyzed.get("cached") is False,
+                 "dap_analyze cached=%r, expected False for a dataset source"
+                 % (analyzed.get("cached"),))
+    step("dap_analyze ok")
 
 
 def run(port, timeout):

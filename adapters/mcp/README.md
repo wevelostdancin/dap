@@ -159,8 +159,8 @@ printf '%s\n' \
 | `dap_get_table` | колонки, число строк, первые N строк | `workflow`, `node`, `port` (0), `limit` (20) |
 | `dap_profile_table` | профиль: пропуски, уникальные, min/max/mean | `workflow`, `node` |
 | `dap_ingest` | один раз конвертировать CSV/Excel/JSON/Parquet в Parquet-кэш | `file`, `format`? |
-| `dap_analyze` | один вызов: файл/датасет → таблица + профиль, опционально SQL по `src` | `file`?/`dataset`?, `sql`?, `profile` (true), `limit` (20) |
-| `dap_workflow_build` | один вызов: узлы + связи + запуск + таблицы выходов | `nodes`, `edges`?, `run` (false), `outputs`?, `limit` (20) |
+| `dap_analyze` | один вызов: файл/датасет → таблица + профиль, опционально SQL по `src` | `file`?/`dataset`?, `format`?, `sql`?, `profile` (true), `limit` (20), `timeoutSec`? |
+| `dap_workflow_build` | один вызов: узлы + связи + запуск + таблицы выходов | `nodes`, `edges`?, `run` (false), `outputs`?, `limit` (20), `timeoutSec`? |
 | `dap_sql` | read-only SQL по таблице узла или по входу `src` | `workflow`, `sql`, `node`?, `limit` |
 | `dap_recipe_list` | рецепты библиотеки | — |
 | `dap_recipe_save` | сохранить workflow как рецепт | `name`, `workflow` |

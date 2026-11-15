@@ -610,6 +610,7 @@ TOOLS = [
                     ),
                 },
                 "run": {"type": "boolean", "description": "запустить после сборки", "default": False},
+                "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
                 "outputs": {
                     "type": "array",
                     "description": "ключи узлов, таблицы которых вернуть",
@@ -630,9 +631,11 @@ TOOLS = [
         "inputSchema": _obj(
             {
                 "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
+                "format": _str("формат входного файла: csv, excel, json или parquet; по умолчанию по расширению"),
                 "dataset": _str("путь к готовому Parquet-датасету (из dap_ingest)"),
                 "sql": _str("read-only SELECT/WITH; вход доступен как src"),
                 "profile": {"type": "boolean", "description": "вернуть профиль источника", "default": True},
+                "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
                 "limit": _int("строк таблицы", 20),
             },
         ),
@@ -936,7 +939,13 @@ def tool_workflow_build(args: dict):
     for index, spec in enumerate(nodes):
         if not isinstance(spec, dict) or not spec.get("factory"):
             raise DapError("каждый узел требует 'factory'", code=-32602)
-        key = str(spec.get("key") or index)
+        unknown = set(spec) - {"key", "factory", "settings"}
+        if unknown:
+            raise DapError(f"неизвестные ключи узла: {', '.join(sorted(unknown))}", code=-32602)
+        key = spec.get("key")
+        key = str(index) if key is None else str(key)
+        if not key.strip():
+            raise DapError("'key' не может быть пустым", code=-32602)
         if key in keys:
             raise DapError(f"дублирующийся ключ узла: {key}", code=-32602)
         keys.append(key)
@@ -947,57 +956,88 @@ def tool_workflow_build(args: dict):
         if not isinstance(edge, dict):
             raise DapError("edge должен быть объектом", code=-32602)
         for side in ("from", "to"):
-            if edge.get(side) not in keys:
+            if edge.get(side) is None or str(edge.get(side)) not in keys:
                 raise DapError(f"edge ссылается на неизвестный узел: {edge.get(side)}", code=-32602)
     outputs = args.get("outputs") or []
+    if not isinstance(outputs, list):
+        raise DapError("'outputs' должен быть массивом ключей", code=-32602)
+    if len(outputs) > 50:
+        raise DapError("слишком много outputs: максимум 50", code=-32602)
+    run = args.get("run", False)
+    if not isinstance(run, bool):
+        raise DapError("'run' должен быть boolean", code=-32602)
+    if outputs and not run:
+        raise DapError("'outputs' требует run=true: иначе таблицы не материализованы", code=-32602)
     for key in outputs:
-        if key not in keys:
+        if str(key) not in keys:
             raise DapError(f"outputs ссылается на неизвестный узел: {key}", code=-32602)
+    limit = int(args.get("limit") or 20)
+    if limit < 1 or limit > 1000:
+        raise DapError("'limit' должен быть от 1 до 1000", code=-32602)
     created = call("POST", "/v1/workflows", {"name": args.get("name") or "workflow"})
     workflow = created.get("id") if isinstance(created, dict) else None
     if not workflow:
         raise DapError("движок не вернул id workflow")
-    mapping = {}
-    for index, spec in enumerate(nodes):
-        key = str(spec.get("key") or index)
-        node = call("POST", f"/v1/workflows/{_seg(workflow)}/nodes",
-                    {"factory": spec["factory"], "settings": spec.get("settings")})
-        node_id = node.get("node") if isinstance(node, dict) else None
-        if not node_id:
-            raise DapError(f"движок не вернул id узла для '{key}'")
-        mapping[key] = node_id
-    for edge in edges:
-        call("POST", f"/v1/workflows/{_seg(workflow)}/connect", {
-            "from": mapping[edge["from"]], "fromPort": int(edge.get("fromPort", 0)),
-            "to": mapping[edge["to"]], "toPort": int(edge.get("toPort", 0))})
-    result = {"workflow": workflow, "nodes": mapping}
-    if args.get("run"):
-        result["run"] = call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
-    if outputs:
-        tables = {}
-        limit = int(args.get("limit", 20))
-        for key in outputs:
-            tables[key] = call("GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(mapping[key])}/table?limit={limit}")
-        result["tables"] = tables
-    return result
+    try:
+        mapping = {}
+        for index, spec in enumerate(nodes):
+            key = str(index) if spec.get("key") is None else str(spec.get("key"))
+            node = call("POST", f"/v1/workflows/{_seg(workflow)}/nodes",
+                        {"factory": spec["factory"], "settings": spec.get("settings")})
+            node_id = node.get("node") if isinstance(node, dict) else None
+            if not node_id:
+                raise DapError(f"движок не вернул id узла для '{key}'")
+            mapping[key] = node_id
+        for edge in edges:
+            call("POST", f"/v1/workflows/{_seg(workflow)}/connect", {
+                "from": mapping[str(edge["from"])], "fromPort": int(edge.get("fromPort") or 0),
+                "to": mapping[str(edge["to"])], "toPort": int(edge.get("toPort") or 0)})
+        result = {"workflow": workflow, "nodes": mapping}
+        if run:
+            result["run"] = call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
+        if outputs:
+            tables = {}
+            for key in outputs:
+                tables[str(key)] = call(
+                    "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(mapping[str(key)])}/table?limit={limit}")
+            result["tables"] = tables
+        return result
+    except Exception:
+        try:
+            call("DELETE", f"/v1/workflows/{_seg(workflow)}")
+        except Exception:
+            pass
+        raise
 
 
 def tool_analyze(args: dict):
-    source = args.get("file") or args.get("dataset")
-    if not source:
+    has_file = args.get("file") is not None and args.get("file") != ""
+    has_dataset = args.get("dataset") is not None and args.get("dataset") != ""
+    if not has_file and not has_dataset:
         raise DapError("нужен 'file' или 'dataset'", code=-32602)
+    if has_file and has_dataset:
+        raise DapError("укажите либо 'file', либо 'dataset', не оба", code=-32602)
     sql = args.get("sql")
     if sql:
         try:
             sql = RECIPES.validate_sql(str(sql))
         except RECIPES.RecipeError as failure:
             raise _recipe_error(failure)
+    limit = int(args.get("limit") or 20)
+    if limit < 1 or limit > 1000:
+        raise DapError("'limit' должен быть от 1 до 1000", code=-32602)
     cached = None
-    if args.get("file"):
-        ingested = call("POST", "/v1/datasets", {"file": args["file"]})
+    ingest_cached = False
+    source = args.get("dataset")
+    if has_file:
+        ingest_body = {"file": args["file"]}
+        if args.get("format"):
+            ingest_body["format"] = args["format"]
+        ingested = call("POST", "/v1/datasets", ingest_body)
         cached = ingested.get("path") if isinstance(ingested, dict) else None
         if not cached:
             raise DapError("движок не вернул путь Parquet-кэша")
+        ingest_cached = bool(ingested.get("cached"))
         source = cached
     created = call("POST", "/v1/workflows", {"name": "analyze"})
     workflow = created.get("id") if isinstance(created, dict) else None
@@ -1011,11 +1051,8 @@ def tool_analyze(args: dict):
             raise DapError("движок не вернул id узла parquet_reader")
         node_id = reader_id
         if sql:
-            settings = {"sql": sql, "inputs": ["src"]}
-            if args.get("limit") is not None:
-                settings["limit"] = int(args["limit"])
             query = call("POST", f"/v1/workflows/{_seg(workflow)}/nodes",
-                         {"factory": "dap.sql_query", "settings": settings})
+                         {"factory": "dap.sql_query", "settings": {"sql": sql, "inputs": ["src"]}})
             node_id = query.get("node") if isinstance(query, dict) else None
             if not node_id:
                 raise DapError("движок не вернул id узла dap.sql_query")
@@ -1023,18 +1060,19 @@ def tool_analyze(args: dict):
                  {"from": reader_id, "fromPort": 0, "to": node_id, "toPort": 0})
         run = call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
         table = call("GET",
-                     f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node_id)}/table?limit={int(args.get('limit', 20))}")
+                     f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node_id)}/table?limit={limit}")
         result = {"workflow": workflow, "node": node_id, "source": source,
-                  "cached": bool(args.get("file") and cached), "run": run, "table": table}
-        if args.get("profile", True):
+                  "cached": ingest_cached, "run": run, "table": table}
+        if args.get("profile") is not False:
             result["profile"] = call(
                 "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(reader_id)}/profile")
         return result
     finally:
         try:
             call("DELETE", f"/v1/workflows/{_seg(workflow)}")
-        except Exception:
-            pass
+        except Exception as failure:  # noqa: BLE001 - cleanup must not hide the result
+            print(f"dap-mcp: cannot delete analyze workflow {workflow}: {failure}",
+                  file=sys.stderr, flush=True)
 
 
 # ------------------------------------------------------------------ resources

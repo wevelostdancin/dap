@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -93,10 +94,10 @@ public final class SqlQueryExecutor implements NodeExecutor {
     }
 
     /**
-     * One alias per input port (null for an unconnected or unnamed port). When 'inputs'
-     * is omitted the connected source node ids are used, so {@code FROM "1:1"} just
-     * works; an explicit entry may be a source node id or a free alias assigned in port
-     * order. Naming a subset exposes only those inputs.
+     * One alias per input port (null for an unconnected port). When 'inputs' is omitted
+     * the connected source node ids are used, so {@code FROM "1:1"} just works. An
+     * explicit 'inputs' is positional: names for every connected port in port order, and
+     * a source node id is a valid name. Aliases are case-insensitive (DuckDB CTE rules).
      */
     private static List<String> aliases(JsonNode config, List<LazyPlan> inputs, List<String> inputNodeIds) {
         List<String> aliases = new ArrayList<>(java.util.Collections.nCopies(inputs.size(), null));
@@ -108,43 +109,56 @@ public final class SqlQueryExecutor implements NodeExecutor {
         }
         JsonNode node = config.get("inputs");
         if (node == null || node.isNull()) {
+            Set<String> seen = new HashSet<>();
             for (int index : connected) {
                 String id = index < inputNodeIds.size() ? inputNodeIds.get(index) : null;
                 if (id == null) {
                     throw new IllegalArgumentException("sql_query: cannot derive an alias for input port "
                             + index + "; pass 'inputs' explicitly");
                 }
+                if (seen.contains(id.toLowerCase(Locale.ROOT))) {
+                    throw new IllegalArgumentException("sql_query: source '" + id
+                            + "' is connected to more than one input port; pass 'inputs' explicitly");
+                }
+                checkAlias(id, seen);
                 aliases.set(index, id);
             }
             return aliases;
         }
         if (!node.isArray()) {
-            throw new IllegalArgumentException("sql_query: 'inputs' must be an array of node ids or aliases");
+            throw new IllegalArgumentException("sql_query: 'inputs' must be an array of aliases");
         }
-        Set<String> seen = new LinkedHashSet<>();
-        int next = 0;
+        List<String> names = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
         for (JsonNode item : node) {
             if (!item.isTextual() || item.textValue().isBlank()) {
-                throw new IllegalArgumentException("sql_query: 'inputs' must contain non-empty node ids or aliases");
+                throw new IllegalArgumentException("sql_query: 'inputs' must contain non-empty aliases");
             }
-            String entry = item.textValue();
-            if (!seen.add(entry)) {
-                throw new IllegalArgumentException("sql_query: duplicate input '" + entry + "'");
-            }
-            int port = inputNodeIds.indexOf(entry);
-            if (port >= 0 && inputs.get(port) != null) {
-                aliases.set(port, entry);
-            } else {
-                while (next < connected.size() && aliases.get(connected.get(next)) != null) {
-                    next++;
-                }
-                if (next >= connected.size()) {
-                    throw new IllegalArgumentException("sql_query: 'inputs' names more tables than connected ports");
-                }
-                aliases.set(connected.get(next), entry);
-            }
+            String name = item.textValue();
+            checkAlias(name, seen);
+            names.add(name);
+        }
+        if (names.size() != connected.size()) {
+            throw new IllegalArgumentException("sql_query: 'inputs' names " + names.size()
+                    + " tables but " + connected.size()
+                    + " input ports are connected; name every connected input in port order");
+        }
+        for (int index = 0; index < connected.size(); index++) {
+            aliases.set(connected.get(index), names.get(index));
         }
         return aliases;
+    }
+
+    /** Reject duplicate aliases (case-insensitive) and the reserved wrapper name. */
+    private static void checkAlias(String alias, Set<String> seen) {
+        if ("dap_query".equalsIgnoreCase(alias)) {
+            throw new IllegalArgumentException("sql_query: alias '" + alias
+                    + "' is reserved for the query wrapper; choose another name");
+        }
+        if (!seen.add(alias.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("sql_query: duplicate input alias '" + alias
+                    + "' (aliases are case-insensitive)");
+        }
     }
 
     /**

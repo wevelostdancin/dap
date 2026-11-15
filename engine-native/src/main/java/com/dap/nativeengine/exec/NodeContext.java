@@ -13,7 +13,8 @@ public record NodeContext(String workflowId, String nodeId, String sessionId, Ob
         if (config == null) {
             config = com.dap.nativeengine.api.Json.object();
         }
-        inputNodeIds = inputNodeIds == null ? List.of() : List.copyOf(inputNodeIds);
+        inputNodeIds = inputNodeIds == null ? List.of()
+                : java.util.Collections.unmodifiableList(new java.util.ArrayList<>(inputNodeIds));
     }
 
     /** Context without input ids, for executors that never look at them. */

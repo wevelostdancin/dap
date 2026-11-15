@@ -109,14 +109,74 @@ class SqlQueryExecutorTest {
     }
 
     @Test
-    void nodeIdAliasSelectsTheMatchingPort() throws Exception {
+    void positionalAliasesFollowPortOrder() throws Exception {
         try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
             LazyPlan left = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
             LazyPlan right = NodeTestSupport.table(db, PEOPLE,
                     List.<Object[]>of(new Object[]{9L, "zed", 9.0, "Z"}));
+            // Names are positional: port 0 is "1:2" (left), port 1 is "1:1" (right).
             LazyPlan plan = planWithInputs(db, connection, List.of(left, right),
-                    config("SELECT COUNT(*) AS n FROM \"1:2\"", "1:2"), "1:1", "1:2");
+                    config("SELECT COUNT(*) AS n FROM \"1:1\"", "1:2", "1:1"), "1:1", "1:2");
             assertEquals(List.of(List.of("1")), plan.preview(10).data());
+        }
+    }
+
+    @Test
+    void subsetOfInputsIsRejected() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            LazyPlan left = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            LazyPlan right = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> planWithInputs(db, connection, List.of(left, right),
+                            config("SELECT COUNT(*) FROM \"1:2\"", "1:2"), "1:1", "1:2"));
+            assertTrue(failure.getMessage().contains("name every connected input"), failure.getMessage());
+        }
+    }
+
+    @Test
+    void duplicateAliasesAreRejectedCaseInsensitively() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            LazyPlan left = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            LazyPlan right = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> planWithInputs(db, connection, List.of(left, right),
+                            config("SELECT 1", "A", "a"), "1:1", "1:2"));
+            assertTrue(failure.getMessage().contains("duplicate input alias"), failure.getMessage());
+        }
+    }
+
+    @Test
+    void reservedWrapperAliasIsRejected() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            LazyPlan input = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> planWithInputs(db, connection, List.of(input),
+                            config("SELECT COUNT(*) FROM dap_query", "dap_query"), "1:1"));
+            assertTrue(failure.getMessage().contains("reserved"), failure.getMessage());
+        }
+    }
+
+    @Test
+    void sameSourceOnBothPortsIsRejectedWithoutInputs() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            LazyPlan left = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            LazyPlan right = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> planWithInputs(db, connection, List.of(left, right),
+                            config("SELECT 1"), "1:1", "1:1"));
+            assertTrue(failure.getMessage().contains("more than one input port"), failure.getMessage());
+        }
+    }
+
+    @Test
+    void mismatchedInputIdListIsRejected() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            LazyPlan left = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            LazyPlan right = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> planWithInputs(db, connection, List.of(left, right),
+                            config("SELECT 1"), "1:1"));
+            assertTrue(failure.getMessage().contains("cannot derive an alias"), failure.getMessage());
         }
     }
 
