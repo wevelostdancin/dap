@@ -74,7 +74,8 @@ class NodeRegistryTest {
             "dap.text_normalize",
             "dap.fuzzy_join",
             "dap.geo_distance",
-            "dap.calendar");
+            "dap.calendar",
+            "dap.resample_test");
 
     private final NodeRegistry registry = new NodeRegistry();
 

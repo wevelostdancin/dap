@@ -2337,3 +2337,51 @@ Europe/Moscow); у `Date32` времени суток нет. `holidays` — с�
   }
 }
 ```
+
+## 62. dap.resample_test
+
+Bootstrap-доверительные интервалы и перестановочный тест на две группы; считаются в
+Java по строкам входа (не более `max_rows`), результат — литеральный план, как у
+остальных in-memory статистик. В режиме `bootstrap` наблюдения пересэмплируются с
+возвращением, выдаётся одна строка: `statistic`, `estimate`, `se` (стандартное
+отклонение пересэмплированных статистик), `ci_low`/`ci_high` (перцентильный
+интервал уровня `confidence`), `bias` (среднее пересэмплированных минус estimate),
+`n`, `resamples`. Статистики: `mean`, `median`, `sd` (выборочное, n−1),
+`correlation` (Пирсон, две колонки), `slope` (МНК-наклон второй колонки по первой).
+В режиме `permutation` метки `group` переставляются между двумя уровнями `value`,
+выдаётся одна строка: `statistic`, `observed` (разность средних или медиан: первая
+группа в лексикографическом порядке минус вторая), `p_value` (оценка «+1»:
+`(extreme + 1) / (permutations + 1)`, поэтому p никогда не 0), `n`, `permutations`.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `mode` | `bootstrap` \| `permutation` | — | обязателен |
+| `statistic` | `mean` \| `median` \| `sd` \| `correlation` \| `slope` \| `difference_mean` \| `difference_median` | — | обязателен; bootstrap принимает первые пять, permutation — две разности |
+| `columns` | array<string> | — | 1 числовая колонка для mean/median/sd, 2 различные для correlation/slope (x, y) |
+| `value` | string | — | permutation: числовая колонка значений |
+| `group` | string | — | permutation: колонка ровно с двумя уровнями |
+| `resamples` | integer | `1000` | положительное |
+| `permutations` | integer | `1000` | положительное |
+| `confidence` | number | `0.95` | в (0, 1); уровень перцентильного интервала |
+| `alternative` | `two-sided` \| `less` \| `greater` | `two-sided` | хвост permutation p-value |
+| `seed` | integer | `42` | сид одного `java.util.Random`; одинаковый сид — одинаковые числа |
+| `max_rows` | integer | `100000` | больше строк — ошибка с подсказкой |
+
+Строки с NULL в выбранных колонках исключаются. Для `sd` нужно ≥2 строк, для
+`correlation`/`slope` — ≥3 и положительная дисперсия; вырожденные пересэмплы
+(например, все x одинаковы) пропускаются. Seed детерминирует каждый draw.
+
+```json
+{
+  "factory": "dap.resample_test",
+  "settings": {
+    "mode": "bootstrap",
+    "statistic": "mean",
+    "columns": ["revenue"],
+    "resamples": 2000,
+    "confidence": 0.95,
+    "seed": 42
+  }
+}
+```

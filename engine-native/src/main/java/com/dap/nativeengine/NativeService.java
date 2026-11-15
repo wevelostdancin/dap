@@ -71,6 +71,7 @@ import com.dap.nativeengine.nodes.MathFormulaExecutor;
 import com.dap.nativeengine.nodes.MissingValueExecutor;
 import com.dap.nativeengine.nodes.ParquetReaderExecutor;
 import com.dap.nativeengine.nodes.ParquetWriterExecutor;
+import com.dap.nativeengine.nodes.ResampleTestExecutor;
 import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
 import com.dap.nativeengine.nodes.SqlQueryExecutor;
@@ -745,7 +746,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new TextNormalizeExecutor())
                 .register(new FuzzyJoinExecutor())
                 .register(new GeoDistanceExecutor())
-                .register(new CalendarExecutor());
+                .register(new CalendarExecutor())
+                .register(new ResampleTestExecutor());
     }
 
     /**
