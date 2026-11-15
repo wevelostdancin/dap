@@ -1,0 +1,113 @@
+{
+  "id": "wf-p6-joiner-asof",
+  "title": "Joiner: asof left join over an integer time column",
+  "rationale": "Pins dap.joiner how=asof: every left row takes the nearest right row at or before its ts, with equality keys.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "left",
+      "type": "file_reader",
+      "config": {
+        "path": "{DATA}/asof_left.csv",
+        "format": "csv"
+      }
+    },
+    {
+      "id": "right",
+      "type": "file_reader",
+      "config": {
+        "path": "{DATA}/asof_right.csv",
+        "format": "csv"
+      }
+    },
+    {
+      "id": "asof",
+      "type": "joiner",
+      "config": {
+        "how": "asof",
+        "left_keys": [
+          "id"
+        ],
+        "right_keys": [
+          "id"
+        ],
+        "left_time": "ts",
+        "right_time": "ts",
+        "asof_inequality": ">="
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "left",
+      "to": "asof",
+      "toPort": 0
+    },
+    {
+      "from": "right",
+      "to": "asof",
+      "toPort": 1
+    }
+  ],
+  "checks": [
+    {
+      "node": "asof",
+      "kind": "expect",
+      "rows": 3,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "ts",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "value",
+          "type": "String"
+        },
+        {
+          "name": "id (Right)",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "ts (Right)",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "quote",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          1,
+          1,
+          "A",
+          1,
+          1,
+          10
+        ],
+        [
+          1,
+          3,
+          "B",
+          1,
+          2,
+          11
+        ],
+        [
+          2,
+          2,
+          "C",
+          2,
+          1,
+          20
+        ]
+      ],
+      "order": "unordered"
+    }
+  ],
+  "notes": "left: (1,1,A),(1,3,B),(2,2,C); right: (1,1,10),(1,2,11),(2,1,20). Each left row matches the latest right ts <= its own within the id."
+}

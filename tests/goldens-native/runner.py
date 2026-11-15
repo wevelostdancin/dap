@@ -71,7 +71,10 @@ LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "so
                  "outlier_detect", "resample", "rolling", "diff", "date_range", "excel_writer",
                  "markdown_report", "chart", "data_quality",
                  "hypothesis_test", "linear_regression",
-                 "sql_query", "db_reader", "file_list"}
+                 "sql_query", "db_reader", "file_list",
+                 "file_reader", "db_writer", "text_normalize", "fuzzy_join", "geo_distance",
+                 "calendar", "chart_grid", "logistic_regression", "cluster", "pca",
+                 "resample_test", "survival", "ab_test", "time_series"}
 CHECK_KINDS = {"table", "profile", "equivalent", "expect", "expect_profile", "file"}
 
 
@@ -238,13 +241,12 @@ def native_binding(node_type, config, datasets):
             "columns": _dataset_columns(entry),
             "emptyStringIsNull": False,
         }
-    if node_type in ("db_reader", "file_list"):
-        resolved = dict(config)
-        for key in ("path", "directory"):
-            if isinstance(resolved.get(key), str):
-                resolved[key] = resolved[key].replace("{DATA}", str(DATA_DIR.resolve()))
-        return "dap." + node_type, resolved
-    return "dap." + node_type, config
+    # Any node may point at a fixture with {DATA}; file_reader/joiner goldens rely on it.
+    resolved = {
+        key: (value.replace("{DATA}", str(DATA_DIR.resolve())) if isinstance(value, str) else value)
+        for key, value in config.items()
+    }
+    return "dap." + node_type, resolved
 
 
 # ------------------------------------------------------------------- running
