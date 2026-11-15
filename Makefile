@@ -7,7 +7,7 @@ export DAP_JDK
 JAR := engine-native/target/dap-native.jar
 
 .PHONY: help build-native test-native run-native goldens goldens-validate test-mcp smoke \
-        mcp mcp-e2e dist install-e2e extensions bench bench-full image-native run-native-image lint check soak clean-native
+        mcp mcp-e2e mcp-recipe-e2e dist install-e2e extensions bench bench-full image-native run-native-image lint check soak clean-native
 
 help:
 	@echo "DAP 1.0.0 — native analytics backend for agents"
@@ -20,6 +20,7 @@ help:
 	@echo "  make smoke          black-box smoke against a running engine (DAP_BASE)"
 	@echo "  make mcp            run the stdio MCP adapter (client-facing entrypoint)"
 	@echo "  make mcp-e2e        MCP create/add/run/table e2e"
+	@echo "  make mcp-recipe-e2e MCP resources/prompts/recipes/dap_sql e2e"
 	@echo "  make dist           build the distributable dist/ (jar, adapter, CLI, checksums)"
 	@echo "  make install-e2e    install from dist/ into a temp HOME and run the stdio preflight"
 	@echo "  make extensions     install the DuckDB sqlite/postgres/httpfs extensions (network once)"
@@ -59,6 +60,9 @@ mcp: build-native
 
 mcp-e2e: build-native
 	python3 tests/mcp_e2e.py
+
+mcp-recipe-e2e: build-native
+	python3 tests/mcp_recipe_e2e.py
 
 DIST := dist
 
@@ -103,7 +107,7 @@ soak:
 lint:
 	python3 scripts/check_repo.py
 
-check: test-native goldens goldens-validate test-mcp mcp-e2e lint
+check: test-native goldens goldens-validate test-mcp mcp-e2e mcp-recipe-e2e lint
 
 clean-native:
 	rm -rf engine-native/target

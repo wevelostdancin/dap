@@ -45,9 +45,10 @@ CLIENT_CONFIGS = {
     "dsh": pathlib.Path(".dsh") / "profiles" / "desktop" / "cordis.patch.yml",
 }
 
-# The adapter currently declares 22 tools; the 1.1.0 target is >= 23 once the
-# recipes stage lands. test_min_tools_matches_declared_tools keeps this honest.
-MIN_TOOLS = 22
+# The adapter declares 26 tools: the 22 core ones plus the recipe and dap_sql
+# tools of the adaptability stage. test_min_tools_matches_declared_tools keeps
+# this honest.
+MIN_TOOLS = 26
 PREFLIGHT_TIMEOUT = 10.0
 ENGINE_START_TIMEOUT = 60.0
 PROTOCOL_VERSION = "2024-11-05"

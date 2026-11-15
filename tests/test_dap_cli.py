@@ -400,7 +400,7 @@ class DoctorTest(unittest.TestCase):
         jar.parent.mkdir(parents=True, exist_ok=True)
         jar.write_bytes(b"")
 
-    def make_adapter(self, count=23, body=None):
+    def make_adapter(self, count=26, body=None):
         path = self.home / "adapters" / "mcp" / "dap_mcp.py"
         path.parent.mkdir(parents=True, exist_ok=True)
         text = body if body is not None else FAKE_ADAPTER.replace("COUNT", str(count))
@@ -416,16 +416,16 @@ class DoctorTest(unittest.TestCase):
 
     def test_all_checks_pass(self):
         self.make_jar()
-        self.make_adapter(23)
+        self.make_adapter(26)
         self.make_config()
         code, out, err = self.doctor()
         self.assertEqual(code, 0, out + err)
         for name in ("python", "jar", "engine", "preflight", "config", "port"):
             self.assertRegex(out, rf"PASS  {name}\b")
-        self.assertIn("tools/list returned 23 tools", out)
+        self.assertIn("tools/list returned 26 tools", out)
 
     def test_missing_jar_fails(self):
-        self.make_adapter(23)
+        self.make_adapter(26)
         self.make_config()
         code, out, err = self.doctor()
         self.assertEqual(code, 1)
@@ -434,7 +434,7 @@ class DoctorTest(unittest.TestCase):
 
     def test_config_without_dap_fails(self):
         self.make_jar()
-        self.make_adapter(23)
+        self.make_adapter(26)
         self.make_config(text=SIBLING_CONFIG)
         code, out, err = self.doctor()
         self.assertEqual(code, 1)
@@ -443,16 +443,16 @@ class DoctorTest(unittest.TestCase):
 
     def test_missing_config_fails(self):
         self.make_jar()
-        self.make_adapter(23)
+        self.make_adapter(26)
         code, out, err = self.doctor()
         self.assertEqual(code, 1)
         self.assertRegex(out, r"FAIL  config\b")
 
     def test_preflight_counts_tools(self):
         self.make_jar()
-        self.make_adapter(23)
+        self.make_adapter(26)
         cli = load_cli()
-        self.assertEqual(cli.stdio_preflight(self.home), 23)
+        self.assertEqual(cli.stdio_preflight(self.home), 26)
 
     def test_preflight_below_minimum_fails(self):
         self.make_jar()
@@ -471,7 +471,7 @@ class DoctorTest(unittest.TestCase):
 
     def test_json_output(self):
         self.make_jar()
-        self.make_adapter(23)
+        self.make_adapter(26)
         self.make_config()
         code, out, err = self.doctor("--json")
         self.assertEqual(code, 0, err)
@@ -496,9 +496,10 @@ class DoctorStartsEngineTest(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory(prefix="dap-doctor-engine-")
         self.addCleanup(self._tmp.cleanup)
         self.home = pathlib.Path(self._tmp.name)
-        adapter = self.home / "adapters" / "mcp" / "dap_mcp.py"
-        adapter.parent.mkdir(parents=True)
-        shutil.copyfile(ROOT / "adapters" / "mcp" / "dap_mcp.py", adapter)
+        adapter_dir = self.home / "adapters" / "mcp"
+        adapter_dir.mkdir(parents=True)
+        for source in (ROOT / "adapters" / "mcp").glob("*.py"):
+            shutil.copyfile(source, adapter_dir / source.name)
         jar = self.home / "engine-native" / "target" / "dap-native.jar"
         jar.parent.mkdir(parents=True)
         jar.symlink_to(JAR)

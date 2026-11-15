@@ -19,10 +19,13 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -45,6 +48,24 @@ _CHILD: subprocess.Popen | None = None
 # Boot generation of the engine we talked to last, and a pending restart notice.
 _GENERATION: str | None = None
 _RESTART_PENDING = False
+
+# --------------------------------------------------------------- sibling modules
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load_sibling(name: str, filename: str):
+    """Load a sibling module by path, so the adapter runs as a script and as a module."""
+    spec = importlib.util.spec_from_file_location(name, os.path.join(HERE, filename))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load {filename}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+RESOURCES = _load_sibling("dap_mcp_resources", "resources.py")
+RECIPES = _load_sibling("dap_mcp_recipes", "recipes.py")
 
 
 class DapError(Exception):
@@ -480,6 +501,80 @@ TOOLS = [
         ),
     },
     {
+        "name": "dap_recipe_list",
+        "description": (
+            "Список сохранённых рецептов из $DAP_HOME/recipes: имя, описание, теги, "
+            "объявленные параметры и признак параметра dataset."
+        ),
+        "inputSchema": _obj({}),
+    },
+    {
+        "name": "dap_recipe_save",
+        "description": (
+            "Сохранить пайплайн как рецепт: workflow JSON (dap-native-workflow/1) или id "
+            "workflow движка пишется в $DAP_HOME/recipes/<name>.json с блоком recipe. "
+            "Имя не может содержать разделители пути."
+        ),
+        "inputSchema": _obj(
+            {
+                "name": _str("имя рецепта (файл <name>.json в библиотеке; без разделителей пути)"),
+                "workflow": {
+                    "type": ["object", "string"],
+                    "description": (
+                        "workflow JSON (dap-native-workflow/1) или id workflow, "
+                        "сохранённого в движке"
+                    ),
+                },
+                "description": _str("описание для библиотеки рецептов"),
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "теги для поиска в библиотеке",
+                },
+            },
+            ["name", "workflow"],
+        ),
+    },
+    {
+        "name": "dap_recipe_run",
+        "description": (
+            "Загрузить сохранённый рецепт, применить dataset и params к настройкам узлов, "
+            "выполнить workflow и вернуть таблицу выходного узла. Сам рецепт не меняется."
+        ),
+        "inputSchema": _obj(
+            {
+                "name": _str("имя сохранённого рецепта (dap_recipe_list)"),
+                "dataset": _str(
+                    "путь к файлу данных: привязывается к reader-узлу рецепта "
+                    "(recipe.dataset или первый reader с настройкой file)"
+                ),
+                "params": _obj_prop("переопределения настроек: имя параметра -> значение"),
+                "limit": _int("сколько строк таблицы вернуть", 20),
+                "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
+            },
+            ["name"],
+        ),
+    },
+    {
+        "name": "dap_sql",
+        "description": (
+            "Добавить узел dap.sql_query в workflow, выполнить его и вернуть таблицу. "
+            "Принимает один read-only SELECT/WITH; DDL/DML и несколько стейтментов "
+            "отклоняются до обращения к движку. Если передан node, его таблица доступна "
+            "в SQL под именем node id (в кавычках, например \"1:1\")."
+        ),
+        "inputSchema": _obj(
+            {
+                "workflow": _str(_WF),
+                "node": _str("опционально: узел-источник, чья таблица доступна в SQL"),
+                "sql": _str("один SELECT или WITH; DDL/DML и несколько стейтментов запрещены"),
+                "limit": _int("сколько строк таблицы вернуть", 20),
+                "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
+            },
+            ["workflow", "sql"],
+        ),
+    },
+    {
         "name": "dap_shutdown",
         "description": "Остановить движок DAP на этом порту. Следующий вызов инструмента поднимет его заново.",
         "inputSchema": _obj({}),
@@ -634,6 +729,166 @@ def tool_load_workflow(args: dict):
     return call("POST", "/v1/workflows/load", body)
 
 
+# -------------------------------------------------------------------- recipes
+
+def _recipe_error(failure: RECIPES.RecipeError) -> DapError:
+    return DapError(str(failure), code=-32602, data=failure.data)
+
+
+def _workflow_document(workflow) -> dict:
+    """A workflow JSON object, or the document of a workflow id saved by the engine."""
+    if isinstance(workflow, dict):
+        return workflow
+    if isinstance(workflow, str) and workflow.strip():
+        directory = tempfile.mkdtemp(prefix="dap-recipe-save-")
+        try:
+            call("POST", f"/v1/workflows/{_seg(workflow)}/save", {"dir": directory})
+            with open(os.path.join(directory, "workflow.json"), "r", encoding="utf-8") as stream:
+                return json.load(stream)
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+    raise DapError(
+        "workflow должен быть объектом workflow JSON или id workflow",
+        code=-32602,
+    )
+
+
+def tool_recipe_list(_args: dict):
+    return {"recipes": RECIPES.list_recipes(DAP_HOME)}
+
+
+def tool_recipe_save(args: dict):
+    name = _need(args, "name")
+    document = _workflow_document(_need(args, "workflow"))
+    try:
+        saved = RECIPES.save_recipe(
+            DAP_HOME,
+            name,
+            document,
+            description=args.get("description"),
+            tags=args.get("tags"),
+        )
+    except RECIPES.RecipeError as failure:
+        raise _recipe_error(failure)
+    return {
+        "name": saved["recipe"]["name"],
+        "path": RECIPES.recipe_path(DAP_HOME, name),
+        "recipe": saved["recipe"],
+        "nodes": len(saved["nodes"]),
+    }
+
+
+def tool_recipe_run(args: dict):
+    name = _need(args, "name")
+    try:
+        document = RECIPES.load_recipe(DAP_HOME, name)
+        bound, applied = RECIPES.bind_recipe(
+            document, args.get("dataset"), args.get("params")
+        )
+    except RECIPES.RecipeError as failure:
+        raise _recipe_error(failure)
+    output = RECIPES.output_node(bound)
+    position = RECIPES.node_position(bound, output) if output else None
+    if position is None:
+        raise DapError(f"рецепт {name}: не найден выходной узел", code=-32602)
+    directory = tempfile.mkdtemp(prefix="dap-recipe-run-")
+    try:
+        with open(os.path.join(directory, "workflow.json"), "w", encoding="utf-8") as stream:
+            json.dump(bound, stream, ensure_ascii=False)
+        loaded = call("POST", "/v1/workflows/load", {"dir": directory, "name": str(name)})
+        workflow = loaded.get("id") if isinstance(loaded, dict) else None
+        if not workflow:
+            raise DapError(f"движок не вернул id workflow для рецепта {name}")
+        try:
+            nodes = (call("GET", f"/v1/workflows/{_seg(workflow)}/nodes") or {}).get("nodes") or []
+            if position >= len(nodes):
+                raise DapError(
+                    f"загруженный рецепт {name}: узлов {len(nodes)}, ожидался хотя бы {position + 1}"
+                )
+            node = nodes[position].get("node")
+            call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
+            query = urllib.parse.urlencode(
+                {"port": 0, "limit": int(args.get("limit", 20))}
+            )
+            table = call(
+                "GET",
+                f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/table?{query}",
+            )
+        finally:
+            try:
+                call("DELETE", f"/v1/workflows/{_seg(workflow)}")
+            except DapError:
+                pass
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+    return {
+        "recipe": name,
+        "workflow": workflow,
+        "node": node,
+        "table": table,
+        "applied": applied,
+    }
+
+
+def tool_sql(args: dict):
+    workflow = _need(args, "workflow")
+    try:
+        sql = RECIPES.validate_sql(_need(args, "sql"))
+    except RECIPES.RecipeError as failure:
+        raise _recipe_error(failure)
+    settings = {"sql": sql}
+    if args.get("limit") is not None:
+        settings["limit"] = int(args["limit"])
+    upstream = args.get("node")
+    if upstream:
+        settings["inputs"] = [str(upstream)]
+    created = call(
+        "POST",
+        f"/v1/workflows/{_seg(workflow)}/nodes",
+        {"factory": "dap.sql_query", "settings": settings},
+    )
+    node = created.get("node") if isinstance(created, dict) else None
+    if not node:
+        raise DapError("движок не вернул id узла dap.sql_query")
+    if upstream:
+        call(
+            "POST",
+            f"/v1/workflows/{_seg(workflow)}/connect",
+            {"from": str(upstream), "fromPort": 0, "to": node, "toPort": 0},
+        )
+    call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
+    query = urllib.parse.urlencode({"port": 0, "limit": int(args.get("limit", 20))})
+    table = call(
+        "GET",
+        f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/table?{query}",
+    )
+    return {"workflow": workflow, "node": node, "table": table}
+
+
+# ------------------------------------------------------------------ resources
+
+def _resource_error(message: str, uri: str | None = None) -> DapError:
+    return DapError(message, code=-32602, data={"uri": uri} if uri else None)
+
+
+def read_resource(uri: str) -> str:
+    """Return the JSON text of one MCP resource; engine errors propagate as DapError."""
+    try:
+        kind, name = RESOURCES.parse_uri(uri)
+    except RESOURCES.ResourceError as failure:
+        raise _resource_error(str(failure), uri)
+    if kind == "catalog":
+        ensure_service()
+        return RESOURCES.render_catalog(call("GET", "/v1/nodes?limit=1000"))
+    if kind == "recipes":
+        return RESOURCES.render_recipes(RECIPES.list_recipes(DAP_HOME))
+    try:
+        document = RECIPES.load_recipe(DAP_HOME, name)
+    except RECIPES.RecipeError as failure:
+        raise DapError(str(failure), code=-32602, data=failure.data or {"name": name})
+    return RESOURCES.render_recipe(document, name)
+
+
 def _reap_child() -> None:
     """Дождаться собственного дочернего процесса после shutdown (без зомби)."""
     global _CHILD
@@ -681,6 +936,10 @@ HANDLERS = {
     "dap_ingest": tool_ingest,
     "dap_save_workflow": tool_save_workflow,
     "dap_load_workflow": tool_load_workflow,
+    "dap_recipe_list": tool_recipe_list,
+    "dap_recipe_save": tool_recipe_save,
+    "dap_recipe_run": tool_recipe_run,
+    "dap_sql": tool_sql,
     "dap_shutdown": tool_shutdown,
 }
 
@@ -720,7 +979,11 @@ def handle(msg: dict) -> None:
             msg_id,
             {
                 "protocolVersion": version,
-                "capabilities": {"tools": {"listChanged": False}},
+                "capabilities": {
+                    "tools": {"listChanged": False},
+                    "resources": {"listChanged": False},
+                    "prompts": {"listChanged": False},
+                },
                 "serverInfo": {"name": "dap-mcp", "version": "1.0.0"},
             },
         )
@@ -728,6 +991,54 @@ def handle(msg: dict) -> None:
 
     if method == "ping":
         respond(msg_id, {})
+        return
+
+    if method == "prompts/list":
+        respond(msg_id, {"prompts": RESOURCES.list_prompts()})
+        return
+
+    if method == "prompts/get":
+        name = params.get("name")
+        if not isinstance(name, str) or not name.strip():
+            fail(msg_id, -32602, "prompts/get: 'name' is required")
+            return
+        try:
+            prompt = RESOURCES.render_prompt(name, params.get("arguments"))
+        except RESOURCES.PromptError as e:
+            fail(msg_id, -32602, str(e), e.data)
+            return
+        respond(
+            msg_id,
+            {
+                "description": prompt["description"],
+                "messages": [
+                    {"role": "user", "content": {"type": "text", "text": prompt["text"]}}
+                ],
+            },
+        )
+        return
+
+    if method == "resources/list":
+        respond(msg_id, {"resources": RESOURCES.list_resources()})
+        return
+
+    if method == "resources/read":
+        uri = params.get("uri")
+        if not isinstance(uri, str) or not uri.strip():
+            fail(msg_id, -32602, "resources/read: 'uri' is required")
+            return
+        try:
+            text = read_resource(uri)
+        except DapError as e:
+            note = _restart_note() if e.code in (-32000, -32001) else ""
+            fail(msg_id, e.code, note + str(e), e.data)
+        except Exception as e:  # noqa: BLE001 — граница протокола
+            fail(msg_id, -32603, f"{type(e).__name__}: {e}")
+        else:
+            respond(
+                msg_id,
+                {"contents": [{"uri": uri, "mimeType": "application/json", "text": text}]},
+            )
         return
 
     if method == "tools/list":
