@@ -24,7 +24,8 @@ public record ReportDocument(Format format, String title, String subtitle, Strin
     public enum Format {
         MD,
         HTML,
-        PDF
+        PDF,
+        PPTX
     }
 
     /** Colour palette; HTML uses the full palette, PDF and PPTX only its accent colour. */

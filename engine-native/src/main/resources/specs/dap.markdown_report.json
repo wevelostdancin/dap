@@ -74,10 +74,11 @@
         "enum": [
           "md",
           "html",
-          "pdf"
+          "pdf",
+          "pptx"
         ],
         "default": "md",
-        "description": "Output format: md - Markdown; html - one self-contained HTML file with embedded CSS, tables, images and an optional table of contents; pdf - paginated A4/Letter document with text, tables and images."
+        "description": "Output format: md - Markdown; html - one self-contained HTML file with embedded CSS, tables, images and an optional table of contents; pdf - paginated A4/Letter document with text, tables and images; pptx - PowerPoint deck with one slide per section (page_break is ignored)."
       },
       "title": {
         "type": "string",

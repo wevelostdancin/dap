@@ -391,4 +391,22 @@ class MarkdownReportExecutorTest {
             assertTrue(content.contains("/MediaBox [0 0 792 612]"), content);
         }
     }
+
+    @Test
+    void pptxFormatWritesZipPresentation() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            LazyPlan first = input(db);
+            Path file = dir.resolve("deck.pptx");
+            LazyPlan plan = execute(db, job, file,
+                    ",\"format\":\"pptx\",\"sections\":[{\"kind\":\"table\",\"title\":\"Rows\","
+                            + "\"columns\":[\"id\"],\"limit\":2}]",
+                    List.of(first));
+
+            assertSame(first, plan, "pptx reports still pass input port 0 through");
+            byte[] bytes = Files.readAllBytes(file);
+            assertTrue(bytes.length > 1000, "pptx size " + bytes.length);
+            assertEquals('P', bytes[0]);
+            assertEquals('K', bytes[1]);
+        }
+    }
 }

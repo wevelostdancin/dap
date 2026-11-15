@@ -21,6 +21,7 @@ public final class ReportWriter {
             case MD -> markdown(document).getBytes(StandardCharsets.UTF_8);
             case HTML -> new HtmlWriter().write(document);
             case PDF -> new PdfWriter().write(document);
+            case PPTX -> new PptxWriter().write(document);
         };
     }
 
