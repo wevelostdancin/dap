@@ -14,6 +14,10 @@ workspace/
 __pycache__/
 *.pyc
 
+# The user-global gitignore excludes every coverage/ directory; the task suite is tracked.
+!tests/coverage/
+!tests/coverage/**
+
 # Logs and OS metadata
 *.log
 .DS_Store

@@ -311,6 +311,52 @@ public final class DuckDbSession implements AutoCloseable {
         }
     }
 
+    /**
+     * Declared output columns of a query: {@code SELECT * FROM (<sql>) LIMIT 0} plus JDBC
+     * metadata, mapped through {@link TypeMap}. Nested result types (LIST, STRUCT, MAP)
+     * and TIMESTAMPTZ are rejected with the column name because the engine has no Arrow
+     * representation for them; duplicate result aliases get deterministic {@code a_1},
+     * {@code a_2} suffixes so /profile can address every column.
+     */
+    public List<ColumnSpec> describe(Connection connection, String sql) throws SQLException {
+        Objects.requireNonNull(connection, "connection");
+        if (sql == null || sql.isBlank()) {
+            throw new IllegalArgumentException("sql must not be empty");
+        }
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT * FROM (" + LazyPlan.stripSemicolon(sql) + "\n) AS dap_describe LIMIT 0")) {
+            ResultSetMetaData metadata = result.getMetaData();
+            List<ColumnSpec> columns = new ArrayList<>(metadata.getColumnCount());
+            Set<String> names = new LinkedHashSet<>();
+            for (int index = 1; index <= metadata.getColumnCount(); index++) {
+                String name = metadata.getColumnName(index);
+                String duckDbType = metadata.getColumnTypeName(index);
+                String arrowType;
+                try {
+                    arrowType = TypeMap.fromDuckDb(duckDbType);
+                } catch (IllegalArgumentException unsupported) {
+                    throw ApiException.badRequest("sql_type_not_supported",
+                            "column '" + name + "' has unsupported type " + duckDbType,
+                            "LIST, STRUCT, MAP and TIMESTAMPTZ columns cannot be returned; "
+                                    + "cast the column to a scalar type in the query");
+                }
+                columns.add(ColumnSpec.of(uniqueName(names, name), arrowType));
+            }
+            return columns;
+        }
+    }
+
+    private static String uniqueName(Set<String> used, String name) {
+        String candidate = name;
+        int suffix = 1;
+        while (!used.add(candidate)) {
+            candidate = name + "_" + suffix;
+            suffix++;
+        }
+        return candidate;
+    }
+
     public long count(String sql) throws SQLException {
         try (DuckDBConnection connection = newConnection();
              Statement statement = connection.createStatement()) {

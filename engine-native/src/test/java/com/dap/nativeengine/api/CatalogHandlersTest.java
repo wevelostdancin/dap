@@ -61,9 +61,9 @@ class CatalogHandlersTest {
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(44, body.path("count").asInt());
+        assertEquals(45, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(44, nodes.size());
+        assertEquals(45, nodes.size());
                 assertEquals(List.of(
                 "Binner", "Column Filter", "Column Renamer",
                 "Column Resorter", "Concatenate", "Correlation",
@@ -77,7 +77,7 @@ class CatalogHandlersTest {
                 "Parquet Writer", "Pivot", "Quantile",
                 "Resample", "Rolling", "Row Aggregator",
                 "Row Filter", "Rule Engine", "Sample Rows",
-                "Sorter", "String Manipulation", "Top N per Group",
+                "Sorter", "SQL Query", "String Manipulation", "Top N per Group",
                 "Type Cast", "Unpivot", "Value Counts",
                 "Value Replace", "Window"), names(nodes));
 

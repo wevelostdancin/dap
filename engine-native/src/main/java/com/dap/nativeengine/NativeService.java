@@ -55,6 +55,7 @@ import com.dap.nativeengine.nodes.ParquetReaderExecutor;
 import com.dap.nativeengine.nodes.ParquetWriterExecutor;
 import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
+import com.dap.nativeengine.nodes.SqlQueryExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
 import io.javalin.Javalin;
 
@@ -498,7 +499,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new GroupByExecutor())
                 .register(new JoinerExecutor())
                 .register(new StringManipulationExecutor())
-                .register(new MathFormulaExecutor());
+                .register(new MathFormulaExecutor())
+                .register(new SqlQueryExecutor());
     }
 
     public static void main(String[] args) {

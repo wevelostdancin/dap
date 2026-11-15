@@ -1,0 +1,85 @@
+{
+  "id": "wf-n6-sql-query",
+  "title": "P5: SQL query over two node outputs",
+  "rationale": "Pins dap.sql_query end to end: two reader inputs exposed as CTE tables, an aggregate over a join, and the declared result schema.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src_a",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "src_b",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "q",
+      "type": "sql_query",
+      "config": {
+        "sql": "SELECT a.category, COUNT(*) AS n, SUM(a.score) AS total FROM src_a a JOIN src_b b ON a.id = b.id GROUP BY a.category ORDER BY a.category",
+        "inputs": [
+          "src_a",
+          "src_b"
+        ],
+        "limit": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src_a",
+      "to": "q"
+    },
+    {
+      "from": "src_b",
+      "to": "q",
+      "toPort": 1
+    }
+  ],
+  "checks": [
+    {
+      "node": "q",
+      "kind": "expect",
+      "rows": 3,
+      "columns": [
+        {
+          "name": "category",
+          "type": "String"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "total",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          "A",
+          5,
+          13.0
+        ],
+        [
+          "B",
+          2,
+          7.0
+        ],
+        [
+          "C",
+          1,
+          4.0
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "p2.csv: id=3 appears twice (gamma, score 3). Joining P2 on id keeps 8 rows; per category A=5/13.0, B=2/7.0, C=1/4.0. ORDER BY category makes the order deterministic."
+}

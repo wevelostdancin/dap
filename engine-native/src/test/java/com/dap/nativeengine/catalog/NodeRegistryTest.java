@@ -58,7 +58,8 @@ class NodeRegistryTest {
             "dap.rolling",
             "dap.diff",
             "dap.date_range",
-            "dap.excel_writer");
+            "dap.excel_writer",
+            "dap.sql_query");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -110,7 +111,8 @@ class NodeRegistryTest {
     @Test
     void sourcesHaveNoInputsAndManipulatorsHaveOne() {
         for (NodeSpec spec : registry.all()) {
-            if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")) {
+            if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")
+                    || spec.id().equals("dap.sql_query")) {
                 continue;
             }
             if (spec.type().equals("Source")) {
