@@ -22,6 +22,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -319,6 +320,7 @@ def _obj_prop(desc: str) -> dict:
 _WF = "идентификатор workflow (выдаёт dap_workflow_create, вид wf-1)"
 _NODE = "идентификатор узла внутри workflow (выдаёт dap_add_node, вид 0:1)"
 _SETTINGS = "плоский объект настроек по configKey из dap_node_dialog_schema"
+_TABLE_FORMATS = ("json", "objects", "csv", "markdown")
 
 
 TOOLS = [
@@ -469,13 +471,40 @@ TOOLS = [
     },
     {
         "name": "dap_get_table",
-        "description": "Прочитать выходную таблицу узла: колонки с типами, число строк и первые N строк.",
+        "description": (
+            "Прочитать выходную таблицу узла: колонки с типами, число строк и строки. "
+            "Пагинация (offset/nextOffset/truncated), проекция (columns), фильтр (where) "
+            "и компактные форматы (objects/csv/markdown) экономят контекст агента."
+        ),
         "inputSchema": _obj(
             {
                 "workflow": _str(_WF),
                 "node": _str(_NODE),
                 "port": _int("индекс выходного порта", 0),
                 "limit": _int("сколько строк вернуть", 20),
+                "offset": _int("пропустить N строк после фильтра (>= 0)", 0),
+                "columns": {
+                    "type": ["array", "string"],
+                    "items": {"type": "string"},
+                    "description": "проекция: имена колонок массивом или строкой через запятую",
+                },
+                "where": _str(
+                    "SQL-предикат над выходными колонками, например \"total > 10\"; "
+                    "запрещены ';', '--', '/*', SELECT, FROM и read_*"
+                ),
+                "format": {
+                    "type": "string",
+                    "enum": list(_TABLE_FORMATS),
+                    "description": "json (по умолчанию), objects (строки-объекты), csv, markdown",
+                    "default": "json",
+                },
+                "maxCellChars": _int(
+                    "обрезать значение ячейки до N символов с многоточием", 200),
+                "includeColumns": {
+                    "type": "boolean",
+                    "description": "вернуть список колонок (false — только data)",
+                    "default": True,
+                },
             },
             ["workflow", "node"],
         ),
@@ -840,11 +869,203 @@ def tool_list_jobs(_args: dict):
     return call("GET", "/v1/jobs")
 
 
+# ------------------------------------------------------------------ get_table
+
+_DEFAULT_MAX_CELL_CHARS = 200
+# A filter is one SQL predicate over the output columns. Anything that could start
+# a second statement or a file scan is rejected here, before the HTTP call.
+_FILTER_FRAGMENTS = (";", "--", "/*")
+_FILTER_WORDS = re.compile(r"\b(select|from)\b", re.IGNORECASE)
+_QUOTED_SPAN = re.compile(r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"")
+
+
+def _offset_arg(args: dict) -> int:
+    value = args.get("offset")
+    if value is None or value == "":
+        return 0
+    try:
+        offset = int(value)
+    except (TypeError, ValueError):
+        raise DapError("'offset' должен быть целым числом >= 0", code=-32602)
+    if offset < 0:
+        raise DapError("'offset' должен быть >= 0", code=-32602)
+    return offset
+
+
+def _columns_arg(args: dict) -> list[str] | None:
+    """Column projection: an array of names or one comma-separated string."""
+    value = args.get("columns")
+    if value is None:
+        return None
+    if isinstance(value, str):
+        names = value.split(",")
+    elif isinstance(value, list):
+        names = [str(item) for item in value]
+    else:
+        raise DapError(
+            "'columns' должен быть массивом имён или строкой через запятую", code=-32602)
+    names = [name.strip() for name in names if str(name).strip()]
+    return names or None
+
+
+def _where_arg(args: dict) -> str | None:
+    """One SQL predicate over the output columns, validated before the HTTP call."""
+    value = args.get("where")
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    # String literals are data, not SQL: check only the code around them.
+    code = _QUOTED_SPAN.sub(" ", text)
+    for fragment in _FILTER_FRAGMENTS:
+        if fragment in code:
+            raise DapError(
+                f"'where': запрещён фрагмент {fragment!r} в предикате",
+                code=-32602, data={"code": "invalid_filter"},
+            )
+    if _FILTER_WORDS.search(code) or "read_" in code.lower():
+        raise DapError(
+            "'where' принимает только предикат над выходными колонками; "
+            "SELECT, FROM и read_* запрещены",
+            code=-32602, data={"code": "invalid_filter"},
+        )
+    return text
+
+
+def _max_cell_chars(args: dict) -> int:
+    value = args.get("maxCellChars")
+    if value is None:
+        return _DEFAULT_MAX_CELL_CHARS
+    try:
+        chars = int(value)
+    except (TypeError, ValueError):
+        raise DapError("'maxCellChars' должен быть целым числом >= 0", code=-32602)
+    if chars < 0:
+        raise DapError("'maxCellChars' должен быть >= 0", code=-32602)
+    return chars
+
+
+def _cell_text(value, max_chars: int) -> str:
+    text = "" if value is None else str(value)
+    if len(text) > max_chars:
+        return text[:max_chars - 1] + "\u2026" if max_chars else ""
+    return text
+
+
+def _column_names(table: dict) -> list[str]:
+    names = []
+    for column in table.get("columns") or []:
+        if isinstance(column, dict):
+            names.append(str(column.get("name", "")))
+        else:
+            names.append(str(column))
+    return names
+
+
+def _csv_cell(text: str) -> str:
+    if any(char in text for char in ',"\n\r'):
+        return '"' + text.replace('"', '""') + '"'
+    return text
+
+
+def _csv_text(names: list[str], rows: list[list[str]]) -> str:
+    lines = [",".join(_csv_cell(name) for name in names)]
+    lines.extend(",".join(_csv_cell(cell) for cell in row) for row in rows)
+    return "\n".join(lines) + "\n"
+
+
+def _markdown_cell(text: str) -> str:
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def _markdown_text(names: list[str], rows: list[list[str]]) -> str:
+    lines = ["| " + " | ".join(_markdown_cell(name) for name in names) + " |",
+             "| " + " | ".join("---" for _ in names) + " |"]
+    lines.extend("| " + " | ".join(_markdown_cell(cell) for cell in row) + " |"
+                 for row in rows)
+    return "\n".join(lines) + "\n"
+
+
+def _page_meta(table: dict, offset: int, limit: int) -> tuple[int, int | None]:
+    """(offset, nextOffset): the engine's paging fields, computed when absent."""
+    data = table.get("data")
+    count = len(data) if isinstance(data, list) else 0
+    current = table.get("offset")
+    current = current if isinstance(current, int) and not isinstance(current, bool) else offset
+    if "nextOffset" in table:
+        following = table["nextOffset"]
+    elif "truncated" in table:
+        following = current + count if table["truncated"] else None
+    else:
+        total = table.get("rows")
+        if isinstance(total, int) and not isinstance(total, bool):
+            following = current + count if current + count < total else None
+        else:
+            following = current + count if count == limit else None
+    if not isinstance(following, int) or isinstance(following, bool) or following <= current:
+        following = None
+    return current, following
+
+
+def _format_table(table: dict, fmt: str, offset: int, limit: int,
+                  max_chars: int, include_columns: bool) -> dict:
+    if not isinstance(table, dict):
+        table = {"data": table if isinstance(table, list) else []}
+    names = _column_names(table)
+    data = table.get("data")
+    data = data if isinstance(data, list) else []
+    rows = []
+    for row in data:
+        values = list(row) if isinstance(row, (list, tuple)) else [row]
+        rows.append([_cell_text(values[index] if index < len(values) else None, max_chars)
+                     for index in range(len(names) or len(values))])
+    if not names:
+        names = [str(index) for index in range(len(rows[0]) if rows else 0)]
+    current, following = _page_meta(table, offset, limit)
+    total = table.get("rows")
+    total = total if isinstance(total, int) and not isinstance(total, bool) else current + len(rows)
+    meta = {"offset": current, "nextOffset": following, "truncated": following is not None}
+    if fmt == "csv":
+        return dict({"format": "csv", "text": _csv_text(names, rows), "rows": total}, **meta)
+    if fmt == "markdown":
+        return dict({"format": "markdown", "text": _markdown_text(names, rows), "rows": total},
+                    **meta)
+    if fmt == "objects":
+        result = {"rows": total,
+                  "data": [dict(zip(names, row)) for row in rows]}
+        if include_columns:
+            result["columns"] = table.get("columns")
+        return dict(result, **meta)
+    result = dict(table)
+    result["rows"] = total
+    result["data"] = rows
+    result.update(meta)
+    if not include_columns:
+        result.pop("columns", None)
+    return result
+
+
 def tool_get_table(args: dict):
-    query = urllib.parse.urlencode(
-        {"port": int(args.get("port", 0)), "limit": int(args.get("limit", 20))}
-    )
-    return call("GET", f"{_node_url(args)}/table?{query}")
+    fmt = str(args.get("format") or "json").strip().lower()
+    if fmt not in _TABLE_FORMATS:
+        raise DapError(
+            "'format' должен быть один из: " + ", ".join(_TABLE_FORMATS), code=-32602)
+    offset = _offset_arg(args)
+    columns = _columns_arg(args)
+    where = _where_arg(args)
+    max_chars = _max_cell_chars(args)
+    include_columns = args.get("includeColumns") is not False
+    limit = _table_limit(args)
+    query = {"port": int(args.get("port", 0)), "limit": limit}
+    if offset:
+        query["offset"] = offset
+    if columns:
+        query["columns"] = ",".join(columns)
+    if where:
+        query["where"] = where
+    table = call("GET", f"{_node_url(args)}/table?{urllib.parse.urlencode(query)}")
+    return _format_table(table, fmt, offset, limit, max_chars, include_columns)
 
 
 def tool_profile_table(args: dict):
