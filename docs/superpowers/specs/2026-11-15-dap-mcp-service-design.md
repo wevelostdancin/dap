@@ -159,7 +159,7 @@ DAP 1.0.0 — локальный аналитический движок (Java 2
 
 **Hermes** (проверено по документации и исходникам): `~/.hermes/config.yaml`, ключ `mcp_servers.dap`; поля `command`, `args`, `env`, `cwd`, `enabled`, `timeout` (по умолчанию 300 с), `connect_timeout` (60 с), `lazy`, `tools.include/exclude`, `tools.resources`, `tools.prompts`. `install` пишет `command: python3`, `args: [<abs>/adapters/mcp/dap_mcp.py]`, `env: {DAP_HOME, JAVA_HOME, DAP_PORT, DAP_HEAP}`, `tools: {resources: true, prompts: true}`; окружение Hermes не наследует shell, поэтому все пути — абсолютные. Проверка: `hermes mcp test dap` (код 0) и `tools/list`.
 
-**DSH**: `install` находит конфиг MCP-клиента DSH (путь и формат определяются в задаче 1.1 по отчёту исследователя), пишет stdio-запись с теми же полями и проверяет её через `doctor`. Если конфиг недоступен для записи или формат нестандартный — install печатает готовый фрагмент и завершается с кодом 2 (без частичной записи).
+**DSH** (проверено по asar и профилю): конфиг — `~/.dsh/profiles/desktop/cordis.patch.yml`, YAML-массив патчей профиля. Запись — элемент `id: mcp-manager`, `config.servers.dap`: `transport: stdio`, `command`, `args`, `env`, `cwd`, `enabled`, `startupTimeoutMs`, `toolCallTimeoutMs`, `reconnect`. Ключ `dap` — имя сервера, инструменты видны как `mcp__dap__*`. Патч заменяет весь `servers`-map, поэтому install мержит: если `mcp-manager` уже есть — обновляет только `servers.dap`, сохраняя остальные ключи; если файл пуст (`[]`) — создаёт элемент; если безопасно смержить нельзя (нет PyYAML и структура нестандартная) — печатает фрагмент и завершается с кодом 2. Ручные правки применяются после перезапуска DSH; `doctor` проверяет сервер напрямую через stdio (`initialize` + `tools/list`). Окружение дочернего процесса DSH вычищается, поэтому `command` — абсолютный путь к Python, а `JAVA_HOME`, `DAP_HOME`, `DAP_PORT` передаются явно.
 
 YAML-редактор: минимальный блочный (вставка под `mcp_servers:`), с бэкапом, `--dry-run` и проверкой разбора после записи; без новой зависимости.
 
@@ -229,7 +229,7 @@ YAML-редактор: минимальный блочный (вставка п�
 
 | Риск | Мера |
 |---|---|
-| Конфиг DSH недокументирован | отчёт `dsh-mcp`; fallback: doctor печатает фрагмент, install возвращает 2; при необходимости — плагин |
+| Патч DSH заменяет весь `servers`-map; ручные правки требуют перезапуска | install мержит только `servers.dap` и сохраняет остальные ключи; при нестандартном YAML — фрагмент + код 2; `doctor` проверяет stdio напрямую |
 | Расширения DuckDB (sqlite/postgres/httpfs) не установлены и требуют сети | v1: только файлы DuckDB (attach, офлайн); внешние БД — опция с явной ошибкой и hint; голдены офлайн |
 | p-value для тестов и регрессии | своя неполная бета (~100 строк), без зависимости; сверка с эталонными значениями R/scipy |
 | sql_query read-only нельзя гарантировать через `enable_external_access=false` | subquery-обёртка + deny-list ключевых слов + лимиты; тесты на multi-statement и DDL |
@@ -239,8 +239,7 @@ YAML-редактор: минимальный блочный (вставка п�
 
 ## 14. Открытые вопросы (решаются на этапе плана)
 
-1. Точный путь и формат конфига DSH — отчёт `dsh-mcp`; спека требует поведения, не пути.
-2. Формат p-value в v1: statistic+df+p_value сразу или statistic+df с p_value во втором шаге — решается по объёму математики в плане.
+1. Формат p-value в v1: statistic+df+p_value сразу или statistic+df с p_value во втором шаге — решается по объёму математики в плане.
 
 ## 15. Что дальше
 
