@@ -416,5 +416,33 @@
         "missing": 0
       }
     ]
+  },
+  "RECIPES": {
+    "file": "recipes.csv",
+    "rows": 3,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "code",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "tags",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "x",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "y",
+        "arrow": "Int64",
+        "missing": 0
+      }
+    ]
   }
 }

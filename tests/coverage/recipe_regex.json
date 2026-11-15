@@ -1,0 +1,64 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "B9",
+      "title": "Regex extraction with regexp_extract",
+      "kind": "recipe",
+      "requires": [],
+      "workflow": {
+        "id": "cov-recipe-regex",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "RECIPES"
+            }
+          },
+          {
+            "id": "q",
+            "type": "sql_query",
+            "config": {
+              "sql": "SELECT regexp_extract(code, '[a-z]+-([0-9]+)', 1) AS number FROM src ORDER BY number",
+              "inputs": [
+                "src"
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "q"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "q",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "number",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              "123"
+            ],
+            [
+              "456"
+            ],
+            [
+              "789"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    }
+  ]
+}

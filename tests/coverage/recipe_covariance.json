@@ -1,0 +1,58 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "E4",
+      "title": "Sample covariance with covar_samp",
+      "kind": "recipe",
+      "requires": [],
+      "workflow": {
+        "id": "cov-recipe-covariance",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "RECIPES"
+            }
+          },
+          {
+            "id": "q",
+            "type": "sql_query",
+            "config": {
+              "sql": "SELECT covar_samp(x, y) AS covariance FROM src",
+              "inputs": [
+                "src"
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "q"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "q",
+          "kind": "expect",
+          "rows": 1,
+          "columns": [
+            {
+              "name": "covariance",
+              "type": "Number (Float)"
+            }
+          ],
+          "data": [
+            [
+              2
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    }
+  ]
+}

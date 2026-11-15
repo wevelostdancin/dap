@@ -1419,7 +1419,74 @@ run. `modified` — в UTC, поэтому результат не зависи�
 }
 ```
 
-## 49. Порядок для агента
+## 49. Рецепты SQL
+
+Часть задач таксономии покрывается не отдельным узлом, а SQL-выражением поверх
+`dap.sql_query` (YAGNI: одно выражение — не узел). Каждый рецепт имеет
+coverage-сценарий в `tests/coverage/` и проверяется через `/v1` в `SqlRecipeTest`.
+
+### 49.1. Regex-извлечение (B9)
+
+`regexp_extract(колонка, шаблон, группа)` — группа 1..n, 0 — всё совпадение;
+выражение возвращает String. NULL, если шаблон не совпал.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT regexp_extract(code, '[a-z]+-([0-9]+)', 1) AS number FROM src ORDER BY number",
+    "inputs": ["src"]
+  }
+}
+```
+
+### 49.2. Split колонки (B10)
+
+`unnest(string_split(колонка, разделитель))` — одна строка на часть; пустые части
+сохраняются (соседние разделители и хвост дают пустые строки). Порядок строк не
+определён — добавьте `ORDER BY`, если он важен.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT unnest(string_split(tags, ',')) AS tag FROM src",
+    "inputs": ["src"]
+  }
+}
+```
+
+### 49.3. Ковариация (E4)
+
+`covar_samp(a, b)` — выборочная ковариация (делитель n-1); NULL-пары пропускаются,
+меньше двух пар — NULL. Для корреляции есть отдельный узел `dap.correlation`.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT covar_samp(x, y) AS covariance FROM src",
+    "inputs": ["src"]
+  }
+}
+```
+
+### 49.4. Чтение HTTP/API (A8)
+
+`read_csv_auto(url)` / `read_json_auto(url)` через расширение `httpfs`: нужны
+установленное расширение (`make extensions`) и сеть в момент чтения. Остальные
+источники (S3, локальный файл) сети не требуют.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT COUNT(*) AS n FROM read_csv_auto('https://raw.githubusercontent.com/plotly/datasets/master/iris.csv')"
+  }
+}
+```
+
+## 50. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.
