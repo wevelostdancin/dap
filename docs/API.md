@@ -36,24 +36,34 @@
 
 ### Ошибки
 
-Обычная ошибка — объект с одним полем:
+Обычная ошибка — объект с `error` (человекочитаемое сообщение), `code`
+(машиночитаемый код) и необязательным `hint` (что сделать, чтобы исправить):
 
 ```json
-{"error": "unknown setting 'foo' in 'settings'; available: [file, delimiter, header, columns, emptyStringIsNull]"}
+{"error": "unknown setting 'foo' in 'settings'; available: [file, delimiter, header, columns, emptyStringIsNull]",
+ "code": "unknown_setting",
+ "hint": "remove 'foo' or check GET /v1/nodes/dap.csv_reader/dialog for the available settings"}
 ```
 
-Исключения: таймаут и падение синхронного run возвращают объект job, отмена
-завершённого job — `CancelResult` (см. §5).
+`code` — аддитивное расширение контракта: старые клиенты читают `error` как
+раньше. Если у ошибки нет специфичного кода, он выводится из статуса:
+`bad_request` (400), `not_found` (404), `conflict` (409), `server_error` (500).
+`hint` и дополнительные поля (например `limit` у `workflow_limit`) опускаются,
+когда их нет.
 
-| Код | Когда |
-|---|---|
-| 200 | успех |
-| 202 | асинхронный запуск принят |
-| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, узел без таблицы, неизвестный узел workflow в `/table`/`/profile`, отсутствующий `dir` |
-| 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут |
-| 408 | истёк `timeoutSec` синхронного run; тело — job со `state: "timeout"` |
-| 409 | отмена уже завершённого job |
-| 500 | ошибка исполнения, невалидное значение config, нечитаемый файл, битый JSON, лимит workflow, нецелый query-параметр |
+Исключения: таймаут и падение синхронного run возвращают объект job, отмена
+завершённого job — `CancelResult` (см. §5); в них тоже есть `code`
+(`node_failed` у упавшего run, `not_cancellable` у отмены завершённого job).
+
+| Код | Когда | `code` |
+|---|---|---|
+| 200 | успех | — |
+| 202 | асинхронный запуск принят | — |
+| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, порт вне диапазона, отсутствующий `dir` | `bad_request`, `unknown_setting`, `invalid_query_param` |
+| 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `/table`/`/profile`/`PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут | `not_found`, `unknown_node` |
+| 408 | истёк `timeoutSec` синхронного run (тело — job со `state: "timeout"`); истёк `DAP_QUERY_TIMEOUT_SEC` у `/table`/`/profile` | `query_timeout` |
+| 409 | отмена уже завершённого job; лимит workflow на сессию; у узла ещё нет таблицы (до run); узел упал | `not_cancellable`, `workflow_limit`, `not_materialized`, `node_failed` |
+| 500 | ошибка исполнения, невалидное значение config, нечитаемый файл, битый JSON | `server_error`, `node_failed` |
 
 Метод, не поддержанный для маршрута, даёт 404 `no route: <METHOD> <path>`, а не 405.
 
@@ -133,8 +143,9 @@
 ### `POST /v1/workflows`
 
 Тело `{"name": "demo"}` необязательно. Ответ — объект workflow. Лимит на сессию
-(`DAP_MAX_WORKFLOWS`, по умолчанию 100) при превышении даёт 500
-`workflow limit for session`.
+(`DAP_MAX_WORKFLOWS`, по умолчанию 100) при превышении даёт 409
+`workflow_limit`: `error` — `workflow limit for session`, в `limit` — сам
+лимит, `hint` предлагает удалить workflow или взять другую сессию.
 
 ### `POST /v1/workflows/load`
 
@@ -207,7 +218,8 @@
 запросом `?async=true`.
 
 - Синхронно: ждёт завершения, `200` с `RunResult`; `408` при таймауте;
-  `500` при ошибке (тело — job со `state: "failed"` или `"cancelled"`).
+  `500` при ошибке (тело — job со `state: "failed"` или `"cancelled"` и
+  `code: "node_failed"`).
 - `async=true`: `202` с объектом job.
 - Неизвестный workflow — 404. Таймаут считается от постановки в очередь.
 
@@ -233,20 +245,23 @@
 `DELETE /v1/jobs/{jobId}` — отмена активного job:
 
 - `200` `{"ok":true,"id":"job-1","job":{...}}`;
-- `409` `{"ok":false,...}`, если job уже завершён;
+- `409` `{"ok":false,...,"error":"...","code":"not_cancellable"}`, если job уже завершён;
 - `404` для неизвестного или чужого.
 
 Поля job: `id`, `workflow`, `state`, `createdAt`, `timeoutSec`,
-`startedAt`/`finishedAt`/`durationMs` (когда известны), `error`, `result`,
-`statusUrl`. Состояния: `queued`, `running`, `succeeded`, `failed`,
-`cancelled`, `timeout`.
+`startedAt`/`finishedAt`/`durationMs` (когда известны), `error`, `code`
+(у упавшего run), `result`, `statusUrl`. Состояния: `queued`, `running`,
+`succeeded`, `failed`, `cancelled`, `timeout`.
 
 ## 6. Данные
 
 ### `GET /v1/workflows/{workflowId}/nodes/{node}/table?port=0&limit=1`
 
 Материализует сохранённый план узла: `COUNT(*)` и первые `limit` строк (по
-умолчанию 50). Пример ниже сокращён до одной строки.
+умолчанию 50). Материализация ограничена `DAP_QUERY_TIMEOUT_SEC` (по умолчанию
+60 с; `0` выключает): по истечении соединение закрывается, ответ — 408
+`query_timeout` с `hint`, следующий запрос работает как обычно. Пример ниже
+сокращён до одной строки.
 
 ```json
 {"rows":150,
@@ -257,8 +272,10 @@
 
 `rows` — всего строк, `data` — строки значениями-строками (`null` для NULL),
 `preview` — сколько строк вернулось. `limit < 0` даёт пустой `data`; `port`
-вне диапазона, узел без результата или неизвестный узел — 400; неизвестный
-workflow — 404.
+вне диапазона или нецелый query-параметр — 400; неизвестный узел workflow —
+404 `unknown_node`; узел ещё не исполнялся — 409 `not_materialized` (в теле
+есть `ports` и `hint` с командой run); узел упал — 409 `node_failed` с
+сообщением узла; неизвестный workflow — 404.
 
 ### `GET /v1/workflows/{workflowId}/nodes/{node}/profile`
 
@@ -272,7 +289,8 @@ workflow — 404.
 
 `missing` и `distinct` точные; `distinct` считается точно до 100 000 строк,
 выше — приблизительно с досчётом у границы. `min`/`max`/`mean` — только для
-числовых колонок; у колонки из одних NULL они опускаются.
+числовых колонок; у колонки из одних NULL они опускаются. Статусы те же, что у
+`/table`: 404 `unknown_node`, 409 `not_materialized`/`node_failed`.
 
 ### `POST /v1/datasets`
 

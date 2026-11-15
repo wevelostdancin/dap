@@ -179,7 +179,9 @@ paths:
       tags: [workflows]
       operationId: createWorkflow
       summary: Create an empty workflow
-      description: A per-session limit applies; exceeding it returns 500.
+      description: >-
+        A per-session limit applies (DAP_MAX_WORKFLOWS, default 100); exceeding it returns
+        409 with code workflow_limit and the cap in limit.
       parameters:
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'
@@ -198,6 +200,8 @@ paths:
                 $ref: '#/components/schemas/Workflow'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/ServerError'
   /v1/workflows/load:
@@ -560,7 +564,10 @@ paths:
       tags: [data]
       operationId: getNodeTable
       summary: Preview an output table
-      description: If the requested port is not a table, the first table port is used silently.
+      description: >-
+        If the requested port is not a table, the first table port is used silently. Before a
+        run the node has no table: 409 not_materialized; when the node failed: 409 node_failed
+        with the node message. Unknown workflow nodes are 404 unknown_node.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
         - $ref: '#/components/parameters/WorkflowNodeId'
@@ -589,6 +596,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '408':
+          $ref: '#/components/responses/Timeout'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/ServerError'
   /v1/workflows/{workflowId}/nodes/{workflowNodeId}/profile:
@@ -596,7 +607,11 @@ paths:
       tags: [data]
       operationId: getNodeProfile
       summary: Profile the first table output
-      description: Full scan; distinct values up to 100000 per column; numeric min/max/mean where available.
+      description: >-
+        Full scan; distinct values up to 100000 per column; numeric min/max/mean where
+        available. 409 not_materialized before a run, 409 node_failed for a failed node,
+        404 unknown_node for an unknown workflow node, 408 query_timeout after
+        DAP_QUERY_TIMEOUT_SEC.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
         - $ref: '#/components/parameters/WorkflowNodeId'
@@ -613,6 +628,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '408':
+          $ref: '#/components/responses/Timeout'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/ServerError'
   /v1/workflows/{workflowId}/nodes/{workflowNodeId}/dialog:
@@ -800,6 +819,23 @@ components:
             $ref: '#/components/schemas/Error'
     NotFound:
       description: Unknown or foreign object, or no matching route
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Timeout:
+      description: >-
+        The materialization exceeded DAP_QUERY_TIMEOUT_SEC; the read connection was closed and
+        the engine stays healthy. code is query_timeout.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: >-
+        The request conflicts with the current state: workflow_limit (session workflow cap),
+        not_materialized (node has no table output yet), node_failed (the node failed during
+        the run; error carries its message).
       content:
         application/json:
           schema:
@@ -1175,6 +1211,9 @@ components:
           type: integer
         error:
           type: string
+        code:
+          type: string
+          description: Machine-readable error code of a failed run (node_failed)
         result:
           oneOf:
             - $ref: '#/components/schemas/RunResult'
@@ -1202,6 +1241,14 @@ components:
           type: string
         job:
           $ref: '#/components/schemas/Job'
+        error:
+          type: string
+          description: Present when the job was already terminal and could not be cancelled
+        code:
+          type: string
+          description: not_cancellable when the job was already terminal
+        hint:
+          type: string
       additionalProperties: true
     TableColumn:
       type: object
@@ -1354,10 +1401,19 @@ components:
       additionalProperties: true
     Error:
       type: object
-      required: [error]
+      required: [error, code]
       properties:
         error:
           type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: >-
+            Machine-readable error code. Defaults from the status when the error has no
+            specific one: bad_request (400), not_found (404), conflict (409), server_error (500).
+        hint:
+          type: string
+          description: Actionable suggestion for fixing the request; omitted when there is none
         ports:
           type: array
           items:

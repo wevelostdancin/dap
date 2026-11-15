@@ -1,6 +1,7 @@
 package com.dap.nativeengine.api;
 
 import com.dap.nativeengine.catalog.NodeSpec;
+import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Connection;
 import com.dap.nativeengine.exec.Job;
 import com.dap.nativeengine.exec.Workflow;
@@ -137,6 +138,12 @@ public final class WorkflowHandlers {
         for (Job job : state.jobs().activeForWorkflow(workflow.id())) {
             state.jobs().cancel(job);
         }
+        DuckDbSession database = state.sessionIfPresent(session);
+        if (database != null) {
+            // Drop the reader tables now: the workflow is gone, its data must not linger
+            // in the session database for the rest of the process.
+            database.dropTablesForWorkflow(workflow.id());
+        }
         state.workflows().delete(session, workflowId);
         Http.ok(ctx, Map.of("ok", true));
     }
@@ -191,7 +198,7 @@ public final class WorkflowHandlers {
         String nodeId = ctx.pathParam("workflowNodeId");
         WorkflowNode node = workflow.node(nodeId);
         if (node == null) {
-            throw ApiException.notFound("unknown node: " + nodeId);
+            throw unknownNode(workflow, nodeId);
         }
         JsonNode request = Json.parseBody(ctx.body());
         JsonNode settings = request.get("settings");
@@ -210,7 +217,7 @@ public final class WorkflowHandlers {
         Workflow workflow = state.requireWorkflow(session, ctx.pathParam("workflowId"));
         String nodeId = ctx.pathParam("workflowNodeId");
         if (workflow.node(nodeId) == null) {
-            throw ApiException.notFound("unknown node: " + nodeId);
+            throw unknownNode(workflow, nodeId);
         }
         workflow.removeNode(nodeId);
         Map<String, Object> body = new LinkedHashMap<>();
@@ -246,15 +253,21 @@ public final class WorkflowHandlers {
         String nodeId = ctx.pathParam("workflowNodeId");
         WorkflowNode node = workflow.node(nodeId);
         if (node == null) {
-            throw ApiException.notFound("unknown node: " + nodeId);
+            throw unknownNode(workflow, nodeId);
         }
         NodeSpec spec = state.registry().find(node.factory());
         if (spec == null) {
-            throw ApiException.notFound("unknown node: " + node.factory());
+            throw unknownNode(workflow, node.factory());
         }
         Map<String, Object> body = new LinkedHashMap<>(spec.dialog());
         body.put("node", node.id());
         Http.ok(ctx, body);
+    }
+
+    /** Unknown workflow node: 404 unknown_node in PATCH, DELETE and dialog. */
+    private static ApiException unknownNode(Workflow workflow, String nodeId) {
+        return ApiException.notFound("unknown_node", "unknown node: " + nodeId,
+                "GET /v1/workflows/" + workflow.id() + "/nodes lists the node ids");
     }
 
     private static Map<String, Object> view(Workflow workflow) {
@@ -281,8 +294,10 @@ public final class WorkflowHandlers {
         while (keys.hasNext()) {
             String key = keys.next();
             if (!spec.hasConfigKey(key)) {
-                throw ApiException.badRequest("unknown setting '" + key
-                        + "' in 'settings'; available: " + spec.settingKeys());
+                throw ApiException.badRequest("unknown_setting", "unknown setting '" + key
+                        + "' in 'settings'; available: " + spec.settingKeys(),
+                        "remove '" + key + "' or check GET /v1/nodes/" + spec.id()
+                                + "/dialog for the available settings");
             }
         }
         workflow.setConfig(node.id(), ((ObjectNode) settings).deepCopy());

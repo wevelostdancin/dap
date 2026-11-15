@@ -83,9 +83,9 @@ def check_catalog_errors(api):
     if api.dialog("dap.no_such_node").status != 400:
         raise AssertionError("GET unknown dialog did not return 400")
     # Every pilot node is available in Phase 2; only the unknown-id codes remain.
-    if api.get("/v1/nodes?limit=not-a-number").status != 500:
-        raise AssertionError("non-integer limit did not return 500")
-    return "404/400/500 semantics ok"
+    if api.get("/v1/nodes?limit=not-a-number").status != 400:
+        raise AssertionError("non-integer limit did not return 400")
+    return "404/400 semantics ok"
 
 
 def create_workflow(api, source_file):
@@ -139,10 +139,11 @@ def check_workflow(api, tmpdir):
     if len(node_list) != 5:
         raise AssertionError("workflow has %d nodes, expected 5" % len(node_list))
 
-    # The data nodes are lazy before a run.
+    # The data nodes are lazy before a run: 409 not_materialized with a hint.
     before = api.get("/v1/workflows/%s/nodes/%s/table" % (workflow, nodes["sort"]))
-    if before.status != 400:
-        raise AssertionError("table before run did not return 400")
+    if before.status != 409 or before.body.get("code") != "not_materialized":
+        raise AssertionError("table before run did not return 409 not_materialized: %s %r"
+                             % (before.status, before.body))
 
     result = api.run_ok(workflow)
     states = {entry["name"]: entry["state"] for entry in result["nodes"]}
@@ -196,7 +197,7 @@ def check_workflow(api, tmpdir):
     if api.run(workflow).status != 500:
         raise AssertionError("run with an unknown sort column did not fail")
     stale = api.get("/v1/workflows/%s/nodes/%s/table" % (workflow, nodes["sort"]))
-    if stale.status != 400:
+    if stale.status != 409 or stale.body.get("code") != "node_failed":
         raise AssertionError("failed run kept a stale table: %s %r" % (stale.status, stale.body))
     if configure_score_sort(api, workflow, nodes["sort"]).status != 200:
         raise AssertionError("could not restore the sorter config")
@@ -248,8 +249,10 @@ def check_errors(api):
             raise AssertionError("valid sorter settings were rejected")
         if api.run(wf).status != 500:
             raise AssertionError("unknown-column run did not return 500")
-        if api.get("/v1/workflows/%s/nodes/%s/table" % (wf, node)).status != 400:
-            raise AssertionError("failed node table did not return 400")
+        failed_table = api.get("/v1/workflows/%s/nodes/%s/table" % (wf, node))
+        if failed_table.status != 409 or failed_table.body.get("code") != "node_failed":
+            raise AssertionError("failed node table did not return 409 node_failed: %s %r"
+                                 % (failed_table.status, failed_table.body))
         if api.get("/v1/workflows/wf-999999").status != 404:
             raise AssertionError("unknown workflow did not return 404")
         if api.delete("/v1/workflows/wf-999999").status != 404:

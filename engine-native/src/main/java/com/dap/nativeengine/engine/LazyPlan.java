@@ -40,6 +40,12 @@ public final class LazyPlan {
         return session.preview(sql, columns, limit, workflowId, nodeId);
     }
 
+    /** Bounded preview: fails with 408 query_timeout after timeoutMillis. */
+    public TableData preview(int limit, long timeoutMillis, String workflowId, String nodeId)
+            throws SQLException {
+        return session.preview(sql, columns, limit, timeoutMillis, workflowId, nodeId);
+    }
+
     public ProfileData profile() throws SQLException {
         return session.profile(sql, columns);
     }
@@ -47,6 +53,12 @@ public final class LazyPlan {
     /** Profile registered against its workflow/node so a job cancel can interrupt it. */
     public ProfileData profile(String workflowId, String nodeId) throws SQLException {
         return session.profile(sql, columns, workflowId, nodeId);
+    }
+
+    /** Bounded profile: fails with 408 query_timeout after timeoutMillis. */
+    public ProfileData profile(long timeoutMillis, String workflowId, String nodeId)
+            throws SQLException {
+        return session.profile(sql, columns, timeoutMillis, workflowId, nodeId);
     }
 
     public long count() throws SQLException {

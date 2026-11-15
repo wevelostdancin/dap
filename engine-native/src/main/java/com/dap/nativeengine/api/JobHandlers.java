@@ -35,7 +35,9 @@ public final class JobHandlers {
         } else if (job.state() == JobState.timeout) {
             Http.json(ctx, 408, view(job, false));
         } else {
-            Http.json(ctx, 500, view(job, false));
+            Map<String, Object> body = view(job, false);
+            body.put("code", "node_failed");
+            Http.json(ctx, 500, body);
         }
     }
 
@@ -91,6 +93,10 @@ public final class JobHandlers {
         body.put("ok", cancelled);
         body.put("id", jobId);
         body.put("job", view(job, true));
+        if (!cancelled) {
+            body.put("error", "job is not cancellable: " + jobId + " is " + job.state());
+            body.put("code", "not_cancellable");
+        }
         Http.json(ctx, cancelled ? 200 : 409, body);
     }
 

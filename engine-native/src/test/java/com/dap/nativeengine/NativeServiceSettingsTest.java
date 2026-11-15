@@ -85,6 +85,23 @@ class NativeServiceSettingsTest {
     }
 
     @Test
+    void queryTimeoutDefaultsTo60SecondsAndIsConfigurable() {
+        assertEquals(60, NativeService.Settings.fromEnv(Map.of()).queryTimeoutSec());
+        assertEquals(5, NativeService.Settings.fromEnv(
+                Map.of("DAP_QUERY_TIMEOUT_SEC", " 5 ")).queryTimeoutSec());
+        assertEquals(0, NativeService.Settings.fromEnv(
+                Map.of("DAP_QUERY_TIMEOUT_SEC", "0")).queryTimeoutSec());
+        assertEquals(60, NativeService.Settings.fromEnv(
+                Map.of("DAP_QUERY_TIMEOUT_SEC", " ")).queryTimeoutSec(), "blank keeps the default");
+
+        IllegalArgumentException negative = assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_QUERY_TIMEOUT_SEC", "-1")));
+        assertTrue(negative.getMessage().contains("DAP_QUERY_TIMEOUT_SEC"), negative.getMessage());
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_QUERY_TIMEOUT_SEC", "soon")));
+    }
+
+    @Test
     void invalidThreadsEnvFailsLoudly() {
         IllegalArgumentException notANumber = assertThrows(IllegalArgumentException.class,
                 () -> NativeService.Settings.fromEnv(Map.of("DAP_DUCKDB_THREADS", "many")));

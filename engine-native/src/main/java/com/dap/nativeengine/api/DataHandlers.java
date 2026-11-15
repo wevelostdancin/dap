@@ -28,26 +28,17 @@ public final class DataHandlers {
         String session = Http.session(ctx);
         Workflow workflow = state.requireWorkflow(session, ctx.pathParam("workflowId"));
         String nodeId = ctx.pathParam("workflowNodeId");
-        WorkflowNode node = workflow.node(nodeId);
-        if (node == null) {
-            throw ApiException.badRequest("unknown node: " + nodeId);
-        }
+        WorkflowNode node = node(workflow, nodeId);
         NodeSpec spec = spec(node);
         int port = Http.queryInt(ctx, "port", 0);
         int limit = Math.max(0, Http.queryInt(ctx, "limit", DEFAULT_LIMIT));
-        LazyPlan plan = node.result();
-        if (plan == null) {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("error", "node has no table output");
-            body.put("ports", spec.outPorts().stream().map(NodeSpec.Port::toMap).toList());
-            Http.json(ctx, 400, body);
-            return;
-        }
+        LazyPlan plan = materialized(workflow, node,
+                spec.outPorts().stream().map(NodeSpec.Port::toMap).toList());
         int outPorts = spec.outPorts().size();
         if (port < 0 || port >= outPorts) {
             throw ApiException.badRequest("node has " + outPorts + " out ports");
         }
-        TableData table = plan.preview(limit, workflow.id(), nodeId);
+        TableData table = plan.preview(limit, timeoutMillis(), workflow.id(), nodeId);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("rows", table.rows());
         body.put("columns", columns(table.columns()));
@@ -60,16 +51,10 @@ public final class DataHandlers {
         String session = Http.session(ctx);
         Workflow workflow = state.requireWorkflow(session, ctx.pathParam("workflowId"));
         String nodeId = ctx.pathParam("workflowNodeId");
-        WorkflowNode node = workflow.node(nodeId);
-        if (node == null) {
-            throw ApiException.badRequest("unknown node: " + nodeId);
-        }
+        WorkflowNode node = node(workflow, nodeId);
         spec(node);
-        LazyPlan plan = node.result();
-        if (plan == null) {
-            throw ApiException.badRequest("node has no table output");
-        }
-        ProfileData profile = plan.profile(workflow.id(), nodeId);
+        LazyPlan plan = materialized(workflow, node, null);
+        ProfileData profile = plan.profile(timeoutMillis(), workflow.id(), nodeId);
         List<Map<String, Object>> columns = new ArrayList<>();
         for (ProfileColumn column : profile.columns()) {
             Map<String, Object> view = new LinkedHashMap<>();
@@ -95,10 +80,50 @@ public final class DataHandlers {
         Http.ok(ctx, body);
     }
 
+    /** DAP_QUERY_TIMEOUT_SEC bounds every /table and /profile materialization. */
+    private long timeoutMillis() {
+        return state.settings().queryTimeoutSec() * 1000L;
+    }
+
+    /** Unknown workflow node: 404 unknown_node on every data route. */
+    private static WorkflowNode node(Workflow workflow, String nodeId) {
+        WorkflowNode node = workflow.node(nodeId);
+        if (node == null) {
+            throw ApiException.notFound("unknown_node", "unknown node: " + nodeId,
+                    "GET /v1/workflows/" + workflow.id() + "/nodes lists the node ids");
+        }
+        return node;
+    }
+
+    /**
+     * The node's materialized plan: 409 node_failed when the node failed (with the node
+     * message) and 409 not_materialized before a run. Ports are only reported by /table,
+     * which had them in its 400 body before the code was pinned.
+     */
+    private static LazyPlan materialized(Workflow workflow, WorkflowNode node,
+                                         List<Map<String, Object>> ports) {
+        LazyPlan plan = node.result();
+        if (plan != null) {
+            return plan;
+        }
+        if ("ERROR".equals(node.state())) {
+            throw ApiException.conflict("node_failed",
+                    node.message() == null ? "node failed: " + node.id() : node.message(),
+                    "fix the node configuration and run the workflow again");
+        }
+        String hint = "run the workflow first: POST /v1/workflows/" + workflow.id() + "/run";
+        if (ports == null) {
+            throw new ApiException(409, "not_materialized", "node has no table output", hint);
+        }
+        throw new ApiException(409, "not_materialized", "node has no table output", hint,
+                Map.of("ports", ports));
+    }
+
     private NodeSpec spec(WorkflowNode node) {
         NodeSpec spec = state.registry().find(node.factory());
         if (spec == null) {
-            throw ApiException.badRequest("unknown node: " + node.factory());
+            throw ApiException.notFound("unknown_node", "unknown node: " + node.factory(),
+                    "GET /v1/nodes lists the available node types");
         }
         return spec;
     }

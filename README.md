@@ -67,7 +67,8 @@ Cold start — около 0.4–0.5 с от `java -jar` до первого `200
 Переменные: `DAP_PORT` (7800), `DAP_BIND` (`127.0.0.1`; также `localhost` и
 `0.0.0.0`), `DAP_MAX_WORKFLOWS` (100 на сессию), `DAP_JOB_TIMEOUT` (600 с),
 `DAP_IDLE_TIMEOUT_SEC` (900 с; `0` выключает автозавершение),
-`DAP_DUCKDB_MEMORY_LIMIT`, `DAP_DUCKDB_THREADS`, `DAP_DUCKDB_TEMP_DIR`,
+`DAP_QUERY_TIMEOUT_SEC` (60 с; предел материализации `/table` и `/profile`; `0`
+выключает), `DAP_DUCKDB_MEMORY_LIMIT`, `DAP_DUCKDB_THREADS`, `DAP_DUCKDB_TEMP_DIR`,
 `DAP_CACHE_DIR` (Parquet-кэш; по умолчанию `$DAP_HOME/build/cache` при заданном
 `DAP_HOME`, иначе `~/.dap/cache`; в sandbox — `$TMPDIR/dap-cache`).
 
