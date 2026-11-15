@@ -17,3 +17,6 @@ __pycache__/
 # Logs and OS metadata
 *.log
 .DS_Store
+
+# Coverage scenarios (global gitignore ignores coverage/)
+!tests/coverage/

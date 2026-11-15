@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Joins two tables on key columns using an inner, left, or right join. Key columns can be merged into one output column. A right-side column whose name already appears in the output is renamed with the suffix \" (Right)\".",
+  "description": "Joins two tables on key columns using an inner, left, right, full, semi or anti join. Semi and anti joins keep only the left columns. Key columns can be merged into one output column. A right-side column whose name already appears in the output is renamed with the suffix \" (Right)\".",
   "inPorts": [
     {
       "index": 0,
@@ -35,11 +35,14 @@
       "how": {
         "type": "string",
         "title": "Join type",
-        "description": "Join mode between the left and right inputs.",
+        "description": "Join mode between the left and right inputs; semi and anti keep the left rows that do (semi) or do not (anti) have a match, and return only the left columns.",
         "enum": [
           "inner",
           "left",
-          "right"
+          "right",
+          "full",
+          "semi",
+          "anti"
         ],
         "default": "inner"
       },

@@ -186,7 +186,8 @@ class NodeRegistryTest {
                 .path("items").path("properties").path("method")));
         assertEquals(List.of("mean", "sum", "count", "min", "max", "count_distinct", "median", "percentile"),
                 enumValues(property("dap.group_by", "aggregations").path("items").path("properties").path("fn")));
-        assertEquals(List.of("inner", "left", "right"), enumValues(property("dap.joiner", "how")));
+        assertEquals(List.of("inner", "left", "right", "full", "semi", "anti"),
+                enumValues(property("dap.joiner", "how")));
         assertEquals(List.of("upper", "lower", "trim", "replace", "concat"),
                 enumValues(property("dap.string_manipulation", "op")));
         assertEquals(List.of("replace", "append"), enumValues(property("dap.string_manipulation", "mode")));
