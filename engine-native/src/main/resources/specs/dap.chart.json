@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Renders a bar, line, scatter or histogram chart from the input table and passes the table through unchanged. SVG is hand-written XML with rounded coordinates and no timestamps, so the same input produces byte-identical output; PNG is drawn with Java2D in headless mode.",
+  "description": "Renders a bar, line, scatter, histogram, pie, boxplot, heatmap or world map chart from the input table and passes the table through unchanged. A visible title, subtitle, axis labels and units are drawn on the canvas; axes get 5% headroom, bars start at 0 and sort by value by default. SVG is hand-written XML with rounded coordinates and no timestamps, so the same input produces byte-identical output; PNG is drawn with Java2D in headless mode.",
   "inPorts": [
     {
       "index": 0,
@@ -76,7 +76,107 @@
       "title": {
         "type": "string",
         "title": "Title",
-        "description": "Optional chart title."
+        "description": "Visible chart title, also used for the SVG <title> element."
+      },
+      "subtitle": {
+        "type": "string",
+        "title": "Subtitle",
+        "description": "Optional line under the title."
+      },
+      "x_label": {
+        "type": "string",
+        "title": "X axis label",
+        "description": "Text under the x axis; combined with x_unit as 'label (unit)'."
+      },
+      "y_label": {
+        "type": "string",
+        "title": "Y axis label",
+        "description": "Rotated text next to the y axis; combined with y_unit as 'label (unit)'."
+      },
+      "x_unit": {
+        "type": "string",
+        "title": "X unit",
+        "description": "Unit appended to the x axis label."
+      },
+      "y_unit": {
+        "type": "string",
+        "title": "Y unit",
+        "description": "Unit appended to the y axis label."
+      },
+      "sort": {
+        "type": "string",
+        "title": "Category sort",
+        "enum": [
+          "value",
+          "label",
+          "none"
+        ],
+        "description": "Category order: by aggregated value (bar default, descending), by label, or input order."
+      },
+      "sort_direction": {
+        "type": "string",
+        "title": "Sort direction",
+        "enum": [
+          "asc",
+          "desc"
+        ],
+        "description": "Direction for sort=value/label; defaults to desc for value and asc for label."
+      },
+      "log_x": {
+        "type": "boolean",
+        "title": "Logarithmic x axis",
+        "default": false,
+        "description": "line/scatter only; all x values must be positive."
+      },
+      "log_y": {
+        "type": "boolean",
+        "title": "Logarithmic y axis",
+        "default": false,
+        "description": "All y values must be positive; bar baselines at the axis minimum."
+      },
+      "grid": {
+        "type": "boolean",
+        "title": "Grid lines",
+        "default": true,
+        "description": "Draw horizontal grid lines at y ticks."
+      },
+      "data_labels": {
+        "type": "boolean",
+        "title": "Data labels",
+        "default": false,
+        "description": "Print the value next to each bar, point or slice."
+      },
+      "annotations": {
+        "type": "array",
+        "title": "Annotations",
+        "description": "Text notes placed on the canvas.",
+        "items": {
+          "type": "object",
+          "title": "Annotation",
+          "properties": {
+            "text": {
+              "type": "string",
+              "title": "Text"
+            },
+            "x": {
+              "type": "string",
+              "title": "X",
+              "description": "Data x for numeric axes or a category name."
+            },
+            "y": {
+              "type": "number",
+              "title": "Y"
+            },
+            "color": {
+              "type": "string",
+              "title": "Colour",
+              "description": "#rrggbb"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
       },
       "width": {
         "type": "integer",
@@ -113,8 +213,7 @@
     },
     "required": [
       "file",
-      "type",
-      "x"
+      "type"
     ]
   }
 }
