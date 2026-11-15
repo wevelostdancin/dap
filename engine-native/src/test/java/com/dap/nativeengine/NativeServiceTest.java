@@ -1214,6 +1214,124 @@ class NativeServiceTest {
         assertTrue(listed.body().path("hint").asText().contains("datasets.json"));
     }
 
+    @Test
+    void exploreProfilesIrisAndIsStableAcrossCalls() throws Exception {
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+        assertTrue(Files.isRegularFile(csv), "fixture missing: " + csv);
+
+        Resp first = post("/v1/explore", Map.of("file", csv.toString(), "format", "csv"));
+        assertEquals(200, first.status(), first.raw().body());
+        JsonNode body = first.body();
+        assertEquals(csv.toString(), body.path("source").asText());
+        assertEquals(150, body.path("rows").asInt());
+        assertEquals(5, body.path("columns").size());
+        JsonNode species = column(body, "species");
+        assertEquals("Utf8", species.path("type").asText());
+        assertEquals(3, species.path("distinct").asInt());
+        assertEquals(0, species.path("missing").asInt());
+        assertEquals(43, column(body, "petal_length").path("distinct").asInt());
+        int score = body.path("quality").path("score").asInt();
+        assertTrue(score >= 0 && score <= 100, "quality score out of range: " + score);
+        assertTrue(body.path("quality").path("issues").isArray());
+
+        JsonNode petals = findPair(body.path("relationships"), "petal_length", "petal_width");
+        assertNotNull(petals, "petal relationship missing: " + body.path("relationships"));
+        assertEquals("pearson", petals.path("method").asText());
+        assertTrue(petals.path("value").asDouble() > 0.9);
+        assertTrue(petals.path("p_value").asDouble() < 1e-10);
+        assertEquals(150, petals.path("n").asInt());
+        assertEquals("very strong", petals.path("strength").asText());
+
+        JsonNode anova = findPair(body.path("group_differences"), "petal_length", "species");
+        assertNotNull(anova, "species difference missing: " + body.path("group_differences"));
+        assertEquals("anova", anova.path("test").asText());
+        assertTrue(anova.path("p_value").asDouble() < 1e-6);
+
+        JsonNode hypotheses = body.path("hypotheses");
+        assertTrue(hypotheses.size() >= 3 && hypotheses.size() <= 5,
+                "expected 3 to 5 hypotheses, got " + hypotheses);
+        for (JsonNode hypothesis : hypotheses) {
+            assertFalse(hypothesis.path("id").asText().isBlank());
+            assertFalse(hypothesis.path("question").asText().isBlank());
+            assertFalse(hypothesis.path("test").asText().isBlank());
+            assertTrue(hypothesis.path("columns").size() > 0);
+            assertFalse(hypothesis.path("rationale").asText().isBlank());
+            assertTrue(Set.of("high", "medium", "low").contains(hypothesis.path("priority").asText()));
+        }
+        assertTrue(body.path("recommendations").size() > 0);
+        assertTrue(body.path("time").isMissingNode(), "iris has no date column");
+
+        Resp second = post("/v1/explore", Map.of("file", csv.toString(), "format", "csv"));
+        assertEquals(200, second.status(), second.raw().body());
+        assertEquals(hypotheses, second.body().path("hypotheses"),
+                "hypotheses must be stable across calls");
+        assertEquals(body.path("relationships"), second.body().path("relationships"));
+    }
+
+    @Test
+    void exploreAcceptsAnIngestedDatasetPath() throws Exception {
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+        Resp ingested = post("/v1/datasets", Map.of("file", csv.toString(), "format", "csv"));
+        assertEquals(200, ingested.status(), ingested.raw().body());
+        String parquet = ingested.body().path("path").asText();
+
+        Resp explored = post("/v1/explore", Map.of("dataset", parquet));
+        assertEquals(200, explored.status(), explored.raw().body());
+        assertEquals(parquet, explored.body().path("source").asText());
+        assertEquals(150, explored.body().path("rows").asInt());
+
+        Resp sql = post("/v1/explore", Map.of("dataset", parquet,
+                "sql", "SELECT petal_length * 2 AS pl2, species FROM src"));
+        assertEquals(200, sql.status(), sql.raw().body());
+        assertEquals(2, sql.body().path("columns").size());
+        assertEquals("pl2", sql.body().path("columns").get(0).path("name").asText());
+    }
+
+    @Test
+    void exploreRejectsBothOrNeitherSource() throws Exception {
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+
+        Resp both = post("/v1/explore", Map.of("file", csv.toString(), "dataset", csv.toString()));
+        assertEquals(400, both.status(), both.raw().body());
+
+        Resp neither = post("/v1/explore", Map.of());
+        assertEquals(400, neither.status(), neither.raw().body());
+
+        Resp badFormat = post("/v1/explore", Map.of("file", csv.toString(), "format", "xml"));
+        assertEquals(400, badFormat.status(), badFormat.raw().body());
+    }
+
+    @Test
+    void exploreReportsMissingDatasetAndInvalidSql() throws Exception {
+        Resp missing = post("/v1/explore", Map.of("dataset", tempDir.resolve("absent.parquet").toString()));
+        assertEquals(404, missing.status(), missing.raw().body());
+        assertEquals("dataset_not_found", missing.body().path("code").asText());
+
+        Path csv = Path.of("..", "tests", "goldens-native", "data", "iris.csv")
+                .toAbsolutePath().normalize();
+        Resp invalidSql = post("/v1/explore", Map.of("file", csv.toString(),
+                "sql", "DROP TABLE src"));
+        assertEquals(400, invalidSql.status(), invalidSql.raw().body());
+        assertEquals("invalid_sql", invalidSql.body().path("code").asText());
+    }
+
+    private static JsonNode findPair(JsonNode array, String left, String right) {
+        for (JsonNode pair : array) {
+            if (left.equals(pair.path("left").asText())
+                    && right.equals(pair.path("right").asText())) {
+                return pair;
+            }
+            if (left.equals(pair.path("value").asText())
+                    && right.equals(pair.path("group").asText())) {
+                return pair;
+            }
+        }
+        return null;
+    }
+
     private JsonNode awaitJobState(String jobId, Set<String> states, Duration timeout) throws Exception {
         long deadline = System.nanoTime() + timeout.toNanos();
         JsonNode last = null;

@@ -45,6 +45,9 @@ tags:
     description: One-time conversion of source files into the Parquet cache
   - name: dataset-catalog
     description: Persistent dataset catalog with versions and profile cache
+  - name: explore
+    description: >-
+      One-call dataset exploration: profile, quality, relationships and hypotheses
 paths:
   /v1:
     get:
@@ -992,6 +995,54 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/ServerError'
+  /v1/explore:
+    post:
+      tags: [explore]
+      operationId: exploreDataset
+      summary: Profile a dataset and suggest next steps
+      description: |
+        One call over an ingested dataset: column profile, deterministic quality
+        score with issues, pairwise relationships (Pearson for numeric pairs,
+        Cramer's V for categorical pairs), group differences (ANOVA, or
+        Kruskal-Wallis when a group has fewer than five values), the time span of
+        the first date column, three to five templated hypotheses and concrete
+        recommendations.
+
+        Exactly one source is required: file (converted once through the Parquet
+        cache with the same rules as POST /v1/datasets) or dataset (a path
+        returned by POST /v1/datasets). format applies to file only and defaults
+        to the file extension. sql refines the source with one read-only
+        SELECT/WITH statement; the ingested Parquet file is available as the
+        view src.
+
+        Profile aggregates scan the whole relation. Relationships, group
+        differences and hypotheses read at most sampleRows rows (default 1000,
+        deterministic first rows in scan order) and are capped at 20, 10 and 5
+        entries. Ordering is deterministic: relationships by descending |value|
+        then names, group differences by p-value then names, hypotheses by
+        priority then id.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExploreRequest'
+      responses:
+        '200':
+          description: Exploration result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
 components:
   parameters:
     SessionHeader:
@@ -1900,3 +1951,202 @@ components:
         name:
           type: string
       additionalProperties: false
+
+    ExploreRequest:
+      type: object
+      description: Exactly one of file or dataset is required.
+      properties:
+        file:
+          type: string
+          description: Path to a CSV, XLSX, JSON or Parquet file, ingested first
+        dataset:
+          type: string
+          description: Path of an already ingested Parquet file (POST /v1/datasets)
+        format:
+          type: string
+          enum: [csv, excel, xlsx, json, parquet]
+          description: Source format for file; defaults to the extension; rejected with dataset
+        sql:
+          type: string
+          description: >-
+            One read-only SELECT or WITH statement refining the source; the ingested
+            Parquet file is available as the view src.
+        maxColumns:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+          description: Number of leading columns to profile
+        sampleRows:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          default: 1000
+          description: Rows read for relationships, group differences and hypotheses
+      additionalProperties: false
+    ExploreColumn:
+      type: object
+      required: [name, type, missing, distinct]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: Arrow type name, e.g. Float64 or Utf8
+        missing:
+          type: integer
+        distinct:
+          type: integer
+        min:
+          type: number
+        max:
+          type: number
+        mean:
+          type: number
+        stddev:
+          type: number
+          description: Sample standard deviation
+        zeros:
+          type: integer
+        negatives:
+          type: integer
+        outliers:
+          type: integer
+          description: Rows outside the 1.5x IQR fences
+      additionalProperties: true
+    ExploreIssue:
+      type: object
+      required: [severity, kind, detail]
+      properties:
+        severity:
+          type: string
+          enum: [high, medium, low]
+        kind:
+          type: string
+          description: >-
+            missing, empty, constant, duplicate_rows, high_cardinality, outliers or
+            mixed_type
+        column:
+          type: string
+        count:
+          type: integer
+        detail:
+          type: string
+      additionalProperties: true
+    ExploreQuality:
+      type: object
+      required: [score, issues]
+      properties:
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreIssue'
+    ExploreRelationship:
+      type: object
+      required: [left, right, method, value, n, strength]
+      properties:
+        left:
+          type: string
+        right:
+          type: string
+        method:
+          type: string
+          enum: [pearson, cramers_v]
+        value:
+          type: number
+        p_value:
+          type: number
+          description: May be 0.0 when the true p-value underflows a double
+        n:
+          type: integer
+        strength:
+          type: string
+          enum: [very strong, strong, moderate, weak, very weak]
+    ExploreGroupDifference:
+      type: object
+      required: [value, group, test, statistic, p_value]
+      properties:
+        value:
+          type: string
+        group:
+          type: string
+        test:
+          type: string
+          enum: [anova, kruskal]
+        statistic:
+          type: number
+        p_value:
+          type: number
+          description: May be 0.0 when the true p-value underflows a double
+        effect_size:
+          type: number
+          description: Eta squared for anova, epsilon squared for kruskal
+    ExploreTime:
+      type: object
+      required: [column, granularity, from, to]
+      properties:
+        column:
+          type: string
+        granularity:
+          type: string
+          enum: [day, week, month, year]
+        from:
+          type: string
+        to:
+          type: string
+    ExploreHypothesis:
+      type: object
+      required: [id, question, test, columns, rationale, priority]
+      properties:
+        id:
+          type: string
+        question:
+          type: string
+        test:
+          type: string
+        columns:
+          type: array
+          items:
+            type: string
+        rationale:
+          type: string
+        priority:
+          type: string
+          enum: [high, medium, low]
+    ExploreResult:
+      type: object
+      required: [source, rows, columns, quality, relationships, group_differences, hypotheses, recommendations]
+      properties:
+        source:
+          type: string
+        rows:
+          type: integer
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreColumn'
+        quality:
+          $ref: '#/components/schemas/ExploreQuality'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreRelationship'
+        group_differences:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreGroupDifference'
+        time:
+          $ref: '#/components/schemas/ExploreTime'
+        hypotheses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreHypothesis'
+        recommendations:
+          type: array
+          items:
+            type: string
+      additionalProperties: true

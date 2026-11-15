@@ -5,6 +5,7 @@ import com.dap.nativeengine.api.CatalogHandlers;
 import com.dap.nativeengine.api.DataHandlers;
 import com.dap.nativeengine.api.DatasetCatalogHandlers;
 import com.dap.nativeengine.api.DatasetHandlers;
+import com.dap.nativeengine.api.ExploreHandlers;
 import com.dap.nativeengine.api.Http;
 import com.dap.nativeengine.api.JobHandlers;
 import com.dap.nativeengine.api.OpsHandlers;
@@ -361,6 +362,7 @@ public final class NativeService implements AutoCloseable {
         DataHandlers data = new DataHandlers(state);
         DatasetHandlers datasets = new DatasetHandlers();
         DatasetCatalogHandlers datasetCatalog = new DatasetCatalogHandlers(catalog);
+        ExploreHandlers explore = new ExploreHandlers();
         OpsHandlers ops = new OpsHandlers(state, this::shutdownAsync);
 
         app.get("/v1", context -> Http.ok(context, meta()));
@@ -401,6 +403,7 @@ public final class NativeService implements AutoCloseable {
         app.delete("/v1/catalog/datasets/{name}", datasetCatalog::remove);
         app.post("/v1/catalog/datasets/{name}/refresh", datasetCatalog::refresh);
         app.get("/v1/catalog/datasets/{name}/profile", datasetCatalog::profile);
+        app.post("/v1/explore", explore::explore);
         app.post("/v1/workflows/{workflowId}/save", ops::save);
         app.get("/v1/workflows/{workflowId}/debug", ops::debug);
         app.post("/v1/shutdown", ops::shutdown);
