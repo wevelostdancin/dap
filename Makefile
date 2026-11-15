@@ -7,7 +7,7 @@ export DAP_JDK
 JAR := engine-native/target/dap-native.jar
 
 .PHONY: help build-native test-native run-native goldens goldens-validate test-mcp smoke \
-        mcp mcp-e2e dist install-e2e bench bench-full image-native run-native-image lint check soak clean-native
+        mcp mcp-e2e dist install-e2e extensions bench bench-full image-native run-native-image lint check soak clean-native
 
 help:
 	@echo "DAP 1.0.0 — native analytics backend for agents"
@@ -22,6 +22,7 @@ help:
 	@echo "  make mcp-e2e        MCP create/add/run/table e2e"
 	@echo "  make dist           build the distributable dist/ (jar, adapter, CLI, checksums)"
 	@echo "  make install-e2e    install from dist/ into a temp HOME and run the stdio preflight"
+	@echo "  make extensions     install the DuckDB sqlite/postgres/httpfs extensions (network once)"
 	@echo "  make bench          native 100k-row benchmark"
 	@echo "  make bench-full     native 10M-row benchmark -> build/bench.json"
 	@echo "  make image-native   build the dap-native image (Docker host required)"
@@ -78,6 +79,9 @@ dist: build-native
 
 install-e2e: dist
 	python3 tests/install_e2e.py
+
+extensions: build-native
+	DAP_HOME="$(CURDIR)" "$(DAP_JDK)/bin/java" -jar $(JAR) --install-extensions sqlite postgres httpfs
 
 bench: build-native
 	python3 tests/bench.py --jar $(JAR) --rows 100000

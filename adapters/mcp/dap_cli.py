@@ -512,6 +512,32 @@ def _check_preflight(home: pathlib.Path) -> Check:
     return Check("preflight", False, f"tools/list returned {count} tools (need >= {MIN_TOOLS})")
 
 
+EXTENSIONS = ("sqlite_scanner", "postgres_scanner", "httpfs")
+
+
+def _extension_dir(home: pathlib.Path) -> pathlib.Path:
+    raw = (os.environ.get("DAP_DUCKDB_EXTENSION_DIR") or "").strip()
+    if raw:
+        return pathlib.Path(raw).expanduser()
+    return home / "build" / "duckdb-ext"
+
+
+def _check_extensions(home: pathlib.Path) -> Check:
+    """DuckDB extensions are optional: a missing set is a hint, never a failure."""
+    directory = _extension_dir(home)
+    present, missing = [], []
+    for name in EXTENSIONS:
+        if directory.is_dir() and any(directory.rglob(name + "*.duckdb_extension")):
+            present.append(name)
+        else:
+            missing.append(name)
+    if not missing:
+        return Check("extensions", True, "installed: " + ", ".join(present))
+    return Check("extensions", True,
+                 "optional: missing " + ", ".join(missing) + " in " + str(directory)
+                 + "; run make extensions")
+
+
 def doctor(client: str | None, home: pathlib.Path) -> list:
     """Run every check; the order is stable for humans and for --json."""
     return [
@@ -520,6 +546,7 @@ def doctor(client: str | None, home: pathlib.Path) -> list:
         _check_engine(home),
         _check_preflight(home),
         _check_config(client),
+        _check_extensions(home),
         _check_port(),
     ]
 

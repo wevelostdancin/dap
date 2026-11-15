@@ -478,7 +478,7 @@ class DoctorTest(unittest.TestCase):
         checks = json.loads(out)
         self.assertEqual(
             [check["name"] for check in checks],
-            ["python", "jar", "engine", "preflight", "config", "port"],
+            ["python", "jar", "engine", "preflight", "config", "extensions", "port"],
         )
         self.assertTrue(all(check["ok"] for check in checks))
 
@@ -537,3 +537,27 @@ class DoctorStartsEngineTest(unittest.TestCase):
         self.assertLess(elapsed, 10.0)
 
 
+
+class ExtensionsCheckTest(unittest.TestCase):
+    def test_missing_extensions_are_optional(self):
+        cli = load_cli()
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.dict(os.environ, {"DAP_DUCKDB_EXTENSION_DIR": ""}):
+                check = cli._check_extensions(pathlib.Path(tmp))
+            self.assertTrue(check.ok)
+            self.assertIn("optional", check.detail)
+            self.assertIn("make extensions", check.detail)
+
+    def test_installed_extensions_are_reported(self):
+        cli = load_cli()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / "v1.5.6" / "osx_arm64"
+            root.mkdir(parents=True)
+            for name in cli.EXTENSIONS:
+                (root / (name + ".duckdb_extension")).write_bytes(b"x")
+            with mock.patch.dict(os.environ, {"DAP_DUCKDB_EXTENSION_DIR": tmp}):
+                check = cli._check_extensions(pathlib.Path(tmp) / "home")
+            self.assertTrue(check.ok)
+            self.assertIn("installed", check.detail)
+            for name in cli.EXTENSIONS:
+                self.assertIn(name, check.detail)

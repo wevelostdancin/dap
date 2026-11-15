@@ -44,8 +44,9 @@ python3 adapters/mcp/dap_cli.py version                   # adapter=… engine=�
 якоря) не переписывается: печатается фрагмент и код 2.
 
 `doctor` проверяет Python >= 3.10, jar, `/v1/health`, прямой stdio-прогон
-(`initialize` + `tools/list`), запись `dap` в конфиге клиента и свободный порт;
-код 0 — только когда все проверки PASS, `--json` печатает список. Если движок не
+(`initialize` + `tools/list`), запись `dap` в конфиге клиента, набор расширений
+DuckDB (необязательный: отсутствие даёт подсказку `make extensions`, а не FAIL) и
+свободный порт; код 0 — только когда все проверки PASS, `--json` печатает список. Если движок не
 запущен, `doctor` поднимает его через адаптер (initialize + первый tool call,
 как при реальном вызове) и ждёт `/v1/health` до 60 с, поэтому PASS означает
 рабочую установку «с нуля».
@@ -55,6 +56,7 @@ python3 adapters/mcp/dap_cli.py version                   # adapter=… engine=�
 ```bash
 make dist          # dist/: jar, adapters/mcp, scripts/dap-mcp, VERSION, SHA256SUMS
 make install-e2e   # установка из dist/ во временный HOME + stdio preflight
+make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (сеть один раз)
 ```
 
 `dist/` самодостаточен: распакуйте в `~/.dap` и задайте `DAP_HOME=~/.dap` — CLI и
