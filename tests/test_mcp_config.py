@@ -197,7 +197,7 @@ DSH_ENTRY = {
     "enabled": True,
     "startupTimeoutMs": 60000,
     "toolCallTimeoutMs": 300000,
-    "reconnect": True,
+    "reconnect": {"enabled": True},
 }
 
 
@@ -217,7 +217,7 @@ class WriteDshTest(unittest.TestCase):
         self.assertIn("- id: mcp-manager", written)
         self.assertIn("      dap:", written)
         self.assertIn("        transport: stdio", written)
-        self.assertIn("        reconnect: true", written)
+        self.assertIn("        reconnect:\n          enabled: true", written)
         self.assertIn("- id: ui-chat", written)
         self.assertIn("# DSH profile patch", written)
         backups = sorted(self.dir.glob("cordis.patch.yml.bak-*"))

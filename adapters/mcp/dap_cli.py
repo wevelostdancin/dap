@@ -176,7 +176,10 @@ def _dsh_entry(home: pathlib.Path) -> dict:
         "enabled": True,
         "startupTimeoutMs": 60000,
         "toolCallTimeoutMs": 300000,
-        "reconnect": True,
+        # mcp-manager validates `reconnect` against mcp-client's ReconnectSchema
+        # (enabled/initialDelayMs/maxDelayMs/maxAttempts), not a boolean; a bare
+        # `true` fails validation and takes the whole MCP manager down.
+        "reconnect": {"enabled": True},
     }
 
 

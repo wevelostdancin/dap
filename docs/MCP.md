@@ -429,7 +429,8 @@ DSH (`~/.dsh/profiles/desktop/cordis.patch.yml`):
         enabled: true
         startupTimeoutMs: 60000
         toolCallTimeoutMs: 300000
-        reconnect: true
+        reconnect:
+          enabled: true
 ```
 
 После ручной правки DSH перезапустите; `dap-mcp doctor` проверяет сервер напрямую

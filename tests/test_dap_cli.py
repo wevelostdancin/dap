@@ -339,7 +339,7 @@ class InstallDshTest(unittest.TestCase):
         self.assertIn("        transport: stdio", written)
         self.assertIn("        startupTimeoutMs: 60000", written)
         self.assertIn("        toolCallTimeoutMs: 300000", written)
-        self.assertIn("        reconnect: true", written)
+        self.assertIn("        reconnect:\n          enabled: true", written)
         self.assertIn(str(ROOT / "adapters" / "mcp" / "dap_mcp.py"), written)
         self.assertIn(f"DAP_HOME: {ROOT}", written)
         self.assertIn("- id: ui-chat", written)
