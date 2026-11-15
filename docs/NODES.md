@@ -324,17 +324,24 @@ ISO-даты и даты по `numFmtId`; ошибки ячеек становя
 ## 9. dap.group_by
 
 Группирует строки по ключам и считает агрегаты. Имена выходных колонок —
-`Mean(x)`, `Sum(x)`, `Count(x)`, `Min(x)`, `Max(x)`.
+`Mean(x)`, `Sum(x)`, `Count(x)`, `Min(x)`, `Max(x)`, `CountDistinct(x)`,
+`Median(x)`, `Percentile(x, 0.9)`.
 
 | Ключ | Тип | Примечание |
 |---|---|---|
 | `keys` | array<string> | обязателен; минимум одна колонка |
-| `aggregations` | array<{column, fn}> | обязателен |
+| `aggregations` | array<{column, fn, p}> | обязателен |
 | `aggregations[].column` | string | колонка входа |
-| `aggregations[].fn` | `mean` \| `sum` \| `count` \| `min` \| `max` | — |
+| `aggregations[].fn` | `mean` \| `sum` \| `count` \| `min` \| `max` \| `count_distinct` \| `median` \| `percentile` | — |
+| `aggregations[].p` | number | для `percentile`; вероятность в `[0, 1]` |
 
-`mean` и `sum` требуют числовую колонку. `mean` возвращает `Float64`, `count` —
-`Int64`, `sum`/`min`/`max` — тип входной колонки.
+`mean`, `sum`, `median` и `percentile` требуют числовую колонку; `count_distinct`
+работает с любым типом. `mean`, `median` и `percentile` возвращают `Float64`,
+`count`/`count_distinct` — `Int64`, `sum`/`min`/`max` — тип входной колонки.
+NULL-значения агрегаты игнорируют (как `COUNT`). `median` — это
+`QUANTILE_CONT(x, 0.5)`, `percentile` — `QUANTILE_CONT(x, p)` с линейной
+интерполяцией; вход `Decimal128` приводится к `DOUBLE`, поэтому выход всегда
+`Number (Float)`. `p` вне `[0, 1]` или отсутствие `p` — ошибка конфигурации.
 
 ```json
 {

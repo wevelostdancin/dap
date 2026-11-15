@@ -13,7 +13,9 @@ import java.util.StringJoiner;
 
 /** dap.group_by: Groups rows by key columns and aggregates per group, named like KNIME (Mean(x)). */
 public final class GroupByExecutor implements NodeExecutor {
-    private static final List<String> FUNCTIONS = List.of("mean", "sum", "count", "min", "max");
+    private static final List<String> FUNCTIONS = List.of(
+            "mean", "sum", "count", "min", "max", "count_distinct", "median", "percentile");
+    private static final List<String> NUMERIC_FUNCTIONS = List.of("mean", "sum", "median", "percentile");
 
     @Override
     public String nodeId() {
@@ -57,14 +59,15 @@ public final class GroupByExecutor implements NodeExecutor {
             String fn = NodeSql.requiredText(aggregation, "fn").toLowerCase(Locale.ROOT);
             if (!FUNCTIONS.contains(fn)) {
                 throw new IllegalArgumentException("group_by: unknown aggregation function '" + fn
-                        + "' (expected mean, sum, count, min, max)");
+                        + "' (expected mean, sum, count, min, max, count_distinct, median, percentile)");
             }
-            if (("mean".equals(fn) || "sum".equals(fn)) && !column.numeric()) {
+            if (NUMERIC_FUNCTIONS.contains(fn) && !column.numeric()) {
                 throw new IllegalArgumentException("group_by: " + fn + " requires a numeric column, got '"
                         + column.name() + "' (" + column.arrowType() + ")");
             }
-            String name = aggregateName(fn, column.name());
-            select.add(aggregateSql(fn, column) + " AS " + NodeSql.quote(name));
+            Double probability = "percentile".equals(fn) ? probability(aggregation) : null;
+            String name = aggregateName(fn, column.name(), probability);
+            select.add(aggregateSql(fn, column, probability) + " AS " + NodeSql.quote(name));
             output.add(ColumnSpec.of(name, outputType(fn, column)));
         }
 
@@ -80,33 +83,57 @@ public final class GroupByExecutor implements NodeExecutor {
         }
     }
 
-    private static String aggregateName(String fn, String column) {
+    private static String aggregateName(String fn, String column, Double probability) {
         return switch (fn) {
             case "mean" -> "Mean(" + column + ")";
             case "sum" -> "Sum(" + column + ")";
             case "count" -> "Count(" + column + ")";
             case "min" -> "Min(" + column + ")";
             case "max" -> "Max(" + column + ")";
+            case "count_distinct" -> "CountDistinct(" + column + ")";
+            case "median" -> "Median(" + column + ")";
+            case "percentile" -> "Percentile(" + column + ", " + probability + ")";
             default -> throw new IllegalArgumentException("group_by: unknown aggregation function '" + fn + "'");
         };
     }
 
-    private static String aggregateSql(String fn, ColumnSpec column) {
+    private static String aggregateSql(String fn, ColumnSpec column, Double probability) {
         String quoted = NodeSql.quote(column.name());
+        // Decimal inputs are cast to DOUBLE so the aggregate has a stable Arrow type.
+        String numeric = "CAST(" + quoted + " AS DOUBLE)";
         return switch (fn) {
             case "mean" -> "CAST(AVG(" + quoted + ") AS DOUBLE)";
             case "sum" -> "CAST(SUM(" + quoted + ") AS " + column.duckDbType() + ")";
             case "count" -> "CAST(COUNT(" + quoted + ") AS BIGINT)";
             case "min" -> "MIN(" + quoted + ")";
             case "max" -> "MAX(" + quoted + ")";
+            case "count_distinct" -> "CAST(COUNT(DISTINCT " + quoted + ") AS BIGINT)";
+            case "median" -> "CAST(MEDIAN(" + numeric + ") AS DOUBLE)";
+            case "percentile" -> "CAST(QUANTILE_CONT(" + numeric + ", " + probability + ") AS DOUBLE)";
             default -> throw new IllegalArgumentException("group_by: unknown aggregation function '" + fn + "'");
         };
     }
 
+    /** Percentile probability from the aggregation's 'p', which must be a number in [0, 1]. */
+    private static Double probability(JsonNode aggregation) {
+        JsonNode value = aggregation.get("p");
+        if (value == null || value.isNull()) {
+            throw new IllegalArgumentException("group_by: percentile requires 'p' in [0, 1]");
+        }
+        if (!value.isNumber()) {
+            throw new IllegalArgumentException("group_by: percentile 'p' must be a number in [0, 1]");
+        }
+        double probability = value.doubleValue();
+        if (!(probability >= 0.0 && probability <= 1.0)) {
+            throw new IllegalArgumentException("group_by: percentile 'p' must be within [0, 1], got " + probability);
+        }
+        return probability;
+    }
+
     private static String outputType(String fn, ColumnSpec column) {
         return switch (fn) {
-            case "mean" -> "Float64";
-            case "count" -> "Int64";
+            case "mean", "median", "percentile" -> "Float64";
+            case "count", "count_distinct" -> "Int64";
             default -> column.arrowType();
         };
     }

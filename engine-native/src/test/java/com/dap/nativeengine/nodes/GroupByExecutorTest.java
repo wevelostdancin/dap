@@ -225,9 +225,9 @@ class GroupByExecutorTest {
 
             IllegalArgumentException badFunction = assertThrows(IllegalArgumentException.class,
                     () -> new GroupByExecutor().execute(NodeTestSupport.context(db, """
-                            {"keys":["grp"],"aggregations":[{"column":"n","fn":"median"}]}
+                            {"keys":["grp"],"aggregations":[{"column":"n","fn":"stddev"}]}
                             """), List.of(input)));
-            assertTrue(badFunction.getMessage().contains("median"), badFunction.getMessage());
+            assertTrue(badFunction.getMessage().contains("stddev"), badFunction.getMessage());
 
             IllegalArgumentException nonNumericMean = assertThrows(IllegalArgumentException.class,
                     () -> new GroupByExecutor().execute(NodeTestSupport.context(db, """

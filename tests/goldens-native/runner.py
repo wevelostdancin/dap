@@ -58,7 +58,7 @@ def load_corpus(only=None):
 
 
 ROW_FILTER_OPS = {"eq", "ne", "lt", "le", "gt", "ge", "is_null", "not_null"}
-AGGREGATIONS = {"mean", "count", "sum"}
+AGGREGATIONS = {"mean", "count", "sum", "min", "max", "count_distinct", "median", "percentile"}
 LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "sorter",
                  "group_by", "joiner", "column_filter", "column_renamer", "missing_value",
                  "string_manipulation", "math_formula",
