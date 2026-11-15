@@ -66,7 +66,8 @@ class NodeRegistryTest {
             "dap.linear_regression",
             "dap.sql_query",
             "dap.db_reader",
-            "dap.file_list");
+            "dap.file_list",
+            "dap.chart_grid");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -120,7 +121,8 @@ class NodeRegistryTest {
         for (NodeSpec spec : registry.all()) {
             if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")
                     || spec.id().equals("dap.data_quality")
-                    || spec.id().equals("dap.sql_query")) {
+                    || spec.id().equals("dap.sql_query")
+                    || spec.id().equals("dap.chart_grid")) {
                 continue;
             }
             if (spec.type().equals("Source")) {
@@ -276,7 +278,7 @@ class NodeRegistryTest {
     @Test
     void limitCapsTheResultInNameOrder() {
         assertEquals(ALL_IDS.size(), registry.search(null, null, -1).size());
-        assertEquals(List.of("Binner", "Chart", "Column Filter"),
+        assertEquals(List.of("Binner", "Chart", "Chart Grid"),
                 registry.search(null, null, 3).stream().map(NodeSpec::name).toList());
         assertTrue(registry.search(null, null, 0).isEmpty());
     }

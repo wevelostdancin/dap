@@ -59,10 +59,6 @@ public record ChartSpec(
         return title != null && !title.isBlank();
     }
 
-    public boolean hasSubtitle() {
-        return subtitle != null && !subtitle.isBlank();
-    }
-
     public boolean faceted() {
         return facet != null && !facet.isBlank();
     }

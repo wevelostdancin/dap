@@ -34,6 +34,12 @@ final class ChartConfig {
     }
 
     static ChartSpec parse(JsonNode config, List<ColumnSpec> columns, String node) {
+        return parse(config, columns, node, 0, 0);
+    }
+
+    /** Parse chart settings; a positive width/height overrides the canvas size (grid cells). */
+    static ChartSpec parse(JsonNode config, List<ColumnSpec> columns, String node, int width,
+                           int height) {
         String type = requiredText(config, "type", node);
         if (!TYPES.contains(type)) {
             throw new IllegalArgumentException(node + ": unknown 'type' '" + type
@@ -71,8 +77,9 @@ final class ChartConfig {
                 text(config, "title", node), text(config, "subtitle", node),
                 text(config, "x_label", node), text(config, "y_label", node),
                 text(config, "x_unit", node), text(config, "y_unit", node),
-                integer(config, "width", DEFAULT_WIDTH, MIN_SIZE, MAX_SIZE, node),
-                integer(config, "height", DEFAULT_HEIGHT, MIN_SIZE, MAX_SIZE, node),
+                width > 0 ? width : integer(config, "width", DEFAULT_WIDTH, MIN_SIZE, MAX_SIZE, node),
+                height > 0 ? height
+                        : integer(config, "height", DEFAULT_HEIGHT, MIN_SIZE, MAX_SIZE, node),
                 integer(config, "bins", DEFAULT_BINS, 1, MAX_BINS, node),
                 integer(config, "limit", DEFAULT_LIMIT, 1, MAX_LIMIT, node),
                 sort, descending, logX, logY,
@@ -269,7 +276,7 @@ final class ChartConfig {
         return value.textValue();
     }
 
-    private static String text(JsonNode node, String field, String prefix) {
+    static String text(JsonNode node, String field, String prefix) {
         JsonNode value = node.get(field);
         if (value == null || value.isNull()) {
             return null;
@@ -293,8 +300,8 @@ final class ChartConfig {
         return value.booleanValue();
     }
 
-    private static int integer(JsonNode node, String field, int fallback, int minimum,
-                               int maximum, String prefix) {
+    static int integer(JsonNode node, String field, int fallback, int minimum, int maximum,
+                       String prefix) {
         JsonNode value = node.get(field);
         if (value == null || value.isNull()) {
             return fallback;
