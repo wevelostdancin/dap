@@ -45,6 +45,8 @@ public final class ChartRenderer {
     private static final String TEXT = "#333333";
     private static final String TITLE_TEXT = "#111111";
     private static final String ANNOTATION = "#d62728";
+    private static final String MAP_OUTLINE = "#c9c9c9";
+    private static final String MAP_LEGEND = "#9aa7b4";
 
     private static final double TICK_SIZE = 11;
     private static final double TITLE_SIZE = 16;
@@ -154,6 +156,7 @@ public final class ChartRenderer {
             case "pie" -> pie(spec, columns, rows, body, shapes);
             case "boxplot" -> boxplot(spec, columns, rows, body, shapes);
             case "heatmap" -> heatmap(spec, columns, rows, body, shapes);
+            case "map" -> map(spec, columns, rows, body, shapes);
             default -> throw new IllegalArgumentException("chart: unsupported type '" + spec.type()
                     + "'");
         }
@@ -942,6 +945,101 @@ public final class ChartRenderer {
         int green = (int) Math.round(low[1] + (high[1] - low[1]) * value);
         int blue = (int) Math.round(low[2] + (high[2] - low[2]) * value);
         return String.format(Locale.ROOT, "#%02x%02x%02x", red, green, blue);
+    }
+
+    // ------------------------------------------------------------------ map
+
+    private record MapPoint(double lat, double lng, Double size, String colour, String label) {
+    }
+
+    private static void map(ChartSpec spec, List<ColumnSpec> columns, List<List<String>> rows,
+                            Frame frame, List<Shape> shapes) {
+        int latIndex = indexOf(columns, spec.lat());
+        int lngIndex = indexOf(columns, spec.lng());
+        int sizeIndex = spec.size() == null ? -1 : indexOf(columns, spec.size());
+        int colourIndex = spec.color() == null ? -1 : indexOf(columns, spec.color());
+        int labelIndex = spec.label() == null ? -1 : indexOf(columns, spec.label());
+        List<MapPoint> points = new ArrayList<>();
+        Set<String> colourNames = new LinkedHashSet<>();
+        double minSize = Double.POSITIVE_INFINITY;
+        double maxSize = Double.NEGATIVE_INFINITY;
+        for (List<String> row : rows) {
+            Double lat = number(cell(row, latIndex));
+            Double lng = number(cell(row, lngIndex));
+            if (lat == null || lng == null) {
+                continue;
+            }
+            if (lat < -90 || lat > 90) {
+                throw new IllegalArgumentException("chart: 'lat' column '" + spec.lat()
+                        + "' value " + format(lat) + " is outside [-90, 90]");
+            }
+            if (lng < -180 || lng > 180) {
+                throw new IllegalArgumentException("chart: 'lng' column '" + spec.lng()
+                        + "' value " + format(lng) + " is outside [-180, 180]");
+            }
+            Double size = sizeIndex < 0 ? null : number(cell(row, sizeIndex));
+            if (size != null) {
+                minSize = Math.min(minSize, size);
+                maxSize = Math.max(maxSize, size);
+            }
+            String colour = colourIndex < 0 ? null : cell(row, colourIndex);
+            if (colour != null) {
+                colourNames.add(colour);
+            }
+            points.add(new MapPoint(lat, lng, size, colour,
+                    labelIndex < 0 ? null : cell(row, labelIndex)));
+        }
+        List<String> colours = categoryOrder(colourNames);
+        boolean sizeLegend = sizeIndex >= 0 && !points.isEmpty();
+        Plot plot = plot(frame, false, false, false, sizeLegend ? 96 : 0);
+        for (List<double[]> ring : WorldMap.load().rings()) {
+            List<double[]> projected = new ArrayList<>(ring.size());
+            for (double[] point : ring) {
+                double[] normalized = WorldMap.normalize(point[0], point[1]);
+                projected.add(new double[]{plot.px(normalized[0]), plot.py(normalized[1])});
+            }
+            shapes.add(new Shape.Path(projected, "none", MAP_OUTLINE, 0.6));
+        }
+        axes(shapes, plot);
+        for (MapPoint point : points) {
+            double[] normalized = WorldMap.normalize(point.lng(), point.lat());
+            double x = plot.px(normalized[0]);
+            double y = plot.py(normalized[1]);
+            double radius = 5;
+            if (point.size() != null) {
+                radius = radiusFor(point.size(), minSize, maxSize);
+            }
+            String colour = point.colour() == null ? PALETTE[0]
+                    : PALETTE[Math.max(0, colours.indexOf(point.colour())) % PALETTE.length];
+            shapes.add(new Shape.Circle(x, y, radius, colour));
+            if (point.label() != null && points.size() <= 40) {
+                shapes.add(new Shape.Label(x + radius + 3, y + 4, point.label(), "start",
+                        DATA_LABEL_SIZE, TEXT));
+            }
+        }
+        if (sizeLegend) {
+            double legendX = plot.right() + 28;
+            double legendY = plot.top() + 40;
+            double[] values = {maxSize, (maxSize + minSize) / 2, minSize};
+            shapes.add(new Shape.Label(legendX, plot.top() + 20, "size", "start", LEGEND_SIZE,
+                    TEXT));
+            for (int index = 0; index < values.length; index++) {
+                double radius = radiusFor(values[index], minSize, maxSize);
+                shapes.add(new Shape.Circle(legendX + 14, legendY + index * 44, radius,
+                        MAP_LEGEND));
+                shapes.add(new Shape.Label(legendX + 34, legendY + index * 44 + 4,
+                        format(values[index]), "start", TICK_SIZE, TEXT));
+            }
+        }
+        annotations(shapes, spec, plot, null, null, null);
+    }
+
+    private static double radiusFor(double value, double minimum, double maximum) {
+        if (maximum - minimum < 1e-9) {
+            return 9;
+        }
+        double fraction = Math.max(0, Math.min(1, (value - minimum) / (maximum - minimum)));
+        return 4 + 16 * Math.sqrt(fraction);
     }
 
     // ------------------------------------------------------------------ svg

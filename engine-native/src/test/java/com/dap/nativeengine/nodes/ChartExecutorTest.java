@@ -366,6 +366,43 @@ class ChartExecutorTest {
     }
 
     @Test
+    void mapDrawsWorldOutlineBubblesAndSizeLegend() throws Exception {
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("country", "Utf8"),
+                ColumnSpec.of("region", "Utf8"),
+                ColumnSpec.of("lat", "Float64"),
+                ColumnSpec.of("lng", "Float64"),
+                ColumnSpec.of("population", "Float64"));
+        List<Object[]> rows = List.<Object[]>of(
+                new Object[]{"Moscow", "East", 55.75, 37.62, 12.0},
+                new Object[]{"New York", "West", 40.71, -74.0, 8.0},
+                new Object[]{"Sydney", "East", -33.87, 151.2, 5.0});
+        String document = svg(columns, rows, ",\"type\":\"map\",\"lat\":\"lat\",\"lng\":\"lng\","
+                + "\"size\":\"population\",\"color\":\"region\",\"label\":\"country\","
+                + "\"title\":\"Cities\"");
+        assertTrue(count(document, "<path ") >= 100, "the world outline is drawn as paths");
+        assertEquals(6, count(document, "<circle "), "three bubbles and a three-step size legend");
+        assertEquals(2, count(document, "fill=\"#1f77b4\""), "East bubbles use the first palette colour");
+        assertEquals(1, count(document, "fill=\"#ff7f0e\""), "the West bubble uses the second colour");
+        assertTrue(document.contains(">Moscow</text>"), document);
+        assertTrue(document.contains(">12</text>"), "size legend shows the maximum: " + document);
+
+        IllegalArgumentException latitude = assertThrows(IllegalArgumentException.class,
+                () -> svg(columns, List.<Object[]>of(new Object[]{"X", "E", 91.0, 0.0, 1.0}),
+                        ",\"type\":\"map\",\"lat\":\"lat\",\"lng\":\"lng\""));
+        assertTrue(latitude.getMessage().contains("lat"), latitude.getMessage());
+
+        IllegalArgumentException longitude = assertThrows(IllegalArgumentException.class,
+                () -> svg(columns, List.<Object[]>of(new Object[]{"X", "E", 0.0, -181.0, 1.0}),
+                        ",\"type\":\"map\",\"lat\":\"lat\",\"lng\":\"lng\""));
+        assertTrue(longitude.getMessage().contains("lng"), longitude.getMessage());
+
+        IllegalArgumentException missing = assertThrows(IllegalArgumentException.class,
+                () -> svg(columns, rows, ",\"type\":\"map\",\"lng\":\"lng\""));
+        assertTrue(missing.getMessage().contains("lat"), missing.getMessage());
+    }
+
+    @Test
     void newChartTypesRenderPng() throws Exception {
         List<ColumnSpec> columns = List.of(
                 ColumnSpec.of("category", "Utf8"),

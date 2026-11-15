@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Renders a bar, line, scatter, histogram, pie, boxplot or heatmap chart from the input table and passes the table through unchanged. A visible title, subtitle, axis labels and units are drawn on the canvas; axes get 5% headroom, bars start at 0 and sort by value by default. Pie slices show shares with percentages, boxplots draw quartiles with whiskers and outliers, heatmaps aggregate means per cell with a colour legend. SVG is hand-written XML with rounded coordinates and no timestamps, so the same input produces byte-identical output; PNG is drawn with Java2D in headless mode.",
+  "description": "Renders a bar, line, scatter, histogram, pie, boxplot, heatmap or world bubble map from the input table and passes the table through unchanged. A visible title, subtitle, axis labels and units are drawn on the canvas; axes get 5% headroom, bars start at 0 and sort by value by default. Pie slices show shares with percentages, boxplots draw quartiles with whiskers and outliers, heatmaps aggregate means per cell with a colour legend, and maps project lat/lng bubbles over a bundled public-domain Natural Earth 110m outline. SVG is hand-written XML with rounded coordinates and no timestamps, so the same input produces byte-identical output; PNG is drawn with Java2D in headless mode.",
   "inPorts": [
     {
       "index": 0,
@@ -53,14 +53,15 @@
           "histogram",
           "pie",
           "boxplot",
-          "heatmap"
+          "heatmap",
+          "map"
         ],
-        "description": "bar - summed values per category; line/scatter - points over a numeric x; histogram - distribution of the x column; pie - shares of one y column per category; boxplot - quartiles and outliers of one y column per category; heatmap - mean of one y column per x/series cell."
+        "description": "bar - summed values per category; line/scatter - points over a numeric x; histogram - distribution of the x column; pie - shares of one y column per category; boxplot - quartiles and outliers of one y column per category; heatmap - mean of one y column per x/series cell; map - lat/lng bubble map over a world outline."
       },
       "x": {
         "type": "string",
         "title": "X column",
-        "description": "Category column for bar; numeric column for line, scatter and histogram."
+        "description": "Category column for bar/pie/boxplot/heatmap; numeric column for line, scatter and histogram; not used by map."
       },
       "y": {
         "type": "array",
@@ -212,6 +213,31 @@
         "minimum": 1,
         "maximum": 1000,
         "description": "Number of equal-width bins for the histogram type."
+      },
+      "lat": {
+        "type": "string",
+        "title": "Latitude column",
+        "description": "map only: numeric latitude in [-90, 90]; rows with NULL lat/lng are skipped."
+      },
+      "lng": {
+        "type": "string",
+        "title": "Longitude column",
+        "description": "map only: numeric longitude in [-180, 180]."
+      },
+      "size": {
+        "type": "string",
+        "title": "Bubble size column",
+        "description": "map only: numeric column scaled to bubble radius; adds a size legend."
+      },
+      "color": {
+        "type": "string",
+        "title": "Bubble colour column",
+        "description": "map only: categorical column; one palette colour per value."
+      },
+      "label": {
+        "type": "string",
+        "title": "Bubble label column",
+        "description": "map only: text drawn next to each bubble when there are at most 40 points."
       }
     },
     "required": [
