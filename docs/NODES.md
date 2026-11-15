@@ -136,7 +136,7 @@
 | `dap.date_range` | Date Range | `/Time Series` | — |
 | `dap.excel_writer` | Excel Writer | `/IO/Write` | 1 (pass-through) |
 
-| `dap.markdown_report` | Markdown Report | `/IO/Write` | 1 (pass-through) |
+| `dap.markdown_report` | Markdown Report | `/IO/Write` | 8 (pass-through порта 0) |
 | `dap.chart` | Chart | `/Visualization` | 1 (pass-through) |
 
 ## 2. dap.csv_reader
@@ -1314,29 +1314,43 @@ Apache POI не используется: книга собирается сре
 
 ## 46. dap.markdown_report
 
-Пишет детерминированный Markdown-отчёт и возвращает входную таблицу без изменений
-(pass-through). Разделы рендерятся в порядке конфига: `table` — строки входа,
+Пишет детерминированный отчёт в формате `md` (по умолчанию), `html`, `pdf` или
+`pptx` и возвращает таблицу входа порта 0 без изменений (pass-through). У узла восемь
+входных портов; каждый раздел выбирает таблицу через `sections[].input` (0…7, по
+умолчанию 0). Разделы рендерятся в порядке конфига: `table` — строки выбранного входа,
 `profile` — статистика `dap.describe` (по колонкам), `text` — литеральный абзац,
-`metrics` — счётчики строк/колонок и агрегаты по выбранным колонкам. Файл пишется
-на run атомарно (временный файл рядом с целевым + переименование), родительские
-каталоги создаются; вывод не содержит времени и прочих недетерминированных данных.
-Порты: вход 0 — `Data`, выход 0 — `Data` (та же таблица).
+`metrics` — счётчики строк/колонок и агрегаты по выбранным колонкам, `image` —
+растровый файл, `page_break` — явный разрыв страницы. Файл пишется на run атомарно
+(временный файл рядом с целевым + переименование), родительские каталоги создаются;
+вывод не содержит времени и прочих недетерминированных данных.
+Порты: входы 0–7 — `Data 1`…`Data 8`; выход 0 — `Data` (таблица входа порта 0).
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `file` | string | — | обязателен; путь к выходному `.md` |
-| `title` | string | — | заголовок документа (`#`); пустой — без заголовка |
+| `file` | string | — | обязателен; путь к выходному файлу |
+| `format` | `md` \| `html` \| `pdf` \| `pptx` | `md` | формат отчёта |
+| `title` | string | — | заголовок документа |
+| `subtitle` | string | — | подзаголовок (html, pdf) |
+| `author` | string | — | автор (html, pdf) |
+| `toc` | boolean | `false` | оглавление по заголовкам разделов (html) |
+| `theme` | `default` \| `light` \| `dark` \| `mono` | `default` | палитра; в pdf/pptx используется акцентный цвет |
+| `page_size` | `a4` \| `letter` | — | бумага для html/pdf; по умолчанию A4 (html/pdf) или 16:9 (pptx) |
+| `orientation` | `portrait` \| `landscape` | — | ориентация; по умолчанию portrait, для pptx — landscape |
 | `sections` | array | — | обязателен, непустой; порядок = порядок вывода |
 
 Раздел (`sections[]`):
 
 | Ключ | Тип | По умолчанию | Примечание |
 |---|---|---|---|
-| `kind` | `table` \| `profile` \| `text` \| `metrics` | — | обязателен |
-| `title` | string | — | заголовок раздела (`##`) |
+| `kind` | `table` \| `profile` \| `text` \| `metrics` \| `image` \| `page_break` | — | обязателен |
+| `title` | string | — | заголовок раздела (`##` в md) |
+| `input` | integer | 0 | вход 0…7 для `table`/`profile`/`metrics`; порт должен быть подключён |
 | `columns` | string[] | — | для `table`/`profile` — какие колонки показывать (пусто = все); для `metrics` — какие колонки суммировать (пусто = только `rows`/`columns`) |
 | `limit` | integer | 100 (table), 1000 (profile) | 1…10000; для `table` — строк, для `profile` — строк статистики |
 | `text` | string | — | обязателен для `kind: text` |
+| `path` | string | — | обязателен для `kind: image`; PNG, JPEG или GIF |
+| `alt` | string | — | альтернативный текст (md, html) |
+| `width` | integer | — | ширина изображения в пикселях, 1…10000; в pdf/pptx масштабируется под страницу |
 
 Семантика:
 
@@ -1347,18 +1361,41 @@ Apache POI не используется: книга собирается сре
 - `metrics` — таблица `metric`/`value`: всегда `rows` и `columns`, затем для каждой
   выбранной колонки `<col>.count`, `<col>.missing` и для числовых —
   `<col>.mean`, `<col>.min`, `<col>.max`.
-- Один preview на все `table`-разделы (по максимальному `limit`), поэтому отчёт
-  читает вход один раз; ошибка конфига или пути видна на run (500).
+- `image` — файл читается один раз при разборе конфига; отсутствующий файл — ошибка run.
+- `page_break` — новая страница в pdf/html, `---` в md, в pptx пропускается.
+- Один preview на вход (по максимальному `limit` среди его `table`-разделов), поэтому
+  каждый вход читается один раз; ошибка конфига или пути видна на run (500).
+
+Форматы:
+
+- `md` — прежний Markdown: изображение рендерится как `![alt](path)`, разрыв — `---`;
+  побайтово совместим с одно-входовым отчётом прежних версий.
+- `html` — один самодостаточный файл: CSS внутри, таблицы, изображения как data URI,
+  без внешних ссылок; `toc: true` добавляет оглавление со ссылками на разделы.
+- `pdf` — минимальный writer без библиотек: A4/Letter, portrait/landscape, раскладка
+  через Java2D (заголовки, текст с переносами, таблицы с повтором шапки на новой
+  странице, изображения); PNG/JPEG декодируются в RGB и встраиваются Flate-потоком;
+  в файле нет дат и id, поэтому вывод побайтово детерминирован. Символы вне WinAnsi
+  (например кириллица) заменяются на `?`: шрифт не встраивается.
+- `pptx` — минимальный OOXML-пакет: `[Content_Types].xml`, rels, `ppt/presentation.xml`,
+  master/layout/theme и по одному слайду на раздел (`page_break` не создаёт слайд);
+  слайд — заголовок плюс текст, таблица (до 12 строк и строка «… N more rows») или
+  картинка в `ppt/media`. Zip детерминирован: фиксированные даты и порядок частей.
 
 ```json
 {
   "factory": "dap.markdown_report",
   "settings": {
-    "file": "/data/report.md",
+    "file": "/data/report.pdf",
+    "format": "pdf",
     "title": "Sales report",
+    "page_size": "a4",
+    "orientation": "landscape",
     "sections": [
-      {"kind": "table", "title": "Rows", "columns": ["id", "amount"], "limit": 50},
-      {"kind": "metrics", "title": "Totals", "columns": ["amount"]},
+      {"kind": "table", "title": "Rows", "input": 0, "columns": ["id", "amount"], "limit": 50},
+      {"kind": "metrics", "title": "Totals", "input": 0, "columns": ["amount"]},
+      {"kind": "image", "title": "Chart", "input": 1, "path": "/data/chart.png", "width": 480},
+      {"kind": "page_break"},
       {"kind": "text", "title": "Note", "text": "Generated by DAP."}
     ]
   }
