@@ -138,6 +138,16 @@ python3 adapters/mcp/dap_mcp.py
 }
 ```
 
+Подключить одной командой (stdlib-CLI, идемпотентно, с бэкапом и `--dry-run`):
+
+```bash
+python3 adapters/mcp/dap_cli.py install --client hermes   # или --client dsh
+python3 adapters/mcp/dap_cli.py doctor --client hermes
+```
+
+Дистрибутив: `make dist` → `dist/` (jar, адаптер, CLI, `SHA256SUMS`); проверка
+установки из него — `make install-e2e`. Подробности — [docs/MCP.md](docs/MCP.md).
+
 Инструменты: `dap_search_nodes`, `dap_node_dialog_schema`, `dap_workflow_create`,
 `dap_add_node`, `dap_connect`, `dap_run`, `dap_get_table`, `dap_profile_table`,
 `dap_ingest`, `dap_save_workflow`, `dap_load_workflow`, `dap_shutdown` и остальные
@@ -151,6 +161,7 @@ make test-native    # JUnit: 401 тест
 make goldens        # 15 golden-workflow на отдельном экземпляре :7811
 make smoke          # чёрный smoke по HTTP против запущенного движка (DAP_BASE)
 make mcp-e2e        # create → add_node → connect → run → table → delete через MCP
+make install-e2e    # установка из dist/ во временный HOME + stdio preflight
 make check          # test-native + goldens + lint
 ```
 
@@ -161,10 +172,10 @@ engine-native/   движок: Java 21, specs/*.json, JUnit-тесты
 adapters/mcp/    stdio MCP-адаптер (Python, только stdlib)
 api/             контракт /v1: openapi.yaml
 docs/            ARCHITECTURE, NODES, QUALITY, ROADMAP, API, MCP, BENCH
-tests/           goldens-native/, native_smoke.py, mcp_e2e.py, bench.py
+tests/           goldens-native/, native_smoke.py, mcp_e2e.py, install_e2e.py, bench.py
 deploy/          Dockerfile.native (образ не проверен без Docker-демона)
 scripts/         статические проверки репозитория
-Makefile         build-native, test-native, run-native, goldens, check
+Makefile         build-native, test-native, run-native, goldens, dist, check
 ```
 
 ## Документация

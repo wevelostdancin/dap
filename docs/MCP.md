@@ -11,14 +11,54 @@ scripts/dap-mcp
 ```
 
 Обёртка сама находит корень репозитория, выставляет `DAP_HOME` и запускает
-`adapters/mcp/dap_mcp.py` (Python 3.10+, только стандартная библиотека). Клиент
-запускает её как дочерний процесс и говорит по stdin/stdout JSON-RPC 2.0.
+`adapters/mcp/dap_cli.py run` (Python 3.10+, только стандартная библиотека).
+Клиент запускает её как дочерний процесс и говорит по stdin/stdout JSON-RPC 2.0.
 
 Требования на машине:
 
 - JDK 21 — `DAP_JDK` или `JAVA_HOME`;
 - собранный jar: `make build-native` (`engine-native/target/dap-native.jar`);
 - Python 3.10+ в `PATH` (или `PYTHON=/path/to/python3`).
+
+## Подключение одной командой
+
+`dap-mcp` — CLI адаптера (Python, только stdlib). Подкоманды: `run` (stdio,
+по умолчанию), `install`, `doctor`, `version`.
+
+```bash
+python3 adapters/mcp/dap_cli.py install --client hermes   # ~/.hermes/config.yaml
+python3 adapters/mcp/dap_cli.py install --client dsh      # ~/.dsh/profiles/desktop/cordis.patch.yml
+python3 adapters/mcp/dap_cli.py doctor --client hermes
+python3 adapters/mcp/dap_cli.py doctor --json
+python3 adapters/mcp/dap_cli.py version                   # adapter=… engine=… api=…
+```
+
+`install` идемпотентен: повторный запуск не меняет файл (mtime сохраняется) и не
+плодит записи; перед записью делается бэкап `<config>.bak-<YYYYmmdd-HHMMSS>`;
+`--dry-run` печатает результат и ничего не пишет; `--force` создаёт отсутствующий
+конфиг клиента (без него — код 2); `--config PATH` — явный путь к конфигу;
+`--home PATH` — DAP home (по умолчанию `$DAP_HOME` или корень репозитория), а
+клиентские конфиги ищутся в `$HOME`. Все пути в записи абсолютные: оба клиента
+чистят окружение дочернего процесса. Существующие MCP-серверы и комментарии
+сохраняются — обновляется только запись `dap`. Нестандартный YAML (flow-style,
+якоря) не переписывается: печатается фрагмент и код 2.
+
+`doctor` проверяет Python >= 3.10, jar, `/v1/health`, прямой stdio-прогон
+(`initialize` + `tools/list`), запись `dap` в конфиге клиента и свободный порт;
+код 0 — только когда все проверки PASS, `--json` печатает список. Если движок не
+запущен, `doctor` поднимает его через адаптер (initialize + первый tool call,
+как при реальном вызове) и ждёт `/v1/health` до 60 с, поэтому PASS означает
+рабочую установку «с нуля».
+
+## Дистрибутив
+
+```bash
+make dist          # dist/: jar, adapters/mcp, scripts/dap-mcp, VERSION, SHA256SUMS
+make install-e2e   # установка из dist/ во временный HOME + stdio preflight
+```
+
+`dist/` самодостаточен: распакуйте в `~/.dap` и задайте `DAP_HOME=~/.dap` — CLI и
+адаптер окажутся в `~/.dap`, jar в `~/.dap/engine-native/target/dap-native.jar`.
 
 ## Переменные окружения
 
@@ -120,9 +160,63 @@ stdout, ответы сопоставляются по `id`.
 - `dap_save_workflow`/`dap_load_workflow` принимают произвольный локальный путь —
   это осознанный дизайн локального инструмента.
 
+## Если конфиг нестандартный
+
+`install` не переписывает YAML, который не понимает (flow-style, якоря, теги):
+печатает первые 20 строк конфига и выходит с кодом 2. Добавьте запись вручную.
+
+Hermes (`~/.hermes/config.yaml`):
+
+```yaml
+mcp_servers:
+  dap:
+    command: /absolute/path/to/python3
+    args:
+      - /absolute/path/to/dap/adapters/mcp/dap_mcp.py
+    env:
+      DAP_HOME: /absolute/path/to/dap
+      DAP_PORT: "7800"
+      DAP_HEAP: 2g
+      JAVA_HOME: /absolute/path/to/jdk-21
+    cwd: /absolute/path/to/dap
+    enabled: true
+    timeout: 300
+    connect_timeout: 60
+    tools:
+      resources: true
+      prompts: true
+```
+
+DSH (`~/.dsh/profiles/desktop/cordis.patch.yml`):
+
+```yaml
+- id: mcp-manager
+  config:
+    servers:
+      dap:
+        transport: stdio
+        command: /absolute/path/to/python3
+        args:
+          - /absolute/path/to/dap/adapters/mcp/dap_mcp.py
+        env:
+          DAP_HOME: /absolute/path/to/dap
+          DAP_PORT: "7800"
+          DAP_HEAP: 2g
+          JAVA_HOME: /absolute/path/to/jdk-21
+        cwd: /absolute/path/to/dap
+        enabled: true
+        startupTimeoutMs: 60000
+        toolCallTimeoutMs: 300000
+        reconnect: true
+```
+
+После ручной правки DSH перезапустите; `dap-mcp doctor` проверяет сервер напрямую
+через stdio и не зависит от CLI клиента.
+
 ## Проверка
 
 ```bash
 make check                 # JUnit + goldens + MCP launch + MCP e2e + lint
+make install-e2e           # установка из dist/ во временный HOME + stdio preflight
 python3 tests/mcp_e2e.py   # полный сценарий через stdio
 ```
