@@ -1,0 +1,63 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "J1",
+      "title": "Profile a table through /v1/profile",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-profile",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          }
+        ],
+        "edges": []
+      },
+      "checks": [
+        {
+          "node": "src",
+          "kind": "expect_profile",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)",
+              "missing": 0,
+              "distinct": 5,
+              "min": 1,
+              "max": 5,
+              "mean": 3
+            },
+            {
+              "name": "name",
+              "type": "String",
+              "missing": 0,
+              "distinct": 5
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)",
+              "missing": 0,
+              "distinct": 5,
+              "min": 1,
+              "max": 5,
+              "mean": 3
+            },
+            {
+              "name": "category",
+              "type": "String",
+              "missing": 0,
+              "distinct": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

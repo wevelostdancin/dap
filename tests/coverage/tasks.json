@@ -1,0 +1,419 @@
+{
+  "format": "dap-coverage-tasks/1",
+  "tasks": [
+    {
+      "id": "A1",
+      "title": "Read CSV",
+      "kind": "node",
+      "scenario": "sources.json"
+    },
+    {
+      "id": "A2",
+      "title": "Read Excel",
+      "kind": "node",
+      "scenario": "sources.json"
+    },
+    {
+      "id": "A3",
+      "title": "Read JSON/JSONL",
+      "kind": "node",
+      "scenario": "sources.json"
+    },
+    {
+      "id": "A4",
+      "title": "Read Parquet",
+      "kind": "node",
+      "scenario": "sources.json"
+    },
+    {
+      "id": "A5",
+      "title": "Read gzip-compressed CSV",
+      "kind": "node",
+      "scenario": "csv_gzip.json"
+    },
+    {
+      "id": "A6",
+      "title": "Read an external SQL database",
+      "kind": "node",
+      "scenario": "db_reader.json"
+    },
+    {
+      "id": "A7",
+      "title": "Read a DuckDB file",
+      "kind": "node",
+      "scenario": "db_reader.json"
+    },
+    {
+      "id": "A8",
+      "title": "Read HTTP/API",
+      "kind": "recipe",
+      "scenario": "recipe_http.json"
+    },
+    {
+      "id": "A9",
+      "title": "List a directory",
+      "kind": "node",
+      "scenario": "file_list.json"
+    },
+    {
+      "id": "B1",
+      "title": "Filter rows",
+      "kind": "node",
+      "scenario": "transforms.json"
+    },
+    {
+      "id": "B2",
+      "title": "Select, rename and reorder columns",
+      "kind": "node",
+      "scenario": "transforms.json"
+    },
+    {
+      "id": "B3",
+      "title": "Cast types",
+      "kind": "node",
+      "scenario": "transforms.json"
+    },
+    {
+      "id": "B4",
+      "title": "Handle missing values",
+      "kind": "node",
+      "scenario": "transforms.json"
+    },
+    {
+      "id": "B5",
+      "title": "Remove duplicates",
+      "kind": "node",
+      "scenario": "transforms.json"
+    },
+    {
+      "id": "B6",
+      "title": "Replace values",
+      "kind": "node",
+      "scenario": "transforms.json"
+    },
+    {
+      "id": "B7",
+      "title": "Filter outliers",
+      "kind": "node",
+      "scenario": "transforms.json"
+    },
+    {
+      "id": "B8",
+      "title": "String case, trim, replace and concat",
+      "kind": "node",
+      "scenario": "transforms.json"
+    },
+    {
+      "id": "B9",
+      "title": "Regex extraction",
+      "kind": "recipe",
+      "scenario": "recipe_regex.json"
+    },
+    {
+      "id": "B10",
+      "title": "Split a column",
+      "kind": "recipe",
+      "scenario": "recipe_split.json"
+    },
+    {
+      "id": "C1",
+      "title": "Sort",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C2",
+      "title": "Formula / derived column",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C3",
+      "title": "Business rules",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C4",
+      "title": "Bins",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C5",
+      "title": "Normalize",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C6",
+      "title": "Encode",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C7",
+      "title": "Sample rows",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C8",
+      "title": "Inner/left/right join",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C9",
+      "title": "Full/semi/anti join",
+      "kind": "node",
+      "scenario": "joiner_modes.json"
+    },
+    {
+      "id": "C10",
+      "title": "Concatenate tables",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C11",
+      "title": "Pivot",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C12",
+      "title": "Unpivot",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C13",
+      "title": "Window functions",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C14",
+      "title": "Top-N per group",
+      "kind": "node",
+      "scenario": "derive.json"
+    },
+    {
+      "id": "C15",
+      "title": "Train/test split",
+      "kind": "recipe",
+      "scenario": "recipe_train_test.json"
+    },
+    {
+      "id": "C16",
+      "title": "Rollup/cube",
+      "kind": "recipe",
+      "scenario": "recipe_rollup.json"
+    },
+    {
+      "id": "D1",
+      "title": "Group by mean/sum/count/min/max",
+      "kind": "node",
+      "scenario": "aggregates.json"
+    },
+    {
+      "id": "D2",
+      "title": "Count distinct",
+      "kind": "node",
+      "scenario": "aggregates.json"
+    },
+    {
+      "id": "D3",
+      "title": "Median/percentile aggregate",
+      "kind": "node",
+      "scenario": "aggregates.json"
+    },
+    {
+      "id": "D4",
+      "title": "Row-wise aggregates",
+      "kind": "node",
+      "scenario": "aggregates.json"
+    },
+    {
+      "id": "D5",
+      "title": "Distinct rows",
+      "kind": "node",
+      "scenario": "aggregates.json"
+    },
+    {
+      "id": "D6",
+      "title": "HAVING (filter after aggregation)",
+      "kind": "recipe",
+      "scenario": "recipe_having.json"
+    },
+    {
+      "id": "E1",
+      "title": "Describe/summary",
+      "kind": "node",
+      "scenario": "stats.json"
+    },
+    {
+      "id": "E2",
+      "title": "Value frequencies",
+      "kind": "node",
+      "scenario": "stats.json"
+    },
+    {
+      "id": "E3",
+      "title": "Correlation",
+      "kind": "node",
+      "scenario": "stats.json"
+    },
+    {
+      "id": "E4",
+      "title": "Covariance",
+      "kind": "recipe",
+      "scenario": "recipe_covariance.json"
+    },
+    {
+      "id": "E5",
+      "title": "Histogram",
+      "kind": "node",
+      "scenario": "stats.json"
+    },
+    {
+      "id": "E6",
+      "title": "Quantiles",
+      "kind": "node",
+      "scenario": "stats.json"
+    },
+    {
+      "id": "E7",
+      "title": "Outlier detection",
+      "kind": "node",
+      "scenario": "stats.json"
+    },
+    {
+      "id": "E8",
+      "title": "t-test",
+      "kind": "node",
+      "scenario": "hypothesis.json"
+    },
+    {
+      "id": "E9",
+      "title": "Chi-square/ANOVA",
+      "kind": "node",
+      "scenario": "hypothesis.json"
+    },
+    {
+      "id": "E10",
+      "title": "Linear regression",
+      "kind": "node",
+      "scenario": "regression.json"
+    },
+    {
+      "id": "E11",
+      "title": "Normality (skewness/kurtosis)",
+      "kind": "recipe",
+      "scenario": "recipe_normality.json"
+    },
+    {
+      "id": "F1",
+      "title": "Resample",
+      "kind": "node",
+      "scenario": "timeseries.json"
+    },
+    {
+      "id": "F2",
+      "title": "Rolling window",
+      "kind": "node",
+      "scenario": "timeseries.json"
+    },
+    {
+      "id": "F3",
+      "title": "Diff",
+      "kind": "node",
+      "scenario": "timeseries.json"
+    },
+    {
+      "id": "F4",
+      "title": "Date range",
+      "kind": "node",
+      "scenario": "timeseries.json"
+    },
+    {
+      "id": "F5",
+      "title": "Date parse/format/extract",
+      "kind": "node",
+      "scenario": "timeseries.json"
+    },
+    {
+      "id": "F6",
+      "title": "Seasonality/forecast",
+      "kind": "node",
+      "not_covered": "non-goal (spec 6.2: seasonality/forecast)"
+    },
+    {
+      "id": "G1",
+      "title": "Text concatenation",
+      "kind": "node",
+      "scenario": "text.json"
+    },
+    {
+      "id": "H1",
+      "title": "Write CSV",
+      "kind": "node",
+      "scenario": "writers.json"
+    },
+    {
+      "id": "H2",
+      "title": "Write Excel",
+      "kind": "node",
+      "scenario": "writers.json"
+    },
+    {
+      "id": "H3",
+      "title": "Write JSON",
+      "kind": "node",
+      "scenario": "writers.json"
+    },
+    {
+      "id": "H4",
+      "title": "Write Parquet",
+      "kind": "node",
+      "scenario": "writers.json"
+    },
+    {
+      "id": "H5",
+      "title": "Markdown report",
+      "kind": "node",
+      "scenario": "markdown.json"
+    },
+    {
+      "id": "H6",
+      "title": "SVG/PNG chart",
+      "kind": "node",
+      "scenario": "chart.json"
+    },
+    {
+      "id": "I1",
+      "title": "Arbitrary SQL",
+      "kind": "node",
+      "scenario": "sql_query.json"
+    },
+    {
+      "id": "I2",
+      "title": "Saved recipe (save/load)",
+      "kind": "recipe",
+      "scenario": "recipes_io.json"
+    },
+    {
+      "id": "J1",
+      "title": "Table profile",
+      "kind": "node",
+      "scenario": "profile.json"
+    },
+    {
+      "id": "J2",
+      "title": "Data quality checks",
+      "kind": "node",
+      "scenario": "data_quality.json"
+    }
+  ]
+}

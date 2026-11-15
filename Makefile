@@ -6,7 +6,7 @@ export DAP_JDK
 
 JAR := engine-native/target/dap-native.jar
 
-.PHONY: help build-native test-native run-native goldens goldens-validate test-mcp smoke \
+.PHONY: help build-native test-native run-native goldens goldens-validate coverage test-mcp smoke \
         mcp mcp-e2e mcp-recipe-e2e dist install-e2e extensions bench bench-full image-native run-native-image lint check soak clean-native
 
 help:
@@ -17,6 +17,7 @@ help:
 	@echo "  make run-native     start the engine on 127.0.0.1:7800 (blocking)"
 	@echo "  make goldens        run the native golden suite (starts/stops its own engine)"
 	@echo "  make goldens-validate  structural check of the golden fixtures (no engine)"
+	@echo "  make coverage       run the 69-task coverage suite (starts/stops its own engine)"
 	@echo "  make smoke          black-box smoke against a running engine (DAP_BASE)"
 	@echo "  make mcp            run the stdio MCP adapter (client-facing entrypoint)"
 	@echo "  make mcp-e2e        MCP create/add/run/table e2e"
@@ -48,6 +49,9 @@ goldens: build-native
 
 goldens-validate:
 	python3 tests/goldens-native/runner.py --validate
+
+coverage: build-native
+	python3 tests/coverage/runner.py
 
 test-mcp:
 	python3 tests/test_mcp_launch.py

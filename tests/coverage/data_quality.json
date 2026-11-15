@@ -1,191 +1,197 @@
 {
-  "id": "wf-coverage-data-quality",
-  "task": "J2",
-  "node": "dap.data_quality",
-  "title": "Coverage J2: data quality checks over the P2 fixture",
-  "rationale": "Runs dap.data_quality end to end through /v1 with a reference input and checks the long output contract.",
-  "kind": "native",
-  "nodes": [
+  "format": "dap-coverage-scenario/1",
+  "cases": [
     {
-      "id": "src",
-      "type": "csv_reader",
-      "config": {
-        "dataset": "P2"
-      }
-    },
-    {
-      "id": "ref_src",
-      "type": "csv_reader",
-      "config": {
-        "dataset": "P2"
-      }
-    },
-    {
-      "id": "reference",
-      "type": "row_filter",
-      "config": {
-        "where": [
+      "task": "J2",
+      "title": "Coverage J2: data quality checks over the P2 fixture",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "wf-coverage-data-quality",
+        "nodes": [
           {
-            "column": "id",
-            "op": "le",
-            "value": 3
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "ref_src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "reference",
+            "type": "row_filter",
+            "config": {
+              "where": [
+                {
+                  "column": "id",
+                  "op": "le",
+                  "value": 3
+                }
+              ]
+            }
+          },
+          {
+            "id": "quality",
+            "type": "data_quality",
+            "config": {
+              "fail_on": "never",
+              "output": "long",
+              "checks": [
+                {
+                  "kind": "not_null",
+                  "column": "id"
+                },
+                {
+                  "kind": "unique",
+                  "column": "id"
+                },
+                {
+                  "kind": "range",
+                  "column": "score",
+                  "min": 0,
+                  "max": 4
+                },
+                {
+                  "kind": "pattern",
+                  "column": "name",
+                  "regex": "^[a-z]+$"
+                },
+                {
+                  "kind": "allowed_values",
+                  "column": "category",
+                  "values": [
+                    "A",
+                    "B",
+                    "C"
+                  ]
+                },
+                {
+                  "kind": "row_count",
+                  "min": 1,
+                  "max": 10
+                },
+                {
+                  "kind": "referential",
+                  "column": "id"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "quality"
+          },
+          {
+            "from": "ref_src",
+            "to": "reference"
+          },
+          {
+            "from": "reference",
+            "to": "quality",
+            "toPort": 1
           }
         ]
-      }
-    },
-    {
-      "id": "quality",
-      "type": "data_quality",
-      "config": {
-        "fail_on": "never",
-        "output": "long",
-        "checks": [
-          {
-            "kind": "not_null",
-            "column": "id"
-          },
-          {
-            "kind": "unique",
-            "column": "id"
-          },
-          {
-            "kind": "range",
-            "column": "score",
-            "min": 0,
-            "max": 4
-          },
-          {
-            "kind": "pattern",
-            "column": "name",
-            "regex": "^[a-z]+$"
-          },
-          {
-            "kind": "allowed_values",
-            "column": "category",
-            "values": [
-              "A",
-              "B",
-              "C"
+      },
+      "checks": [
+        {
+          "node": "quality",
+          "kind": "expect",
+          "rows": 7,
+          "columns": [
+            {
+              "name": "check",
+              "type": "String"
+            },
+            {
+              "name": "column",
+              "type": "String"
+            },
+            {
+              "name": "status",
+              "type": "String"
+            },
+            {
+              "name": "message",
+              "type": "String"
+            },
+            {
+              "name": "failed_rows",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "total_rows",
+              "type": "Number (Integer)"
+            }
+          ],
+          "data": [
+            [
+              "not_null",
+              "id",
+              "PASS",
+              "ok",
+              0,
+              6
+            ],
+            [
+              "unique",
+              "id",
+              "FAIL",
+              "2 rows sharing a duplicated value",
+              2,
+              6
+            ],
+            [
+              "range",
+              "score",
+              "FAIL",
+              "1 row outside [0, 4]",
+              1,
+              6
+            ],
+            [
+              "pattern",
+              "name",
+              "PASS",
+              "ok",
+              0,
+              6
+            ],
+            [
+              "allowed_values",
+              "category",
+              "PASS",
+              "ok",
+              0,
+              6
+            ],
+            [
+              "row_count",
+              null,
+              "PASS",
+              "ok",
+              0,
+              6
+            ],
+            [
+              "referential",
+              "id",
+              "FAIL",
+              "2 rows missing from the reference table",
+              2,
+              6
             ]
-          },
-          {
-            "kind": "row_count",
-            "min": 1,
-            "max": 10
-          },
-          {
-            "kind": "referential",
-            "column": "id"
-          }
-        ]
-      }
-    }
-  ],
-  "edges": [
-    {
-      "from": "src",
-      "to": "quality"
-    },
-    {
-      "from": "ref_src",
-      "to": "reference"
-    },
-    {
-      "from": "reference",
-      "to": "quality",
-      "toPort": 1
-    }
-  ],
-  "checks": [
-    {
-      "node": "quality",
-      "kind": "expect",
-      "rows": 7,
-      "columns": [
-        {
-          "name": "check",
-          "type": "String"
-        },
-        {
-          "name": "column",
-          "type": "String"
-        },
-        {
-          "name": "status",
-          "type": "String"
-        },
-        {
-          "name": "message",
-          "type": "String"
-        },
-        {
-          "name": "failed_rows",
-          "type": "Number (Integer)"
-        },
-        {
-          "name": "total_rows",
-          "type": "Number (Integer)"
+          ],
+          "order": "ordered"
         }
-      ],
-      "data": [
-        [
-          "not_null",
-          "id",
-          "PASS",
-          "ok",
-          0,
-          6
-        ],
-        [
-          "unique",
-          "id",
-          "FAIL",
-          "2 rows sharing a duplicated value",
-          2,
-          6
-        ],
-        [
-          "range",
-          "score",
-          "FAIL",
-          "1 row outside [0, 4]",
-          1,
-          6
-        ],
-        [
-          "pattern",
-          "name",
-          "PASS",
-          "ok",
-          0,
-          6
-        ],
-        [
-          "allowed_values",
-          "category",
-          "PASS",
-          "ok",
-          0,
-          6
-        ],
-        [
-          "row_count",
-          null,
-          "PASS",
-          "ok",
-          0,
-          6
-        ],
-        [
-          "referential",
-          "id",
-          "FAIL",
-          "2 rows missing from the reference table",
-          2,
-          6
-        ]
-      ],
-      "order": "ordered"
+      ]
     }
   ]
 }

@@ -1684,7 +1684,8 @@ run. `modified` — в UTC, поэтому результат не зависи�
 
 Часть задач таксономии покрывается не отдельным узлом, а SQL-выражением поверх
 `dap.sql_query` (YAGNI: одно выражение — не узел). Каждый рецепт имеет
-coverage-сценарий в `tests/coverage/` и проверяется через `/v1` в `SqlRecipeTest`.
+coverage-сценарий в `tests/coverage/` и проверяется через `/v1` в `SqlRecipeTest`
+(рецепты источников и трансформаций) и `SqlRecipeOutputTest` (итоговые рецепты 49.5–49.8).
 
 ### 49.1. Regex-извлечение (B9)
 
@@ -1746,6 +1747,84 @@ coverage-сценарий в `tests/coverage/` и проверяется чер�
   }
 }
 ```
+
+### 49.5. Rollup/cube (C16)
+
+`GROUP BY ROLLUP(...)` (и `GROUP BY CUBE(...)`) в `sql_query`: к каждой комбинации
+ключей добавляется промежуточный итог, у итоговой строки ключ — NULL. `ROLLUP(a, b)`
+даёт наборы `(a, b)`, `(a)`, `()`, а `CUBE` — все 2^n подмножеств. Итоговая строка
+неотличима от строки с NULL-ключом, поэтому для детерминированного порядка добавьте
+`ORDER BY ... NULLS LAST`.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT category, SUM(score) AS total FROM src GROUP BY ROLLUP(category) ORDER BY category NULLS LAST",
+    "inputs": ["src"]
+  }
+}
+```
+
+На fixture `P2` (`category`/ `score`) это даёт строки `A 7.0`, `B 7.0`, `C 4.0` и
+итог `NULL 18.0`.
+
+### 49.6. Нормальность (E11)
+
+`skewness(x)` и `kurtosis(x)` — выборочная асимметрия и excess kurtosis с поправкой на
+смещение (те же определения, что `SKEW`/`KURT` в Excel и pandas); NULL игнорируются.
+Для сводки добавьте `COUNT(*)`: на малом n значения нестабильны, интерпретируйте их
+вместе с размером выборки.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT skewness(sepal_length) AS skewness, kurtosis(sepal_length) AS kurtosis, COUNT(*) AS n FROM src",
+    "inputs": ["src"]
+  }
+}
+```
+
+Для iris `sepal_length` это `skewness = 0.3149`, `kurtosis = -0.5521`, `n = 150`.
+
+### 49.7. HAVING (D6)
+
+Фильтр после агрегации — это `dap.group_by` → `dap.row_filter` по имени агрегатной
+колонки (`Count(id)`, `Mean(score)`, `Median(score)`, …). Условия те же, что у
+`row_filter`; NULL-агрегат сравнение не проходит, как и `HAVING` в SQL.
+
+```json
+{
+  "factory": "dap.row_filter",
+  "settings": {"where": [{"column": "Count(id)", "op": "ge", "value": 2}]}
+}
+```
+
+На `P2` с группировкой по `category` остаются `A 3` и `B 2` (у `C` одна строка).
+
+### 49.8. Train/test split (C15)
+
+Флаг разбиения считается в `sql_query`, затем две ветки `dap.row_filter` делят строки
+по флагу. Важно: `sql_query` — ленивое представление, поэтому `random()` пересчитывается
+при каждом чтении и две ветки увидят разные значения — разбиение не будет ни
+воспроизводимым, ни полным. Документированный рецепт детерминирован: флаг выводится из
+ключа, например `((id * 37) % 10) < 7 AS is_train` (примерно 70/30). Для именно
+случайного сплита материализуйте флаг (writer → reader) или возьмите train через
+`dap.sample_rows` (`mode: random`, `seed`), а test — anti-join в `sql_query`.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT *, ((id * 37) % 10) < 7 AS is_train FROM src",
+    "inputs": ["src"]
+  }
+}
+```
+
+Ветки — два `dap.row_filter` с условиями `is_train eq true` и `is_train eq false`;
+полноту разбиения проверяйте `dap.concatenate` (train + test = вход).
 
 ## 55. Порядок для агента
 

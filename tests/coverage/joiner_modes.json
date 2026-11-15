@@ -1,165 +1,213 @@
 {
-  "id": "C9-joiner-modes",
-  "title": "Join full/semi/anti over duplicate and NULL keys",
-  "kind": "node",
-  "nodes": [
+  "format": "dap-coverage-scenario/1",
+  "cases": [
     {
-      "id": "left",
-      "type": "csv_reader",
-      "config": {
-        "dataset": "JOIN_LEFT"
-      }
-    },
-    {
-      "id": "right",
-      "type": "csv_reader",
-      "config": {
-        "dataset": "JOIN_RIGHT"
-      }
-    },
-    {
-      "id": "full",
-      "type": "joiner",
-      "config": {
-        "how": "full",
-        "left_keys": [
-          "id"
+      "task": "C9",
+      "title": "Join full/semi/anti over duplicate and NULL keys",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "C9-joiner-modes",
+        "nodes": [
+          {
+            "id": "left",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "JOIN_LEFT"
+            }
+          },
+          {
+            "id": "right",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "JOIN_RIGHT"
+            }
+          },
+          {
+            "id": "full",
+            "type": "joiner",
+            "config": {
+              "how": "full",
+              "left_keys": [
+                "id"
+              ],
+              "right_keys": [
+                "id"
+              ],
+              "merge_keys": true
+            }
+          },
+          {
+            "id": "semi",
+            "type": "joiner",
+            "config": {
+              "how": "semi",
+              "left_keys": [
+                "id"
+              ],
+              "right_keys": [
+                "id"
+              ]
+            }
+          },
+          {
+            "id": "anti",
+            "type": "joiner",
+            "config": {
+              "how": "anti",
+              "left_keys": [
+                "id"
+              ],
+              "right_keys": [
+                "id"
+              ]
+            }
+          }
         ],
-        "right_keys": [
-          "id"
-        ],
-        "merge_keys": true
-      }
-    },
-    {
-      "id": "semi",
-      "type": "joiner",
-      "config": {
-        "how": "semi",
-        "left_keys": [
-          "id"
-        ],
-        "right_keys": [
-          "id"
+        "edges": [
+          {
+            "from": "left",
+            "to": "full",
+            "toPort": 0
+          },
+          {
+            "from": "right",
+            "to": "full",
+            "toPort": 1
+          },
+          {
+            "from": "left",
+            "to": "semi",
+            "toPort": 0
+          },
+          {
+            "from": "right",
+            "to": "semi",
+            "toPort": 1
+          },
+          {
+            "from": "left",
+            "to": "anti",
+            "toPort": 0
+          },
+          {
+            "from": "right",
+            "to": "anti",
+            "toPort": 1
+          }
         ]
-      }
-    },
-    {
-      "id": "anti",
-      "type": "joiner",
-      "config": {
-        "how": "anti",
-        "left_keys": [
-          "id"
-        ],
-        "right_keys": [
-          "id"
-        ]
-      }
-    }
-  ],
-  "edges": [
-    {
-      "from": "left",
-      "to": "full",
-      "toPort": 0
-    },
-    {
-      "from": "right",
-      "to": "full",
-      "toPort": 1
-    },
-    {
-      "from": "left",
-      "to": "semi",
-      "toPort": 0
-    },
-    {
-      "from": "right",
-      "to": "semi",
-      "toPort": 1
-    },
-    {
-      "from": "left",
-      "to": "anti",
-      "toPort": 0
-    },
-    {
-      "from": "right",
-      "to": "anti",
-      "toPort": 1
-    }
-  ],
-  "checks": [
-    {
-      "node": "full",
-      "kind": "expect",
-      "rows": 7,
-      "columns": [
+      },
+      "checks": [
         {
-          "name": "id",
-          "type": "Number (Integer)"
+          "node": "full",
+          "kind": "expect",
+          "rows": 7,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "name (Right)",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "L1",
+              "R1"
+            ],
+            [
+              1,
+              "L1",
+              "R1b"
+            ],
+            [
+              2,
+              "L2",
+              null
+            ],
+            [
+              3,
+              "L3",
+              "R3"
+            ],
+            [
+              5,
+              null,
+              "R5"
+            ],
+            [
+              null,
+              "L4",
+              null
+            ],
+            [
+              null,
+              null,
+              "R6"
+            ]
+          ],
+          "order": "unordered"
         },
         {
-          "name": "name",
-          "type": "String"
+          "node": "semi",
+          "kind": "expect",
+          "rows": 2,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "L1"
+            ],
+            [
+              3,
+              "L3"
+            ]
+          ],
+          "order": "unordered"
         },
         {
-          "name": "name (Right)",
-          "type": "String"
+          "node": "anti",
+          "kind": "expect",
+          "rows": 2,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              2,
+              "L2"
+            ],
+            [
+              null,
+              "L4"
+            ]
+          ],
+          "order": "unordered"
         }
-      ],
-      "data": [
-        [1, "L1", "R1"],
-        [1, "L1", "R1b"],
-        [2, "L2", null],
-        [3, "L3", "R3"],
-        [5, null, "R5"],
-        [null, "L4", null],
-        [null, null, "R6"]
-      ],
-      "order": "unordered"
-    },
-    {
-      "node": "semi",
-      "kind": "expect",
-      "rows": 2,
-      "columns": [
-        {
-          "name": "id",
-          "type": "Number (Integer)"
-        },
-        {
-          "name": "name",
-          "type": "String"
-        }
-      ],
-      "data": [
-        [1, "L1"],
-        [3, "L3"]
-      ],
-      "order": "unordered"
-    },
-    {
-      "node": "anti",
-      "kind": "expect",
-      "rows": 2,
-      "columns": [
-        {
-          "name": "id",
-          "type": "Number (Integer)"
-        },
-        {
-          "name": "name",
-          "type": "String"
-        }
-      ],
-      "data": [
-        [2, "L2"],
-        [null, "L4"]
-      ],
-      "order": "unordered"
+      ]
     }
-  ],
-  "notes": "C9: full keeps unmatched rows on both sides (NULL keys included), semi/anti return left columns only. Fixtures join_left.csv/join_right.csv are shared with golden wf-n10-joiner-modes."
+  ]
 }
