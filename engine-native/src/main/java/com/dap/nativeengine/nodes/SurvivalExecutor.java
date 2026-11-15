@@ -97,13 +97,13 @@ public final class SurvivalExecutor implements NodeExecutor {
             throw new IllegalArgumentException(NODE + ": unknown 'time' column '" + name + "'");
         }
         if ("Date32".equals(column.arrowType())) {
-            return new TimeAxis(column, true, ColumnSpec.of(name, "Date32"));
+            return new TimeAxis(column, true, ColumnSpec.of("time", "Date32"));
         }
         if (!column.numeric()) {
             throw new IllegalArgumentException(NODE + ": 'time' column '" + name
                     + "' must be numeric or a date, got " + column.arrowType());
         }
-        return new TimeAxis(column, false, ColumnSpec.of(name, "Float64"));
+        return new TimeAxis(column, false, ColumnSpec.of("time", "Float64"));
     }
 
     private static ColumnSpec eventColumn(JsonNode config, LazyPlan input) {

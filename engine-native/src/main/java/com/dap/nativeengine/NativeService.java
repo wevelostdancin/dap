@@ -79,6 +79,7 @@ import com.dap.nativeengine.nodes.SqlQueryExecutor;
 import com.dap.nativeengine.nodes.SurvivalExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
 import com.dap.nativeengine.nodes.TextNormalizeExecutor;
+import com.dap.nativeengine.nodes.TimeSeriesExecutor;
 import io.javalin.Javalin;
 
 import java.sql.SQLException;
@@ -751,7 +752,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new CalendarExecutor())
                 .register(new ResampleTestExecutor())
                 .register(new SurvivalExecutor())
-                .register(new AbTestExecutor());
+                .register(new AbTestExecutor())
+                .register(new TimeSeriesExecutor());
     }
 
     /**

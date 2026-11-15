@@ -61,3 +61,4 @@ dap.logistic_regression.json
 dap.resample_test.json
 dap.survival.json
 dap.ab_test.json
+dap.time_series.json

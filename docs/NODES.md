@@ -2471,3 +2471,67 @@ A/B-тест: двухвыборочный z-тест для долей плюс
   }
 }
 ```
+
+## 65. dap.time_series
+
+Анализ временного ряда: декомпозиция, ACF/PACF, лаги, прогноз и тест стационарности.
+Строки упорядочиваются по `time` внутри каждой группы `group_by`; Java-режимы читают
+не более `max_rows` строк и возвращают результат таблицей в сессии (у декомпозиции
+строка на наблюдение), режим `lag` остаётся ленивым SQL-планом с
+`LAG(...) OVER (...)`. `time` — числовая колонка или `Date32`, `value` — числовая.
+Выходная колонка времени называется `time`; колонки групп идут первыми.
+Порты: вход 0 — `Data`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `mode` | `decompose` \| `acf` \| `lag` \| `forecast` \| `stationarity` | — | обязателен |
+| `time` | string | — | обязателен; числовая колонка или `Date32` |
+| `value` | string | — | обязателен; числовая колонка ряда |
+| `group_by` | array<string> | — | необязательные колонки: отдельный ряд на группу |
+| `period` | integer | `12` | ≥2; период сезонности для `decompose` и `holt_winters` |
+| `max_lag` | integer | `20` | максимальный лаг ACF или число лаговых колонок в `lag` |
+| `horizon` | integer | `12` | число шагов прогноза |
+| `method` | `additive` \| `multiplicative` \| `naive` \| `seasonal_naive` \| `mean` \| `drift` \| `holt_winters` | — | для `decompose` — additive/multiplicative, для `forecast` — остальные |
+| `confidence` | number | `0.95` | в (0, 1); уровень интервала прогноза |
+| `max_rows` | integer | `100000` | больше строк — ошибка с подсказкой |
+
+Выходы:
+
+- `decompose` → `time`, `observed`, `trend`, `seasonal`, `residual`: тренд —
+  центрированное скользящее среднее порядка `period` (для чётного периода 2×period),
+  сезонные индексы — средние детрендированного ряда по позициям, нормированные в сумму 0
+  (additive) или в среднее 1 (multiplicative); `residual = observed − trend − seasonal`
+  (или `observed / (trend·seasonal)`); на краях, где нет полного окна, `trend` и
+  `residual` — NULL. Нужно ≥ 2·period строк на группу; multiplicative требует
+  строго положительных значений.
+- `acf` → `lag`, `acf`, `pacf`: `r_k = Σ(y_t−ȳ)(y_{t+k}−ȳ) / Σ(y_t−ȳ)²` для
+  `k = 0..max_lag` (ACF(0) = 1), PACF — рекурсия Дарбина-Левинсона; нужно больше
+  `max_lag` строк на группу.
+- `lag` → все входные колонки плюс `value_lag_1..value_lag_<max_lag>` (`Number (Float)`).
+- `forecast` → `time`, `forecast`, `lower`, `upper`, `method`: naive (последнее
+  значение), seasonal_naive (значение того же сезона), mean, drift (последнее + средний
+  наклон) или аддитивный Holt-Winters с фиксированным сглаживанием 0.3/0.1/0.1; время
+  будущих точек — последнее + средний шаг × h. Интервал —
+  `forecast ± z(confidence)·σ·√h`, где σ — стандартное отклонение одношаговых
+  остатков выбранного метода (приближение, задокументировано).
+- `stationarity` → `test` (`adf`), `statistic`, `p_value`, `critical_1`,
+  `critical_5`, `critical_10`, `stationary`: ADF с константой и одним лагом разности,
+  t-статистика коэффициента при `y_{t−1}`; критические значения МакКиннона
+  (−3.43, −2.86, −2.57), p-value — нормальная аппроксимация, подогнанная под эти три
+  значения; `stationary = statistic < −2.86` (отвергаем единичный корень на 5 %).
+  Нужно ≥ 8 строк на группу.
+
+```json
+{
+  "factory": "dap.time_series",
+  "settings": {
+    "mode": "forecast",
+    "time": "month",
+    "value": "revenue",
+    "group_by": ["region"],
+    "period": 12,
+    "horizon": 6,
+    "method": "seasonal_naive"
+  }
+}
+```

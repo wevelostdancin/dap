@@ -1,0 +1,117 @@
+{
+  "id": "dap.time_series",
+  "name": "Time Series",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Time-series analysis over rows ordered by time inside each group_by partition. Mode decompose: centred moving average trend (2 x period for an even period), per-position means of the detrended series normalised to sum to 0 (additive) or average to 1 (multiplicative), residual = observed - trend - seasonal (or observed/(trend*seasonal)); edges without a full window are NULL. Mode acf: autocorrelations for lag 0..max_lag plus the partial autocorrelations from the Durbin-Levinson recursion. Mode lag: the input columns plus value_lag_1..value_lag_max_lag as a lazy SQL plan. Mode forecast: naive, seasonal_naive, mean, drift or additive Holt-Winters (fixed smoothing 0.3/0.1/0.1) for horizon steps; the interval is forecast +/- z(confidence)*sigma*sqrt(h) with sigma the one-step in-sample residual standard deviation (approximation). Mode stationarity: augmented Dickey-Fuller with a constant and one lagged difference; the p-value is a normal approximation fitted to the MacKinnon large-sample critical values (0.10 = -2.57, 0.05 = -2.86, 0.01 = -3.43).",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Time Series configuration",
+    "additionalProperties": false,
+    "properties": {
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "decompose, acf, lag, forecast or stationarity.",
+        "enum": [
+          "decompose",
+          "acf",
+          "lag",
+          "forecast",
+          "stationarity"
+        ]
+      },
+      "time": {
+        "type": "string",
+        "title": "Time column",
+        "description": "Numeric or date column; rows are ordered by it inside each group."
+      },
+      "value": {
+        "type": "string",
+        "title": "Value column",
+        "description": "Numeric series column."
+      },
+      "group_by": {
+        "type": "array",
+        "title": "Group by",
+        "description": "Optional columns: one series per group.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "period": {
+        "type": "integer",
+        "title": "Period",
+        "description": "Seasonal period for decompose and holt_winters, at least 2.",
+        "default": 12,
+        "minimum": 2
+      },
+      "max_lag": {
+        "type": "integer",
+        "title": "Max lag",
+        "description": "Highest autocorrelation lag (acf) or the number of lag columns (lag).",
+        "default": 20,
+        "minimum": 1
+      },
+      "horizon": {
+        "type": "integer",
+        "title": "Horizon",
+        "description": "Number of forecast steps.",
+        "default": 12,
+        "minimum": 1
+      },
+      "method": {
+        "type": "string",
+        "title": "Method",
+        "description": "decompose: additive or multiplicative; forecast: naive, seasonal_naive, mean, drift or holt_winters.",
+        "enum": [
+          "additive",
+          "multiplicative",
+          "naive",
+          "seasonal_naive",
+          "mean",
+          "drift",
+          "holt_winters"
+        ]
+      },
+      "confidence": {
+        "type": "number",
+        "title": "Confidence",
+        "description": "Confidence level of the forecast interval, in (0, 1).",
+        "default": 0.95,
+        "minimum": 0,
+        "maximum": 1
+      },
+      "max_rows": {
+        "type": "integer",
+        "title": "Max rows",
+        "description": "The series is analysed in memory: at most this many rows are read.",
+        "default": 100000,
+        "minimum": 1
+      }
+    },
+    "required": [
+      "mode",
+      "time",
+      "value"
+    ]
+  }
+}

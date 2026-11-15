@@ -77,7 +77,8 @@ class NodeRegistryTest {
             "dap.calendar",
             "dap.resample_test",
             "dap.survival",
-            "dap.ab_test");
+            "dap.ab_test",
+            "dap.time_series");
 
     private final NodeRegistry registry = new NodeRegistry();
 
