@@ -61,9 +61,9 @@ class CatalogHandlersTest {
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(52, body.path("count").asInt());
+        assertEquals(53, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(52, nodes.size());
+        assertEquals(53, nodes.size());
         assertEquals(List.of(
                 "Binner", "Chart", "Column Filter",
                 "Column Renamer", "Column Resorter", "Concatenate",
@@ -74,7 +74,7 @@ class CatalogHandlersTest {
                 "Excel Writer", "File List", "Group By",
                 "Histogram", "Hypothesis Test", "Joiner",
                 "JSON Reader", "JSON Writer", "Linear Regression",
-                "Markdown Report", "Math Formula", "Missing Value",
+                "Logistic Regression", "Markdown Report", "Math Formula", "Missing Value",
                 "Normalizer", "Outlier Detect", "Outlier Filter",
                 "Parquet Reader", "Parquet Writer", "Pivot",
                 "Quantile", "Resample", "Rolling",

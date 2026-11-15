@@ -64,6 +64,7 @@ class NodeRegistryTest {
             "dap.data_quality",
             "dap.hypothesis_test",
             "dap.linear_regression",
+            "dap.logistic_regression",
             "dap.sql_query",
             "dap.db_reader",
             "dap.file_list");

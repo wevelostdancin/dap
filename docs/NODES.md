@@ -131,6 +131,7 @@
 | `dap.data_quality` | Data Quality | `/Statistics` | 2 (1 — опционален) |
 | `dap.hypothesis_test` | Hypothesis Test | `/Statistics` | 1 |
 | `dap.linear_regression` | Linear Regression | `/Statistics` | 1 |
+| `dap.logistic_regression` | Logistic Regression | `/Statistics` | 1 |
 | `dap.resample` | Resample | `/Time Series` | 1 |
 | `dap.rolling` | Rolling | `/Time Series` | 1 |
 | `dap.diff` | Diff | `/Time Series` | 1 |
@@ -1929,3 +1930,51 @@ coverage-сценарий в `tests/coverage/` и проверяется чер�
 6. `POST /v1/workflows/{id}/run` (или `/jobs`) → `GET .../table`, `.../profile`.
 
 Примеры выше — тело запроса `POST /v1/workflows/{id}/nodes`.
+## 56. dap.logistic_regression
+
+Бинарная логистическая регрессия: отклик `y` — 0/1 (числовой) или boolean, предикторы
+`x` — одна или несколько числовых колонок. Подгонка — IRLS (Newton-Raphson) по
+`X'WX`; режим `coefficients` возвращает строку на терм (`intercept` и каждый
+предиктор), режим `predict` — все входные строки плюс вероятность и класс.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `x` | array<string> | — | обязателен; одна или несколько различных числовых колонок |
+| `y` | string | — | обязателен; бинарная колонка 0/1 или boolean, должны быть оба класса |
+| `mode` | `coefficients` \| `predict` | `coefficients` | — |
+| `robust` | `none` \| `hc1` | `none` | `hc1` — сэндвич-оценка `(X'WX)⁻¹·[Σ(y−p)²xx']·(X'WX)⁻¹·n/(n−p)` |
+| `max_iterations` | integer | `50` | положительное; предел итераций Ньютона |
+| `tolerance` | number | `1e-8` | положительное; остановка по максимальному изменению коэффициента |
+| `l2` | number | `0` | необязательный ridge-штраф на диагональ `X'WX` для не-свободных термов |
+| `alpha` | number | `0.05` | уровень значимости интервала лог-шансов: `1 − alpha` |
+| `output` | string | `probability` | имя колонки вероятности в режиме `predict` |
+
+Выход `coefficients`: `term`, `coefficient` (лог-шансы), `std_error`,
+`z_statistic`, `p_value` (Wald, нормальный хвост), `ci_low`, `ci_high`
+(интервал лог-шансов `coefficient ± z(1−α/2)·se`), `odds_ratio` (`exp(coefficient)`),
+`n`, `pseudo_r2` (McFadden: `1 − LL/LL₀`), `auc` (ранговая, Манн-Уитни по
+вероятностям), `iterations`, `converged`.
+
+Выход `predict`: входные колонки, затем `output` (`Number (Float)` — сигмоида
+линейного предиктора) и `prediction` (`Number (Integer)` — 1 при вероятности
+`≥ 0.5`, иначе 0). `probability` и `prediction` NULL, если NULL предиктор.
+
+Правила: строки с NULL в `x` или `y` исключаются; `y` вне `{0, 1}` — ошибка
+`binary`; один класс в `y` — ошибка (нужны оба); `n ≤ p` (включая свободный
+член) — ошибка с подсказкой; при идеальном разделении без `l2` итерации Ньютона
+могут не сойтись — `converged = false`, `l2 > 0` даёт конечное решение; сингулярная
+матрица `X'WX` оставляет коэффициенты NULL, `n` и `iterations` заполнены.
+Подгонка читает значения в память: не более 100 000 строк.
+
+```json
+{
+  "factory": "dap.logistic_regression",
+  "settings": {
+    "x": ["sepal_length", "sepal_width"],
+    "y": "is_big",
+    "robust": "hc1",
+    "max_iterations": 100,
+    "tolerance": 1e-8
+  }
+}
+```
