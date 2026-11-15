@@ -49,6 +49,7 @@ import com.dap.nativeengine.nodes.ExcelReaderExecutor;
 import com.dap.nativeengine.nodes.GroupByExecutor;
 import com.dap.nativeengine.nodes.JsonReaderExecutor;
 import com.dap.nativeengine.nodes.JsonWriterExecutor;
+import com.dap.nativeengine.nodes.LinearRegressionExecutor;
 import com.dap.nativeengine.nodes.JoinerExecutor;
 import com.dap.nativeengine.nodes.MathFormulaExecutor;
 import com.dap.nativeengine.nodes.MissingValueExecutor;
@@ -489,6 +490,7 @@ public final class NativeService implements AutoCloseable {
                 .register(new CsvWriterExecutor())
                 .register(new JsonReaderExecutor())
                 .register(new JsonWriterExecutor())
+                .register(new LinearRegressionExecutor())
                 .register(new ParquetReaderExecutor())
                 .register(new ParquetWriterExecutor())
                 .register(new RowFilterExecutor())

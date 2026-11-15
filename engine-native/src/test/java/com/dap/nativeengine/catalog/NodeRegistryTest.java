@@ -58,7 +58,9 @@ class NodeRegistryTest {
             "dap.rolling",
             "dap.diff",
             "dap.date_range",
-            "dap.excel_writer");
+            "dap.excel_writer",
+            "dap.hypothesis_test",
+            "dap.linear_regression");
 
     private final NodeRegistry registry = new NodeRegistry();
 

@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 45 узлов `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (45 строк);
+Каталог нативного движка: 46 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (46 строк);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 45 узлов имеют `available: true` и `tier: core`.
+спеке. Все 46 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -126,6 +126,7 @@
 | `dap.quantile` | Quantile | `/Statistics` | 1 |
 | `dap.outlier_detect` | Outlier Detect | `/Statistics` | 1 |
 | `dap.hypothesis_test` | Hypothesis Test | `/Statistics` | 1 |
+| `dap.linear_regression` | Linear Regression | `/Statistics` | 1 |
 | `dap.resample` | Resample | `/Time Series` | 1 |
 | `dap.rolling` | Rolling | `/Time Series` | 1 |
 | `dap.diff` | Diff | `/Time Series` | 1 |
@@ -1362,7 +1363,52 @@ Apache POI не используется: книга собирается сре
 }
 ```
 
-## 47. Порядок для агента
+## 47. dap.linear_regression
+
+Парная линейная регрессия одной числовой колонки на ровно один числовой
+предиктор, при необходимости — отдельно по группам. В режиме `coefficients` —
+одна строка на терм (`intercept` и колонка `x`), в режиме `predict` — все
+входные строки плюс `prediction` и `residual`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `x` | array<string> | — | обязателен; ровно одна числовая колонка |
+| `y` | string | — | обязателен; числовая колонка отклика |
+| `group_by` | array<string> | — | необязательные колонки группировки: своя регрессия на группу |
+| `mode` | `coefficients` \| `predict` | `coefficients` | — |
+| `intercept` | boolean | `true` | `false` — модель `y = slope * x` без свободного члена |
+| `output` | string | `prediction` | имя колонки предсказания в режиме `predict` |
+
+Выход `coefficients`: `[group_by…]`, `term`, `coefficient`, `std_error`,
+`t_statistic`, `p_value`, `r2`, `n`. Коэффициенты — из `regr_slope`,
+`regr_intercept`, `regr_r2`, `regr_count`; стандартные ошибки и p-value — из
+`engine/Distributions` (`t` с `df = n - 2`, для модели без свободного члена
+`df = n - 1` и несцентрированный `r2 = 1 - SSE / sum(y^2)`).
+
+Выход `predict`: входные колонки, затем `output` и `residual`
+(`y - prediction`); при `group_by` коэффициенты считаются оконными агрегатами
+по каждой группе. `prediction` NULL, если NULL предиктор; `residual` NULL, если
+NULL отклик.
+
+Правила: строки с NULL в `x` или `y` исключаются из подгонки; меньше двух таких
+строк — ошибка; константный `x` даёт NULL-коэффициенты и NULL-`r2`; идеальная
+подгонка (`std_error = 0`) даёт NULL `t_statistic`/`p_value`; `r2` для модели
+без свободного члена может быть отрицательным. Режим `predict` ленивый (оконные
+агрегаты в SQL), `coefficients` считает подгонку на run.
+
+```json
+{
+  "factory": "dap.linear_regression",
+  "settings": {
+    "x": ["petal_length"],
+    "y": "sepal_length",
+    "group_by": ["species"],
+    "mode": "coefficients"
+  }
+}
+```
+
+## 48. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.

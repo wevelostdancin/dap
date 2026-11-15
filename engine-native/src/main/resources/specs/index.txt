@@ -43,3 +43,4 @@ dap.diff.json
 dap.date_range.json
 dap.excel_writer.json
 dap.hypothesis_test.json
+dap.linear_regression.json

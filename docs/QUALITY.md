@@ -69,10 +69,10 @@ goldens-native/
   runner.py            # прогон и сравнение
   expected.json        # замороженные ожидания baseline-workflow
   data/                # входные фикстуры + datasets.json
-  workflows/           # 17 workflow: wf-*.json
+  workflows/           # 18 workflow: wf-*.json
 ```
 
-Сейчас 17 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 9
+Сейчас 18 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 10
 `kind: "native"` (литеральные проверки или эквивалентность). Фикстуры данных:
 `iris.csv`/`iris.xlsx`, `adult.csv`, `air_quality.csv`, `worldbank_countries.csv`,
 `p2.csv`, `join_left.csv`/`join_right.csv`; `datasets.json` задаёт файл, разделитель, заголовок, схему (`arrow`) и
@@ -81,7 +81,8 @@ goldens-native/
 волны P3: `value_counts` по колонке `category` из `p2.csv` (A=3, B=2, C=1);
 `wf-n10-joiner-modes` — golden волны P5: `full`/`semi`/`anti` джойны на
 `join_left.csv`/`join_right.csv`; `wf-n11-hypothesis` — Welch t-тест и ANOVA на
-`iris.csv`, χ² на `p2.csv`.
+`iris.csv`, χ² на `p2.csv`; `wf-n12-regression` — коэффициенты и predict
+`dap.linear_regression` на `iris.csv` и `p2.csv`.
 
 ### Формат workflow
 
