@@ -281,8 +281,10 @@ public final class WorkflowHandlers {
         while (keys.hasNext()) {
             String key = keys.next();
             if (!spec.hasConfigKey(key)) {
-                throw ApiException.badRequest("unknown setting '" + key
-                        + "' in 'settings'; available: " + spec.settingKeys());
+                throw ApiException.badRequest("unknown_setting", "unknown setting '" + key
+                        + "' in 'settings'; available: " + spec.settingKeys(),
+                        "remove '" + key + "' or check GET /v1/nodes/" + spec.id()
+                                + "/dialog for the available settings");
             }
         }
         workflow.setConfig(node.id(), ((ObjectNode) settings).deepCopy());

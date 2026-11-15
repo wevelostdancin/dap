@@ -1175,6 +1175,9 @@ components:
           type: integer
         error:
           type: string
+        code:
+          type: string
+          description: Machine-readable error code of a failed run (node_failed)
         result:
           oneOf:
             - $ref: '#/components/schemas/RunResult'
@@ -1202,6 +1205,14 @@ components:
           type: string
         job:
           $ref: '#/components/schemas/Job'
+        error:
+          type: string
+          description: Present when the job was already terminal and could not be cancelled
+        code:
+          type: string
+          description: not_cancellable when the job was already terminal
+        hint:
+          type: string
       additionalProperties: true
     TableColumn:
       type: object
@@ -1354,10 +1365,19 @@ components:
       additionalProperties: true
     Error:
       type: object
-      required: [error]
+      required: [error, code]
       properties:
         error:
           type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: >-
+            Machine-readable error code. Defaults from the status when the error has no
+            specific one: bad_request (400), not_found (404), conflict (409), server_error (500).
+        hint:
+          type: string
+          description: Actionable suggestion for fixing the request; omitted when there is none
         ports:
           type: array
           items:

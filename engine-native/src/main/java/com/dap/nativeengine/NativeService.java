@@ -223,7 +223,7 @@ public final class NativeService implements AutoCloseable {
         app.exception(ApiException.class, (exception, context) -> {
             releaseInFlight(context);
             context.attribute(ERROR_BODY_ATTRIBUTE, true);
-            Http.error(context, exception.status(), exception.getMessage());
+            Http.error(context, exception);
         });
         app.exception(Exception.class, (exception, context) -> {
             releaseInFlight(context);

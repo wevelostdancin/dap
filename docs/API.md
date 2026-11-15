@@ -36,14 +36,24 @@
 
 ### Ошибки
 
-Обычная ошибка — объект с одним полем:
+Обычная ошибка — объект с `error` (человекочитаемое сообщение), `code`
+(машиночитаемый код) и необязательным `hint` (что сделать, чтобы исправить):
 
 ```json
-{"error": "unknown setting 'foo' in 'settings'; available: [file, delimiter, header, columns, emptyStringIsNull]"}
+{"error": "unknown setting 'foo' in 'settings'; available: [file, delimiter, header, columns, emptyStringIsNull]",
+ "code": "unknown_setting",
+ "hint": "remove 'foo' or check GET /v1/nodes/dap.csv_reader/dialog for the available settings"}
 ```
 
+`code` — аддитивное расширение контракта: старые клиенты читают `error` как
+раньше. Если у ошибки нет специфичного кода, он выводится из статуса:
+`bad_request` (400), `not_found` (404), `conflict` (409), `server_error` (500).
+`hint` и дополнительные поля (например `limit` у `workflow_limit`) опускаются,
+когда их нет.
+
 Исключения: таймаут и падение синхронного run возвращают объект job, отмена
-завершённого job — `CancelResult` (см. §5).
+завершённого job — `CancelResult` (см. §5); в них тоже есть `code`
+(`node_failed` у упавшего run, `not_cancellable` у отмены завершённого job).
 
 | Код | Когда |
 |---|---|
@@ -207,7 +217,8 @@
 запросом `?async=true`.
 
 - Синхронно: ждёт завершения, `200` с `RunResult`; `408` при таймауте;
-  `500` при ошибке (тело — job со `state: "failed"` или `"cancelled"`).
+  `500` при ошибке (тело — job со `state: "failed"` или `"cancelled"` и
+  `code: "node_failed"`).
 - `async=true`: `202` с объектом job.
 - Неизвестный workflow — 404. Таймаут считается от постановки в очередь.
 
@@ -233,13 +244,13 @@
 `DELETE /v1/jobs/{jobId}` — отмена активного job:
 
 - `200` `{"ok":true,"id":"job-1","job":{...}}`;
-- `409` `{"ok":false,...}`, если job уже завершён;
+- `409` `{"ok":false,...,"error":"...","code":"not_cancellable"}`, если job уже завершён;
 - `404` для неизвестного или чужого.
 
 Поля job: `id`, `workflow`, `state`, `createdAt`, `timeoutSec`,
-`startedAt`/`finishedAt`/`durationMs` (когда известны), `error`, `result`,
-`statusUrl`. Состояния: `queued`, `running`, `succeeded`, `failed`,
-`cancelled`, `timeout`.
+`startedAt`/`finishedAt`/`durationMs` (когда известны), `error`, `code`
+(у упавшего run), `result`, `statusUrl`. Состояния: `queued`, `running`,
+`succeeded`, `failed`, `cancelled`, `timeout`.
 
 ## 6. Данные
 
