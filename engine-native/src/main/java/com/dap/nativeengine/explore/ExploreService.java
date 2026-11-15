@@ -2,6 +2,7 @@ package com.dap.nativeengine.explore;
 
 import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.engine.ColumnSpec;
+import com.dap.nativeengine.engine.Distributions;
 import com.dap.nativeengine.engine.DuckDbSession;
 
 import java.nio.file.Files;
@@ -11,8 +12,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * One-pass exploration of an ingested dataset: column profile, quality score, pairwise
@@ -31,6 +35,13 @@ public final class ExploreService {
     public static final int MAX_COLUMNS_LIMIT = 200;
     public static final int MAX_SAMPLE_ROWS_LIMIT = 100_000;
 
+    private static final int MAX_RELATIONSHIPS = 20;
+    private static final int MAX_GROUP_DIFFERENCES = 10;
+    private static final int MAX_HYPOTHESES = 5;
+    private static final int MIN_HYPOTHESES = 3;
+    private static final int MAX_RECOMMENDATIONS = 8;
+    private static final int MAX_CATEGORIES = 20;
+    private static final int SMALL_GROUP = 5;
     private static final int HIGH_PENALTY = 12;
     private static final int MEDIUM_PENALTY = 5;
     private static final int LOW_PENALTY = 1;
@@ -82,9 +93,16 @@ public final class ExploreService {
             List<ExploreResult.Column> profileColumns = profile.columns().stream()
                     .map(ExploreService::view)
                     .toList();
+            List<ExploreResult.Relationship> relationships = relationships(columns, sample);
+            List<ExploreResult.GroupDifference> groupDifferences = groupDifferences(columns, sample);
+            ExploreResult.TimeSpan time = timeSpan(connection, base, columns);
+            List<ExploreResult.Hypothesis> hypotheses = hypotheses(columns, profile, relationships,
+                    groupDifferences, time, score, issues);
+            List<String> recommendations = recommendations(profile, columns, relationships,
+                    groupDifferences, time);
             return new ExploreResult(sourceLabel, profile.rows(), profileColumns,
-                    new ExploreResult.Quality(score, issues),
-                    List.of(), List.of(), null, List.of(), List.of());
+                    new ExploreResult.Quality(score, issues), relationships, groupDifferences,
+                    time, hypotheses, recommendations);
         }
     }
 
@@ -395,6 +413,614 @@ public final class ExploreService {
 
     private static String number(Double value) {
         return value == null ? "?" : String.format(Locale.ROOT, "%.4g", value);
+    }
+
+    /** Pearson for numeric pairs and Cramer's V for categorical pairs, capped and ordered. */
+    private static List<ExploreResult.Relationship> relationships(List<ColumnSpec> columns,
+                                                                   List<Object[]> sample) {
+        List<ExploreResult.Relationship> found = new ArrayList<>();
+        for (int left = 0; left < columns.size(); left++) {
+            for (int right = left + 1; right < columns.size(); right++) {
+                ColumnSpec first = columns.get(left);
+                ColumnSpec second = columns.get(right);
+                ExploreResult.Relationship pair;
+                if (first.numeric() && second.numeric()) {
+                    pair = pearson(first, second, sample, left, right);
+                } else if (categorical(first) && categorical(second)) {
+                    pair = cramersV(first, second, sample, left, right);
+                } else {
+                    continue;
+                }
+                if (pair != null) {
+                    found.add(pair);
+                }
+            }
+        }
+        found.sort(Comparator.comparingDouble((ExploreResult.Relationship pair) -> -Math.abs(pair.value()))
+                .thenComparing(ExploreResult.Relationship::left)
+                .thenComparing(ExploreResult.Relationship::right)
+                .thenComparing(ExploreResult.Relationship::method));
+        return List.copyOf(found.subList(0, Math.min(MAX_RELATIONSHIPS, found.size())));
+    }
+
+    private static ExploreResult.Relationship pearson(ColumnSpec left, ColumnSpec right,
+                                                      List<Object[]> sample, int leftIndex,
+                                                      int rightIndex) {
+        int n = 0;
+        double sumLeft = 0;
+        double sumRight = 0;
+        for (Object[] row : sample) {
+            Double leftValue = asDouble(row[leftIndex]);
+            Double rightValue = asDouble(row[rightIndex]);
+            if (leftValue == null || rightValue == null) {
+                continue;
+            }
+            n++;
+            sumLeft += leftValue;
+            sumRight += rightValue;
+        }
+        if (n < 3) {
+            return null;
+        }
+        double meanLeft = sumLeft / n;
+        double meanRight = sumRight / n;
+        double covariance = 0;
+        double varianceLeft = 0;
+        double varianceRight = 0;
+        for (Object[] row : sample) {
+            Double leftValue = asDouble(row[leftIndex]);
+            Double rightValue = asDouble(row[rightIndex]);
+            if (leftValue == null || rightValue == null) {
+                continue;
+            }
+            double deltaLeft = leftValue - meanLeft;
+            double deltaRight = rightValue - meanRight;
+            covariance += deltaLeft * deltaRight;
+            varianceLeft += deltaLeft * deltaLeft;
+            varianceRight += deltaRight * deltaRight;
+        }
+        if (varianceLeft <= 0 || varianceRight <= 0) {
+            return null;
+        }
+        double r = Math.max(-1.0, Math.min(1.0, covariance / Math.sqrt(varianceLeft * varianceRight)));
+        return new ExploreResult.Relationship(left.name(), right.name(), "pearson", r,
+                pearsonPValue(r, n), n, strength(r));
+    }
+
+    /** Two-sided p-value of a Pearson correlation: t with n-2 degrees of freedom. */
+    private static double pearsonPValue(double r, long n) {
+        if (n <= 2) {
+            return Double.NaN;
+        }
+        if (Math.abs(r) >= 1.0) {
+            return 0.0;
+        }
+        double degrees = n - 2;
+        double t = r * Math.sqrt(degrees / (1.0 - r * r));
+        return clamp01(2.0 * (1.0 - Distributions.tCdf(Math.abs(t), degrees)));
+    }
+
+    private static ExploreResult.Relationship cramersV(ColumnSpec left, ColumnSpec right,
+                                                       List<Object[]> sample, int leftIndex,
+                                                       int rightIndex) {
+        Map<String, Integer> leftCounts = new LinkedHashMap<>();
+        Map<String, Integer> rightCounts = new LinkedHashMap<>();
+        Map<String, Integer> cells = new LinkedHashMap<>();
+        int n = 0;
+        for (Object[] row : sample) {
+            Object leftValue = row[leftIndex];
+            Object rightValue = row[rightIndex];
+            if (leftValue == null || rightValue == null) {
+                continue;
+            }
+            String leftKey = leftValue.toString();
+            String rightKey = rightValue.toString();
+            leftCounts.merge(leftKey, 1, Integer::sum);
+            rightCounts.merge(rightKey, 1, Integer::sum);
+            cells.merge(leftKey + "\u0000" + rightKey, 1, Integer::sum);
+            n++;
+        }
+        if (n < 5 || leftCounts.size() < 2 || rightCounts.size() < 2
+                || leftCounts.size() > MAX_CATEGORIES || rightCounts.size() > MAX_CATEGORIES) {
+            return null;
+        }
+        double chiSquare = 0;
+        for (Map.Entry<String, Integer> leftCell : leftCounts.entrySet()) {
+            for (Map.Entry<String, Integer> rightCell : rightCounts.entrySet()) {
+                double expected = (double) leftCell.getValue() * rightCell.getValue() / n;
+                if (expected <= 0) {
+                    continue;
+                }
+                int observed = cells.getOrDefault(leftCell.getKey() + "\u0000" + rightCell.getKey(), 0);
+                double delta = observed - expected;
+                chiSquare += delta * delta / expected;
+            }
+        }
+        int degrees = (leftCounts.size() - 1) * (rightCounts.size() - 1);
+        if (degrees <= 0) {
+            return null;
+        }
+        double p = clamp01(1.0 - Distributions.chiSquareCdf(chiSquare, degrees));
+        double v = Math.sqrt(chiSquare / (n * (double) Math.min(leftCounts.size() - 1,
+                rightCounts.size() - 1)));
+        v = Math.min(1.0, v);
+        return new ExploreResult.Relationship(left.name(), right.name(), "cramers_v", v, p, n,
+                strength(v));
+    }
+
+    /** ANOVA when every group has at least five values, Kruskal-Wallis otherwise. */
+    private static List<ExploreResult.GroupDifference> groupDifferences(List<ColumnSpec> columns,
+                                                                        List<Object[]> sample) {
+        List<ExploreResult.GroupDifference> found = new ArrayList<>();
+        for (int valueIndex = 0; valueIndex < columns.size(); valueIndex++) {
+            if (!columns.get(valueIndex).numeric()) {
+                continue;
+            }
+            for (int groupIndex = 0; groupIndex < columns.size(); groupIndex++) {
+                if (!categorical(columns.get(groupIndex))) {
+                    continue;
+                }
+                Map<String, List<Double>> groups = new LinkedHashMap<>();
+                for (Object[] row : sample) {
+                    Double value = asDouble(row[valueIndex]);
+                    Object group = row[groupIndex];
+                    if (value == null || group == null) {
+                        continue;
+                    }
+                    groups.computeIfAbsent(group.toString(), key -> new ArrayList<>()).add(value);
+                }
+                if (groups.size() < 2 || groups.size() > MAX_CATEGORIES) {
+                    continue;
+                }
+                int smallest = Integer.MAX_VALUE;
+                for (List<Double> values : groups.values()) {
+                    smallest = Math.min(smallest, values.size());
+                }
+                if (smallest < 2) {
+                    continue;
+                }
+                if (smallest < SMALL_GROUP) {
+                    kruskal(columns.get(valueIndex), columns.get(groupIndex), groups, found);
+                } else {
+                    anova(columns.get(valueIndex), columns.get(groupIndex), groups, found);
+                }
+            }
+        }
+        found.sort(Comparator.comparingDouble(ExploreResult.GroupDifference::pValue)
+                .thenComparing(ExploreResult.GroupDifference::value)
+                .thenComparing(ExploreResult.GroupDifference::group));
+        return List.copyOf(found.subList(0, Math.min(MAX_GROUP_DIFFERENCES, found.size())));
+    }
+
+    private static void anova(ColumnSpec value, ColumnSpec group, Map<String, List<Double>> groups,
+                              List<ExploreResult.GroupDifference> found) {
+        int n = 0;
+        double sum = 0;
+        for (List<Double> values : groups.values()) {
+            n += values.size();
+            for (double sample : values) {
+                sum += sample;
+            }
+        }
+        int k = groups.size();
+        if (n <= k) {
+            return;
+        }
+        double grandMean = sum / n;
+        double between = 0;
+        double within = 0;
+        for (List<Double> values : groups.values()) {
+            double groupSum = 0;
+            for (double sample : values) {
+                groupSum += sample;
+            }
+            double groupMean = groupSum / values.size();
+            between += values.size() * (groupMean - grandMean) * (groupMean - grandMean);
+            for (double sample : values) {
+                within += (sample - groupMean) * (sample - groupMean);
+            }
+        }
+        if (within <= 0) {
+            return;
+        }
+        int dfBetween = k - 1;
+        int dfWithin = n - k;
+        double f = (between / dfBetween) / (within / dfWithin);
+        double p = clamp01(1.0 - Distributions.fCdf(f, dfBetween, dfWithin));
+        found.add(new ExploreResult.GroupDifference(value.name(), group.name(), "anova", f, p,
+                between / (between + within)));
+    }
+
+    private static void kruskal(ColumnSpec value, ColumnSpec group, Map<String, List<Double>> groups,
+                                List<ExploreResult.GroupDifference> found) {
+        List<String> names = new ArrayList<>(groups.keySet());
+        int n = 0;
+        for (List<Double> values : groups.values()) {
+            n += values.size();
+        }
+        int k = names.size();
+        if (n <= k) {
+            return;
+        }
+        double[] values = new double[n];
+        int[] groupIndex = new int[n];
+        int position = 0;
+        for (int index = 0; index < k; index++) {
+            for (double sample : groups.get(names.get(index))) {
+                values[position] = sample;
+                groupIndex[position] = index;
+                position++;
+            }
+        }
+        Integer[] order = new Integer[n];
+        for (int index = 0; index < n; index++) {
+            order[index] = index;
+        }
+        java.util.Arrays.sort(order, (first, second) -> Double.compare(values[first], values[second]));
+        double[] ranks = new double[n];
+        double ties = 0;
+        int index = 0;
+        while (index < n) {
+            int last = index;
+            while (last + 1 < n
+                    && Double.compare(values[order[last + 1]], values[order[index]]) == 0) {
+                last++;
+            }
+            double rank = (index + last) / 2.0 + 1.0;
+            for (int rankIndex = index; rankIndex <= last; rankIndex++) {
+                ranks[order[rankIndex]] = rank;
+            }
+            int tieSize = last - index + 1;
+            if (tieSize > 1) {
+                ties += (double) tieSize * tieSize * tieSize - tieSize;
+            }
+            index = last + 1;
+        }
+        double[] rankSums = new double[k];
+        int[] sizes = new int[k];
+        for (int row = 0; row < n; row++) {
+            rankSums[groupIndex[row]] += ranks[row];
+            sizes[groupIndex[row]]++;
+        }
+        double h = 0;
+        for (int groupIndexValue = 0; groupIndexValue < k; groupIndexValue++) {
+            h += rankSums[groupIndexValue] * rankSums[groupIndexValue] / sizes[groupIndexValue];
+        }
+        h = 12.0 / (n * (double) (n + 1)) * h - 3.0 * (n + 1);
+        double correction = 1.0 - ties / ((double) n * n * n - n);
+        if (correction > 0) {
+            h /= correction;
+        }
+        double p = clamp01(1.0 - Distributions.chiSquareCdf(Math.max(0.0, h), k - 1));
+        double epsilonSquared = Math.max(0.0, (h - k + 1) / (double) (n - k));
+        found.add(new ExploreResult.GroupDifference(value.name(), group.name(), "kruskal", h, p,
+                Math.min(1.0, epsilonSquared)));
+    }
+
+    /** Span of the first date/timestamp column: from, to and an inferred granularity. */
+    private static ExploreResult.TimeSpan timeSpan(Connection connection, String base,
+                                                   List<ColumnSpec> columns) throws SQLException {
+        for (int index = 0; index < columns.size(); index++) {
+            if (!temporal(columns.get(index))) {
+                continue;
+            }
+            String ref = "#" + (index + 1);
+            String sql = "SELECT CAST(MIN(" + ref + ") AS VARCHAR) AS \"from_value\", "
+                    + "CAST(MAX(" + ref + ") AS VARCHAR) AS \"to_value\", "
+                    + "DATE_DIFF('day', MIN(" + ref + "), MAX(" + ref + ")) AS \"span_days\", "
+                    + "COUNT(DISTINCT " + ref + ") AS \"distinct_values\" "
+                    + "FROM (" + base + ") AS dap_explore";
+            try (Statement statement = connection.createStatement();
+                 ResultSet result = statement.executeQuery(sql)) {
+                result.next();
+                String from = result.getString("from_value");
+                if (from == null) {
+                    continue;
+                }
+                long spanDays = result.getLong("span_days");
+                long distinct = result.getLong("distinct_values");
+                return new ExploreResult.TimeSpan(columns.get(index).name(),
+                        granularity(spanDays, distinct), from, result.getString("to_value"));
+            }
+        }
+        return null;
+    }
+
+    private static String granularity(long spanDays, long distinct) {
+        if (distinct <= 1 || spanDays <= 0) {
+            return "day";
+        }
+        double gap = (double) spanDays / (distinct - 1);
+        if (gap >= 300) {
+            return "year";
+        }
+        if (gap >= 25) {
+            return "month";
+        }
+        if (gap >= 6) {
+            return "week";
+        }
+        return "day";
+    }
+
+    /** Three to five templated next questions, ordered by priority then id. */
+    private static List<ExploreResult.Hypothesis> hypotheses(List<ColumnSpec> columns, Profile profile,
+                                                             List<ExploreResult.Relationship> relationships,
+                                                             List<ExploreResult.GroupDifference> differences,
+                                                             ExploreResult.TimeSpan time, int score,
+                                                             List<ExploreResult.Issue> issues) {
+        if (profile.rows() == 0) {
+            return List.of();
+        }
+        List<ExploreResult.Hypothesis> candidates = new ArrayList<>();
+        int relationshipCandidates = 0;
+        for (ExploreResult.Relationship pair : relationships) {
+            if (relationshipCandidates >= 2 || Math.abs(pair.value()) < 0.5) {
+                break;
+            }
+            String priority = Math.abs(pair.value()) >= 0.7 ? "high" : "medium";
+            String association = "pearson".equals(pair.method()) ? "correlation" : "association";
+            candidates.add(new ExploreResult.Hypothesis("",
+                    "Do " + pair.left() + " and " + pair.right() + " move together?",
+                    pair.method(), List.of(pair.left(), pair.right()),
+                    capitalised(pair.strength()) + " " + association + " ("
+                            + pair.method() + "=" + decimal(pair.value()) + ", "
+                            + pText(pair.pValue()) + ", n=" + pair.n() + ").",
+                    priority));
+            relationshipCandidates++;
+        }
+        int differenceCandidates = 0;
+        for (ExploreResult.GroupDifference difference : differences) {
+            if (differenceCandidates >= 2 || difference.pValue() >= 0.05) {
+                break;
+            }
+            String priority = difference.pValue() < 0.001 ? "high" : "medium";
+            String effect = "anova".equals(difference.test()) ? "eta squared" : "epsilon squared";
+            candidates.add(new ExploreResult.Hypothesis("",
+                    "Does " + difference.value() + " differ across " + difference.group()
+                            + " groups?",
+                    difference.test(), List.of(difference.value(), difference.group()),
+                    capitalised(difference.test()) + " (statistic="
+                            + decimal(difference.statistic()) + ", " + pText(difference.pValue())
+                            + ", " + effect + "=" + decimal(difference.effectSize()) + ").",
+                    priority));
+            differenceCandidates++;
+        }
+        for (ColumnStat stat : profile.columns()) {
+            if (stat.missing() == 0 || stat.missing() == profile.rows()
+                    || (double) stat.missing() / profile.rows() < 0.1) {
+                continue;
+            }
+            String priority = stat.missing() * 2 > profile.rows() ? "high" : "medium";
+            candidates.add(new ExploreResult.Hypothesis("",
+                    "Is " + stat.spec().name() + " missing at random?",
+                    "missingness", List.of(stat.spec().name()),
+                    stat.missing() + " of " + profile.rows() + " values are NULL ("
+                            + percent(stat.missing(), profile.rows()) + ").",
+                    priority));
+            break;
+        }
+        for (ColumnStat stat : profile.columns()) {
+            if (stat.outliers() == null || stat.outliers() < 3) {
+                continue;
+            }
+            candidates.add(new ExploreResult.Hypothesis("",
+                    "Are the " + stat.outliers() + " outliers in " + stat.spec().name()
+                            + " data errors or a real subgroup?",
+                    "outliers", List.of(stat.spec().name()),
+                    stat.outliers() + " rows outside 1.5x IQR [" + number(stat.lowerFence())
+                            + ", " + number(stat.upperFence()) + "].",
+                    "low"));
+            break;
+        }
+        ColumnSpec numeric = firstNumeric(columns);
+        if (time != null && numeric != null) {
+            candidates.add(new ExploreResult.Hypothesis("",
+                    "Is there a trend in " + numeric.name() + " over " + time.column() + "?",
+                    "trend", List.of(time.column(), numeric.name()),
+                    "Time column spans " + time.from() + " to " + time.to() + " with "
+                            + time.granularity() + " granularity.",
+                    "medium"));
+        }
+        if (profile.duplicateRows() > 0) {
+            List<String> names = columns.stream().map(ColumnSpec::name).toList();
+            candidates.add(new ExploreResult.Hypothesis("",
+                    "Are the " + profile.duplicateRows() + " duplicate rows expected?",
+                    "duplicates", names,
+                    profile.duplicateRows() + " rows repeat exactly across all " + names.size()
+                            + " columns.",
+                    "low"));
+        }
+        if (candidates.size() < MIN_HYPOTHESES) {
+            List<String> names = columns.stream().map(ColumnSpec::name).toList();
+            if (numeric != null && candidates.size() < MIN_HYPOTHESES) {
+                ColumnStat stat = statOf(profile, numeric.name());
+                candidates.add(new ExploreResult.Hypothesis("",
+                        "What is the distribution of " + numeric.name() + "?",
+                        "distribution", List.of(numeric.name()),
+                        "mean=" + decimal(stat == null ? null : stat.mean())
+                                + ", stddev=" + decimal(stat == null ? null : stat.stddev()) + ".",
+                        "low"));
+            }
+            if (candidates.size() < MIN_HYPOTHESES) {
+                candidates.add(new ExploreResult.Hypothesis("",
+                        "Is the data quality good enough for modelling?",
+                        "quality", names,
+                        "Quality score " + score + " with " + issues.size() + " issues.",
+                        "low"));
+            }
+            if (candidates.size() < MIN_HYPOTHESES && names.size() >= 2) {
+                candidates.add(new ExploreResult.Hypothesis("",
+                        "Which groups should be compared next?",
+                        "group_comparison", List.of(names.get(0), names.get(1)),
+                        "Compare the main measure with the strongest categorical segment.",
+                        "low"));
+            }
+        }
+        candidates.sort(Comparator.comparingInt(
+                (ExploreResult.Hypothesis hypothesis) -> priorityRank(hypothesis.priority())));
+        List<ExploreResult.Hypothesis> result = new ArrayList<>();
+        int count = Math.min(MAX_HYPOTHESES, candidates.size());
+        for (int index = 0; index < count; index++) {
+            ExploreResult.Hypothesis candidate = candidates.get(index);
+            result.add(new ExploreResult.Hypothesis("h" + (index + 1), candidate.question(),
+                    candidate.test(), candidate.columns(), candidate.rationale(),
+                    candidate.priority()));
+        }
+        return List.copyOf(result);
+    }
+
+    /** Concrete next steps derived from the findings, strongest first. */
+    private static List<String> recommendations(Profile profile, List<ColumnSpec> columns,
+                                                List<ExploreResult.Relationship> relationships,
+                                                List<ExploreResult.GroupDifference> differences,
+                                                ExploreResult.TimeSpan time) {
+        long rows = profile.rows();
+        if (rows == 0) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>();
+        if (profile.duplicateRows() > 0) {
+            result.add("Deduplicate " + profile.duplicateRows()
+                    + " repeated rows (or confirm they are expected).");
+        }
+        int missingAdded = 0;
+        for (ColumnStat stat : profile.columns()) {
+            if (missingAdded >= 3) {
+                break;
+            }
+            if (stat.missing() == 0 || stat.missing() == rows) {
+                continue;
+            }
+            result.add("Review " + stat.missing() + " missing values in " + stat.spec().name()
+                    + " (" + percent(stat.missing(), rows) + ").");
+            missingAdded++;
+        }
+        for (ColumnStat stat : profile.columns()) {
+            if (stat.missing() == rows) {
+                result.add("Drop empty column " + stat.spec().name() + ".");
+            } else if (rows > 1 && stat.distinct() == 1) {
+                result.add("Drop constant column " + stat.spec().name() + ".");
+            }
+        }
+        int cardinalityAdded = 0;
+        for (ColumnStat stat : profile.columns()) {
+            if (cardinalityAdded >= 2) {
+                break;
+            }
+            if (rows >= HIGH_CARDINALITY_MIN_ROWS && stat.distinct() >= HIGH_CARDINALITY_MIN_ROWS
+                    && stat.distinct() >= HIGH_CARDINALITY_RATIO * rows) {
+                result.add("Treat " + stat.spec().name()
+                        + " as an identifier, not a category.");
+                cardinalityAdded++;
+            }
+        }
+        int outliersAdded = 0;
+        for (ColumnStat stat : profile.columns()) {
+            if (outliersAdded >= 3) {
+                break;
+            }
+            if (stat.outliers() != null && stat.outliers() > 0) {
+                result.add("Inspect " + stat.outliers() + " outliers in " + stat.spec().name()
+                        + " (outside 1.5x IQR).");
+                outliersAdded++;
+            }
+        }
+        int relationshipAdded = 0;
+        for (ExploreResult.Relationship pair : relationships) {
+            if (relationshipAdded >= 3 || Math.abs(pair.value()) < 0.5) {
+                break;
+            }
+            result.add("Model " + pair.right() + " with " + pair.left() + " (" + pair.method()
+                    + "=" + decimal(pair.value()) + ", " + pText(pair.pValue()) + ").");
+            relationshipAdded++;
+        }
+        int differenceAdded = 0;
+        for (ExploreResult.GroupDifference difference : differences) {
+            if (differenceAdded >= 3 || difference.pValue() >= 0.05) {
+                break;
+            }
+            result.add("Compare " + difference.value() + " across " + difference.group()
+                    + " groups (" + difference.test() + " " + pText(difference.pValue())
+                    + ", effect size " + decimal(difference.effectSize()) + ").");
+            differenceAdded++;
+        }
+        ColumnSpec numeric = firstNumeric(columns);
+        if (time != null && numeric != null) {
+            result.add("Analyze " + numeric.name() + " over " + time.column()
+                    + " as a time series (" + time.granularity() + " granularity).");
+        }
+        return List.copyOf(result.subList(0, Math.min(MAX_RECOMMENDATIONS, result.size())));
+    }
+
+    private static ColumnStat statOf(Profile profile, String name) {
+        for (ColumnStat stat : profile.columns()) {
+            if (stat.spec().name().equals(name)) {
+                return stat;
+            }
+        }
+        return null;
+    }
+
+    private static ColumnSpec firstNumeric(List<ColumnSpec> columns) {
+        for (ColumnSpec column : columns) {
+            if (column.numeric()) {
+                return column;
+            }
+        }
+        return null;
+    }
+
+    private static boolean categorical(ColumnSpec column) {
+        return "Utf8".equals(column.arrowType()) || "Boolean".equals(column.arrowType());
+    }
+
+    private static boolean temporal(ColumnSpec column) {
+        return "Date32".equals(column.arrowType()) || "Timestamp".equals(column.arrowType());
+    }
+
+    private static int priorityRank(String priority) {
+        return switch (priority) {
+            case "high" -> 0;
+            case "medium" -> 1;
+            default -> 2;
+        };
+    }
+
+    private static String strength(double value) {
+        double magnitude = Math.abs(value);
+        if (magnitude >= 0.9) {
+            return "very strong";
+        }
+        if (magnitude >= 0.7) {
+            return "strong";
+        }
+        if (magnitude >= 0.5) {
+            return "moderate";
+        }
+        if (magnitude >= 0.3) {
+            return "weak";
+        }
+        return "very weak";
+    }
+
+    private static double clamp01(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    private static String capitalised(String text) {
+        return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
+    }
+
+    private static String decimal(Double value) {
+        return value == null ? "?" : String.format(Locale.ROOT, "%.3f", value);
+    }
+
+    private static String pText(Double p) {
+        if (p == null) {
+            return "p=?";
+        }
+        return p < 0.001 ? "p<0.001" : String.format(Locale.ROOT, "p=%.3f", p);
     }
 
     private static ExploreResult.Column view(ColumnStat stat) {
