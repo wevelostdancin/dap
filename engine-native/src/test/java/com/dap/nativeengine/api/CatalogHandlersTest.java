@@ -61,11 +61,11 @@ class CatalogHandlersTest {
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(62, body.path("count").asInt());
+        assertEquals(63, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(62, nodes.size());
+        assertEquals(63, nodes.size());
         assertEquals(List.of(
-                "Binner", "Calendar", "Chart", "Chart Grid", "Column Filter",
+                "A/B Test", "Binner", "Calendar", "Chart", "Chart Grid", "Column Filter",
                 "Column Renamer", "Column Resorter", "Concatenate",
                 "Correlation", "CSV Reader", "CSV Writer",
                 "Data Quality", "Database Reader", "Database Writer",
@@ -88,8 +88,8 @@ class CatalogHandlersTest {
                 "Window"), names(nodes));
 
         JsonNode first = nodes.get(0);
-        assertEquals("dap.binner", first.path("id").asText());
-        JsonNode csvNode = nodes.get(9);
+        assertEquals("dap.ab_test", first.path("id").asText());
+        JsonNode csvNode = nodes.get(10);
         assertEquals("dap.csv_reader", csvNode.path("id").asText());
         assertEquals("CSV Reader", csvNode.path("name").asText());
         assertEquals("/IO/Read", csvNode.path("category").asText());
@@ -126,7 +126,7 @@ class CatalogHandlersTest {
     void appliesLimitAndReturnsEmptyForUnknownValues() throws Exception {
         JsonNode limited = body(fetch("/nodes?limit=3", "s"));
         assertEquals(3, limited.path("count").asInt());
-        assertEquals(List.of("Binner", "Calendar", "Chart"), names(limited.path("nodes")));
+        assertEquals(List.of("A/B Test", "Binner", "Calendar"), names(limited.path("nodes")));
 
         HttpResponse<String> empty = fetch("/nodes?q=no-such-node", "s");
         assertEquals(200, empty.statusCode());

@@ -16,6 +16,7 @@ import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.io.DatasetCatalog;
+import com.dap.nativeengine.nodes.AbTestExecutor;
 import com.dap.nativeengine.nodes.BinnerExecutor;
 import com.dap.nativeengine.nodes.CalendarExecutor;
 import com.dap.nativeengine.nodes.LogisticRegressionExecutor;
@@ -749,7 +750,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new GeoDistanceExecutor())
                 .register(new CalendarExecutor())
                 .register(new ResampleTestExecutor())
-                .register(new SurvivalExecutor());
+                .register(new SurvivalExecutor())
+                .register(new AbTestExecutor());
     }
 
     /**
