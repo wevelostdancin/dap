@@ -115,8 +115,8 @@ class NativeServiceTest {
         assertEquals("DAP", body.path("name").asText());
         assertEquals("1.1.0", body.path("version").asText());
         assertEquals("1", body.path("api").asText());
-        assertEquals(52, body.path("nodes").asInt());
-        assertEquals(52, body.path("coreNodes").asInt());
+        assertEquals(53, body.path("nodes").asInt());
+        assertEquals(53, body.path("coreNodes").asInt());
         assertEquals(0, body.path("workflows").asInt());
         assertEquals(0, body.path("sessions").asInt());
         assertEquals(0, body.path("jobs").asInt());
@@ -134,7 +134,7 @@ class NativeServiceTest {
     void catalogRoutes() throws Exception {
         Resp list = get("/v1/nodes?limit=100");
         assertEquals(200, list.status());
-        assertEquals(52, list.body().path("count").asInt());
+        assertEquals(53, list.body().path("count").asInt());
 
         Resp node = get("/v1/nodes/dap.csv_reader");
         assertEquals(200, node.status());
@@ -376,6 +376,23 @@ class NativeServiceTest {
                 Map.of("settings", Map.of("keys", List.of(Map.of("column", "age", "direction", "asc")))));
         assertEquals(200, patchOk.status());
         assertEquals(nodeId, patchOk.body().path("node").asText());
+    }
+
+    @Test
+    void sqlQueryAcceptsEightInputsAndRejectsTheNinth() throws Exception {
+        String workflow = createWorkflow("sql-eight-ports");
+        String query = addNode(workflow, "dap.sql_query", Map.of("sql", "SELECT 1 AS one"));
+        for (int port = 0; port < 8; port++) {
+            String source = addNode(workflow, "dap.sorter", Map.of("keys", List.of()));
+            Resp connected = post("/v1/workflows/" + workflow + "/connect",
+                    Map.of("from", source, "to", query, "fromPort", 0, "toPort", port));
+            assertEquals(200, connected.status(), "port " + port + ": " + connected.raw().body());
+        }
+        String ninth = addNode(workflow, "dap.sorter", Map.of("keys", List.of()));
+        Resp rejected = post("/v1/workflows/" + workflow + "/connect",
+                Map.of("from", ninth, "to", query, "fromPort", 0, "toPort", 8));
+        assertEquals(400, rejected.status());
+        assertEquals("node has 8 in ports", rejected.error());
     }
 
     @Test
