@@ -41,6 +41,7 @@ BASE = f"http://{HOST}:{PORT}"
 SESSION = (os.environ.get("DAP_SESSION") or "default").strip() or "default"
 LOG = os.path.join(DAP_HOME, "service.log")
 TIMEOUT = 600
+WARMUP_WAIT = 15.0
 START_WAIT = 60
 NATIVE_JAR = os.path.join(DAP_HOME, "engine-native", "target", "dap-native.jar")
 HEAP = (os.environ.get("DAP_HEAP") or "").strip() or "2g"
@@ -192,9 +193,26 @@ def _stop_child(proc: subprocess.Popen) -> None:
         pass
 
 
+def _wait_for_warmup() -> None:
+    """A first call should not race the startup warm-up: wait until it stops running."""
+    deadline = time.monotonic() + WARMUP_WAIT
+    while True:
+        body = probe()
+        if body is None:
+            return
+        if body.get("warmup") not in ("pending", "running"):
+            return
+        if time.monotonic() >= deadline:
+            print(f"dap-mcp: warm-up still running after {WARMUP_WAIT:g}s; continuing",
+                  file=sys.stderr, flush=True)
+            return
+        time.sleep(0.05)
+
+
 def ensure_service() -> None:
     """Поднять движок, если он ещё не запущен; чужой сервис не трогаем."""
     if health():
+        _wait_for_warmup()
         return
     _reap_child()
     env = dict(os.environ)
@@ -218,6 +236,7 @@ def ensure_service() -> None:
             if health():
                 global _CHILD
                 _CHILD = child
+                _wait_for_warmup()
                 return
             code = child.poll()
             if code is not None:
@@ -1236,6 +1255,7 @@ def tool_report(args: dict):
         y = [str(item) for item in y]
     sql = args.get("sql")
     sql = _read_only_sql(sql) if sql else None
+    ensure_service()
     source, cached = _source(args, has_file)
     workflow = _new_workflow("report")
     try:
@@ -1292,6 +1312,7 @@ def tool_report(args: dict):
 def tool_profile(args: dict):
     has_file, _ = _source_args(args)
     limit = _table_limit(args, 10)
+    ensure_service()
     source, cached = _source(args, has_file)
     workflow = _new_workflow("profile")
     try:
@@ -1507,7 +1528,8 @@ def handle(msg: dict) -> None:
             fail(msg_id, -32602, "arguments должен быть объектом")
             return
         try:
-            if name not in ("dap_shutdown", "dap_analyze", "dap_workflow_build"):
+            if name not in ("dap_shutdown", "dap_analyze", "dap_workflow_build",
+                            "dap_report", "dap_profile"):
                 ensure_service()
             result = handler(args)
         except DapError as e:

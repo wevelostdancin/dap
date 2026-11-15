@@ -285,6 +285,7 @@ public final class NativeService implements AutoCloseable {
     private final AtomicInteger inFlight = new AtomicInteger();
     private final ScheduledExecutorService idleWatchdog;
     private final CompletableFuture<Void> warmUpDone = new CompletableFuture<>();
+    private volatile String warmUpStatus = "pending";
     private volatile int port;
 
     /** Production service: environment settings, classpath catalog, five Phase-1 executors. */
@@ -408,6 +409,7 @@ public final class NativeService implements AutoCloseable {
         body.put("version", VERSION);
         body.put("api", Http.API_VERSION);
         body.put("generation", generation);
+        body.put("warmup", warmUpStatus);
         body.put("extensions", Map.of("installed",
                 DuckDbSession.installedExtensions(settings.duckdbExtensionDirectory())));
         body.put("nodes", state.registry().size());
@@ -464,19 +466,24 @@ public final class NativeService implements AutoCloseable {
         if (!WarmUp.enabled()) {
             System.err.println("dap-native: warm-up disabled by " + WarmUp.PROPERTY
                     + "/" + WarmUp.ENV);
+            warmUpStatus = "disabled";
             warmUpDone.complete(null);
             return;
         }
         if (!WarmUp.claim()) {
+            warmUpStatus = "done";
             warmUpDone.complete(null);
             return;
         }
+        warmUpStatus = "running";
         Thread thread = new Thread(() -> {
             try {
                 WarmUp.Outcome outcome = WarmUp.run(settings);
+                warmUpStatus = "done";
                 System.err.println("dap-native: warm-up completed in " + outcome.elapsedMs()
                         + " ms (" + outcome.rows() + " rows)");
             } catch (Throwable failure) {
+                warmUpStatus = "failed";
                 String message = failure.getMessage();
                 System.err.println("dap-native: warm-up skipped: "
                         + (message == null ? failure.getClass().getSimpleName() : message));
