@@ -50,6 +50,7 @@ import com.dap.nativeengine.nodes.CsvReaderExecutor;
 import com.dap.nativeengine.nodes.CsvWriterExecutor;
 import com.dap.nativeengine.nodes.DbReaderExecutor;
 import com.dap.nativeengine.nodes.FileListExecutor;
+import com.dap.nativeengine.nodes.FileReaderExecutor;
 import com.dap.nativeengine.nodes.ExcelReaderExecutor;
 import com.dap.nativeengine.nodes.GroupByExecutor;
 import com.dap.nativeengine.nodes.JsonReaderExecutor;
@@ -707,7 +708,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new DataQualityExecutor())
                 .register(new SqlQueryExecutor())
                 .register(new DbReaderExecutor())
-                .register(new FileListExecutor());
+                .register(new FileListExecutor())
+                .register(new FileReaderExecutor());
     }
 
     /**
