@@ -60,6 +60,9 @@ REQUIRED_TOOLS = {
     "dap_sql",
     "dap_report",
     "dap_profile",
+    "dap_estimate",
+    "dap_explore",
+    "dap_dataset",
 }
 
 
@@ -311,7 +314,7 @@ def scenario(client, source, base):
 
     tools = client.request("tools/list", {}, 10).get("tools") or []
     names = {tool.get("name") for tool in tools}
-    check(len(tools) == 30, "tools/list returned %d tools, expected 30" % len(tools))
+    check(len(tools) == 33, "tools/list returned %d tools, expected 33" % len(tools))
     missing = REQUIRED_TOOLS - names
     check(not missing, "tools/list misses %s" % sorted(missing))
 

@@ -6,7 +6,7 @@ stdio-сервер [Model Context Protocol](https://modelcontextprotocol.io) н�
 
 - Python 3.10+, только стандартная библиотека (без pip-зависимостей).
 - JSON-RPC 2.0, по одному объекту на строку: запросы в stdin, ответы в stdout.
-- Инструменты — только `dap_*` (30 штук). Ошибки движка приходят как JSON-RPC `error`.
+- Инструменты — только `dap_*` (33 штуки). Ошибки движка приходят как JSON-RPC `error`.
 
 ## Быстрый старт
 
@@ -156,14 +156,17 @@ printf '%s\n' \
 | `dap_job_status` | состояние задания, для завершённого — `result` | `job` |
 | `dap_job_cancel` | отменить активное задание | `job` |
 | `dap_list_jobs` | задания сессии, новые сверху | — |
-| `dap_get_table` | колонки, число строк, первые N строк | `workflow`, `node`, `port` (0), `limit` (20) |
+| `dap_get_table` | колонки, число строк и строки; пагинация, проекция, фильтр, компактные форматы | `workflow`, `node`, `port` (0), `limit` (20), `offset`?, `columns`?, `where`?, `format`? (json/objects/csv/markdown), `maxCellChars`? (200), `includeColumns`? (true) |
 | `dap_profile_table` | профиль: пропуски, уникальные, min/max/mean | `workflow`, `node` |
 | `dap_ingest` | один раз конвертировать CSV/Excel/JSON/Parquet в Parquet-кэш | `file`, `format`? |
+| `dap_dataset` | каталог датасетов: list/add/show/refresh/remove | `action` (list), `name`?, `file`?/`dataset`?, `format`?, `description`?, `tags`?, `owner`? |
+| `dap_explore` | один вызов: профиль, качество, связи, гипотезы (`POST /v1/explore`) | `file`?/`dataset`?, `format`?, `sql`?, `maxColumns`?, `sampleRows`? |
+| `dap_estimate` | один вызов: rows/operators/plan до запуска (`/estimate`) | `file`?/`dataset`?, `format`?, `sql`?, `limit`? |
 | `dap_analyze` | один вызов: файл/датасет → таблица + профиль, опционально SQL по `src` | `file`?/`dataset`?, `format`?, `sql`?, `profile` (true), `limit` (20), `timeoutSec`? |
-| `dap_report` | один вызов: файл/датасет → таблица + Markdown-отчёт + график | `file`?/`dataset`?, `format`?, `sql`?, `report`, `chart`?, `chartType`? (bar), `x`?, `y`[]?, `title`?, `profile` (true), `limit` (20), `timeoutSec`? |
+| `dap_report` | один вызов: файл/датасет → таблицы + отчёт md/html/pdf/pptx + график | `file`?/`dataset`?, `format`? (md/html/pdf/pptx), `sql`?/`queries`[]?, `report`, `chart`?, `chartType`? (bar), `x`?, `y`[]?, `title`?, `profile` (true), `limit` (20), `timeoutSec`? |
 | `dap_profile` | один вызов: компактный профиль файла/датасета без таблицы | `file`?/`dataset`?, `format`?, `limit` (10), `timeoutSec`? |
 | `dap_workflow_build` | один вызов: узлы + связи + запуск + таблицы выходов | `nodes`, `edges`?, `run` (false), `outputs`?, `limit` (20), `timeoutSec`? |
-| `dap_sql` | read-only SQL по таблице узла или по входу `src` | `workflow`, `sql`, `node`?, `limit` |
+| `dap_sql` | read-only SQL по таблице узла или по входу `src`; батч `queries`[] и `explain` | `workflow`, `sql`?/`queries`[]?, `node`?, `explain`? (false), `limit` |
 | `dap_recipe_list` | рецепты библиотеки | — |
 | `dap_recipe_save` | сохранить workflow как рецепт | `name`, `workflow` |
 | `dap_recipe_run` | запустить рецепт с датасетом и параметрами | `name`, `dataset`?, `params`?, `limit` (20) |
@@ -198,6 +201,12 @@ printf '%s\n' \
   вернётся JSON-RPC error (движок отвечает `409`).
 - В движке одновременно исполняется одно задание (worker-поток), остальные ждут в
   `queued`; активных заданий не больше 8.
+- Если клиент прислал в `tools/call` `params._meta.progressToken`, `dap_run` сам
+  уходит в async (`{"async":true}`), опрашивает `GET /v1/jobs/{id}` и пишет
+  `notifications/progress` из `job.progress` до финального ответа; без токена
+  поведение прежнее (синхронный `POST /run`). `dap_analyze`, `dap_report`,
+  `dap_profile`, `dap_estimate` и `dap_explore` сообщают стадии
+  `ingest`/`run`/`table`/`profile`.
 
 ## Ошибки
 

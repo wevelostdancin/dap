@@ -12,6 +12,13 @@ import urllib.parse
 CATALOG_URI = "dap://catalog"
 RECIPES_URI = "dap://recipes"
 RECIPE_PREFIX = "dap://recipes/"
+DATASETS_URI = "dap://datasets"
+DATASET_PREFIX = "dap://datasets/"
+# Compact dataset views: the catalog record carries hashes and history, which the
+# agent does not need when it only looks for a dataset to analyse.
+DATASET_LIST_KEYS = ("name", "description", "rows", "columns", "version", "updatedAt")
+DATASET_KEYS = ("name", "description", "owner", "tags", "source", "format", "path",
+                "rows", "columns", "version", "contentHash", "createdAt", "updatedAt")
 
 
 class ResourceError(ValueError):
@@ -23,18 +30,22 @@ class ResourceError(ValueError):
 
 
 def parse_uri(uri: str) -> tuple[str, str | None]:
-    """Return ("catalog"|"recipes"|"recipe", name) or raise ResourceError."""
+    """Return ("catalog"|"recipes"|"recipe"|"datasets"|"dataset", name)."""
     if uri == CATALOG_URI:
         return ("catalog", None)
     if uri == RECIPES_URI:
         return ("recipes", None)
     if uri.startswith(RECIPE_PREFIX) and len(uri) > len(RECIPE_PREFIX):
         return ("recipe", urllib.parse.unquote(uri[len(RECIPE_PREFIX):]))
+    if uri == DATASETS_URI:
+        return ("datasets", None)
+    if uri.startswith(DATASET_PREFIX) and len(uri) > len(DATASET_PREFIX):
+        return ("dataset", urllib.parse.unquote(uri[len(DATASET_PREFIX):]))
     raise ResourceError("unknown resource URI: " + uri, uri)
 
 
 def list_resources() -> list[dict]:
-    """The two library-level resources advertised by resources/list."""
+    """The library-level resources advertised by resources/list."""
     return [
         {
             "uri": CATALOG_URI,
@@ -53,6 +64,17 @@ def list_resources() -> list[dict]:
             "description": (
                 "Names and descriptions of the saved pipelines in $DAP_HOME/recipes; "
                 "read dap://recipes/<name> for the workflow JSON with its recipe block."
+            ),
+            "mimeType": "application/json",
+        },
+        {
+            "uri": DATASETS_URI,
+            "name": "datasets",
+            "title": "Dataset catalog",
+            "description": (
+                "Registered datasets with rows, columns and version; read "
+                "dap://datasets/<name> for one entry with its cached profile. "
+                "The name can be passed as 'dataset' to dap_analyze/dap_profile."
             ),
             "mimeType": "application/json",
         },
@@ -82,6 +104,33 @@ def render_recipes(entries: list[dict]) -> str:
 def render_recipe(document: dict, name: str | None = None) -> str:
     """A saved recipe as the workflow JSON it is stored in (with the recipe block)."""
     return json.dumps(document, ensure_ascii=False)
+
+
+def _dataset_entries(payload) -> list[dict]:
+    """Catalog entries from {"datasets": [...]} or a bare list."""
+    if isinstance(payload, dict):
+        entries = payload.get("datasets")
+    else:
+        entries = payload
+    return [entry for entry in entries or [] if isinstance(entry, dict)]
+
+
+def render_datasets(payload) -> str:
+    """Compact catalog list: name, description, rows, columns and version."""
+    view = [
+        {key: entry[key] for key in DATASET_LIST_KEYS if key in entry}
+        for entry in _dataset_entries(payload)
+    ]
+    return json.dumps({"count": len(view), "datasets": view}, ensure_ascii=False)
+
+
+def render_dataset(document: dict, name: str | None = None) -> str:
+    """One catalog entry with its cached profile."""
+    if not isinstance(document, dict):
+        return json.dumps(document, ensure_ascii=False)
+    view = {key: document[key] for key in DATASET_KEYS if key in document}
+    view["profile"] = document.get("profile")
+    return json.dumps(view, ensure_ascii=False)
 
 
 # ------------------------------------------------------------------- prompts
@@ -159,12 +208,14 @@ def _analyze_csv(values: dict) -> str:
         '\n'
         'DAP pipeline (one tool call per step; do not build the graph by hand):\n'
         '1. dap_ingest {"file": "%s"} - convert the CSV once into the Parquet cache; keep the returned path.\n'
-        '2. dap_recipe_run {"name": "analyze_csv", "dataset": "<cached path>"} when that recipe is saved, '
+        '2. dap_explore {"dataset": "<cached path>"} - profile, quality, relationships and '
+        'hypotheses in one call; use it as the first pass.\n'
+        '3. dap_recipe_run {"name": "analyze_csv", "dataset": "<cached path>"} when that recipe is saved, '
         'otherwise dap_workflow_create plus dap_add_node {"factory": "dap.parquet_reader", '
         '"settings": {"file": "<cached path>"}} and dap_run.\n'
-        '3. dap_profile_table {"workflow": "<id>", "node": "<node>"} for the summary, then '
+        '4. dap_profile_table {"workflow": "<id>", "node": "<node>"} for the summary, then '
         'dap_sql {"workflow": "<id>", "node": "<node>", "sql": "<one SELECT>"} if the question '
-        'needs a custom query.\n'
+        'needs a custom query; call dap_estimate first when the query may be heavy.\n'
         '\n'
         'Question: %s\n'
         'Report the table preview, the profile highlights and the numbers that answer the question.\n'
@@ -178,9 +229,10 @@ def _quality_check(values: dict) -> str:
         '\n'
         'DAP pipeline (one tool call per step):\n'
         '1. dap_ingest {"file": "%s"} - convert the CSV once into the Parquet cache.\n'
-        '2. dap_workflow_create, dap_add_node {"factory": "dap.parquet_reader", '
+        '2. dap_explore {"dataset": "<cached path>"} - quality score and issues in one call.\n'
+        '3. dap_workflow_create, dap_add_node {"factory": "dap.parquet_reader", '
         '"settings": {"file": "<cached path>"}}, then dap_run.\n'
-        '3. dap_profile_table {"workflow": "<id>", "node": "<node>"} for nulls, uniqueness and '
+        '4. dap_profile_table {"workflow": "<id>", "node": "<node>"} for nulls, uniqueness and '
         'ranges; use dap_sql {"workflow": "<id>", "node": "<node>", "sql": "<one SELECT>"} for the '
         'counts that need a query (dap_sql takes one read-only SELECT/WITH statement and rejects DDL).\n'
         '\n'
@@ -192,15 +244,15 @@ def _quality_check(values: dict) -> str:
 def _profile_report(values: dict) -> str:
     output = values.get("output") or "profile.md"
     return (
-        'Build a Markdown profile report for the CSV file at %s.\n'
+        'Build a profile report for the CSV file at %s.\n'
         '\n'
         'DAP pipeline (one tool call per step):\n'
         '1. dap_ingest {"file": "%s"} - convert the CSV once into the Parquet cache.\n'
-        '2. dap_workflow_create; dap_add_node {"factory": "dap.parquet_reader", '
-        '"settings": {"file": "<cached path>"}}; dap_add_node {"factory": "dap.markdown_report", '
-        '"settings": {"file": "%s", "title": "Profile report", "sections": '
-        '[{"kind": "metrics"}, {"kind": "profile"}]}}; dap_connect the reader to the report node; dap_run.\n'
-        '3. dap_get_table on the report node (it passes its input through) and read the report.\n'
+        '2. dap_report {"dataset": "<cached path>", "report": "%s", "format": "md"} - one call: '
+        'it wires dap.parquet_reader into dap.markdown_report (table + profile) and returns the '
+        'pass-through table; use format html, pdf or pptx when the user needs that file.\n'
+        '3. dap_get_table on the report node (it passes its input through) and read the report; '
+        'for a dataset that is already in the catalog pass its name as "dataset" instead of the path.\n'
         '\n'
         'Output file: %s\n'
         % (values["path"], values["path"], output, output)

@@ -45,10 +45,11 @@ CLIENT_CONFIGS = {
     "dsh": pathlib.Path(".dsh") / "profiles" / "desktop" / "cordis.patch.yml",
 }
 
-# The adapter declares 30 tools: 22 core ones, the recipe and dap_sql tools of
-# the adaptability stage, and the one-call dap_analyze/dap_workflow_build and
-# dap_report/dap_profile tools. test_min_tools_matches_declared_tools keeps this honest.
-MIN_TOOLS = 30
+# The adapter declares 33 tools: 22 core ones, the recipe and dap_sql tools of
+# the adaptability stage, the one-call dap_analyze/dap_workflow_build and
+# dap_report/dap_profile tools, and the P6 dap_estimate/dap_dataset/dap_explore
+# tools. test_min_tools_matches_declared_tools keeps this honest.
+MIN_TOOLS = 33
 PREFLIGHT_TIMEOUT = 10.0
 ENGINE_START_TIMEOUT = 60.0
 PROTOCOL_VERSION = "2024-11-05"
