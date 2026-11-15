@@ -69,14 +69,19 @@ class WorkflowDeleteDropsTablesTest {
             createTable(db, "csv_wf_1_1_1");
             createTable(db, "csv_wf-10_1_1");
             createTable(db, "csv_wf-2_1:1");
+            // The in-memory statistics nodes materialize their per-row mapping this way.
+            createTable(db, "stats_wf_1_1_1");
+            createTable(db, "stats_wf_10_1_1");
 
             db.dropTablesForWorkflow("wf-1");
 
             assertEquals(0, tablesStartingWith(db, "csv_wf-1_"), "plan-named csv table must be dropped");
             assertEquals(0, tablesStartingWith(db, "excel_wf-1_"), "plan-named excel table must be dropped");
             assertEquals(0, tablesStartingWith(db, "csv_wf_1_"), "engine-named table must be dropped");
+            assertEquals(0, tablesStartingWith(db, "stats_wf_1_"), "stats mapping table must be dropped");
             assertEquals(1, tablesStartingWith(db, "csv_wf-10_"), "wf-10 must survive a wf-1 delete");
             assertEquals(1, tablesStartingWith(db, "csv_wf-2_"), "wf-2 must survive a wf-1 delete");
+            assertEquals(1, tablesStartingWith(db, "stats_wf_10_"), "wf-10 stats table must survive a wf-1 delete");
         }
     }
 

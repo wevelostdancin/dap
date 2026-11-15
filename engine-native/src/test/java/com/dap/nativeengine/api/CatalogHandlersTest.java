@@ -61,11 +61,11 @@ class CatalogHandlersTest {
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(60, body.path("count").asInt());
+        assertEquals(62, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(60, nodes.size());
+        assertEquals(62, nodes.size());
         assertEquals(List.of(
-                "Binner", "Calendar", "Chart", "Chart Grid", "Column Filter",
+                "Binner", "Calendar", "Chart", "Chart Grid", "Cluster", "Column Filter",
                 "Column Renamer", "Column Resorter", "Concatenate",
                 "Correlation", "CSV Reader", "CSV Writer",
                 "Data Quality", "Database Reader", "Database Writer",
@@ -78,7 +78,7 @@ class CatalogHandlersTest {
                 "JSON Reader", "JSON Writer", "Linear Regression",
                 "Logistic Regression", "Markdown Report", "Math Formula", "Missing Value",
                 "Normalizer", "Outlier Detect", "Outlier Filter",
-                "Parquet Reader", "Parquet Writer", "Pivot",
+                "Parquet Reader", "Parquet Writer", "PCA", "Pivot",
                 "Quantile", "Resample", "Rolling",
                 "Row Aggregator", "Row Filter", "Rule Engine",
                 "Sample Rows", "Sorter", "SQL Query",
@@ -89,7 +89,7 @@ class CatalogHandlersTest {
 
         JsonNode first = nodes.get(0);
         assertEquals("dap.binner", first.path("id").asText());
-        JsonNode csvNode = nodes.get(9);
+        JsonNode csvNode = nodes.get(10);
         assertEquals("dap.csv_reader", csvNode.path("id").asText());
         assertEquals("CSV Reader", csvNode.path("name").asText());
         assertEquals("/IO/Read", csvNode.path("category").asText());

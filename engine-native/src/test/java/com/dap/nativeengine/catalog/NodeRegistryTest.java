@@ -65,6 +65,8 @@ class NodeRegistryTest {
             "dap.hypothesis_test",
             "dap.linear_regression",
             "dap.logistic_regression",
+            "dap.cluster",
+            "dap.pca",
             "dap.sql_query",
             "dap.db_reader",
             "dap.file_list",

@@ -1,0 +1,75 @@
+{
+  "id": "dap.pca",
+  "name": "PCA",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Principal component analysis of one or more numeric columns by the covariance matrix and a Jacobi eigen decomposition. scores mode appends pc1..pcN to the input, loadings mode returns one row per component and column, and explained mode returns the eigenvalue, the explained-variance fraction and the cumulative fraction per component. Features are optionally z-score standardized; the sign of every component is fixed so its largest absolute loading is positive.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "PCA configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "Numeric columns the components are computed on; at least one.",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        }
+      },
+      "components": {
+        "type": "integer",
+        "title": "Components",
+        "description": "Number of principal components to return; must not exceed the number of selected columns.",
+        "default": 2,
+        "minimum": 1
+      },
+      "standardize": {
+        "type": "boolean",
+        "title": "Standardize",
+        "description": "Z-score every feature before the decomposition; a constant column becomes zero.",
+        "default": true
+      },
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "scores appends pc1..pcN to the input rows, loadings returns one row per component and column, explained returns the eigenvalue and variance fractions per component.",
+        "enum": [
+          "scores",
+          "loadings",
+          "explained"
+        ],
+        "default": "scores"
+      },
+      "max_rows": {
+        "type": "integer",
+        "title": "Maximum rows",
+        "description": "The fit reads complete rows into memory and supports at most this many; a larger input is an error with a hint to raise the cap or pre-filter.",
+        "default": 100000,
+        "minimum": 1
+      }
+    },
+    "required": [
+      "columns"
+    ]
+  }
+}

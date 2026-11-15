@@ -1,0 +1,113 @@
+{
+  "id": "dap.cluster",
+  "name": "Cluster",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Unsupervised clustering of one or more numeric columns with k-means++ (default), DBSCAN or agglomerative hierarchical clustering (Ward, complete or average linkage). Appends the cluster label (Int64; -1 is DBSCAN noise) and the per-row silhouette (Float64, NULL for noise and when fewer than two clusters exist). Features are optionally z-score standardized first.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Cluster configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "Numeric feature columns the clusters are computed on.",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        }
+      },
+      "method": {
+        "type": "string",
+        "title": "Method",
+        "description": "kmeans uses k-means++ seeding and Lloyd iterations, dbscan finds density-connected clusters and marks noise with -1, hierarchical merges clusters with the selected linkage.",
+        "enum": [
+          "kmeans",
+          "dbscan",
+          "hierarchical"
+        ],
+        "default": "kmeans"
+      },
+      "k": {
+        "type": "integer",
+        "title": "Clusters",
+        "description": "Requested number of clusters for kmeans and hierarchical; must not exceed the number of complete rows. Ignored by dbscan.",
+        "default": 3,
+        "minimum": 1
+      },
+      "standardize": {
+        "type": "boolean",
+        "title": "Standardize",
+        "description": "Z-score every feature before clustering; a constant column becomes zero.",
+        "default": true
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Random seed",
+        "description": "Seed of the k-means++ initialization; the same seed and input give the same clusters.",
+        "default": 42
+      },
+      "max_iterations": {
+        "type": "integer",
+        "title": "Maximum iterations",
+        "description": "Upper bound on k-means Lloyd iterations; positive.",
+        "default": 100,
+        "minimum": 1
+      },
+      "eps": {
+        "type": "number",
+        "title": "DBSCAN radius",
+        "description": "Neighbourhood radius in the (optionally standardized) feature space; positive. Used by dbscan only.",
+        "default": 0.5,
+        "exclusiveMinimum": 0
+      },
+      "min_points": {
+        "type": "integer",
+        "title": "DBSCAN minimum points",
+        "description": "Minimum neighbourhood size (including the point itself) for a core point; positive. Used by dbscan only.",
+        "default": 5,
+        "minimum": 1
+      },
+      "linkage": {
+        "type": "string",
+        "title": "Linkage",
+        "description": "Agglomeration rule for hierarchical clustering: ward minimizes the within-cluster variance increase, complete uses the farthest pair, average the mean distance.",
+        "enum": [
+          "ward",
+          "complete",
+          "average"
+        ],
+        "default": "ward"
+      },
+      "max_rows": {
+        "type": "integer",
+        "title": "Maximum rows",
+        "description": "Clustering is computed in memory and supports at most this many complete rows; a larger input is an error with a hint to raise the cap or pre-filter. Hierarchical clustering is additionally capped at 1000 rows.",
+        "default": 50000,
+        "minimum": 1
+      }
+    },
+    "required": [
+      "columns"
+    ]
+  }
+}

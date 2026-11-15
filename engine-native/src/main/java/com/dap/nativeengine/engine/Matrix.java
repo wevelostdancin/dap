@@ -162,6 +162,113 @@ public final class Matrix {
         }
     }
 
+    /** Eigenvalues and eigenvectors of a real symmetric matrix, sorted by eigenvalue descending. */
+    public record Eigen(double[] values, double[][] vectors) {
+    }
+
+    /**
+     * Jacobi eigen decomposition of a real symmetric matrix: the matrix is rotated to
+     * diagonal form by a sequence of plane rotations, and the accumulated rotations are the
+     * eigenvectors. Eigenvalues are sorted descending; {@code vectors[i]} is the unit
+     * eigenvector of {@code values[i]}. The sign of an eigenvector is arbitrary, the caller
+     * applies its own convention.
+     */
+    public static Eigen symmetricEigen(double[][] matrix) {
+        int size = squareSize(matrix, "symmetricEigen");
+        double[][] work = new double[size][];
+        double scale = 0.0;
+        for (int i = 0; i < size; i++) {
+            requireRowLength(matrix, i, size, "symmetricEigen");
+            work[i] = matrix[i].clone();
+            for (int j = 0; j < size; j++) {
+                scale = Math.max(scale, Math.abs(work[i][j]));
+            }
+        }
+        double tolerance = Math.max(1e-300, scale * 1e-14);
+        for (int i = 0; i < size; i++) {
+            for (int j = i + 1; j < size; j++) {
+                if (Math.abs(work[i][j] - work[j][i]) > tolerance) {
+                    throw new IllegalArgumentException(
+                            "matrix: symmetricEigen needs a symmetric matrix");
+                }
+            }
+        }
+        double[][] vectors = identity(size);
+        for (int sweep = 0; sweep < 100; sweep++) {
+            double offDiagonal = 0.0;
+            for (int i = 0; i < size; i++) {
+                for (int j = i + 1; j < size; j++) {
+                    offDiagonal = Math.max(offDiagonal, Math.abs(work[i][j]));
+                }
+            }
+            if (offDiagonal <= tolerance) {
+                break;
+            }
+            for (int p = 0; p < size; p++) {
+                for (int q = p + 1; q < size; q++) {
+                    double apq = work[p][q];
+                    if (Math.abs(apq) <= tolerance) {
+                        continue;
+                    }
+                    double theta = (work[q][q] - work[p][p]) / (2.0 * apq);
+                    double t = theta == 0.0
+                            ? 1.0
+                            : Math.signum(theta) / (Math.abs(theta) + Math.sqrt(theta * theta + 1.0));
+                    double c = 1.0 / Math.sqrt(t * t + 1.0);
+                    double s = t * c;
+                    double app = work[p][p];
+                    double aqq = work[q][q];
+                    work[p][p] = c * c * app - 2.0 * s * c * apq + s * s * aqq;
+                    work[q][q] = s * s * app + 2.0 * s * c * apq + c * c * aqq;
+                    work[p][q] = 0.0;
+                    work[q][p] = 0.0;
+                    for (int k = 0; k < size; k++) {
+                        if (k == p || k == q) {
+                            continue;
+                        }
+                        double akp = work[k][p];
+                        double akq = work[k][q];
+                        work[k][p] = c * akp - s * akq;
+                        work[p][k] = work[k][p];
+                        work[k][q] = s * akp + c * akq;
+                        work[q][k] = work[k][q];
+                    }
+                    for (int k = 0; k < size; k++) {
+                        double vkp = vectors[k][p];
+                        double vkq = vectors[k][q];
+                        vectors[k][p] = c * vkp - s * vkq;
+                        vectors[k][q] = s * vkp + c * vkq;
+                    }
+                }
+            }
+        }
+        Integer[] order = new Integer[size];
+        for (int index = 0; index < size; index++) {
+            order[index] = index;
+        }
+        java.util.Arrays.sort(order, java.util.Comparator.comparingDouble(index -> -work[index][index]));
+        double[] values = new double[size];
+        double[][] result = new double[size][];
+        for (int rank = 0; rank < size; rank++) {
+            int column = order[rank];
+            values[rank] = work[column][column];
+            double[] vector = new double[size];
+            double norm = 0.0;
+            for (int row = 0; row < size; row++) {
+                vector[row] = vectors[row][column];
+                norm += vector[row] * vector[row];
+            }
+            norm = Math.sqrt(norm);
+            if (norm > 0.0) {
+                for (int row = 0; row < size; row++) {
+                    vector[row] /= norm;
+                }
+            }
+            result[rank] = vector;
+        }
+        return new Eigen(values, result);
+    }
+
     private static int squareSize(double[][] matrix, String operation) {
         requireNonEmpty(matrix, operation);
         int size = matrix.length;

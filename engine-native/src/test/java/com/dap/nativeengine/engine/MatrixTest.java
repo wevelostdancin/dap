@@ -82,4 +82,33 @@ class MatrixTest {
         assertThrows(IllegalArgumentException.class,
                 () -> Matrix.solve(new double[][]{{1, 2}, {3, 4}}, new double[]{1}));
     }
+
+    @Test
+    void symmetricEigenDecomposesAKnownMatrix() {
+        Matrix.Eigen eigen = Matrix.symmetricEigen(new double[][]{{2, 1}, {1, 2}});
+        assertArrayEquals(new double[]{3.0, 1.0}, eigen.values(), TOLERANCE);
+        double[][] vectors = eigen.vectors();
+        assertEquals(1.0, vectors[0][0] * vectors[0][0] + vectors[0][1] * vectors[0][1], TOLERANCE);
+        assertEquals(1.0, vectors[1][0] * vectors[1][0] + vectors[1][1] * vectors[1][1], TOLERANCE);
+        assertEquals(0.0, vectors[0][0] * vectors[1][0] + vectors[0][1] * vectors[1][1], TOLERANCE);
+        double[][] reconstructed = new double[2][2];
+        for (int row = 0; row < 2; row++) {
+            for (int column = 0; column < 2; column++) {
+                for (int component = 0; component < 2; component++) {
+                    reconstructed[row][column] += vectors[component][row] * eigen.values()[component]
+                            * vectors[component][column];
+                }
+            }
+        }
+        assertMatrix(new double[][]{{2, 1}, {1, 2}}, reconstructed, TOLERANCE);
+    }
+
+    @Test
+    void symmetricEigenSortsDescendingAndRejectsAsymmetricMatrices() {
+        Matrix.Eigen diagonal = Matrix.symmetricEigen(new double[][]{
+                {1, 0, 0}, {0, 3, 0}, {0, 0, 2}});
+        assertArrayEquals(new double[]{3.0, 2.0, 1.0}, diagonal.values(), TOLERANCE);
+        assertThrows(IllegalArgumentException.class,
+                () -> Matrix.symmetricEigen(new double[][]{{1, 2}, {3, 4}}));
+    }
 }

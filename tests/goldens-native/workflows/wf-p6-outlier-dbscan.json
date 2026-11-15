@@ -1,0 +1,215 @@
+{
+  "id": "wf-p6-outlier-dbscan",
+  "title": "DBSCAN outlier detection on two dense clusters and one far point",
+  "rationale": "Pins the distance-based dap.outlier_detect path end to end: standardized features, DBSCAN noise label, the Boolean outlier flag and the k-th-neighbour score, with iqr/zscore contract untouched.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "clusters",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "OUTLIER_CLUSTERS"
+      }
+    },
+    {
+      "id": "dbscan",
+      "type": "outlier_detect",
+      "config": {
+        "columns": [
+          "x",
+          "y"
+        ],
+        "method": "dbscan",
+        "eps": 0.5,
+        "min_points": 3,
+        "k": 5
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "clusters",
+      "to": "dbscan"
+    }
+  ],
+  "checks": [
+    {
+      "node": "dbscan",
+      "kind": "expect",
+      "rows": 21,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "x",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "y",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "outlier",
+          "type": "Boolean"
+        },
+        {
+          "name": "score",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          1,
+          0,
+          0,
+          "false",
+          0
+        ],
+        [
+          2,
+          0.02,
+          -0.01,
+          "false",
+          0
+        ],
+        [
+          3,
+          0.04,
+          -0.02,
+          "false",
+          0
+        ],
+        [
+          4,
+          0.06,
+          -0.03,
+          "false",
+          0
+        ],
+        [
+          5,
+          0.08,
+          -0.04,
+          "false",
+          0
+        ],
+        [
+          6,
+          0.1,
+          -0.05,
+          "false",
+          0
+        ],
+        [
+          7,
+          0.12,
+          -0.06,
+          "false",
+          0
+        ],
+        [
+          8,
+          0.14,
+          -0.07,
+          "false",
+          0
+        ],
+        [
+          9,
+          0.16,
+          -0.08,
+          "false",
+          0
+        ],
+        [
+          10,
+          0.18,
+          -0.09,
+          "false",
+          0
+        ],
+        [
+          11,
+          5,
+          5,
+          "false",
+          0
+        ],
+        [
+          12,
+          5.02,
+          5.01,
+          "false",
+          0
+        ],
+        [
+          13,
+          5.04,
+          5.02,
+          "false",
+          0
+        ],
+        [
+          14,
+          5.06,
+          5.03,
+          "false",
+          0
+        ],
+        [
+          15,
+          5.08,
+          5.04,
+          "false",
+          0
+        ],
+        [
+          16,
+          5.1,
+          5.05,
+          "false",
+          0
+        ],
+        [
+          17,
+          5.12,
+          5.06,
+          "false",
+          0
+        ],
+        [
+          18,
+          5.14,
+          5.07,
+          "false",
+          0
+        ],
+        [
+          19,
+          5.16,
+          5.08,
+          "false",
+          0
+        ],
+        [
+          20,
+          5.18,
+          5.09,
+          "false",
+          0
+        ],
+        [
+          21,
+          20,
+          20,
+          "true",
+          4.619946834215715
+        ]
+      ],
+      "order": "unordered"
+    }
+  ],
+  "notes": "Fixture: two tight 10-point clusters around (0,0) and (5,5) plus the far point (20,20). Expectations computed independently in Python: z-score standardization with the sample standard deviation (n-1), DBSCAN(eps=0.5, min_points=3) in the standardized space, outlier = noise label -1, score = 0 for core points and the distance to the 5th nearest neighbour otherwise (4.619946834215715 for the far point)."
+}
