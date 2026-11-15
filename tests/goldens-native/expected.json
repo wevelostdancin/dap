@@ -3,7 +3,7 @@
  "engine": {
   "api": "v1",
   "name": "DAP",
-  "version": "1.1.0"
+  "version": "1.2.0"
  },
  "workflows": {
   "wf-01-iris-filter-sort": {

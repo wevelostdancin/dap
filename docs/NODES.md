@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 53 узла `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (53 строки);
+Каталог нативного движка: 66 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (66 строк);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 53 узла имеют `available: true` и `tier: core`.
+спеке. Все 66 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -91,60 +91,72 @@
 
 | id | Название | Категория | Входы |
 |---|---|---|---|
-| `dap.csv_reader` | CSV Reader | `/IO/Read` | — |
-| `dap.excel_reader` | Excel Reader | `/IO/Read` | — |
-| `dap.parquet_reader` | Parquet Reader | `/IO/Read` | — |
-| `dap.json_reader` | JSON Reader | `/IO/Read` | — |
-| `dap.row_filter` | Row Filter | `/Manipulation/Row/Filter` | 1 |
-| `dap.column_filter` | Column Filter | `/Manipulation/Column/Filter` | 1 |
-| `dap.column_renamer` | Column Renamer | `/Manipulation/Column` | 1 |
-| `dap.sorter` | Sorter | `/Manipulation/Row/Sort` | 1 |
-| `dap.missing_value` | Missing Value | `/Manipulation/Column/Missing` | 1 |
-| `dap.group_by` | Group By | `/Manipulation/Row/GroupBy` | 1 |
-| `dap.joiner` | Joiner | `/Manipulation/Row/Join` | 2 |
-| `dap.string_manipulation` | String Manipulation | `/Manipulation/Column/String` | 1 |
-| `dap.math_formula` | Math Formula | `/Manipulation/Column/Math` | 1 |
-| `dap.csv_writer` | CSV Writer | `/IO/Write` | 1 (pass-through) |
-| `dap.parquet_writer` | Parquet Writer | `/IO/Write` | 1 (pass-through) |
-| `dap.json_writer` | JSON Writer | `/IO/Write` | 1 (pass-through) |
-| `dap.type_cast` | Type Cast | `/Manipulation/Column/Type` | 1 |
-| `dap.duplicate_filter` | Duplicate Filter | `/Manipulation/Row` | 1 |
-| `dap.value_replace` | Value Replace | `/Manipulation/Column` | 1 |
-| `dap.column_resorter` | Column Resorter | `/Manipulation/Column` | 1 |
-| `dap.outlier_filter` | Outlier Filter | `/Manipulation/Row/Filter` | 1 |
-| `dap.date_time` | Date & Time | `/Manipulation/Column/Date` | 1 |
-| `dap.rule_engine` | Rule Engine | `/Manipulation/Column` | 1 |
-| `dap.binner` | Binner | `/Manipulation/Column` | 1 |
-| `dap.normalizer` | Normalizer | `/Manipulation/Column` | 1 |
-| `dap.encoder` | Encoder | `/Manipulation/Column` | 1 |
-| `dap.sample_rows` | Sample Rows | `/Manipulation/Row` | 1 |
-| `dap.row_aggregator` | Row Aggregator | `/Manipulation/Column` | 1 |
-| `dap.pivot` | Pivot | `/Manipulation/Column` | 1 |
-| `dap.unpivot` | Unpivot | `/Manipulation/Column` | 1 |
-| `dap.window` | Window | `/Manipulation/Column` | 1 |
-| `dap.top_n_per_group` | Top N per Group | `/Manipulation/Row` | 1 |
-| `dap.concatenate` | Concatenate | `/Manipulation/Row/Join` | 2 |
-| `dap.describe` | Describe | `/Statistics` | 1 |
-| `dap.value_counts` | Value Counts | `/Statistics` | 1 |
-| `dap.correlation` | Correlation | `/Statistics` | 1 |
-| `dap.histogram` | Histogram | `/Statistics` | 1 |
-| `dap.quantile` | Quantile | `/Statistics` | 1 |
-| `dap.outlier_detect` | Outlier Detect | `/Statistics` | 1 |
-| `dap.data_quality` | Data Quality | `/Statistics` | 2 (1 — опционален) |
-| `dap.hypothesis_test` | Hypothesis Test | `/Statistics` | 1 |
-| `dap.linear_regression` | Linear Regression | `/Statistics` | 1 |
-| `dap.logistic_regression` | Logistic Regression | `/Statistics` | 1 |
-| `dap.cluster` | Cluster | `/Statistics` | 1 |
-| `dap.pca` | PCA | `/Statistics` | 1 |
-| `dap.resample` | Resample | `/Time Series` | 1 |
-| `dap.rolling` | Rolling | `/Time Series` | 1 |
-| `dap.diff` | Diff | `/Time Series` | 1 |
-| `dap.date_range` | Date Range | `/Time Series` | — |
-| `dap.excel_writer` | Excel Writer | `/IO/Write` | 1 (pass-through) |
-
-| `dap.markdown_report` | Markdown Report | `/IO/Write` | 8 (pass-through порта 0) |
-| `dap.chart` | Chart | `/Visualization` | 1 (pass-through) |
-| `dap.chart_grid` | Chart Grid | `/Visualization` | 8 (pass-through порта 0) |
+| `dap.ab_test` | A/B Test | /Statistics | 1 |
+| `dap.binner` | Binner | /Manipulation/Column | 1 |
+| `dap.calendar` | Calendar | /Manipulation/Column/Date | 1 |
+| `dap.chart` | Chart | /Visualization | 1 (pass-through) |
+| `dap.chart_grid` | Chart Grid | /Visualization | 8 (pass-through) |
+| `dap.cluster` | Cluster | /Statistics | 1 |
+| `dap.column_filter` | Column Filter | /Manipulation/Column/Filter | 1 |
+| `dap.column_renamer` | Column Renamer | /Manipulation/Column | 1 |
+| `dap.column_resorter` | Column Resorter | /Manipulation/Column | 1 |
+| `dap.concatenate` | Concatenate | /Manipulation/Row/Join | 2 |
+| `dap.correlation` | Correlation | /Statistics | 1 |
+| `dap.csv_reader` | CSV Reader | /IO/Read | — |
+| `dap.csv_writer` | CSV Writer | /IO/Write | 1 (pass-through) |
+| `dap.data_quality` | Data Quality | /Statistics | 2 |
+| `dap.date_range` | Date Range | /Time Series | — |
+| `dap.date_time` | Date & Time | /Manipulation/Column/Date | 1 |
+| `dap.db_reader` | Database Reader | /IO/Read | — |
+| `dap.db_writer` | Database Writer | /IO/Write | 1 (pass-through) |
+| `dap.describe` | Describe | /Statistics | 1 |
+| `dap.diff` | Diff | /Time Series | 1 |
+| `dap.duplicate_filter` | Duplicate Filter | /Manipulation/Row | 1 |
+| `dap.encoder` | Encoder | /Manipulation/Column | 1 |
+| `dap.excel_reader` | Excel Reader | /IO/Read | — |
+| `dap.excel_writer` | Excel Writer | /IO/Write | 1 (pass-through) |
+| `dap.file_list` | File List | /IO/Read | — |
+| `dap.file_reader` | File Reader | /IO/Read | — |
+| `dap.fuzzy_join` | Fuzzy Join | /Manipulation/Row/Join | 2 |
+| `dap.geo_distance` | Geo Distance | /Manipulation/Column/Geo | 1 |
+| `dap.group_by` | Group By | /Manipulation/Row/GroupBy | 1 |
+| `dap.histogram` | Histogram | /Statistics | 1 |
+| `dap.hypothesis_test` | Hypothesis Test | /Statistics | 1 |
+| `dap.joiner` | Joiner | /Manipulation/Row/Join | 2 |
+| `dap.json_reader` | JSON Reader | /IO/Read | — |
+| `dap.json_writer` | JSON Writer | /IO/Write | 1 (pass-through) |
+| `dap.linear_regression` | Linear Regression | /Statistics | 1 |
+| `dap.logistic_regression` | Logistic Regression | /Statistics | 1 |
+| `dap.markdown_report` | Markdown Report | /IO/Write | 8 (pass-through) |
+| `dap.math_formula` | Math Formula | /Manipulation/Column/Math | 1 |
+| `dap.missing_value` | Missing Value | /Manipulation/Column/Missing | 1 |
+| `dap.normalizer` | Normalizer | /Manipulation/Column | 1 |
+| `dap.outlier_detect` | Outlier Detect | /Statistics | 1 |
+| `dap.outlier_filter` | Outlier Filter | /Manipulation/Row/Filter | 1 |
+| `dap.parquet_reader` | Parquet Reader | /IO/Read | — |
+| `dap.parquet_writer` | Parquet Writer | /IO/Write | 1 (pass-through) |
+| `dap.pca` | PCA | /Statistics | 1 |
+| `dap.pivot` | Pivot | /Manipulation/Column | 1 |
+| `dap.quantile` | Quantile | /Statistics | 1 |
+| `dap.resample` | Resample | /Time Series | 1 |
+| `dap.resample_test` | Resample Test | /Statistics | 1 |
+| `dap.rolling` | Rolling | /Time Series | 1 |
+| `dap.row_aggregator` | Row Aggregator | /Manipulation/Column | 1 |
+| `dap.row_filter` | Row Filter | /Manipulation/Row/Filter | 1 |
+| `dap.rule_engine` | Rule Engine | /Manipulation/Column | 1 |
+| `dap.sample_rows` | Sample Rows | /Manipulation/Row | 1 |
+| `dap.sorter` | Sorter | /Manipulation/Row/Sort | 1 |
+| `dap.sql_query` | SQL Query | /Manipulation/Row | 8 |
+| `dap.string_manipulation` | String Manipulation | /Manipulation/Column/String | 1 |
+| `dap.survival` | Survival | /Statistics | 1 |
+| `dap.text_normalize` | Text Normalize | /Manipulation/Column/String | 1 |
+| `dap.time_series` | Time Series | /Statistics | 1 |
+| `dap.top_n_per_group` | Top N per Group | /Manipulation/Row | 1 |
+| `dap.type_cast` | Type Cast | /Manipulation/Column/Type | 1 |
+| `dap.unpivot` | Unpivot | /Manipulation/Column | 1 |
+| `dap.value_counts` | Value Counts | /Statistics | 1 |
+| `dap.value_replace` | Value Replace | /Manipulation/Column | 1 |
+| `dap.window` | Window | /Manipulation/Column | 1 |
 
 ## 2. dap.csv_reader
 
@@ -2105,7 +2117,7 @@ Java2D; `format: html` — самодостаточная страница с `<
   }
 }
 ```
-## 56. dap.file_reader
+## 57. dap.file_reader
 
 Читает много файлов как одну таблицу: список файлов (`paths`), glob или каталог
 (`path`). Форматы — `csv`, `parquet`, `json` (JSON-массив или newline-delimited).
@@ -2150,7 +2162,7 @@ Avro нет в ядре) — ошибка с подсказкой конверт
 }
 ```
 
-## 57. dap.db_writer
+## 58. dap.db_writer
 
 Пишет входную таблицу в DuckDB-файл, SQLite-файл или PostgreSQL/MySQL и возвращает
 вход без изменений (pass-through), поэтому узел можно ставить в середину графа.
@@ -2181,7 +2193,7 @@ Avro нет в ядре) — ошибка с подсказкой конверт
 }
 ```
 
-## 58. dap.text_normalize
+## 59. dap.text_normalize
 
 Нормализует текстовые колонки и сохраняет исходные рядом с нормализованными
 (`suffix`, по умолчанию `_normalized`) либо заменяет их (`replace: true`).
@@ -2220,7 +2232,7 @@ Avro нет в ядре) — ошибка с подсказкой конверт
 }
 ```
 
-## 59. dap.fuzzy_join
+## 60. dap.fuzzy_join
 
 Соединяет две таблицы по похожим текстовым ключам. Похожесть считает DuckDB:
 `jaro_winkler_similarity`, `levenshtein` или `damerau_levenshtein` (для
@@ -2257,7 +2269,7 @@ Avro нет в ядре) — ошибка с подсказкой конверт
 }
 ```
 
-## 60. dap.geo_distance
+## 61. dap.geo_distance
 
 Добавляет haversine-расстояние между двумя парами координат (широта/долгота в
 десятичных градусах). Считается SQL-ом, средний радиус Земли 6371.0088 км; `unit`
@@ -2287,7 +2299,7 @@ Avro нет в ядре) — ошибка с подсказкой конверт
 }
 ```
 
-## 61. dap.calendar
+## 62. dap.calendar
 
 Добавляет календарные признаки даты/времени с учётом таймзоны: `year`, `quarter`,
 `month`, `week` (ISO), `day` (день месяца), `dow` (0 = воскресенье), `doy`,
@@ -2322,7 +2334,7 @@ Europe/Moscow); у `Date32` времени суток нет. `holidays` — с�
 }
 ```
 
-## 56. dap.logistic_regression
+## 63. dap.logistic_regression
 
 Бинарная логистическая регрессия: отклик `y` — 0/1 (числовой) или boolean, предикторы
 `x` — одна или несколько числовых колонок. Подгонка — IRLS (Newton-Raphson) по
@@ -2372,7 +2384,7 @@ Europe/Moscow); у `Date32` времени суток нет. `holidays` — с�
 ```
 
 
-## 62. dap.cluster
+## 64. dap.cluster
 
 Кластеризация числовых колонок: `kmeans` (k-means++, по умолчанию), `dbscan` или
 иерархическая агломеративная кластеризация (`ward`, `complete`, `average`). К входу
@@ -2381,7 +2393,7 @@ Europe/Moscow); у `Date32` времени суток нет. `holidays` — с�
 стандартизуются (z-score). `kmeans` и `dbscan` реализованы в движке; иерархическая
 кластеризация держит матрицу расстояний `n × n` (O(n²) памяти, O(n³) времени) и поэтому
 ограничена 1000 строк.
-## 62. dap.resample_test
+## 65. dap.resample_test
 
 Bootstrap-доверительные интервалы и перестановочный тест на две группы; считаются в
 Java по строкам входа (не более `max_rows`), результат — литеральный план, как у
@@ -2428,7 +2440,7 @@ Java по строкам входа (не более `max_rows`), результ
 ```
 
 
-## 63. dap.pca
+## 66. dap.pca
 
 Метод главных компонент по ковариационной матрице и разложению Якоби. Три режима:
 `scores` добавляет к входу `pc1..pcN` (линейные комбинации центрированных, при
@@ -2467,7 +2479,7 @@ Java по строкам входа (не более `max_rows`), результ
 }
 ```
 
-## 63. dap.survival
+## 67. dap.survival
 
 Анализ выживаемости: кривая Каплана-Мейера и лог-ранк тест; считаются в Java по
 строкам входа (не более 100 000), результат — таблица в сессии (у кривой бывает
@@ -2511,7 +2523,7 @@ Java по строкам входа (не более `max_rows`), результ
 }
 ```
 
-## 64. dap.ab_test
+## 68. dap.ab_test
 
 A/B-тест: двухвыборочный z-тест для долей плюс мощность и необходимый размер выборки.
 Счётчики агрегируются в SQL (`COUNT`/`SUM` по группам), строки в Java не читаются.
@@ -2553,7 +2565,7 @@ A/B-тест: двухвыборочный z-тест для долей плюс
 }
 ```
 
-## 65. dap.time_series
+## 69. dap.time_series
 
 Анализ временного ряда: декомпозиция, ACF/PACF, лаги, прогноз и тест стационарности.
 Строки упорядочиваются по `time` внутри каждой группы `group_by`; Java-режимы читают

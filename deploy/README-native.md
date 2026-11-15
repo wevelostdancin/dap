@@ -27,7 +27,7 @@ docker build -f deploy/Dockerfile.native -t dap-native:local engine-native
 
 # multi-arch: каждая платформа собирает jar со своей библиотекой DuckDB
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -f deploy/Dockerfile.native -t dap-native:1.1.0 engine-native
+  -f deploy/Dockerfile.native -t dap-native:1.2.0 engine-native
 
 # явный выбор библиотеки, если TARGETARCH недоступен (старый CLI / plain builder)
 docker build --build-arg DAP_DUCKDB_NATIVE=linux_arm64 \

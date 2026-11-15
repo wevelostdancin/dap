@@ -8,7 +8,7 @@
 - Запросы с телом: `Content-Type: application/json`; ответы —
   `application/json; charset=utf-8`, заголовок `X-DAP-Api-Version: 1`
 - Аутентификации нет; сервис слушает loopback
-- Каталог — 52 узла с id `dap.*`; контракт — 27 операций
+- Каталог — 66 узлов с id `dap.*`; контракт — 30 операций
 
 ## 1. Основы
 
@@ -79,13 +79,13 @@
 ### `GET /v1`
 
 ```json
-{"name":"DAP","version":"1.1.0","api":"v1","endpoints":"/v1/nodes, /v1/workflows, /v1/jobs, /v1/health"}
+{"name":"DAP","version":"1.2.0","api":"v1","endpoints":"/v1/nodes, /v1/workflows, /v1/jobs, /v1/health"}
 ```
 
 ### `GET /v1/health`
 
 ```json
-{"ok":true,"name":"DAP","version":"1.1.0","api":"1",
+{"ok":true,"name":"DAP","version":"1.2.0","api":"1",
  "generation":"0f8c2f7a-…","extensions":{"installed":["sqlite_scanner"]},
  "nodes":44,"coreNodes":44,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
@@ -169,7 +169,7 @@
    "labelCoverage":"5/5","warnings":[]}}
 ```
 
-Неизвестный id — 400. Все 52 узла отдают `available: true`.
+Неизвестный id — 400. Все 66 узлов отдают `available: true`.
 
 ### Диалог узла внутри workflow
 

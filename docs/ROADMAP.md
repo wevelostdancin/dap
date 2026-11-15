@@ -8,7 +8,9 @@ Parquet-ingest, 16 узлов, 247 тестов. **P2 «Ядро аналити�
 06.11.2026:** 11 новых узлов, 44 узла, 401 тест, 15 goldens. **P4 «Hardening» закрыт
 15.11.2026:** таймауты чтения, эвикция сессий и jobs, контракт ошибок, soak.
 **P5 «MCP-сервис» закрыт 15.11.2026:** 52 узла, 30 инструментов, resources/prompts,
-рецепты, coverage-сьют 68/69, установка одной командой.
+рецепты, coverage-сьют 68/69, установка одной командой. **P6 «Аналитик» закрыт
+16.11.2026:** 66 узлов, 33 инструмента, глубокая статистика, мультифайл/каталог
+датасетов, пагинация/оценка/прогресс, HTML/PDF/PPTX, карта и facets.
 **Цель:** лёгкий, быстрый и точный аналитический бэкенд для агента: локальный, по требованию,
 без KNIME.
 **Связанные документы:** [ARCHITECTURE.md](ARCHITECTURE.md), [NODES.md](NODES.md),
@@ -57,7 +59,7 @@ Parquet.
 
 ## 5. Пул узлов
 
-Цель — десятки узлов по направлениям. Реализовано 52 (помечены `*`); остальные —
+Цель — десятки узлов по направлениям. Реализовано 66 (помечены `*`); остальные —
 по задачам.
 
 | Направление | Узлы | Волна |
@@ -69,8 +71,13 @@ Parquet.
 | Статистика | `describe*`, `value_counts*`, `correlation*`, `covariance`, `histogram*`, `quantile*`, `outlier_detect*` | 3 |
 | Временные ряды | `resample*`, `rolling*`, `diff*`, `date_range*` | 3 |
 | Текст | `text_split`, `regex_extract`, `text_concat` | 3 |
+| IO P6 | `file_reader*`, `db_writer*` | 6 |
+| Текст/гео/время P6 | `text_normalize*`, `fuzzy_join*`, `geo_distance*`, `calendar*` | 6 |
+| Статистика P6 | `logistic_regression*`, `cluster*`, `pca*`, `resample_test*`, `survival*`, `ab_test*` | 6 |
+| Временные ряды P6 | `time_series*` | 6 |
+| Визуализация | `chart*`, `chart_grid*`, `markdown_report*` | 5–6 |
 
-Итого ~50 узлов; реализовано 52 — к концу P2 было 33, P3 добавил 11, P5 — ещё 8. Новые узлы
+Итого 66 узлов: к концу P2 было 33, P3 добавил 11, P5 — ещё 8, P6 — 14. Новые узлы
 добавляются по задачам, но всегда по правилу «spec + executor + goldens + docs».
 
 ## 6. Форматы и хранение
@@ -117,6 +124,7 @@ Parquet.
 | **P3. Статистика и время** ✅ | 11 узлов: describe, value_counts, correlation, histogram, quantile, outlier_detect, resample, rolling, diff, date_range, excel_writer | закрыто 06.11.2026: 44 узла, 401 тест, 15 goldens, `make check` зелёный | 5 дней |
 | **P4. Hardening** ✅ | таймауты чтения, эвикция сессий/jobs/таблиц, контракт `{error, code, hint}`, soak | закрыто 15.11.2026: 534 теста, 25 goldens, `make check` и `make soak` зелёные | 3 дня |
 | **P5. MCP-сервис** ✅ | 8 узлов, 3 расширения, 7 SQL-рецептов, `dap-mcp install/doctor`, resources/prompts, coverage harness | закрыто 15.11.2026: 52 узла, 30 инструментов, покрытие 68/69, `make install-e2e` | 1 день |
+| **P6. Аналитик** ✅ | 14 узлов и расширения: file_reader/db_writer/text/geo/calendar, корреляция с p-value и partial, непараметрика/post-hoc/effect size, множественная регрессия/логистика, DBSCAN/LOF/IF, cluster/PCA, bootstrap/permutation, survival, A/B, time_series, chart-типы/карта/facets/chart_grid, отчёты HTML/PDF/PPTX | закрыто 16.11.2026: 66 узлов, 33 инструмента, 35 goldens, пагинация/estimate/progress/explore/каталог датасетов, `make check` зелёный | 1 день |
 
 **Веха:** после P1 (~1,5 недели) — ежедневное использование на CSV/Excel; после P2 —
 полноценная аналитика; после P4 — стабильный продукт.

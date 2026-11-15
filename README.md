@@ -6,24 +6,29 @@
 машину.
 
 Движок: Javalin 6.7 + DuckDB 1.5.6 (in-memory) + Arrow 19.0, Java 21. Каталог —
-52 узла `dap.*`, контракт — 27 операций `/v1`. Версия: **1.1.0**.
+66 узлов `dap.*`, контракт — 30 операций `/v1`. Версия: **1.2.0**.
 
 ## Что это
 
 - **Аналитика по запросу.** Адаптер поднимает движок при первом вызове; отдельного
   демона, Docker и внешней БД в ежедневном пути нет.
-- **Два интерфейса.** MCP (stdio, 30 инструментов `dap_*`) для агента и HTTP `/v1`
+- **Два интерфейса.** MCP (stdio, 33 инструмента `dap_*`) для агента и HTTP `/v1`
   для скриптов и тестов.
 - **Узлы как данные.** Узел описывается JSON-спекой: id, порты, `configSchema`.
   Агент читает схему настроек и собирает граф без XML и без GUI.
-- **52 узла.** IO (5 читателей, включая SQL-БД и список файлов, 4 писателя), очистка
-  (фильтры, дедупликация, замена значений, приведение типов, порядок колонок,
-  выбросы, regex/split), преобразование (дата/время, правила, бины, нормализация,
-  кодирование, выборка, train/test), агрегация и форма (group_by с median/percentile,
-  построчные агрегаты, pivot/unpivot, window, top-N, joiner/concatenate),
-  статистика (describe, value_counts, correlation, hypothesis_test, linear_regression,
-  histogram, quantile, outlier_detect), временные ряды (resample, rolling, diff,
-  date_range), SQL (`sql_query`), вывод (markdown_report, chart, data_quality).
+- **66 узлов.** IO (5 читателей, multi-file/glob `file_reader`, SQL-БД и список
+  файлов, 4 писателя, `db_writer`), очистка (фильтры, дедупликация, замена значений,
+  приведение типов, порядок колонок, выбросы, regex/split, `text_normalize`),
+  преобразование (дата/время, правила, бины, нормализация, кодирование, выборка,
+  train/test, `calendar`, `geo_distance`), агрегация и форма (group_by с
+  median/percentile, построчные агрегаты, pivot/unpivot, window, top-N,
+  joiner/concatenate/asof/cross, `fuzzy_join`), статистика (describe, value_counts,
+  correlation с p-value/partial, hypothesis_test с post-hoc и непараметрикой,
+  linear/logistic regression, outlier_detect с DBSCAN/LOF/IF, cluster, PCA,
+  resample_test, survival, ab_test, histogram, quantile), временные ряды (resample,
+  rolling, diff, date_range, `time_series`), SQL (`sql_query`), визуализация и отчёты
+  (`chart` с pie/boxplot/heatmap/map/facets, `chart_grid`, `markdown_report` в
+  md/html/pdf/pptx), качество (`data_quality`).
 - **DuckDB внутри.** Преобразования — ленивые SQL-отношения; данные материализуются
   только при чтении таблицы или профиля.
 - **Parquet-кэш.** `POST /v1/datasets` (инструмент `dap_ingest`) один раз конвертирует
@@ -57,7 +62,7 @@ curl -s http://127.0.0.1:7800/v1/health
 ```
 
 ```json
-{"ok":true,"name":"DAP","version":"1.1.0","api":"1","nodes":52,"coreNodes":52,
+{"ok":true,"name":"DAP","version":"1.2.0","api":"1","nodes":66,"coreNodes":66,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
@@ -195,7 +200,7 @@ Makefile         build-native, test-native, run-native, goldens, dist, check
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — компоненты, жизненный цикл запроса,
   память и ресурсы DuckDB, отмена, MCP-адаптер.
-- [docs/NODES.md](docs/NODES.md) — 52 узла: назначение, config, примеры JSON.
+- [docs/NODES.md](docs/NODES.md) — 66 узлов: назначение, config, примеры JSON.
 - [docs/QUALITY.md](docs/QUALITY.md) — unit-тесты, goldens, правила сравнения,
   контракт ошибок, критерий готовности узла.
 - [docs/ROADMAP.md](docs/ROADMAP.md) — план продукта и пул узлов.
@@ -215,11 +220,15 @@ Makefile         build-native, test-native, run-native, goldens, dist, check
 - Остановка — явная (`POST /v1/shutdown`, сигнал процессу) или автоматическая по
   простою: `DAP_IDLE_TIMEOUT_SEC` (900 с по умолчанию, `0` выключает), если нет
   активных jobs.
-- Каталог — 52 узла; файловые источники читают любой путь, доступный процессу.
+- Каталог — 66 узлов; файловые источники и SQL подчиняются allowlist путей
+  (`DAP_ALLOWED_ROOTS`; по умолчанию home, tmp, DAP_HOME и cache, всегда запрещены
+  `~/.ssh`, `~/.dsh` и другие секреты). `DAP_DENY_ROOTS` расширяет запреты.
   Расширения DuckDB (sqlite/postgres/httpfs) ставятся один раз `make extensions`
   в `$DAP_HOME/build/duckdb-ext` и дальше работают офлайн.
-- Память ingest живёт в JVM heap: для 10 млн строк нужно ~4,65 ГБ heap, и
-  `DAP_DUCKDB_MEMORY_LIMIT` его не ограничивает.
+- Out-of-core по умолчанию: `parquet_reader` строит ленивый `read_parquet`, CSV
+  больше `DAP_INGEST_STREAM_MB` (64 МБ) идёт через DuckDB `read_csv` без Arrow в heap,
+  `DAP_DUCKDB_MEMORY_LIMIT=512MB` и spill в `$DAP_HOME/build/duckdb-tmp` включены по
+  умолчанию. Потолок теперь задаёт диск, а не `-Xmx`.
 
 ## Лицензия
 

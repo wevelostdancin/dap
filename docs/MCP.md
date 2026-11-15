@@ -167,7 +167,7 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 Всего 33 инструмента: 22 базовых, инструменты рецептов, `dap_sql`, `dap_analyze`,
 `dap_report`, `dap_profile`, `dap_workflow_build` и P6-инструменты `dap_estimate`,
 `dap_explore`, `dap_dataset`. Каталог
-движка — 52 узла `dap.*`: `dap_search_nodes` и `dap_node_dialog_schema` видят их все,
+движка — 66 узлов `dap.*`: `dap_search_nodes` и `dap_node_dialog_schema` видят их все,
 включая узлы волн P2–P4 (`type_cast`, `duplicate_filter`, `pivot`, `window`,
 `concatenate`, `describe`, `value_counts`, `correlation`, `histogram`, `quantile`,
 `outlier_detect`, `resample`, `rolling`, `diff`, `date_range`, `excel_writer`,

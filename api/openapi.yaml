@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: DAP API
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Headless analytical engine for agents. Canonical HTTP contract at /v1.
 

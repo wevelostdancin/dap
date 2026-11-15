@@ -8,8 +8,8 @@
 
 | Уровень | Команда | Что покрывает |
 |---|---|---|
-| JUnit | `make test-native` | 534 теста: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
-| Goldens | `make goldens` | 25 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
+| JUnit | `make test-native` | 853 теста в 115 классах: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
+| Goldens | `make goldens` | 35 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
 | Coverage | `make coverage` | 69 задач таксономии через `/v1`; сейчас 68/69 (F6 — не-цель) |
 | Структура goldens | `python3 tests/goldens-native/runner.py --validate` | проверка фикстур без движка |
 | Smoke | `make smoke` (`DAP_BASE`, по умолчанию `:7800`) | 9 чёрных проверок контракта и пяти узлов на запущенном движке |
@@ -24,7 +24,7 @@
 ## 2. Unit-тесты
 
 JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java.base/java.nio`).
-534 теста в 90 классах:
+853 теста в 115 классах:
 
 - **Исполнители** — по классу на узел (`CsvReaderExecutorTest`, `ExcelReaderExecutorTest`,
   `ParquetReaderExecutorTest`, `JsonReaderExecutorTest`, `CsvWriterExecutorTest`,
@@ -73,8 +73,10 @@ goldens-native/
   workflows/           # 25 workflow: wf-*.json
 ```
 
-Сейчас 25 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 17
-`kind: "native"` (литеральные проверки или эквивалентность). Фикстуры данных:
+Сейчас 35 workflow: 8 `kind: "baseline"` (сравнение с `expected.json`) и 27
+`kind: "native"` (литеральные проверки или эквивалентность). P6 добавил `wf-p6-*`:
+file_reader, asof join, correlation, outlier DBSCAN, cluster, PCA, resample, survival,
+A/B, time_series. Фикстуры данных:
 `iris.csv`/`iris.xlsx`, `adult.csv`, `air_quality.csv`, `worldbank_countries.csv`,
 `p2.csv`, `join_left.csv`/`join_right.csv`; `datasets.json` задаёт файл, разделитель, заголовок, схему (`arrow`) и
 число пропусков по колонкам. `wf-n4-p2-clean` — golden волны P2: `type_cast` →
