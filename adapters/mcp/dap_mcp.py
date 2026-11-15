@@ -689,6 +689,23 @@ TOOLS = [
         ),
     },
     {
+        "name": "dap_estimate",
+        "description": (
+            "Оценить стоимость запроса до запуска: ingest (для file), временный workflow "
+            "parquet_reader (+ sql_query при sql), GET /estimate. Возвращает rows, operators, "
+            "plan и columns без материализации таблицы. Временный workflow удаляется."
+        ),
+        "inputSchema": _obj(
+            {
+                "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
+                "dataset": _str("путь к готовому Parquet-датасету или имя из каталога датасетов"),
+                "format": _str("формат входного файла: csv, excel, json или parquet"),
+                "sql": _str("read-only SELECT/WITH; вход доступен как src"),
+                "limit": _int("cap строк узла sql_query (как в dap_sql)"),
+            },
+        ),
+    },
+    {
         "name": "dap_report",
         "description": (
             "Отчёт одним вызовом: ingest (для file), чтение, опциональный SQL (вход как src), "
@@ -1372,6 +1389,42 @@ def tool_analyze(args: dict):
                   file=sys.stderr, flush=True)
 
 
+def tool_estimate(args: dict):
+    """Rows/operators/plan of a node's EXPLAIN without materializing it."""
+    has_file, _ = _source_args(args)
+    sql = args.get("sql")
+    sql = _read_only_sql(sql) if sql else None
+    limit = _table_limit(args) if args.get("limit") is not None else None
+    ensure_service()
+    source, cached = _source(args, has_file)
+    workflow = _new_workflow("estimate")
+    try:
+        reader = _add_node(workflow, "dap.parquet_reader", {"file": source})
+        node = reader
+        if sql:
+            settings = {"sql": sql, "inputs": ["src"]}
+            if limit is not None:
+                settings["limit"] = limit
+            node = _add_node(workflow, "dap.sql_query", settings)
+            _connect(workflow, reader, node)
+        estimate = call(
+            "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/estimate")
+        estimate = estimate if isinstance(estimate, dict) else {}
+        result = {
+            "source": source,
+            "cached": cached,
+            "node": node,
+            "rows": estimate.get("rows"),
+            "operators": estimate.get("operators") or [],
+            "plan": estimate.get("plan"),
+        }
+        if estimate.get("columns") is not None:
+            result["columns"] = estimate["columns"]
+        return result
+    finally:
+        _drop_workflow(workflow, "estimate")
+
+
 # --------------------------------------------------------------- один вызов
 
 _CHART_TYPES = ("bar", "line", "scatter", "histogram")
@@ -1631,6 +1684,7 @@ HANDLERS = {
     "dap_sql": tool_sql,
     "dap_workflow_build": tool_workflow_build,
     "dap_analyze": tool_analyze,
+    "dap_estimate": tool_estimate,
     "dap_report": tool_report,
     "dap_profile": tool_profile,
     "dap_shutdown": tool_shutdown,
@@ -1749,8 +1803,8 @@ def handle(msg: dict) -> None:
             fail(msg_id, -32602, "arguments должен быть объектом")
             return
         try:
-            if name not in ("dap_shutdown", "dap_analyze", "dap_workflow_build",
-                            "dap_report", "dap_profile"):
+            if name not in ("dap_shutdown", "dap_analyze", "dap_estimate",
+                            "dap_workflow_build", "dap_report", "dap_profile"):
                 ensure_service()
             result = handler(args)
         except DapError as e:
