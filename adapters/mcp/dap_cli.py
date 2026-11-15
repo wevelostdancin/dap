@@ -48,7 +48,7 @@ CLIENT_CONFIGS = {
 # The adapter declares 26 tools: the 22 core ones plus the recipe and dap_sql
 # tools of the adaptability stage. test_min_tools_matches_declared_tools keeps
 # this honest.
-MIN_TOOLS = 26
+MIN_TOOLS = 28
 PREFLIGHT_TIMEOUT = 10.0
 ENGINE_START_TIMEOUT = 60.0
 PROTOCOL_VERSION = "2024-11-05"

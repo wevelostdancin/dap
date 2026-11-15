@@ -137,9 +137,11 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 | данные | `dap_get_table`, `dap_profile_table`, `dap_ingest` |
 | рецепты | `dap_recipe_list`, `dap_recipe_save`, `dap_recipe_run` |
 | SQL | `dap_sql` |
+| одним вызовом | `dap_analyze` (файл → таблица + профиль, опционально SQL), `dap_workflow_build` (узлы + связи + run + таблицы выходов) |
 | сервис | `dap_shutdown` |
 
-Всего 26 инструментов: 22 базовых плюс инструменты рецептов и `dap_sql`. Каталог
+Всего 28 инструментов: 22 базовых, инструменты рецептов, `dap_sql`, `dap_analyze` и
+`dap_workflow_build`. Каталог
 движка — 52 узла `dap.*`: `dap_search_nodes` и `dap_node_dialog_schema` видят их все,
 включая узлы волн P2–P4 (`type_cast`, `duplicate_filter`, `pivot`, `window`,
 `concatenate`, `describe`, `value_counts`, `correlation`, `histogram`, `quantile`,
@@ -150,10 +152,10 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 `rows`, `columns` и `cached`; `path` можно сразу передать в `dap.parquet_reader`
 через `dap_add_node`.
 
-Типовой проход агента: `dap_search_nodes` → `dap_node_dialog_schema` →
-`dap_workflow_create` → `dap_add_node` → `dap_connect` → `dap_run` →
-`dap_get_table`/`dap_profile_table` → `dap_save_workflow`. Для повторяющегося
-файла перед `dap_add_node` вызывается `dap_ingest`.
+Для типовой задачи хватает одного-двух вызовов: `dap_analyze` (файл → таблица и
+профиль, опционально SQL) или `dap_workflow_build` (весь граф, запуск и таблицы
+выходов одним вызовом). Ручная сборка `dap_workflow_create` → `dap_add_node` →
+`dap_connect` → `dap_run` → `dap_get_table` нужна только для нестандартного графа.
 
 Для адаптации пайплайна под задачу вместо ручной сборки графа есть три пути:
 `dap_sql` (один read-only SQL по таблице узла), `dap_recipe_run` (сохранённый

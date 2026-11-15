@@ -111,12 +111,13 @@ public final class Dag implements AutoCloseable {
             AtomicReference<Throwable> firstFailure = new AtomicReference<>();
             for (String nodeId : current) {
                 List<LazyPlan> nodeInputs = inputs.get(nodeId);
+                List<String> nodeInputIds = inputNodeIds(incoming.get(nodeId));
                 NodeExecutor executor = resolved.get(nodeId);
                 ObjectNode config = configs.get(nodeId);
                 Future<?>[] self = new Future<?>[1];
                 Future<LazyPlan> future = pool.submit((Callable<LazyPlan>) () -> {
                     try {
-                        return executeNode(workflow, nodeId, executor, nodeInputs, config, db, jobConnection);
+                        return executeNode(workflow, nodeId, executor, nodeInputs, config, db, jobConnection, nodeInputIds);
                     } catch (Throwable failure) {
                         firstFailure.compareAndSet(null, failure);
                         for (Future<LazyPlan> sibling : pending) {
@@ -221,8 +222,22 @@ public final class Dag implements AutoCloseable {
         return Arrays.asList(plans);
     }
 
+    /** Source node id per input port (null for an unconnected port). */
+    private static List<String> inputNodeIds(List<Connection> connections) {
+        int size = 0;
+        for (Connection connection : connections) {
+            size = Math.max(size, connection.toPort() + 1);
+        }
+        String[] ids = new String[size];
+        for (Connection connection : connections) {
+            ids[connection.toPort()] = connection.from();
+        }
+        return Arrays.asList(ids);
+    }
+
     private LazyPlan executeNode(Workflow workflow, String nodeId, NodeExecutor executor, List<LazyPlan> inputs,
-                                 ObjectNode config, DuckDbSession db, java.sql.Connection jobConnection) {
+                                 ObjectNode config, DuckDbSession db, java.sql.Connection jobConnection,
+                                 List<String> inputNodeIds) {
         try {
             WorkflowNode node = workflow.node(nodeId);
             if (node == null) {
@@ -230,7 +245,7 @@ public final class Dag implements AutoCloseable {
             }
             node.running();
             LazyPlan plan = executor.execute(
-                    new NodeContext(workflow.id(), nodeId, workflow.session(), config, db, jobConnection), inputs);
+                    new NodeContext(workflow.id(), nodeId, workflow.session(), config, db, jobConnection, inputNodeIds), inputs);
             workflow.executed(nodeId, plan);
             return plan;
         } catch (Throwable failure) {

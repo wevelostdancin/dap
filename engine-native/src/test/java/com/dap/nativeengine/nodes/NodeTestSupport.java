@@ -26,6 +26,13 @@ final class NodeTestSupport {
         return new NodeContext("wf", "node", "session", config, db, jobConnection);
     }
 
+    /** Context with the source node id of each input port (for sql_query aliases). */
+    static NodeContext contextWithInputs(DuckDbSession db, Connection jobConnection, String configJson,
+                                         String... inputNodeIds) throws Exception {
+        ObjectNode config = (ObjectNode) Json.parse(configJson);
+        return new NodeContext("wf", "node", "session", config, db, jobConnection, List.of(inputNodeIds));
+    }
+
     /** Load rows into the session and return a plan over the loaded table. */
     static LazyPlan table(DuckDbSession db, List<ColumnSpec> columns, List<Object[]> rows) throws Exception {
         try (ArrowTable table = ArrowTable.of(columns, rows)) {

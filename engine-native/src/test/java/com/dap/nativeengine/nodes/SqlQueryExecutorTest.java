@@ -64,6 +64,12 @@ class SqlQueryExecutorTest {
         return new SqlQueryExecutor().execute(context, inputs);
     }
 
+    private static LazyPlan planWithInputs(DuckDbSession db, Connection connection, List<LazyPlan> inputs,
+                                           String config, String... inputNodeIds) throws Exception {
+        NodeContext context = NodeTestSupport.contextWithInputs(db, connection, config, inputNodeIds);
+        return new SqlQueryExecutor().execute(context, inputs);
+    }
+
     private static List<String> columnNames(LazyPlan plan) {
         return plan.columns().stream().map(ColumnSpec::name).toList();
     }
@@ -88,6 +94,29 @@ class SqlQueryExecutorTest {
             assertEquals(3, data.rows());
             assertEquals(List.of(List.of("A", "2", "3.0"), List.of("B", "2", "7.0"),
                     List.of("C", "2", "11.0")), data.data());
+        }
+    }
+
+    @Test
+    void withoutInputsUsesSourceNodeIdAliases() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            LazyPlan input = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            LazyPlan plan = planWithInputs(db, connection, List.of(input),
+                    config("SELECT COUNT(*) AS n FROM \"1:1\""), "1:1");
+            assertEquals(List.of(ColumnSpec.of("n", "Int64")), plan.columns());
+            assertEquals(List.of(List.of("6")), plan.preview(10).data());
+        }
+    }
+
+    @Test
+    void nodeIdAliasSelectsTheMatchingPort() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            LazyPlan left = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
+            LazyPlan right = NodeTestSupport.table(db, PEOPLE,
+                    List.<Object[]>of(new Object[]{9L, "zed", 9.0, "Z"}));
+            LazyPlan plan = planWithInputs(db, connection, List.of(left, right),
+                    config("SELECT COUNT(*) AS n FROM \"1:2\"", "1:2"), "1:1", "1:2");
+            assertEquals(List.of(List.of("1")), plan.preview(10).data());
         }
     }
 

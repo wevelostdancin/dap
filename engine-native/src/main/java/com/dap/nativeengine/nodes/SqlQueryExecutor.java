@@ -42,20 +42,23 @@ public final class SqlQueryExecutor implements NodeExecutor {
         JsonNode config = context.config();
         String sql = validateReadOnly(NodeSql.requiredText(config, "sql"));
         int limit = limit(config);
-        List<String> aliases = aliases(config, inputs);
+        List<String> aliases = aliases(config, inputs, context.inputNodeIds());
 
-        String analysisSql = (aliases.isEmpty() ? "" : inputCtes(aliases, inputs))
+        List<String> ctes = new ArrayList<>(aliases.size() + 1);
+        for (int index = 0; index < aliases.size(); index++) {
+            String alias = aliases.get(index);
+            if (alias == null) {
+                continue;
+            }
+            ctes.add(NodeSql.quote(alias) + " AS (SELECT * FROM " + inputs.get(index).asTable() + ")");
+        }
+        String analysisSql = (ctes.isEmpty() ? "" : "WITH " + String.join(", ", ctes) + " ")
                 + "SELECT * FROM (" + sql + "\n) AS dap_query LIMIT 0";
         List<ColumnSpec> columns;
         try {
             columns = context.db().describe(context.jobConnection(), analysisSql);
         } catch (SQLException failure) {
             throw new IllegalStateException("sql_query: cannot analyse the query: " + failure.getMessage(), failure);
-        }
-        List<String> ctes = new ArrayList<>(aliases.size() + 1);
-        for (int index = 0; index < aliases.size(); index++) {
-            ctes.add(NodeSql.quote(aliases.get(index)) + " AS (SELECT * FROM "
-                    + inputs.get(index).asTable() + ")");
         }
         // A trailing line comment must not swallow the closing parenthesis of the CTE.
         ctes.add("dap_query AS (" + sql + "\n)");
@@ -69,18 +72,6 @@ public final class SqlQueryExecutor implements NodeExecutor {
         StringJoiner joiner = new StringJoiner(", ");
         for (int index = 0; index < columns.size(); index++) {
             joiner.add("#" + (index + 1) + " AS " + NodeSql.quote(columns.get(index).name()));
-        }
-        return joiner.toString();
-    }
-
-    private static String inputCtes(List<String> aliases, List<LazyPlan> inputs) {
-        if (aliases.isEmpty()) {
-            return "";
-        }
-        StringJoiner joiner = new StringJoiner(", ", "WITH ", " ");
-        for (int index = 0; index < aliases.size(); index++) {
-            joiner.add(NodeSql.quote(aliases.get(index)) + " AS (SELECT * FROM "
-                    + inputs.get(index).asTable() + ")");
         }
         return joiner.toString();
     }
@@ -101,35 +92,57 @@ public final class SqlQueryExecutor implements NodeExecutor {
         return (int) value;
     }
 
-    /** The {@code inputs} array names the connected input tables in port order. */
-    private static List<String> aliases(JsonNode config, List<LazyPlan> inputs) {
+    /**
+     * One alias per input port (null for an unconnected or unnamed port). When 'inputs'
+     * is omitted the connected source node ids are used, so {@code FROM "1:1"} just
+     * works; an explicit entry may be a source node id or a free alias assigned in port
+     * order. Naming a subset exposes only those inputs.
+     */
+    private static List<String> aliases(JsonNode config, List<LazyPlan> inputs, List<String> inputNodeIds) {
+        List<String> aliases = new ArrayList<>(java.util.Collections.nCopies(inputs.size(), null));
+        List<Integer> connected = new ArrayList<>();
+        for (int index = 0; index < inputs.size(); index++) {
+            if (inputs.get(index) != null) {
+                connected.add(index);
+            }
+        }
         JsonNode node = config.get("inputs");
-        List<String> aliases = new ArrayList<>();
-        if (node != null && !node.isNull()) {
-            if (!node.isArray()) {
-                throw new IllegalArgumentException("sql_query: 'inputs' must be an array of node ids");
-            }
-            Set<String> seen = new LinkedHashSet<>();
-            for (JsonNode item : node) {
-                if (!item.isTextual() || item.textValue().isBlank()) {
-                    throw new IllegalArgumentException("sql_query: 'inputs' must contain non-empty node ids");
+        if (node == null || node.isNull()) {
+            for (int index : connected) {
+                String id = index < inputNodeIds.size() ? inputNodeIds.get(index) : null;
+                if (id == null) {
+                    throw new IllegalArgumentException("sql_query: cannot derive an alias for input port "
+                            + index + "; pass 'inputs' explicitly");
                 }
-                String alias = item.textValue();
-                if (!seen.add(alias)) {
-                    throw new IllegalArgumentException("sql_query: duplicate input '" + alias + "'");
+                aliases.set(index, id);
+            }
+            return aliases;
+        }
+        if (!node.isArray()) {
+            throw new IllegalArgumentException("sql_query: 'inputs' must be an array of node ids or aliases");
+        }
+        Set<String> seen = new LinkedHashSet<>();
+        int next = 0;
+        for (JsonNode item : node) {
+            if (!item.isTextual() || item.textValue().isBlank()) {
+                throw new IllegalArgumentException("sql_query: 'inputs' must contain non-empty node ids or aliases");
+            }
+            String entry = item.textValue();
+            if (!seen.add(entry)) {
+                throw new IllegalArgumentException("sql_query: duplicate input '" + entry + "'");
+            }
+            int port = inputNodeIds.indexOf(entry);
+            if (port >= 0 && inputs.get(port) != null) {
+                aliases.set(port, entry);
+            } else {
+                while (next < connected.size() && aliases.get(connected.get(next)) != null) {
+                    next++;
                 }
-                aliases.add(alias);
+                if (next >= connected.size()) {
+                    throw new IllegalArgumentException("sql_query: 'inputs' names more tables than connected ports");
+                }
+                aliases.set(connected.get(next), entry);
             }
-        }
-        int connected = 0;
-        for (LazyPlan input : inputs) {
-            if (input != null) {
-                connected++;
-            }
-        }
-        if (aliases.size() != connected) {
-            throw new IllegalArgumentException("sql_query: 'inputs' names " + aliases.size()
-                    + " tables but " + connected + " input ports are connected; name every connected input");
         }
         return aliases;
     }
