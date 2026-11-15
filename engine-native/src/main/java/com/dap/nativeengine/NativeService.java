@@ -75,6 +75,7 @@ import com.dap.nativeengine.nodes.ResampleTestExecutor;
 import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
 import com.dap.nativeengine.nodes.SqlQueryExecutor;
+import com.dap.nativeengine.nodes.SurvivalExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
 import com.dap.nativeengine.nodes.TextNormalizeExecutor;
 import io.javalin.Javalin;
@@ -747,7 +748,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new FuzzyJoinExecutor())
                 .register(new GeoDistanceExecutor())
                 .register(new CalendarExecutor())
-                .register(new ResampleTestExecutor());
+                .register(new ResampleTestExecutor())
+                .register(new SurvivalExecutor());
     }
 
     /**
