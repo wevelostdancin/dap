@@ -31,6 +31,7 @@ import com.dap.nativeengine.nodes.UnpivotExecutor;
 import com.dap.nativeengine.nodes.ValueReplaceExecutor;
 import com.dap.nativeengine.nodes.WindowExecutor;
 import com.dap.nativeengine.nodes.CorrelationExecutor;
+import com.dap.nativeengine.nodes.DataQualityExecutor;
 import com.dap.nativeengine.nodes.DateRangeExecutor;
 import com.dap.nativeengine.nodes.DescribeExecutor;
 import com.dap.nativeengine.nodes.DiffExecutor;
@@ -502,7 +503,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new StringManipulationExecutor())
                 .register(new MathFormulaExecutor())
                 .register(new MarkdownReportExecutor())
-                .register(new ChartExecutor());
+                .register(new ChartExecutor())
+                .register(new DataQualityExecutor());
     }
 
     public static void main(String[] args) {

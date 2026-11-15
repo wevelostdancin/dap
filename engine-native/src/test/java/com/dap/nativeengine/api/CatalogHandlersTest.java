@@ -61,13 +61,13 @@ class CatalogHandlersTest {
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(46, body.path("count").asInt());
+        assertEquals(47, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(46, nodes.size());
+        assertEquals(47, nodes.size());
                 assertEquals(List.of(
                 "Binner", "Chart", "Column Filter", "Column Renamer",
                 "Column Resorter", "Concatenate", "Correlation",
-                "CSV Reader", "CSV Writer", "Date & Time",
+                "CSV Reader", "CSV Writer", "Data Quality", "Date & Time",
                 "Date Range", "Describe", "Diff",
                 "Duplicate Filter", "Encoder", "Excel Reader",
                 "Excel Writer", "Group By", "Histogram",

@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 46 узлов `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (46 строк);
+Каталог нативного движка: 47 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (47 строк);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 46 узлов имеют `available: true` и `tier: core`.
+спеке. Все 47 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -15,7 +15,9 @@
   запроса: фактическую обязательность проверяет исполнитель.
 - У всех узлов один табличный выход (порт 0). У источников нет входов; у `dap.joiner`
   два входа (0 — Left, 1 — Right), у `dap.concatenate` — два входа (0 — Top,
-  1 — Bottom), у остальных один вход (0). `dap.concatenate` требует оба входа.
+  1 — Bottom), у `dap.data_quality` — два входа (0 — Data, 1 — Reference; второй
+  нужен только для проверок `referential`), у остальных один вход (0).
+  `dap.concatenate` требует оба входа.
 - Все преобразователи — ленивые SQL-отношения: данные читаются только в `/table`
   и `/profile`; исключения — читатели и писатели (см. ниже).
 - Писатели (`dap.csv_writer`, `dap.parquet_writer`, `dap.json_writer`,
@@ -125,6 +127,7 @@
 | `dap.histogram` | Histogram | `/Statistics` | 1 |
 | `dap.quantile` | Quantile | `/Statistics` | 1 |
 | `dap.outlier_detect` | Outlier Detect | `/Statistics` | 1 |
+| `dap.data_quality` | Data Quality | `/Statistics` | 2 (1 — опционален) |
 | `dap.resample` | Resample | `/Time Series` | 1 |
 | `dap.rolling` | Rolling | `/Time Series` | 1 |
 | `dap.diff` | Diff | `/Time Series` | 1 |
@@ -1410,7 +1413,65 @@ smoke-тестом (файл существует, размеры совпада
 }
 ```
 
-## 48. Порядок для агента
+## 48. dap.data_quality
+
+Проверяет качество входной таблицы и возвращает таблицу результатов: один
+совокупный агрегатный запрос вместо скана на каждую проверку. Колонки результата:
+`check`, `column`, `status` (`PASS`/`FAIL`), `message`, `failed_rows`, `total_rows`.
+Порты: вход 0 — `Data`, вход 1 — `Reference` (нужен только для `referential`),
+выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `checks` | array | — | обязателен, непустой; порядок = порядок строк результата |
+| `fail_on` | `error` \| `warn` \| `never` | `error` | `error` — падать на проваленных проверках severity `error`; `warn` — на любой проваленной; `never` — только отчёт |
+| `output` | `long` \| `summary` | `long` | `long` — строка на проверку; `summary` — одна строка `check = summary` |
+
+Проверка (`checks[]`):
+
+| Ключ | Тип | Примечание |
+|---|---|---|
+| `kind` | `not_null` \| `unique` \| `range` \| `pattern` \| `referential` \| `row_count` \| `allowed_values` | обязателен |
+| `column` | string | обязателен для всех, кроме `row_count`; для `referential` колонка с тем же именем должна быть во входе `Reference` |
+| `min` / `max` | number \| string \| boolean | для `range` — границы значения (хотя бы одна), для `row_count` — границы числа строк (целые, хотя бы одна) |
+| `regex` | string | для `pattern`: RE2-выражение DuckDB `regexp_matches` (поиск, не полное совпадение) |
+| `values` | array | для `allowed_values`: непустой домен допустимых значений |
+| `severity` | `error` \| `warn` | по умолчанию `error`; используется в `fail_on` |
+
+Семантика:
+
+- `failed_rows` — число строк, нарушивших проверку; NULL в колонке проваливает
+  только `not_null` (для `unique` NULL — одно значение, как в `GROUP BY`).
+- `unique` считает все строки, значение которых встречается больше одного раза
+  (оконный `COUNT(*) OVER (PARTITION BY column)` в том же скане).
+- `row_count` не смотрит на колонку: `failed_rows` = все строки при нарушении
+  границ, иначе 0; `message` содержит фактическое число строк.
+- `message` при успехе — `ok`; иначе детерминированный текст вида
+  `2 rows sharing a duplicated value`, `1 row outside [0, 4]`,
+  `row count 6 below 10`.
+- `fail_on` срабатывает после расчёта: при провале узел падает (500, `node_failed`)
+  с перечислением проваленных проверок; отчёт при этом не выдаётся.
+- `summary` агрегирует: `status` — `FAIL`, если провалена хотя бы одна проверка;
+  `message` — `N checks: P passed, F failed`; `failed_rows` — сумма, `total_rows` — строки входа.
+
+```json
+{
+  "factory": "dap.data_quality",
+  "settings": {
+    "fail_on": "error",
+    "output": "long",
+    "checks": [
+      {"kind": "not_null", "column": "id"},
+      {"kind": "unique", "column": "email", "severity": "warn"},
+      {"kind": "range", "column": "score", "min": 0, "max": 100},
+      {"kind": "allowed_values", "column": "status", "values": ["new", "paid"]},
+      {"kind": "row_count", "min": 1}
+    ]
+  }
+}
+```
+
+## 49. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.
