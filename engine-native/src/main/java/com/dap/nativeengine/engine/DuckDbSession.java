@@ -18,9 +18,11 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -469,6 +471,40 @@ public final class DuckDbSession implements AutoCloseable {
                 // Best effort cleanup: the session database disappears with the session.
             }
         }
+    }
+
+    /**
+     * Drop every table a workflow's readers materialized. Reader executors name their tables
+     * {@code csv_<workflowId>_<nodeId>} with the id sanitized ('-' and ':' become '_'), so the
+     * raw prefix pinned by the contract and the sanitized one are both matched.
+     */
+    public void dropTablesForWorkflow(String workflowId) {
+        if (workflowId == null || workflowId.isEmpty()) {
+            return;
+        }
+        Set<String> prefixes = new LinkedHashSet<>();
+        prefixes.add("csv_" + workflowId + "_");
+        prefixes.add("excel_" + workflowId + "_");
+        prefixes.add("csv_" + sanitize(workflowId) + "_");
+        prefixes.add("excel_" + sanitize(workflowId) + "_");
+        List<String> names = new ArrayList<>();
+        try (Statement statement = base.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'")) {
+            while (result.next()) {
+                String name = result.getString(1);
+                for (String prefix : prefixes) {
+                    if (name.startsWith(prefix)) {
+                        names.add(name);
+                        break;
+                    }
+                }
+            }
+        } catch (SQLException ignored) {
+            // Best effort cleanup: the session database disappears with the session.
+            return;
+        }
+        dropTables(names);
     }
 
     public String nextTableName(String prefix) {
