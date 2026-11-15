@@ -641,6 +641,61 @@ TOOLS = [
         ),
     },
     {
+        "name": "dap_report",
+        "description": (
+            "Отчёт одним вызовом: ingest (для file), чтение, опциональный SQL (вход как src), "
+            "markdown_report (таблица + профиль) и опциональный график. Возвращает таблицу, "
+            "profile и пути report/chart. Временный workflow удаляется."
+        ),
+        "inputSchema": _obj(
+            {
+                "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
+                "format": _str("формат входного файла: csv, excel, json или parquet; по умолчанию по расширению"),
+                "dataset": _str("путь к готовому Parquet-датасету (из dap_ingest)"),
+                "sql": _str("read-only SELECT/WITH; вход доступен как src"),
+                "report": _str("путь к Markdown-отчёту (обязательный)"),
+                "chart": _str("путь к графику .svg/.png; без него график не строится"),
+                "chartType": {
+                    "type": "string",
+                    "enum": ["bar", "line", "scatter", "histogram"],
+                    "description": "тип графика",
+                    "default": "bar",
+                },
+                "x": _str("колонка X: категория для bar, число для line/scatter/histogram"),
+                "y": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "числовые колонки Y: bar — одна, line/scatter — одна или несколько, histogram — без Y",
+                },
+                "title": _str("заголовок отчёта и графика"),
+                "profile": {
+                    "type": "boolean",
+                    "description": "добавить секцию профиля в отчёт и вернуть profile",
+                    "default": True,
+                },
+                "limit": _int("строк таблицы и отчёта", 20),
+                "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
+            },
+            ["report"],
+        ),
+    },
+    {
+        "name": "dap_profile",
+        "description": (
+            "Компактный профиль файла или датасета одним вызовом: ingest (для file), чтение, "
+            "профиль без таблицы. Временный workflow удаляется."
+        ),
+        "inputSchema": _obj(
+            {
+                "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
+                "format": _str("формат входного файла: csv, excel, json или parquet; по умолчанию по расширению"),
+                "dataset": _str("путь к готовому Parquet-датасету (из dap_ingest)"),
+                "limit": _int("предел строк value counts", 10),
+                "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
+            },
+        ),
+    },
+    {
         "name": "dap_shutdown",
         "description": "Остановить движок DAP на этом порту. Следующий вызов инструмента поднимет его заново.",
         "inputSchema": _obj({}),
@@ -1075,6 +1130,186 @@ def tool_analyze(args: dict):
                   file=sys.stderr, flush=True)
 
 
+# --------------------------------------------------------------- один вызов
+
+_CHART_TYPES = ("bar", "line", "scatter", "histogram")
+
+
+def _source_args(args: dict) -> tuple[bool, bool]:
+    """Validate that exactly one of file/dataset is given, before any HTTP call."""
+    has_file = args.get("file") is not None and args.get("file") != ""
+    has_dataset = args.get("dataset") is not None and args.get("dataset") != ""
+    if not has_file and not has_dataset:
+        raise DapError("нужен 'file' или 'dataset'", code=-32602)
+    if has_file and has_dataset:
+        raise DapError("укажите либо 'file', либо 'dataset', не оба", code=-32602)
+    return has_file, has_dataset
+
+
+def _source(args: dict, has_file: bool) -> tuple[str, bool]:
+    """Ingest the file (once, through the engine cache) or take the dataset path."""
+    if not has_file:
+        return str(args["dataset"]), False
+    body = {"file": args["file"]}
+    if args.get("format"):
+        body["format"] = args["format"]
+    ingested = call("POST", "/v1/datasets", body)
+    path = ingested.get("path") if isinstance(ingested, dict) else None
+    if not path:
+        raise DapError("движок не вернул путь Parquet-кэша")
+    return str(path), bool(ingested.get("cached"))
+
+
+def _read_only_sql(value):
+    try:
+        return RECIPES.validate_sql(str(value))
+    except RECIPES.RecipeError as failure:
+        raise _recipe_error(failure)
+
+
+def _table_limit(args: dict, default: int = 20) -> int:
+    value = args.get("limit")
+    limit = default if value is None else int(value)
+    if limit < 1 or limit > 1000:
+        raise DapError("'limit' должен быть от 1 до 1000", code=-32602)
+    return limit
+
+
+def _new_workflow(name: str) -> str:
+    created = call("POST", "/v1/workflows", {"name": name})
+    workflow = created.get("id") if isinstance(created, dict) else None
+    if not workflow:
+        raise DapError("движок не вернул id workflow")
+    return str(workflow)
+
+
+def _add_node(workflow: str, factory: str, settings: dict) -> str:
+    created = call("POST", f"/v1/workflows/{_seg(workflow)}/nodes",
+                   {"factory": factory, "settings": settings})
+    node = created.get("node") if isinstance(created, dict) else None
+    if not node:
+        raise DapError(f"движок не вернул id узла {factory}")
+    return str(node)
+
+
+def _connect(workflow: str, source: str, target: str) -> None:
+    call("POST", f"/v1/workflows/{_seg(workflow)}/connect",
+         {"from": source, "fromPort": 0, "to": target, "toPort": 0})
+
+
+def _drop_workflow(workflow: str, what: str) -> None:
+    try:
+        call("DELETE", f"/v1/workflows/{_seg(workflow)}")
+    except Exception as failure:  # noqa: BLE001 - cleanup must not hide the result
+        print(f"dap-mcp: cannot delete {what} workflow {workflow}: {failure}",
+              file=sys.stderr, flush=True)
+
+
+def _file_bytes(path: str) -> int | None:
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return None
+
+
+def tool_report(args: dict):
+    has_file, _ = _source_args(args)
+    report = args.get("report")
+    if report is None or str(report).strip() == "":
+        raise DapError("обязательный аргумент 'report' не задан", code=-32602)
+    report = str(report)
+    chart = args.get("chart")
+    chart = str(chart) if chart is not None and str(chart).strip() else None
+    chart_type = str(args.get("chartType") or "bar")
+    if chart_type not in _CHART_TYPES:
+        raise DapError(
+            "'chartType' должен быть один из: " + ", ".join(_CHART_TYPES), code=-32602)
+    limit = _table_limit(args)
+    with_profile = args.get("profile") is not False
+    title = str(args["title"]) if args.get("title") else None
+    y = args.get("y")
+    if y is not None:
+        if not isinstance(y, list) or any(not str(item).strip() for item in y):
+            raise DapError("'y' должен быть массивом непустых имён колонок", code=-32602)
+        y = [str(item) for item in y]
+    sql = args.get("sql")
+    sql = _read_only_sql(sql) if sql else None
+    source, cached = _source(args, has_file)
+    workflow = _new_workflow("report")
+    try:
+        reader = _add_node(workflow, "dap.parquet_reader", {"file": source})
+        node = reader
+        if sql:
+            node = _add_node(workflow, "dap.sql_query", {"sql": sql, "inputs": ["src"]})
+            _connect(workflow, reader, node)
+        sections = [{"kind": "table", "limit": limit}]
+        if with_profile:
+            sections.append({"kind": "profile"})
+        report_settings = {"file": report, "sections": sections}
+        if title:
+            report_settings["title"] = title
+        report_node = _add_node(workflow, "dap.markdown_report", report_settings)
+        _connect(workflow, node, report_node)
+        if chart:
+            chart_settings = {
+                "file": chart,
+                "format": "png" if chart.lower().endswith(".png") else "svg",
+                "type": chart_type,
+            }
+            if args.get("x"):
+                chart_settings["x"] = str(args["x"])
+            if y:
+                chart_settings["y"] = y
+            if title:
+                chart_settings["title"] = title
+            chart_node = _add_node(workflow, "dap.chart", chart_settings)
+            _connect(workflow, report_node, chart_node)
+        call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
+        table = call(
+            "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/table?limit={limit}")
+        result = {"source": source, "cached": cached, "node": node,
+                  "table": table, "report": report}
+        if with_profile:
+            result["profile"] = call(
+                "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/profile")
+        if chart:
+            result["chart"] = chart
+        sizes = {}
+        for key, path in (("report", report), ("chart", chart)):
+            if path:
+                size = _file_bytes(path)
+                if size is not None:
+                    sizes[key] = size
+        if sizes:
+            result["bytes"] = sizes
+        return result
+    finally:
+        _drop_workflow(workflow, "report")
+
+
+def tool_profile(args: dict):
+    has_file, _ = _source_args(args)
+    limit = _table_limit(args, 10)
+    source, cached = _source(args, has_file)
+    workflow = _new_workflow("profile")
+    try:
+        reader = _add_node(workflow, "dap.parquet_reader", {"file": source})
+        call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
+        # limit is reserved for value-count rows; /profile does not return them yet,
+        # so the engine ignores the parameter until the profile grows them.
+        profile = call(
+            "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(reader)}/profile?limit={limit}")
+        result = {"source": source, "cached": cached, "profile": profile}
+        if isinstance(profile, dict):
+            result["rows"] = profile.get("rows")
+            columns = profile.get("columns")
+            if isinstance(columns, list):
+                result["columns"] = len(columns)
+        return result
+    finally:
+        _drop_workflow(workflow, "profile")
+
+
 # ------------------------------------------------------------------ resources
 
 def _resource_error(message: str, uri: str | None = None) -> DapError:
@@ -1152,6 +1387,8 @@ HANDLERS = {
     "dap_sql": tool_sql,
     "dap_workflow_build": tool_workflow_build,
     "dap_analyze": tool_analyze,
+    "dap_report": tool_report,
+    "dap_profile": tool_profile,
     "dap_shutdown": tool_shutdown,
 }
 
