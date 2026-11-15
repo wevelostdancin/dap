@@ -204,4 +204,185 @@ class OutlierDetectExecutorTest {
             assertTrue(existing.getMessage().contains("outlier"), existing.getMessage());
         }
     }
+
+    // ------------------------------------------- dbscan / lof / isolation forest
+
+    private static final List<ColumnSpec> CLUSTER_COLUMNS = List.of(
+            ColumnSpec.of("id", "Int64"),
+            ColumnSpec.of("x", "Float64"),
+            ColumnSpec.of("y", "Float64"));
+
+    /** Two tight clusters around (0, 0) and (5, 5) plus one far point at (20, 20). */
+    private static List<Object[]> clusteredWithFarPoint() {
+        List<Object[]> rows = new ArrayList<>();
+        long id = 1;
+        for (int i = 0; i < 10; i++) {
+            rows.add(new Object[]{id++, 0.02 * i, -0.01 * i});
+        }
+        for (int i = 0; i < 10; i++) {
+            rows.add(new Object[]{id++, 5.0 + 0.02 * i, 5.0 + 0.01 * i});
+        }
+        rows.add(new Object[]{id, 20.0, 20.0});
+        return rows;
+    }
+
+    private static List<String> row(TableData data, String id) {
+        return data.data().stream()
+                .filter(row -> id.equals(row.get(0)))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no row " + id + " in " + data.data()));
+    }
+
+    private static double score(TableData data, String id) {
+        String value = row(data, id).get(4);
+        return value == null ? Double.NaN : Double.parseDouble(value);
+    }
+
+    @Test
+    void dbscanFlagsTheFarPointAndZeroesCoreScores() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan plan = detect(db, CLUSTER_COLUMNS, clusteredWithFarPoint(), """
+                    {"columns":["x","y"],"method":"dbscan","eps":0.5,"min_points":3,"k":5}
+                    """);
+
+            assertEquals(List.of(
+                    ColumnSpec.of("id", "Int64"),
+                    ColumnSpec.of("x", "Float64"),
+                    ColumnSpec.of("y", "Float64"),
+                    ColumnSpec.of("outlier", "Boolean"),
+                    ColumnSpec.of("score", "Float64")), plan.columns());
+            TableData data = plan.preview(30);
+            assertEquals(21L, data.rows());
+            assertEquals("false", row(data, "1").get(3));
+            assertEquals("false", row(data, "11").get(3));
+            assertEquals("true", row(data, "21").get(3));
+            assertEquals(0.0, score(data, "1"), 0.0);
+            assertTrue(score(data, "21") > 1.0, "far score " + score(data, "21"));
+        }
+    }
+
+    @Test
+    void lofFlagsTheFarPointAndKeepsNormalRowsBelowOne() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            TableData data = detect(db, CLUSTER_COLUMNS, clusteredWithFarPoint(), """
+                    {"columns":["x","y"],"method":"lof","k":5,"contamination":0.05}
+                    """).preview(30);
+
+            assertEquals(21L, data.rows());
+            assertEquals("false", row(data, "1").get(3));
+            assertEquals("false", row(data, "11").get(3));
+            assertEquals("true", row(data, "21").get(3));
+            assertTrue(score(data, "21") > 1.5, "far LOF " + score(data, "21"));
+            assertTrue(score(data, "1") < 1.5, "normal LOF " + score(data, "1"));
+        }
+    }
+
+    @Test
+    void isolationForestIsDeterministicAndFlagsTheFarPoint() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            String config = """
+                    {"columns":["x","y"],"method":"isolation_forest","contamination":0.05,"seed":7}
+                    """;
+            TableData first = detect(db, CLUSTER_COLUMNS, clusteredWithFarPoint(), config).preview(30);
+            TableData second = detect(db, CLUSTER_COLUMNS, clusteredWithFarPoint(), config).preview(30);
+
+            assertEquals(21L, first.rows());
+            assertEquals("true", row(first, "21").get(3));
+            assertEquals("false", row(first, "1").get(3));
+            assertEquals(first.data().stream().map(row -> row.get(4)).toList(),
+                    second.data().stream().map(row -> row.get(4)).toList());
+            for (List<String> entry : first.data()) {
+                double parsed = Double.parseDouble(entry.get(4));
+                assertTrue(parsed >= 0.0 && parsed <= 1.0, "score " + parsed);
+            }
+        }
+    }
+
+    @Test
+    void distanceMethodsKeepNullRowsUnflaggedAndScoredNull() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            List<Object[]> rows = new ArrayList<>();
+            rows.add(new Object[]{1L, 1.0, 1.0});
+            rows.add(new Object[]{2L, 1.1, 1.1});
+            rows.add(new Object[]{3L, 1.2, 1.2});
+            rows.add(new Object[]{4L, null, 1.0});
+            rows.add(new Object[]{5L, 50.0, 50.0});
+
+            TableData data = detect(db, CLUSTER_COLUMNS, rows, """
+                    {"columns":["x","y"],"method":"dbscan","eps":0.5,"min_points":2,"k":1}
+                    """).preview(10);
+
+            assertEquals("false", row(data, "4").get(3));
+            assertEquals(null, row(data, "4").get(4));
+        }
+    }
+
+    @Test
+    void iqrAndZscoreStillEmitOnlyTheOutlierColumn() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan iqr = detect(db, List.of(ColumnSpec.of("v", "Int64")), range(20), """
+                    {"columns":["v"],"method":"iqr"}
+                    """);
+            assertEquals(List.of(ColumnSpec.of("v", "Int64"), ColumnSpec.of("outlier", "Boolean")),
+                    iqr.columns());
+
+            LazyPlan zscore = detect(db, List.of(ColumnSpec.of("v", "Float64")), range(20), """
+                    {"columns":["v"],"method":"zscore"}
+                    """);
+            assertEquals(List.of(ColumnSpec.of("v", "Float64"), ColumnSpec.of("outlier", "Boolean")),
+                    zscore.columns());
+        }
+    }
+
+    @Test
+    void newMethodsRejectBadSettingsAndExistingOutputColumns() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            List<Object[]> rows = clusteredWithFarPoint();
+
+            IllegalArgumentException eps = assertThrows(IllegalArgumentException.class,
+                    () -> detect(db, CLUSTER_COLUMNS, rows, """
+                            {"columns":["x","y"],"method":"dbscan","eps":0}
+                            """));
+            assertTrue(eps.getMessage().contains("eps"), eps.getMessage());
+
+            IllegalArgumentException minPoints = assertThrows(IllegalArgumentException.class,
+                    () -> detect(db, CLUSTER_COLUMNS, rows, """
+                            {"columns":["x","y"],"method":"dbscan","min_points":0}
+                            """));
+            assertTrue(minPoints.getMessage().contains("min_points"), minPoints.getMessage());
+
+            IllegalArgumentException neighbours = assertThrows(IllegalArgumentException.class,
+                    () -> detect(db, CLUSTER_COLUMNS, rows, """
+                            {"columns":["x","y"],"method":"lof","k":0}
+                            """));
+            assertTrue(neighbours.getMessage().contains("k"), neighbours.getMessage());
+
+            IllegalArgumentException contamination = assertThrows(IllegalArgumentException.class,
+                    () -> detect(db, CLUSTER_COLUMNS, rows, """
+                            {"columns":["x","y"],"method":"isolation_forest","contamination":0.75}
+                            """));
+            assertTrue(contamination.getMessage().contains("contamination"), contamination.getMessage());
+
+            IllegalArgumentException existing = assertThrows(IllegalArgumentException.class,
+                    () -> detect(db, List.of(ColumnSpec.of("x", "Float64"),
+                                    ColumnSpec.of("y", "Float64"),
+                                    ColumnSpec.of("score", "Float64")),
+                            List.<Object[]>of(new Object[]{1.0, 2.0, 3.0}), """
+                            {"columns":["x","y"],"method":"dbscan"}
+                            """));
+            assertTrue(existing.getMessage().contains("score"), existing.getMessage());
+        }
+    }
+
+    @Test
+    void rowCapFailsWithAHint() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                    () -> detect(db, CLUSTER_COLUMNS, clusteredWithFarPoint(), """
+                            {"columns":["x","y"],"method":"lof","max_rows":5}
+                            """));
+            assertTrue(error.getMessage().contains("max_rows"), error.getMessage());
+            assertTrue(error.getMessage().contains("pre-filter"), error.getMessage());
+        }
+    }
 }

@@ -63,10 +63,11 @@ class TimeSeriesSpecsTest {
 
     @Test
     void configSchemasExposeTheExecutorVocabulary() throws Exception {
-        assertEquals(Set.of("columns", "method", "threshold"), load("dap.outlier_detect").settingKeys());
+        assertEquals(Set.of("columns", "method", "threshold", "eps", "min_points", "k",
+                "contamination", "seed", "max_rows"), load("dap.outlier_detect").settingKeys());
         assertEquals(List.of("columns", "method"), load("dap.outlier_detect").requiredKeys());
         JsonNode method = property(load("dap.outlier_detect"), "method");
-        assertEquals(List.of("iqr", "zscore"), enumValues(method));
+        assertEquals(List.of("iqr", "zscore", "dbscan", "lof", "isolation_forest"), enumValues(method));
 
         assertEquals(Set.of("timeColumn", "every", "aggregations"), load("dap.resample").settingKeys());
         assertEquals(List.of("timeColumn", "aggregations"), load("dap.resample").requiredKeys());
