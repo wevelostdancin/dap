@@ -325,6 +325,9 @@ _WF = "идентификатор workflow (выдаёт dap_workflow_create, в
 _NODE = "идентификатор узла внутри workflow (выдаёт dap_add_node, вид 0:1)"
 _SETTINGS = "плоский объект настроек по configKey из dap_node_dialog_schema"
 _TABLE_FORMATS = ("json", "objects", "csv", "markdown")
+_DATASET_ACTIONS = ("list", "add", "show", "refresh", "remove")
+# Catalog dataset names: [A-Za-z0-9._-]{1,64} (the engine enforces the same rule).
+_CATALOG_NAME = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
 TOOLS = [
@@ -537,6 +540,35 @@ TOOLS = [
         ),
     },
     {
+        "name": "dap_dataset",
+        "description": (
+            "Каталог датасетов: list (по умолчанию), add (file или dataset + описание), "
+            "show, refresh (переингест и version+1) и remove. Имя из каталога можно "
+            "передавать как 'dataset' в dap_analyze/dap_profile/dap_report/dap_explore."
+        ),
+        "inputSchema": _obj(
+            {
+                "action": {
+                    "type": "string",
+                    "enum": list(_DATASET_ACTIONS),
+                    "description": "list, add, show, refresh или remove",
+                    "default": "list",
+                },
+                "name": _str("имя датасета: [A-Za-z0-9._-]{1,64} (кроме list)"),
+                "file": _str("путь к CSV/Excel/JSON/Parquet для add"),
+                "dataset": _str("путь к готовому Parquet-датасету для add"),
+                "format": _str("формат входного файла для add: csv, excel, json или parquet"),
+                "description": _str("описание датасета"),
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "теги для поиска в каталоге",
+                },
+                "owner": _str("владелец или команда"),
+            },
+        ),
+    },
+    {
         "name": "dap_save_workflow",
         "description": "Сохранить workflow в каталог на диске (файл workflow.json).",
         "inputSchema": _obj(
@@ -703,7 +735,9 @@ TOOLS = [
             {
                 "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
                 "format": _str("формат входного файла: csv, excel, json или parquet; по умолчанию по расширению"),
-                "dataset": _str("путь к готовому Parquet-датасету (из dap_ingest)"),
+                "dataset": _str(
+                    "путь к готовому Parquet-датасету (из dap_ingest) или имя из "
+                    "каталога датасетов (dap_dataset action=list)"),
                 "sql": _str("read-only SELECT/WITH; вход доступен как src"),
                 "profile": {"type": "boolean", "description": "вернуть профиль источника", "default": True},
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
@@ -721,7 +755,8 @@ TOOLS = [
         "inputSchema": _obj(
             {
                 "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
-                "dataset": _str("путь к готовому Parquet-датасету или имя из каталога датасетов"),
+                "dataset": _str(
+                    "путь к готовому Parquet-датасету или имя из каталога датасетов"),
                 "format": _str("формат входного файла: csv, excel, json или parquet"),
                 "sql": _str("read-only SELECT/WITH; вход доступен как src"),
                 "limit": _int("cap строк узла sql_query (как в dap_sql)"),
@@ -739,7 +774,9 @@ TOOLS = [
             {
                 "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
                 "format": _str("формат входного файла: csv, excel, json или parquet; по умолчанию по расширению"),
-                "dataset": _str("путь к готовому Parquet-датасету (из dap_ingest)"),
+                "dataset": _str(
+                    "путь к готовому Parquet-датасету (из dap_ingest) или имя из "
+                    "каталога датасетов (dap_dataset action=list)"),
                 "sql": _str("read-only SELECT/WITH; вход доступен как src"),
                 "report": _str("путь к Markdown-отчёту (обязательный)"),
                 "chart": _str("путь к графику .svg/.png; без него график не строится"),
@@ -777,7 +814,9 @@ TOOLS = [
             {
                 "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
                 "format": _str("формат входного файла: csv, excel, json или parquet; по умолчанию по расширению"),
-                "dataset": _str("путь к готовому Parquet-датасету (из dap_ingest)"),
+                "dataset": _str(
+                    "путь к готовому Parquet-датасету (из dap_ingest) или имя из "
+                    "каталога датасетов (dap_dataset action=list)"),
                 "limit": _int("предел строк value counts", 10),
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
             },
@@ -1171,6 +1210,48 @@ def tool_ingest(args: dict):
     return call("POST", "/v1/datasets", body)
 
 
+def tool_dataset(args: dict):
+    """Dataset catalog CRUD: one tool, an action enum, the engine does the work."""
+    action = str(args.get("action") or "list").strip().lower()
+    if action not in _DATASET_ACTIONS:
+        raise DapError(
+            "'action' должен быть один из: " + ", ".join(_DATASET_ACTIONS), code=-32602)
+    name = None
+    if action != "list":
+        name = str(_need(args, "name")).strip()
+        if not _CATALOG_NAME.match(name):
+            raise DapError(
+                "'name' датасета: [A-Za-z0-9._-]{1,64}", code=-32602)
+    body = None
+    if action == "add":
+        has_file = args.get("file") is not None and args.get("file") != ""
+        has_dataset = args.get("dataset") is not None and args.get("dataset") != ""
+        if not has_file and not has_dataset:
+            raise DapError("для action=add нужен 'file' или 'dataset'", code=-32602)
+        if has_file and has_dataset:
+            raise DapError("укажите либо 'file', либо 'dataset', не оба", code=-32602)
+        tags = args.get("tags")
+        if tags is not None and (not isinstance(tags, list)
+                                 or any(not isinstance(tag, str) for tag in tags)):
+            raise DapError("'tags' должен быть массивом строк", code=-32602)
+        body = {"name": name}
+        body["file" if has_file else "dataset"] = (
+            args["file"] if has_file else args["dataset"])
+        for key in ("format", "description", "tags", "owner"):
+            if args.get(key) is not None and args.get(key) != "":
+                body[key] = args[key]
+    ensure_service()
+    if action == "list":
+        return call("GET", "/v1/catalog/datasets")
+    if action == "add":
+        return call("POST", "/v1/catalog/datasets", body)
+    if action == "show":
+        return call("GET", f"/v1/catalog/datasets/{_seg(name)}")
+    if action == "refresh":
+        return call("POST", f"/v1/catalog/datasets/{_seg(name)}/refresh")
+    return call("DELETE", f"/v1/catalog/datasets/{_seg(name)}")
+
+
 def tool_save_workflow(args: dict):
     return call("POST", f"/v1/workflows/{_wf(args)}/save", {"dir": _need(args, "dir")})
 
@@ -1499,7 +1580,7 @@ def tool_analyze(args: dict):
     ensure_service()
     cached = None
     ingest_cached = False
-    source = args.get("dataset")
+    source = _resolve_dataset(args["dataset"]) if not has_file else None
     if has_file:
         ingest_body = {"file": args["file"]}
         if args.get("format"):
@@ -1604,10 +1685,32 @@ def _source_args(args: dict) -> tuple[bool, bool]:
     return has_file, has_dataset
 
 
+def _resolve_dataset(value) -> str:
+    """A dataset path, or a catalog name resolved through /v1/catalog/datasets/{name}.
+
+    A value that exists on disk is a path and is returned untouched; a value that
+    looks like a catalog name is looked up, and a 404 falls back to the old
+    behaviour (the value is used as a path) so old callers keep working.
+    """
+    text = str(value)
+    if os.path.exists(os.path.expanduser(text)):
+        return text
+    if not _CATALOG_NAME.match(text):
+        return text
+    try:
+        entry = call("GET", f"/v1/catalog/datasets/{_seg(text)}")
+    except DapError as failure:
+        if (failure.data or {}).get("status") == 404:
+            return text
+        raise
+    path = entry.get("path") if isinstance(entry, dict) else None
+    return str(path) if path else text
+
+
 def _source(args: dict, has_file: bool) -> tuple[str, bool]:
     """Ingest the file (once, through the engine cache) or take the dataset path."""
     if not has_file:
-        return str(args["dataset"]), False
+        return _resolve_dataset(args["dataset"]), False
     body = {"file": args["file"]}
     if args.get("format"):
         body["format"] = args["format"]
@@ -1793,6 +1896,13 @@ def read_resource(uri: str) -> str:
     if kind == "catalog":
         ensure_service()
         return RESOURCES.render_catalog(call("GET", "/v1/nodes?limit=1000"))
+    if kind == "datasets":
+        ensure_service()
+        return RESOURCES.render_datasets(call("GET", "/v1/catalog/datasets"))
+    if kind == "dataset":
+        ensure_service()
+        return RESOURCES.render_dataset(
+            call("GET", f"/v1/catalog/datasets/{_seg(name)}"), name)
     if kind == "recipes":
         return RESOURCES.render_recipes(RECIPES.list_recipes(DAP_HOME))
     try:
@@ -1847,6 +1957,7 @@ HANDLERS = {
     "dap_get_table": tool_get_table,
     "dap_profile_table": tool_profile_table,
     "dap_ingest": tool_ingest,
+    "dap_dataset": tool_dataset,
     "dap_save_workflow": tool_save_workflow,
     "dap_load_workflow": tool_load_workflow,
     "dap_recipe_list": tool_recipe_list,
@@ -1991,7 +2102,8 @@ def handle(msg: dict) -> None:
         _PROGRESS_TOKEN = meta.get("progressToken") if isinstance(meta, dict) else None
         try:
             if name not in ("dap_shutdown", "dap_analyze", "dap_estimate",
-                            "dap_workflow_build", "dap_report", "dap_profile"):
+                            "dap_dataset", "dap_workflow_build", "dap_report",
+                            "dap_profile"):
                 ensure_service()
             result = handler(args)
         except DapError as e:

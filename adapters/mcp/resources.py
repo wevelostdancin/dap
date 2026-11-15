@@ -12,6 +12,13 @@ import urllib.parse
 CATALOG_URI = "dap://catalog"
 RECIPES_URI = "dap://recipes"
 RECIPE_PREFIX = "dap://recipes/"
+DATASETS_URI = "dap://datasets"
+DATASET_PREFIX = "dap://datasets/"
+# Compact dataset views: the catalog record carries hashes and history, which the
+# agent does not need when it only looks for a dataset to analyse.
+DATASET_LIST_KEYS = ("name", "description", "rows", "columns", "version", "updatedAt")
+DATASET_KEYS = ("name", "description", "owner", "tags", "source", "format", "path",
+                "rows", "columns", "version", "contentHash", "createdAt", "updatedAt")
 
 
 class ResourceError(ValueError):
@@ -23,18 +30,22 @@ class ResourceError(ValueError):
 
 
 def parse_uri(uri: str) -> tuple[str, str | None]:
-    """Return ("catalog"|"recipes"|"recipe", name) or raise ResourceError."""
+    """Return ("catalog"|"recipes"|"recipe"|"datasets"|"dataset", name)."""
     if uri == CATALOG_URI:
         return ("catalog", None)
     if uri == RECIPES_URI:
         return ("recipes", None)
     if uri.startswith(RECIPE_PREFIX) and len(uri) > len(RECIPE_PREFIX):
         return ("recipe", urllib.parse.unquote(uri[len(RECIPE_PREFIX):]))
+    if uri == DATASETS_URI:
+        return ("datasets", None)
+    if uri.startswith(DATASET_PREFIX) and len(uri) > len(DATASET_PREFIX):
+        return ("dataset", urllib.parse.unquote(uri[len(DATASET_PREFIX):]))
     raise ResourceError("unknown resource URI: " + uri, uri)
 
 
 def list_resources() -> list[dict]:
-    """The two library-level resources advertised by resources/list."""
+    """The library-level resources advertised by resources/list."""
     return [
         {
             "uri": CATALOG_URI,
@@ -53,6 +64,17 @@ def list_resources() -> list[dict]:
             "description": (
                 "Names and descriptions of the saved pipelines in $DAP_HOME/recipes; "
                 "read dap://recipes/<name> for the workflow JSON with its recipe block."
+            ),
+            "mimeType": "application/json",
+        },
+        {
+            "uri": DATASETS_URI,
+            "name": "datasets",
+            "title": "Dataset catalog",
+            "description": (
+                "Registered datasets with rows, columns and version; read "
+                "dap://datasets/<name> for one entry with its cached profile. "
+                "The name can be passed as 'dataset' to dap_analyze/dap_profile."
             ),
             "mimeType": "application/json",
         },
@@ -82,6 +104,33 @@ def render_recipes(entries: list[dict]) -> str:
 def render_recipe(document: dict, name: str | None = None) -> str:
     """A saved recipe as the workflow JSON it is stored in (with the recipe block)."""
     return json.dumps(document, ensure_ascii=False)
+
+
+def _dataset_entries(payload) -> list[dict]:
+    """Catalog entries from {"datasets": [...]} or a bare list."""
+    if isinstance(payload, dict):
+        entries = payload.get("datasets")
+    else:
+        entries = payload
+    return [entry for entry in entries or [] if isinstance(entry, dict)]
+
+
+def render_datasets(payload) -> str:
+    """Compact catalog list: name, description, rows, columns and version."""
+    view = [
+        {key: entry[key] for key in DATASET_LIST_KEYS if key in entry}
+        for entry in _dataset_entries(payload)
+    ]
+    return json.dumps({"count": len(view), "datasets": view}, ensure_ascii=False)
+
+
+def render_dataset(document: dict, name: str | None = None) -> str:
+    """One catalog entry with its cached profile."""
+    if not isinstance(document, dict):
+        return json.dumps(document, ensure_ascii=False)
+    view = {key: document[key] for key in DATASET_KEYS if key in document}
+    view["profile"] = document.get("profile")
+    return json.dumps(view, ensure_ascii=False)
 
 
 # ------------------------------------------------------------------- prompts
