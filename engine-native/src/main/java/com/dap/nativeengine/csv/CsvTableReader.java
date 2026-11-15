@@ -236,8 +236,16 @@ public final class CsvTableReader {
             throw new IllegalArgumentException("unsupported column type '" + type + "' for column '" + column.name() + "'");
         } catch (RuntimeException failure) {
             throw new IllegalArgumentException("cannot parse value '" + text + "' as " + type + " in column '"
-                    + column.name() + "' (data row " + dataRow + ")", failure);
+                    + column.name() + "' (data row " + dataRow + ")" + quotedEmptyHint(field), failure);
         }
+    }
+
+    /** A quoted empty string in a typed column is the classic emptyStringIsNull trap. */
+    private static String quotedEmptyHint(CsvParser.Field field) {
+        if (field.quoted() && field.text().isEmpty()) {
+            return "; quoted empty string — set emptyStringIsNull=true or type the column as Utf8";
+        }
+        return "";
     }
 
     private static Boolean parseBoolean(String text) {

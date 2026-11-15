@@ -324,7 +324,7 @@ class NativeServiceTest {
     // ---------------------------------------------------------- node errors
 
     @Test
-    void addNodeValidationLeavesTheNodeAfterBadSettings() throws Exception {
+    void addNodeValidationLeavesNoGhostNode() throws Exception {
         String workflow = createWorkflow("node-errors");
 
         Resp noFactory = post("/v1/workflows/" + workflow + "/nodes", Map.of());
@@ -349,13 +349,14 @@ class NativeServiceTest {
                 unknownSetting.error());
         assertTrue(unknownSetting.error().contains("keys"), unknownSetting.error());
 
-        // Frozen contract quirk: the node stays in the workflow after a settings 400,
-        // so both rejected settings requests left one node behind.
+        // Settings are validated before the node is created: rejected requests leave no ghost.
+        assertEquals(0, get("/v1/workflows/" + workflow + "/nodes").body().path("nodes").size());
+        String nodeId = addNode(workflow, "dap.sorter", Map.of("keys", List.of()));
         JsonNode nodes = get("/v1/workflows/" + workflow + "/nodes").body().path("nodes");
-        assertEquals(2, nodes.size());
-        assertEquals("Sorter", nodes.get(1).path("name").asText());
-        assertEquals("IDLE", nodes.get(1).path("state").asText());
-        String nodeId = nodes.get(1).path("node").asText();
+        assertEquals(1, nodes.size());
+        assertEquals("Sorter", nodes.get(0).path("name").asText());
+        assertEquals("IDLE", nodes.get(0).path("state").asText());
+        assertEquals(nodeId, nodes.get(0).path("node").asText());
 
         Resp patchUnknownWorkflow = patch("/v1/workflows/wf-999999/nodes/" + nodeId,
                 Map.of("settings", Map.of()));
