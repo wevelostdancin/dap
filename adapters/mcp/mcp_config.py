@@ -36,7 +36,6 @@ _KEY_RE = re.compile(
 _PLAIN_RE = re.compile(r"^[A-Za-z0-9_./~+][A-Za-z0-9_./~+ @-]*$")
 _NUMBER_RE = re.compile(r"^[-+]?(?:\d[\d_]*\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$")
 _ITEM_RE = re.compile(r"^(?P<indent> *)-(?:[ ]+(?P<rest>.*))?$")
-_ITEM_RE = re.compile(r"^(?P<indent> *)-(?:[ ]+(?P<rest>.*))?$")
 _YAML_WORDS = {"true", "false", "null", "~", "yes", "no", "on", "off"}
 
 
@@ -457,4 +456,13 @@ def write_dsh(patch_path: pathlib.Path, entry: dict, dry_run: bool = False) -> s
     if not dry_run and new_text != old_text:
         _verify_written(path, old_text, _dsh_has_entry, "mcp-manager.config.servers.dap")
     return new_text
+
+
+def has_entry(client: str, text: str) -> bool:
+    """True when *text* already contains the DAP entry for *client*."""
+    if client == "hermes":
+        return _mapping_path_exists(text, ["mcp_servers", "dap"])
+    if client == "dsh":
+        return _dsh_has_entry(text)
+    raise ValueError(f"unknown client: {client}")
 

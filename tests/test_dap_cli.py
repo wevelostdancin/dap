@@ -9,12 +9,15 @@ the stdio server is replaced by a stub, so the suite runs offline in seconds.
 from __future__ import annotations
 
 import contextlib
+import http.server
 import importlib.util
 import io
+import json
 import os
 import pathlib
 import re
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -111,6 +114,65 @@ class RunTest(unittest.TestCase):
                 self.assertEqual(code, 0)
                 self.assertEqual(os.environ["DAP_HOME"], str(pathlib.Path(tmp).resolve()))
         self.assertEqual(calls, ["main"])
+
+
+
+
+FAKE_ADAPTER = '''#!/usr/bin/env python3
+import json
+import sys
+
+TOOLS = [
+    {"name": "tool_%d" % index, "description": "fake", "inputSchema": {"type": "object"}}
+    for index in range(COUNT)
+]
+
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    message = json.loads(line)
+    method = message.get("method")
+    if method == "initialize":
+        reply = {
+            "jsonrpc": "2.0",
+            "id": message.get("id"),
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "fake-dap", "version": "0"},
+            },
+        }
+        print(json.dumps(reply), flush=True)
+    elif method == "tools/list":
+        reply = {"jsonrpc": "2.0", "id": message.get("id"), "result": {"tools": TOOLS}}
+        print(json.dumps(reply), flush=True)
+'''
+
+SILENT_ADAPTER = '''#!/usr/bin/env python3
+import sys
+import time
+
+for _line in sys.stdin:
+    time.sleep(30)
+'''
+
+
+class _HealthHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"ok":true}')
+
+    def log_message(self, *args):
+        pass
+
+
+def start_fake_engine():
+    server = http.server.HTTPServer(("127.0.0.1", 0), _HealthHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
 
 
 SIBLING_CONFIG = "mcp_servers:\n  other:\n    command: other\n"
@@ -261,3 +323,118 @@ class InstallDshTest(unittest.TestCase):
         self.assertEqual(self.path.read_text(encoding="utf-8"), first)
         self.assertEqual(self.path.stat().st_mtime_ns, mtime)
         self.assertEqual(first.count("- id: mcp-manager"), 1)
+
+class DoctorTest(unittest.TestCase):
+    """doctor runs against a temp home: a stub HTTP server stands in for the engine."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(prefix="dap-doctor-")
+        self.addCleanup(self._tmp.cleanup)
+        self.home = pathlib.Path(self._tmp.name)
+        self.engine = start_fake_engine()
+        self.addCleanup(self.engine.server_close)
+        self.addCleanup(self.engine.shutdown)
+        self.port = self.engine.server_address[1]
+        patched = mock.patch.dict(
+            os.environ,
+            {
+                "HOME": str(self.home),
+                "DAP_HOME": str(self.home),
+                "DAP_PORT": str(self.port),
+            },
+        )
+        patched.start()
+        self.addCleanup(patched.stop)
+
+    def make_jar(self):
+        jar = self.home / "engine-native" / "target" / "dap-native.jar"
+        jar.parent.mkdir(parents=True, exist_ok=True)
+        jar.write_bytes(b"")
+
+    def make_adapter(self, count=23, body=None):
+        path = self.home / "adapters" / "mcp" / "dap_mcp.py"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        text = body if body is not None else FAKE_ADAPTER.replace("COUNT", str(count))
+        path.write_text(text, encoding="utf-8")
+
+    def make_config(self, text="mcp_servers:\n  dap:\n    command: python3\n"):
+        path = self.home / ".hermes" / "config.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def doctor(self, *extra):
+        return run_cli(["doctor", "--client", "hermes", *extra])
+
+    def test_all_checks_pass(self):
+        self.make_jar()
+        self.make_adapter(23)
+        self.make_config()
+        code, out, err = self.doctor()
+        self.assertEqual(code, 0, out + err)
+        for name in ("python", "jar", "engine", "preflight", "config", "port"):
+            self.assertRegex(out, rf"PASS  {name}\b")
+        self.assertIn("tools/list returned 23 tools", out)
+
+    def test_missing_jar_fails(self):
+        self.make_adapter(23)
+        self.make_config()
+        code, out, err = self.doctor()
+        self.assertEqual(code, 1)
+        self.assertRegex(out, r"FAIL  jar\b")
+        self.assertIn("make build-native", out)
+
+    def test_config_without_dap_fails(self):
+        self.make_jar()
+        self.make_adapter(23)
+        self.make_config(text=SIBLING_CONFIG)
+        code, out, err = self.doctor()
+        self.assertEqual(code, 1)
+        self.assertRegex(out, r"FAIL  config\b")
+        self.assertIn("no dap entry", out)
+
+    def test_missing_config_fails(self):
+        self.make_jar()
+        self.make_adapter(23)
+        code, out, err = self.doctor()
+        self.assertEqual(code, 1)
+        self.assertRegex(out, r"FAIL  config\b")
+
+    def test_preflight_counts_tools(self):
+        self.make_jar()
+        self.make_adapter(23)
+        cli = load_cli()
+        self.assertEqual(cli.stdio_preflight(self.home), 23)
+
+    def test_preflight_below_minimum_fails(self):
+        self.make_jar()
+        self.make_adapter(21)
+        self.make_config()
+        code, out, err = self.doctor()
+        self.assertEqual(code, 1)
+        self.assertRegex(out, r"FAIL  preflight\b")
+        self.assertIn("21 tools", out)
+
+    def test_silent_adapter_times_out(self):
+        self.make_adapter(body=SILENT_ADAPTER)
+        cli = load_cli()
+        with self.assertRaises(TimeoutError):
+            cli.stdio_preflight(self.home, timeout=0.5)
+
+    def test_json_output(self):
+        self.make_jar()
+        self.make_adapter(23)
+        self.make_config()
+        code, out, err = self.doctor("--json")
+        self.assertEqual(code, 0, err)
+        checks = json.loads(out)
+        self.assertEqual(
+            [check["name"] for check in checks],
+            ["python", "jar", "engine", "preflight", "config", "port"],
+        )
+        self.assertTrue(all(check["ok"] for check in checks))
+
+    def test_min_tools_matches_declared_tools(self):
+        cli = load_cli()
+        adapter = cli._load_adapter()
+        self.assertEqual(cli.MIN_TOOLS, len(adapter.TOOLS))
+

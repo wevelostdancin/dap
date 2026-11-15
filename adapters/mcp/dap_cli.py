@@ -22,12 +22,19 @@ both clients scrub the child environment.
 from __future__ import annotations
 
 import argparse
+import collections
 import importlib.util
+import json
 import os
 import pathlib
 import re
+import select
 import shutil
+import socket
+import subprocess
 import sys
+import time
+import urllib.request
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
@@ -36,6 +43,14 @@ CLIENT_CONFIGS = {
     "hermes": pathlib.Path(".hermes") / "config.yaml",
     "dsh": pathlib.Path(".dsh") / "profiles" / "desktop" / "cordis.patch.yml",
 }
+
+# The adapter currently declares 22 tools; the 1.1.0 target is >= 23 once the
+# recipes stage lands. test_min_tools_matches_declared_tools keeps this honest.
+MIN_TOOLS = 22
+PREFLIGHT_TIMEOUT = 10.0
+PROTOCOL_VERSION = "2024-11-05"
+
+Check = collections.namedtuple("Check", "name ok detail")
 
 
 # ------------------------------------------------------------------- helpers
@@ -216,12 +231,223 @@ def _cmd_install(args: argparse.Namespace, home: pathlib.Path) -> int:
     return 0
 
 
-def _cmd_doctor(_args: argparse.Namespace, _home: pathlib.Path) -> int:
-    print("dap-mcp: doctor is not implemented yet", file=sys.stderr)
-    return 2
+def _cmd_doctor(args: argparse.Namespace, home: pathlib.Path) -> int:
+    os.environ["DAP_HOME"] = str(home)
+    checks = doctor(getattr(args, "client", None), home)
+    if getattr(args, "json", False):
+        payload = [
+            {"name": check.name, "ok": check.ok, "detail": check.detail}
+            for check in checks
+        ]
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        for check in checks:
+            status = "PASS" if check.ok else "FAIL"
+            print(f"{status}  {check.name:<11} {check.detail}")
+    return 0 if all(check.ok for check in checks) else 1
+
+
+# -------------------------------------------------------------------- doctor
+
+def _port() -> int:
+    raw = (os.environ.get("DAP_PORT") or "7800").strip()
+    try:
+        port = int(raw)
+    except ValueError:
+        return 7800
+    return port if 1 <= port <= 65535 else 7800
+
+
+def _engine_healthy() -> bool:
+    url = f"http://127.0.0.1:{_port()}/v1/health"
+    try:
+        with urllib.request.urlopen(url, timeout=2) as response:
+            return response.status == 200
+    except (OSError, ValueError):
+        return False
+
+
+def _check_python() -> Check:
+    version = ".".join(str(part) for part in sys.version_info[:3])
+    if sys.version_info >= (3, 10):
+        return Check("python", True, version)
+    return Check("python", False, f"{version} (need >= 3.10)")
+
+
+def _check_jar(home: pathlib.Path) -> Check:
+    jar = home / "engine-native" / "target" / "dap-native.jar"
+    if jar.is_file():
+        return Check("jar", True, str(jar))
+    return Check("jar", False, f"missing {jar} (run make build-native)")
+
+
+def _check_engine() -> Check:
+    port = _port()
+    if _engine_healthy():
+        return Check("engine", True, f"healthy at 127.0.0.1:{port}")
+    return Check(
+        "engine",
+        False,
+        f"no /v1/health at 127.0.0.1:{port}; run make run-native or let the adapter start it",
+    )
+
+
+def _check_port() -> Check:
+    port = _port()
+    if _engine_healthy():
+        return Check("port", True, f"{port} in use by DAP")
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("127.0.0.1", port))
+    except OSError:
+        return Check("port", False, f"{port} is in use by another process")
+    finally:
+        sock.close()
+    return Check("port", True, f"{port} free")
+
+
+def _check_config(client: str | None) -> Check:
+    module = _load_config()
+    names = [client] if client else sorted(CLIENT_CONFIGS)
+    passed: list[str] = []
+    failed: list[str] = []
+    for name in names:
+        path = _client_config_path(name, None, None)
+        if not path.is_file():
+            failed.append(f"{name}: config not found ({path})")
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            failed.append(f"{name}: cannot read {path}: {exc}")
+            continue
+        if module.has_entry(name, text):
+            passed.append(f"{name}: dap entry in {path}")
+        else:
+            failed.append(f"{name}: no dap entry in {path}")
+    if failed:
+        return Check("config", False, "; ".join(failed))
+    return Check("config", True, "; ".join(passed))
+
+
+def _send(process, message: dict) -> None:
+    process.stdin.write(json.dumps(message) + "\n")
+    process.stdin.flush()
+
+
+def _read_reply(process, message_id: int, deadline: float) -> dict:
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("stdio preflight timed out")
+        ready, _, _ = select.select([process.stdout], [], [], remaining)
+        if not ready:
+            raise TimeoutError("stdio preflight timed out")
+        line = process.stdout.readline()
+        if not line:
+            raise RuntimeError("adapter closed stdout before replying")
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if message.get("id") != message_id:
+            continue
+        if "error" in message:
+            raise RuntimeError(f"JSON-RPC error: {message['error']}")
+        result = message.get("result")
+        return result if isinstance(result, dict) else {}
+
+
+def _stop_process(process) -> None:
+    try:
+        process.stdin.close()
+    except (OSError, ValueError):
+        pass
+    try:
+        process.wait(timeout=1)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    process.terminate()
+    try:
+        process.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=3)
+
+
+def stdio_preflight(home: pathlib.Path, timeout: float = PREFLIGHT_TIMEOUT) -> int:
+    """Run initialize then tools/list over stdio; return the number of tools.
+
+    The adapter is started directly, so the check does not depend on any client
+    CLI being installed or runnable.
+    """
+    adapter = pathlib.Path(_adapter_path(home))
+    if not adapter.is_file():
+        raise FileNotFoundError(f"adapter not found: {adapter}")
+    environment = dict(os.environ, DAP_HOME=str(home))
+    process = subprocess.Popen(
+        [_python(), str(adapter)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        cwd=str(home),
+        env=environment,
+        text=True,
+        bufsize=1,
+    )
+    deadline = time.monotonic() + timeout
+    try:
+        _send(
+            process,
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": PROTOCOL_VERSION,
+                    "capabilities": {},
+                    "clientInfo": {"name": "dap-mcp-doctor", "version": _read_version(home)},
+                },
+            },
+        )
+        _read_reply(process, 1, deadline)
+        _send(process, {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
+        _send(process, {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+        result = _read_reply(process, 2, deadline)
+    finally:
+        _stop_process(process)
+    tools = result.get("tools")
+    if not isinstance(tools, list):
+        raise RuntimeError("tools/list returned no tools array")
+    return len(tools)
+
+
+def _check_preflight(home: pathlib.Path) -> Check:
+    try:
+        count = stdio_preflight(home)
+    except Exception as exc:  # noqa: BLE001 - every failure is a failed check
+        return Check("preflight", False, f"{type(exc).__name__}: {exc}")
+    if count >= MIN_TOOLS:
+        return Check("preflight", True, f"tools/list returned {count} tools")
+    return Check("preflight", False, f"tools/list returned {count} tools (need >= {MIN_TOOLS})")
+
+
+def doctor(client: str | None, home: pathlib.Path) -> list:
+    """Run every check; the order is stable for humans and for --json."""
+    return [
+        _check_python(),
+        _check_jar(home),
+        _check_engine(),
+        _check_preflight(home),
+        _check_config(client),
+        _check_port(),
+    ]
 
 
 # --------------------------------------------------------------------- entry
+
 
 def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
