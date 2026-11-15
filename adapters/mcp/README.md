@@ -6,7 +6,7 @@ stdio-сервер [Model Context Protocol](https://modelcontextprotocol.io) н�
 
 - Python 3.10+, только стандартная библиотека (без pip-зависимостей).
 - JSON-RPC 2.0, по одному объекту на строку: запросы в stdin, ответы в stdout.
-- Инструменты — только `dap_*` (28 штук). Ошибки движка приходят как JSON-RPC `error`.
+- Инструменты — только `dap_*` (30 штук). Ошибки движка приходят как JSON-RPC `error`.
 
 ## Быстрый старт
 
@@ -160,6 +160,8 @@ printf '%s\n' \
 | `dap_profile_table` | профиль: пропуски, уникальные, min/max/mean | `workflow`, `node` |
 | `dap_ingest` | один раз конвертировать CSV/Excel/JSON/Parquet в Parquet-кэш | `file`, `format`? |
 | `dap_analyze` | один вызов: файл/датасет → таблица + профиль, опционально SQL по `src` | `file`?/`dataset`?, `format`?, `sql`?, `profile` (true), `limit` (20), `timeoutSec`? |
+| `dap_report` | один вызов: файл/датасет → таблица + Markdown-отчёт + график | `file`?/`dataset`?, `format`?, `sql`?, `report`, `chart`?, `chartType`? (bar), `x`?, `y`[]?, `title`?, `profile` (true), `limit` (20), `timeoutSec`? |
+| `dap_profile` | один вызов: компактный профиль файла/датасета без таблицы | `file`?/`dataset`?, `format`?, `limit` (10), `timeoutSec`? |
 | `dap_workflow_build` | один вызов: узлы + связи + запуск + таблицы выходов | `nodes`, `edges`?, `run` (false), `outputs`?, `limit` (20), `timeoutSec`? |
 | `dap_sql` | read-only SQL по таблице узла или по входу `src` | `workflow`, `sql`, `node`?, `limit` |
 | `dap_recipe_list` | рецепты библиотеки | — |

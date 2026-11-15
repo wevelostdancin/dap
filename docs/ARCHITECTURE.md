@@ -87,7 +87,7 @@ JobManager ──► Dag (уровни Кана, параллельные вет
 | `ArrowTable`, `CsvParser`, `CsvTableReader`, `XlsxTableReader` | Граница данных на входе: разбор CSV/XLSX в Arrow, затем построчная вставка в DuckDB |
 | `IngestService` | Parquet-кэш `POST /v1/datasets`: конвертация CSV/Excel/JSON/Parquet, ключ SHA-256 (путь, размер, mtime, формат), ответ `path/rows/columns/cached` |
 | `CatalogHandlers`, `WorkflowHandlers`, `JobHandlers`, `DataHandlers`, `DatasetHandlers`, `OpsHandlers` | HTTP-слой: валидация запросов, коды ошибок, сериализация ответов |
-| MCP-адаптер (`adapters/mcp/dap_mcp.py`) | Отдельный Python-процесс: stdio JSON-RPC 2.0, 28 инструментов `dap_*`, при необходимости поднимает jar |
+| MCP-адаптер (`adapters/mcp/dap_mcp.py`) | Отдельный Python-процесс: stdio JSON-RPC 2.0, 30 инструментов `dap_*`, при необходимости поднимает jar |
 
 ## 3. Жизненный цикл запроса
 
@@ -223,7 +223,7 @@ cached}`. Ключ кэша — SHA-256 от абсолютного пути, р
 на строку, только стандартная библиотека Python. Вычислений в адаптере нет: он вызывает
 `/v1` и возвращает результат как текст.
 
-- 28 инструментов `dap_*`: каталог и схемы настроек, сборка workflow, запуск
+- 30 инструментов `dap_*`: каталог и схемы настроек, сборка workflow, запуск
   (sync/async), задания, таблица, профиль, ingest в Parquet-кэш (`dap_ingest`),
   сохранение и загрузка, `dap_shutdown`.
 - Сессия задаётся один раз переменной `DAP_SESSION` и уходит заголовком
