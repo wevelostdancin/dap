@@ -234,6 +234,12 @@ def native_binding(node_type, config, datasets):
             "columns": _dataset_columns(entry),
             "emptyStringIsNull": False,
         }
+    if node_type in ("db_reader", "file_list"):
+        resolved = dict(config)
+        for key in ("path", "directory"):
+            if isinstance(resolved.get(key), str):
+                resolved[key] = resolved[key].replace("{DATA}", str(DATA_DIR.resolve()))
+        return "dap." + node_type, resolved
     return "dap." + node_type, config
 
 

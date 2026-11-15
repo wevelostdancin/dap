@@ -533,6 +533,7 @@ public final class DuckDbSession implements AutoCloseable {
         prefixes.add("excel_" + workflowId + "_");
         prefixes.add("csv_" + sanitize(workflowId) + "_");
         prefixes.add("excel_" + sanitize(workflowId) + "_");
+        prefixes.add("db_" + sanitize(workflowId) + "_");
         List<String> names = new ArrayList<>();
         try (Statement statement = base.createStatement();
              ResultSet result = statement.executeQuery(

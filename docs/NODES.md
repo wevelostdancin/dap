@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 45 узлов `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (45 строк);
+Каталог нативного движка: 46 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (46 строк);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 45 узлов имеют `available: true` и `tier: core`.
+спеке. Все 46 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -1340,7 +1340,49 @@ EXPORT IMPORT CALL` и второй оператор (`;` вне кавычек)
 }
 ```
 
-## 47. Порядок для агента
+## 47. dap.db_reader
+
+Читает одну таблицу или результат read-only запроса из внешней БД и копирует его в
+таблицу сессии: остальной граф видит обычную таблицу, как после `dap.csv_reader`.
+DuckDB-файл подключается нативно; SQLite, PostgreSQL и MySQL — через расширения
+`sqlite_scanner`, `postgres_scanner`, `mysql_scanner` (ставятся один раз
+`make extensions`; без расширения — ошибка `extension_missing` с этим hint).
+Подключение `READ_ONLY` по умолчанию и отключается после копирования
+(`DETACH`), поэтому файл не остаётся залоченным.
+Порты: входов нет; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `driver` | string | — | обязателен: `duckdb`, `sqlite`, `postgres`, `mysql` |
+| `path` | string | — | обязателен для `duckdb`/`sqlite`; абсолютный путь к файлу БД |
+| `url` | string | — | обязателен для `postgres`/`mysql`; `user`/`password` можно передать отдельно |
+| `table` | string | — | таблица; можно `schema.table`; ровно один из `table`/`query` |
+| `query` | string | — | read-only `SELECT`/`WITH`; таблицы внешней БД доступны по имени; ровно один из `table`/`query` |
+| `read_only` | boolean | `true` | `ATTACH ... (READ_ONLY)` |
+| `user` | string | — | пользователь для `postgres`/`mysql`; не сохраняется в `workflow.json` |
+| `password` | string | — | пароль; не сохраняется в `workflow.json` и маскируется в ошибках |
+
+Схема выхода — колонки скопированной таблицы. `TIMESTAMPTZ`, `LIST`, `STRUCT`,
+`MAP` из внешней БД отклоняются с именем колонки (нет Arrow-представления) —
+выберите другую колонку или `query` с приведением типа.
+При `POST /v1/workflows/{id}/save` из настроек `dap.db_reader` удаляются
+`user`/`password`, а userinfo в `url` заменяется на `***`: после загрузки
+workflow.json учётные данные нужно передать заново.
+`query` видит все таблицы подключённой БД как CTE с именем таблицы (одна схема на
+имя); при дубле имени между схемами используется первая по порядку схем.
+
+```json
+{
+  "factory": "dap.db_reader",
+  "settings": {
+    "driver": "sqlite",
+    "path": "/data/sales.db",
+    "table": "orders"
+  }
+}
+```
+
+## 48. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.

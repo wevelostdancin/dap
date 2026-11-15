@@ -61,13 +61,13 @@ class CatalogHandlersTest {
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(45, body.path("count").asInt());
+        assertEquals(46, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(45, nodes.size());
+        assertEquals(46, nodes.size());
                 assertEquals(List.of(
                 "Binner", "Column Filter", "Column Renamer",
                 "Column Resorter", "Concatenate", "Correlation",
-                "CSV Reader", "CSV Writer", "Date & Time",
+                "CSV Reader", "CSV Writer", "Database Reader", "Date & Time",
                 "Date Range", "Describe", "Diff",
                 "Duplicate Filter", "Encoder", "Excel Reader",
                 "Excel Writer", "Group By", "Histogram",
@@ -106,12 +106,12 @@ class CatalogHandlersTest {
         assertEquals("dap.csv_writer", csv.path("nodes").get(1).path("id").asText());
 
         JsonNode io = body(fetch("/nodes?category=%2FIO", "s"));
-        assertEquals(8, io.path("count").asInt());
-        assertEquals(List.of("CSV Reader", "CSV Writer", "Excel Reader", "Excel Writer", "JSON Reader",
-                "JSON Writer", "Parquet Reader", "Parquet Writer"), names(io.path("nodes")));
+        assertEquals(9, io.path("count").asInt());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Excel Reader", "Excel Writer",
+                "JSON Reader", "JSON Writer", "Parquet Reader", "Parquet Writer"), names(io.path("nodes")));
 
         JsonNode combined = body(fetch("/nodes?q=reader&category=%2FIO", "s"));
-        assertEquals(4, combined.path("count").asInt());
+        assertEquals(5, combined.path("count").asInt());
     }
 
     @Test

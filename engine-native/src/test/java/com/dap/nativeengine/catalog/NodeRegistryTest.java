@@ -59,7 +59,8 @@ class NodeRegistryTest {
             "dap.diff",
             "dap.date_range",
             "dap.excel_writer",
-            "dap.sql_query");
+            "dap.sql_query",
+            "dap.db_reader");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -241,11 +242,11 @@ class NodeRegistryTest {
     @Test
     void categoryPrefixFindsAllIoNodes() {
         List<NodeSpec> hits = registry.search(null, "/IO", 50);
-        assertEquals(8, hits.size());
-        assertEquals(List.of("CSV Reader", "CSV Writer", "Excel Reader", "Excel Writer", "JSON Reader",
-                "JSON Writer", "Parquet Reader", "Parquet Writer"),
+        assertEquals(9, hits.size());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Excel Reader", "Excel Writer",
+                "JSON Reader", "JSON Writer", "Parquet Reader", "Parquet Writer"),
                 hits.stream().map(NodeSpec::name).toList());
-        assertEquals(4, registry.search(null, "/IO/Read", 50).size());
+        assertEquals(5, registry.search(null, "/IO/Read", 50).size());
         assertEquals(4, registry.search(null, "/IO/Write", 50).size());
     }
 
@@ -253,7 +254,7 @@ class NodeRegistryTest {
     void searchTokensAreCombinedWithAnd() {
         assertEquals(1, registry.search("reader csv", null, 50).size());
         assertEquals(0, registry.search("reader zzz", null, 50).size());
-        assertEquals(4, registry.search("reader", "/IO", 50).size());
+        assertEquals(5, registry.search("reader", "/IO", 50).size());
     }
 
     @Test

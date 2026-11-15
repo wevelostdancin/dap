@@ -22,8 +22,8 @@
 
 `tests/goldens-native/` — эталонные сценарии:
 
-    workflows/      13 workflow: описание графа + checks
-    data/           фикстуры (CSV/XLSX) и datasets.json (схема, типы)
+    workflows/      17 workflow: описание графа + checks
+    data/           фикстуры (CSV/XLSX/SQLite/DuckDB), datasets.json (схема, типы)
     expected.json   замороженные наблюдения (таблицы и профили)
     runner.py       прогон через /v1 и сравнение
 
@@ -51,7 +51,9 @@ int/NULL, `""` — значение, ordered/unordered.
 
 ## Добавить golden
 
-1. Положить фикстуру в `goldens-native/data/` и запись в `datasets.json`.
+1. Положить фикстуру в `goldens-native/data/` и запись в `datasets.json`
+   (SQL-фикстуры `fixture.db`/`fixture.duckdb` пересобираются
+   `python3 tests/goldens-native/data/make_db_fixtures.py`).
 2. Добавить `workflows/wf-*.json` с checks.
 3. Для baseline-сценария — добавить наблюдение в `expected.json` вручную
    (CLI-флага `--record` нет: эталон фиксируется осознанно, а не автозаписью).

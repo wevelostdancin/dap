@@ -43,3 +43,4 @@ dap.diff.json
 dap.date_range.json
 dap.excel_writer.json
 dap.sql_query.json
+dap.db_reader.json
