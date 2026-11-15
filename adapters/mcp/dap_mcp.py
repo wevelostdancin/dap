@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -45,6 +46,24 @@ _CHILD: subprocess.Popen | None = None
 # Boot generation of the engine we talked to last, and a pending restart notice.
 _GENERATION: str | None = None
 _RESTART_PENDING = False
+
+# --------------------------------------------------------------- sibling modules
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load_sibling(name: str, filename: str):
+    """Load a sibling module by path, so the adapter runs as a script and as a module."""
+    spec = importlib.util.spec_from_file_location(name, os.path.join(HERE, filename))
+    if spec is None or spec.loader is None:
+        raise ImportError(f"cannot load {filename}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+RESOURCES = _load_sibling("dap_mcp_resources", "resources.py")
+RECIPES = _load_sibling("dap_mcp_recipes", "recipes.py")
 
 
 class DapError(Exception):
@@ -634,6 +653,30 @@ def tool_load_workflow(args: dict):
     return call("POST", "/v1/workflows/load", body)
 
 
+# ------------------------------------------------------------------ resources
+
+def _resource_error(message: str, uri: str | None = None) -> DapError:
+    return DapError(message, code=-32602, data={"uri": uri} if uri else None)
+
+
+def read_resource(uri: str) -> str:
+    """Return the JSON text of one MCP resource; engine errors propagate as DapError."""
+    try:
+        kind, name = RESOURCES.parse_uri(uri)
+    except RESOURCES.ResourceError as failure:
+        raise _resource_error(str(failure), uri)
+    if kind == "catalog":
+        ensure_service()
+        return RESOURCES.render_catalog(call("GET", "/v1/nodes?limit=1000"))
+    if kind == "recipes":
+        return RESOURCES.render_recipes(RECIPES.list_recipes(DAP_HOME))
+    try:
+        document = RECIPES.load_recipe(DAP_HOME, name)
+    except RECIPES.RecipeError as failure:
+        raise DapError(str(failure), code=-32602, data=failure.data or {"name": name})
+    return RESOURCES.render_recipe(document, name)
+
+
 def _reap_child() -> None:
     """Дождаться собственного дочернего процесса после shutdown (без зомби)."""
     global _CHILD
@@ -720,7 +763,10 @@ def handle(msg: dict) -> None:
             msg_id,
             {
                 "protocolVersion": version,
-                "capabilities": {"tools": {"listChanged": False}},
+                "capabilities": {
+                    "tools": {"listChanged": False},
+                    "resources": {"listChanged": False},
+                },
                 "serverInfo": {"name": "dap-mcp", "version": "1.0.0"},
             },
         )
@@ -728,6 +774,29 @@ def handle(msg: dict) -> None:
 
     if method == "ping":
         respond(msg_id, {})
+        return
+
+    if method == "resources/list":
+        respond(msg_id, {"resources": RESOURCES.list_resources()})
+        return
+
+    if method == "resources/read":
+        uri = params.get("uri")
+        if not isinstance(uri, str) or not uri.strip():
+            fail(msg_id, -32602, "resources/read: 'uri' is required")
+            return
+        try:
+            text = read_resource(uri)
+        except DapError as e:
+            note = _restart_note() if e.code in (-32000, -32001) else ""
+            fail(msg_id, e.code, note + str(e), e.data)
+        except Exception as e:  # noqa: BLE001 — граница протокола
+            fail(msg_id, -32603, f"{type(e).__name__}: {e}")
+        else:
+            respond(
+                msg_id,
+                {"contents": [{"uri": uri, "mimeType": "application/json", "text": text}]},
+            )
         return
 
     if method == "tools/list":
