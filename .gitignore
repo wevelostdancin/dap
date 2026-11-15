@@ -14,6 +14,10 @@ workspace/
 __pycache__/
 *.pyc
 
+# The coverage suite is part of the repo; the user-global gitignore skips coverage/.
+!tests/coverage/
+!tests/coverage/**
+
 # Logs and OS metadata
 *.log
 .DS_Store

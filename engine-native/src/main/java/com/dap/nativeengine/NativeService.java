@@ -49,6 +49,7 @@ import com.dap.nativeengine.nodes.GroupByExecutor;
 import com.dap.nativeengine.nodes.JsonReaderExecutor;
 import com.dap.nativeengine.nodes.JsonWriterExecutor;
 import com.dap.nativeengine.nodes.JoinerExecutor;
+import com.dap.nativeengine.nodes.MarkdownReportExecutor;
 import com.dap.nativeengine.nodes.MathFormulaExecutor;
 import com.dap.nativeengine.nodes.MissingValueExecutor;
 import com.dap.nativeengine.nodes.ParquetReaderExecutor;
@@ -498,7 +499,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new GroupByExecutor())
                 .register(new JoinerExecutor())
                 .register(new StringManipulationExecutor())
-                .register(new MathFormulaExecutor());
+                .register(new MathFormulaExecutor())
+                .register(new MarkdownReportExecutor());
     }
 
     public static void main(String[] args) {

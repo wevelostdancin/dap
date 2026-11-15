@@ -1,0 +1,126 @@
+{
+  "id": "wf-coverage-markdown",
+  "task": "H5",
+  "node": "dap.markdown_report",
+  "title": "Coverage H5: Markdown report (table, profile, text, metrics)",
+  "rationale": "Runs dap.markdown_report end to end through /v1 and checks the pass-through table; the report file is written next to the engine's temporary data directory.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "report",
+      "type": "markdown_report",
+      "config": {
+        "file": "/tmp/dap-goldens/coverage-markdown.md",
+        "title": "P2 report",
+        "sections": [
+          {
+            "kind": "table",
+            "title": "Rows",
+            "columns": [
+              "id",
+              "name",
+              "score"
+            ],
+            "limit": 10
+          },
+          {
+            "kind": "profile",
+            "title": "Profile",
+            "columns": [
+              "id"
+            ]
+          },
+          {
+            "kind": "text",
+            "title": "Note",
+            "text": "Coverage scenario H5."
+          },
+          {
+            "kind": "metrics",
+            "title": "Metrics",
+            "columns": [
+              "score"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "report"
+    }
+  ],
+  "checks": [
+    {
+      "node": "report",
+      "kind": "expect",
+      "rows": 6,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "score",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "category",
+          "type": "String"
+        }
+      ],
+      "data": [
+        [
+          1,
+          "alpha",
+          1,
+          "A"
+        ],
+        [
+          2,
+          "beta",
+          2,
+          "B"
+        ],
+        [
+          3,
+          "gamma",
+          3,
+          "A"
+        ],
+        [
+          4,
+          "delta",
+          4,
+          "C"
+        ],
+        [
+          3,
+          "gamma",
+          3,
+          "A"
+        ],
+        [
+          5,
+          "epsilon",
+          5,
+          "B"
+        ]
+      ],
+      "order": "ordered"
+    }
+  ]
+}
