@@ -160,7 +160,11 @@ class RecipeToolsTest(unittest.TestCase):
         self.assertEqual(by_name["dap_recipe_save"]["inputSchema"]["required"],
                          ["name", "workflow"])
         self.assertEqual(by_name["dap_recipe_run"]["inputSchema"]["required"], ["name"])
-        self.assertEqual(by_name["dap_sql"]["inputSchema"]["required"], ["workflow", "sql"])
+        sql_schema = by_name["dap_sql"]["inputSchema"]
+        # sql and queries are mutually exclusive, so only workflow is required statically.
+        self.assertEqual(sql_schema["required"], ["workflow"])
+        self.assertIn("sql", sql_schema["properties"])
+        self.assertIn("queries", sql_schema["properties"])
 
     # -- save ----------------------------------------------------------------
 

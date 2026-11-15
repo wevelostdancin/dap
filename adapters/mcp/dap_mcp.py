@@ -607,19 +607,38 @@ TOOLS = [
         "name": "dap_sql",
         "description": (
             "Добавить узел dap.sql_query в workflow, выполнить его и вернуть таблицу. "
-            "Принимает один read-only SELECT/WITH; DDL/DML и несколько стейтментов "
-            "отклоняются до обращения к движку. Если передан node, его таблица доступна "
-            "в SQL под именем node id (в кавычках, например \"1:1\")."
+            "Принимает один read-only SELECT/WITH ('sql') или батч 'queries' — по узлу на "
+            "запрос, один запуск и таблица на запрос. С 'explain' узел не выполняется: "
+            "возвращается оценка /estimate (rows, operators, plan). DDL/DML и несколько "
+            "стейтментов отклоняются до обращения к движку. Если передан node, его таблица "
+            "доступна в SQL под именем node id (в кавычках, например \"1:1\")."
         ),
         "inputSchema": _obj(
             {
                 "workflow": _str(_WF),
                 "node": _str("опционально: узел-источник, чья таблица доступна в SQL"),
                 "sql": _str("один SELECT или WITH; DDL/DML и несколько стейтментов запрещены"),
+                "queries": {
+                    "type": "array",
+                    "description": "батч запросов: по узлу dap.sql_query на элемент",
+                    "items": _obj(
+                        {
+                            "sql": _str("один read-only SELECT или WITH"),
+                            "limit": _int("cap строк этого узла", 20),
+                            "node": _str("опционально: узел-источник для этого запроса"),
+                        },
+                        ["sql"],
+                    ),
+                },
+                "explain": {
+                    "type": "boolean",
+                    "description": "не выполнять: вернуть оценку /estimate построенного узла",
+                    "default": False,
+                },
                 "limit": _int("сколько строк таблицы вернуть", 20),
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
             },
-            ["workflow", "sql"],
+            ["workflow"],
         ),
     },
     {
@@ -1208,39 +1227,119 @@ def tool_recipe_run(args: dict):
     }
 
 
-def tool_sql(args: dict):
-    workflow = _need(args, "workflow")
+_SQL_QUERY_KEYS = ("sql", "limit", "node")
+
+
+def _sql_limit(value, where: str = "'limit'") -> int:
     try:
-        sql = RECIPES.validate_sql(_need(args, "sql"))
-    except RECIPES.RecipeError as failure:
-        raise _recipe_error(failure)
-    settings = {"sql": sql}
+        limit = int(value)
+    except (TypeError, ValueError):
+        raise DapError(f"{where} должен быть целым числом от 1 до 1000", code=-32602)
+    if limit < 1 or limit > 1000:
+        raise DapError(f"{where} должен быть от 1 до 1000", code=-32602)
+    return limit
+
+
+def _sql_plans(args: dict) -> tuple[list[dict], bool]:
+    """One plan per sql_query node to add; the second value marks a single 'sql'."""
+    single = args.get("sql")
+    batch = args.get("queries")
+    if single is not None and batch is not None:
+        raise DapError("укажите либо 'sql', либо 'queries', не оба", code=-32602)
+    if single is None and batch is None:
+        raise DapError("нужен 'sql' или 'queries'", code=-32602)
+    default_limit = None
     if args.get("limit") is not None:
-        settings["limit"] = int(args["limit"])
-    upstream = args.get("node")
+        default_limit = _sql_limit(args["limit"])
+    if batch is None:
+        return [{"sql": _read_only_sql(single), "limit": default_limit,
+                 "node": args.get("node")}], True
+    if not isinstance(batch, list) or not batch:
+        raise DapError("'queries' должен быть непустым массивом", code=-32602)
+    plans = []
+    for index, item in enumerate(batch):
+        if not isinstance(item, dict):
+            raise DapError(f"queries[{index}] должен быть объектом", code=-32602)
+        unknown = set(item) - set(_SQL_QUERY_KEYS)
+        if unknown:
+            raise DapError(
+                f"queries[{index}]: неизвестные ключи: {', '.join(sorted(unknown))}",
+                code=-32602,
+            )
+        sql = item.get("sql")
+        if sql is None or (isinstance(sql, str) and not sql.strip()):
+            raise DapError(f"queries[{index}]: обязательный аргумент 'sql' не задан",
+                           code=-32602)
+        limit = None if item.get("limit") is None else _sql_limit(
+            item["limit"], f"queries[{index}].limit")
+        plans.append({"sql": _read_only_sql(sql), "limit": limit,
+                      "node": item.get("node")})
+    return plans, False
+
+
+def _add_sql_node(workflow: str, plan: dict) -> str:
+    settings = {"sql": plan["sql"]}
+    if plan["limit"] is not None:
+        settings["limit"] = plan["limit"]
+    upstream = plan["node"]
     if upstream:
         settings["inputs"] = [str(upstream)]
-    created = call(
-        "POST",
-        f"/v1/workflows/{_seg(workflow)}/nodes",
-        {"factory": "dap.sql_query", "settings": settings},
-    )
+    created = call("POST", f"/v1/workflows/{_seg(workflow)}/nodes",
+                   {"factory": "dap.sql_query", "settings": settings})
     node = created.get("node") if isinstance(created, dict) else None
     if not node:
         raise DapError("движок не вернул id узла dap.sql_query")
     if upstream:
-        call(
-            "POST",
-            f"/v1/workflows/{_seg(workflow)}/connect",
-            {"from": str(upstream), "fromPort": 0, "to": node, "toPort": 0},
-        )
+        call("POST", f"/v1/workflows/{_seg(workflow)}/connect",
+             {"from": str(upstream), "fromPort": 0, "to": node, "toPort": 0})
+    return str(node)
+
+
+def _estimate_node(workflow: str, node: str) -> dict:
+    estimate = call("GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/estimate")
+    return estimate if isinstance(estimate, dict) else {}
+
+
+def _sql_table(workflow: str, node: str, limit: int) -> dict:
+    query = urllib.parse.urlencode({"port": 0, "limit": limit})
+    return call("GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/table?{query}")
+
+
+def tool_sql(args: dict):
+    workflow = _need(args, "workflow")
+    explain = args.get("explain", False)
+    if not isinstance(explain, bool):
+        raise DapError("'explain' должен быть boolean", code=-32602)
+    plans, single = _sql_plans(args)
+    default_limit = 20
+    if args.get("limit") is not None:
+        default_limit = _sql_limit(args["limit"])
+    if explain:
+        # EXPLAIN only: build the node(s) and read /estimate, never run the workflow.
+        if single:
+            node = _add_sql_node(workflow, plans[0])
+            return {"workflow": workflow, "node": node,
+                    "estimate": _estimate_node(workflow, node)}
+        estimates = []
+        for index, plan in enumerate(plans):
+            node = _add_sql_node(workflow, plan)
+            estimates.append({"index": index, "node": node,
+                              "estimate": _estimate_node(workflow, node)})
+        return {"workflow": workflow, "estimates": estimates}
+    nodes = [_add_sql_node(workflow, plan) for plan in plans]
     call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
-    query = urllib.parse.urlencode({"port": 0, "limit": int(args.get("limit", 20))})
-    table = call(
-        "GET",
-        f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/table?{query}",
-    )
-    return {"workflow": workflow, "node": node, "table": table}
+    if single:
+        limit = plans[0]["limit"] or default_limit
+        return {"workflow": workflow, "node": nodes[0],
+                "table": _sql_table(workflow, nodes[0], limit)}
+    return {
+        "workflow": workflow,
+        "tables": [
+            {"index": index, "node": node,
+             "table": _sql_table(workflow, node, plan["limit"] or default_limit)}
+            for index, (plan, node) in enumerate(zip(plans, nodes))
+        ],
+    }
 
 
 def tool_workflow_build(args: dict):
