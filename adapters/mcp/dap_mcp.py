@@ -50,6 +50,10 @@ _CHILD: subprocess.Popen | None = None
 # Boot generation of the engine we talked to last, and a pending restart notice.
 _GENERATION: str | None = None
 _RESTART_PENDING = False
+# progressToken of the tools/call in flight (params._meta.progressToken), if any.
+_PROGRESS_TOKEN = None
+# How often dap_run polls GET /v1/jobs/{id} while it forwards job progress.
+PROGRESS_POLL = 0.2
 
 # --------------------------------------------------------------- sibling modules
 
@@ -885,8 +889,60 @@ def _timeout_body(args: dict) -> dict:
     return body
 
 
+_JOB_TERMINAL = ("succeeded", "failed", "cancelled", "timeout")
+
+
+def _job_progress(status: dict):
+    """(progress, total, message) from job.progress, or None when the job has none."""
+    progress = status.get("progress")
+    if not isinstance(progress, dict):
+        return None
+    done = progress.get("nodesDone")
+    percent = progress.get("percent")
+    value = done if isinstance(done, int) and not isinstance(done, bool) else percent
+    if not isinstance(value, int) or isinstance(value, bool):
+        return None
+    total = progress.get("nodesTotal")
+    total = total if isinstance(total, int) and not isinstance(total, bool) else None
+    current = progress.get("currentNode")
+    return value, total, (str(current) if current else None)
+
+
+def _poll_job(job: str) -> dict:
+    """Poll GET /v1/jobs/{id} until terminal, forwarding job.progress as notifications."""
+    seen = None
+    deadline = time.monotonic() + TIMEOUT
+    while True:
+        status = call("GET", f"/v1/jobs/{_seg(job)}")
+        status = status if isinstance(status, dict) else {}
+        update = _job_progress(status)
+        if update is not None and update != seen:
+            seen = update
+            _emit_progress(update[0], update[1], update[2])
+        state = status.get("state")
+        if state in _JOB_TERMINAL:
+            result = status.get("result")
+            return result if state == "succeeded" and isinstance(result, dict) else status
+        if time.monotonic() >= deadline:
+            raise DapError(
+                f"задание {job} не завершилось за {TIMEOUT} с",
+                data={"job": job, "state": state},
+            )
+        time.sleep(PROGRESS_POLL)
+
+
 def tool_run(args: dict):
-    return call("POST", f"/v1/workflows/{_wf(args)}/run", _timeout_body(args))
+    if _PROGRESS_TOKEN is None:
+        return call("POST", f"/v1/workflows/{_wf(args)}/run", _timeout_body(args))
+    # A client that asked for progress gets an async job: the adapter polls it and
+    # translates job.progress into notifications/progress.
+    body = _timeout_body(args)
+    body["async"] = True
+    created = call("POST", f"/v1/workflows/{_wf(args)}/run", body)
+    job = created.get("id") if isinstance(created, dict) else None
+    if not job:
+        return created
+    return _poll_job(str(job))
 
 
 def tool_run_async(args: dict):
@@ -1438,6 +1494,8 @@ def tool_analyze(args: dict):
     limit = int(args.get("limit") or 20)
     if limit < 1 or limit > 1000:
         raise DapError("'limit' должен быть от 1 до 1000", code=-32602)
+    with_profile = args.get("profile") is not False
+    stages = 4 if with_profile else 3
     ensure_service()
     cached = None
     ingest_cached = False
@@ -1452,6 +1510,7 @@ def tool_analyze(args: dict):
             raise DapError("движок не вернул путь Parquet-кэша")
         ingest_cached = bool(ingested.get("cached"))
         source = cached
+    _emit_progress(1, stages, "ingest")
     created = call("POST", "/v1/workflows", {"name": "analyze"})
     workflow = created.get("id") if isinstance(created, dict) else None
     if not workflow:
@@ -1472,13 +1531,16 @@ def tool_analyze(args: dict):
             call("POST", f"/v1/workflows/{_seg(workflow)}/connect",
                  {"from": reader_id, "fromPort": 0, "to": node_id, "toPort": 0})
         run = call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
+        _emit_progress(2, stages, "run")
         table = call("GET",
                      f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node_id)}/table?limit={limit}")
+        _emit_progress(3, stages, "table")
         result = {"workflow": workflow, "node": node_id, "source": source,
                   "cached": ingest_cached, "run": run, "table": table}
-        if args.get("profile") is not False:
+        if with_profile:
             result["profile"] = call(
                 "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(reader_id)}/profile")
+            _emit_progress(4, stages, "profile")
         return result
     finally:
         try:
@@ -1496,6 +1558,7 @@ def tool_estimate(args: dict):
     limit = _table_limit(args) if args.get("limit") is not None else None
     ensure_service()
     source, cached = _source(args, has_file)
+    _emit_progress(1, 2, "ingest")
     workflow = _new_workflow("estimate")
     try:
         reader = _add_node(workflow, "dap.parquet_reader", {"file": source})
@@ -1508,6 +1571,7 @@ def tool_estimate(args: dict):
             _connect(workflow, reader, node)
         estimate = call(
             "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/estimate")
+        _emit_progress(2, 2, "estimate")
         estimate = estimate if isinstance(estimate, dict) else {}
         result = {
             "source": source,
@@ -1620,6 +1684,7 @@ def tool_report(args: dict):
             "'chartType' должен быть один из: " + ", ".join(_CHART_TYPES), code=-32602)
     limit = _table_limit(args)
     with_profile = args.get("profile") is not False
+    stages = 4 if with_profile else 3
     title = str(args["title"]) if args.get("title") else None
     y = args.get("y")
     if y is not None:
@@ -1630,6 +1695,7 @@ def tool_report(args: dict):
     sql = _read_only_sql(sql) if sql else None
     ensure_service()
     source, cached = _source(args, has_file)
+    _emit_progress(1, stages, "ingest")
     workflow = _new_workflow("report")
     try:
         reader = _add_node(workflow, "dap.parquet_reader", {"file": source})
@@ -1660,13 +1726,16 @@ def tool_report(args: dict):
             chart_node = _add_node(workflow, "dap.chart", chart_settings)
             _connect(workflow, report_node, chart_node)
         call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
+        _emit_progress(2, stages, "run")
         table = call(
             "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/table?limit={limit}")
+        _emit_progress(3, stages, "table")
         result = {"source": source, "cached": cached, "node": node,
                   "table": table, "report": report}
         if with_profile:
             result["profile"] = call(
                 "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/profile")
+            _emit_progress(4, stages, "profile")
         if chart:
             result["chart"] = chart
         sizes = {}
@@ -1687,14 +1756,17 @@ def tool_profile(args: dict):
     limit = _table_limit(args, 10)
     ensure_service()
     source, cached = _source(args, has_file)
+    _emit_progress(1, 3, "ingest")
     workflow = _new_workflow("profile")
     try:
         reader = _add_node(workflow, "dap.parquet_reader", {"file": source})
         call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
+        _emit_progress(2, 3, "run")
         # limit is reserved for value-count rows; /profile does not return them yet,
         # so the engine ignores the parameter until the profile grows them.
         profile = call(
             "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(reader)}/profile?limit={limit}")
+        _emit_progress(3, 3, "profile")
         result = {"source": source, "cached": cached, "profile": profile}
         if isinstance(profile, dict):
             result["rows"] = profile.get("rows")
@@ -1799,6 +1871,19 @@ def _write(payload: dict) -> None:
     sys.stdout.flush()
 
 
+def _emit_progress(progress, total=None, message: str | None = None) -> None:
+    """notifications/progress for the tools/call in flight; a no-op without a token."""
+    token = _PROGRESS_TOKEN
+    if token is None:
+        return
+    params = {"progressToken": token, "progress": progress}
+    if total is not None:
+        params["total"] = total
+    if message:
+        params["message"] = message
+    _write({"jsonrpc": "2.0", "method": "notifications/progress", "params": params})
+
+
 def respond(msg_id, result) -> None:
     _write({"jsonrpc": "2.0", "id": msg_id, "result": result})
 
@@ -1811,6 +1896,7 @@ def fail(msg_id, code: int, message: str, data=None) -> None:
 
 
 def handle(msg: dict) -> None:
+    global _PROGRESS_TOKEN
     method = msg.get("method")
     msg_id = msg.get("id")
     params = msg.get("params") or {}
@@ -1901,6 +1987,8 @@ def handle(msg: dict) -> None:
         if not isinstance(args, dict):
             fail(msg_id, -32602, "arguments должен быть объектом")
             return
+        meta = params.get("_meta")
+        _PROGRESS_TOKEN = meta.get("progressToken") if isinstance(meta, dict) else None
         try:
             if name not in ("dap_shutdown", "dap_analyze", "dap_estimate",
                             "dap_workflow_build", "dap_report", "dap_profile"):
@@ -1917,6 +2005,8 @@ def handle(msg: dict) -> None:
                 msg_id,
                 {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]},
             )
+        finally:
+            _PROGRESS_TOKEN = None
         return
 
     if msg_id is None:
