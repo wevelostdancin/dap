@@ -205,3 +205,59 @@ class InstallHermesTest(unittest.TestCase):
         code, out, err = run_cli(["install", "--client", "nope"])
         self.assertEqual(code, 2)
         self.assertIn("invalid choice", err)
+
+
+class InstallDshTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(prefix="dap-cli-dsh-")
+        self.addCleanup(self._tmp.cleanup)
+        self.dir = pathlib.Path(self._tmp.name)
+        self.path = self.dir / "cordis.patch.yml"
+        self.fixture = (FIXTURES / "cordis.patch.yml").read_text(encoding="utf-8")
+
+    def install(self, *extra):
+        return run_cli(["install", "--client", "dsh", "--config", str(self.path), *extra])
+
+    def test_writes_mcp_manager_entry(self):
+        self.path.write_text(self.fixture, encoding="utf-8")
+        code, out, err = self.install()
+        self.assertEqual(code, 0, err)
+        written = self.path.read_text(encoding="utf-8")
+        self.assertIn("- id: mcp-manager", written)
+        self.assertIn("      dap:", written)
+        self.assertIn("        transport: stdio", written)
+        self.assertIn("        startupTimeoutMs: 60000", written)
+        self.assertIn("        toolCallTimeoutMs: 300000", written)
+        self.assertIn("        reconnect: true", written)
+        self.assertIn(str(ROOT / "adapters" / "mcp" / "dap_mcp.py"), written)
+        self.assertIn(f"DAP_HOME: {ROOT}", written)
+        self.assertIn("- id: ui-chat", written)
+        self.assertIn("# DSH profile patch", written)
+
+    def test_dry_run_prints_and_keeps_file(self):
+        self.path.write_text(self.fixture, encoding="utf-8")
+        code, out, err = self.install("--dry-run")
+        self.assertEqual(code, 0, err)
+        self.assertIn("- id: mcp-manager", out)
+        self.assertEqual(self.path.read_text(encoding="utf-8"), self.fixture)
+
+    def test_malformed_patch_exits_2_and_prints_fragment(self):
+        source = "config:\n  servers: {}\n"
+        self.path.write_text(source, encoding="utf-8")
+        code, out, err = self.install()
+        self.assertEqual(code, 2)
+        self.assertIn("YAML list", err)
+        self.assertIn("config:", err)
+        self.assertEqual(self.path.read_text(encoding="utf-8"), source)
+
+    def test_second_run_is_idempotent(self):
+        self.path.write_text(self.fixture, encoding="utf-8")
+        code, _, err = self.install()
+        self.assertEqual(code, 0, err)
+        first = self.path.read_text(encoding="utf-8")
+        mtime = self.path.stat().st_mtime_ns
+        code, _, err = self.install()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.path.read_text(encoding="utf-8"), first)
+        self.assertEqual(self.path.stat().st_mtime_ns, mtime)
+        self.assertEqual(first.count("- id: mcp-manager"), 1)

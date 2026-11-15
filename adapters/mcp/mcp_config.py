@@ -13,7 +13,9 @@ instead of being silently rewritten.
 
 Public API:
     upsert_mapping_block(text, path, block, indent=0) -> str
+    upsert_list_entry(text, entry_id, path, block, indent=0) -> str
     write_hermes(config_path, entry, dry_run=False) -> str
+    write_dsh(patch_path, entry, dry_run=False) -> str
 """
 from __future__ import annotations
 
@@ -33,6 +35,8 @@ _KEY_RE = re.compile(
 )
 _PLAIN_RE = re.compile(r"^[A-Za-z0-9_./~+][A-Za-z0-9_./~+ @-]*$")
 _NUMBER_RE = re.compile(r"^[-+]?(?:\d[\d_]*\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$")
+_ITEM_RE = re.compile(r"^(?P<indent> *)-(?:[ ]+(?P<rest>.*))?$")
+_ITEM_RE = re.compile(r"^(?P<indent> *)-(?:[ ]+(?P<rest>.*))?$")
 _YAML_WORDS = {"true", "false", "null", "~", "yes", "no", "on", "off"}
 
 
@@ -237,6 +241,94 @@ def upsert_mapping_block(text: str, path: list[str], block: dict, indent: int = 
     return _join(_upsert_lines(lines, list(path), block, indent, 0, len(lines)))
 
 
+# -------------------------------------------------------------- list entries
+
+def _plain_value(rest: str):
+    text = rest.strip()
+    if not text:
+        return None
+    if text[0] in "\"'":
+        end = text.find(text[0], 1)
+        return text[1:end] if end > 0 else text[1:]
+    return text.split(" #", 1)[0].strip()
+
+
+def _item_end(lines, index, indent, end):
+    """First line after the list item that starts at *index*."""
+    position = index + 1
+    while position < end:
+        line = lines[position]
+        if _is_content(line) and _indent_of(line) <= indent:
+            break
+        position += 1
+    return position
+
+
+def _list_items(lines, indent, start, end):
+    first = next((line for line in lines[start:end] if _is_content(line)), None)
+    if first is not None and _indent_of(first) != indent:
+        raise ConfigError("expected a YAML list at the top level")
+    items = []
+    position = start
+    while position < end:
+        line = lines[position]
+        if _is_content(line) and _indent_of(line) == indent:
+            if not _ITEM_RE.match(line):
+                raise ConfigError("expected a YAML list of patch entries")
+            item_end = _item_end(lines, position, indent, end)
+            items.append((position, item_end))
+            position = item_end
+            continue
+        position += 1
+    return items
+
+
+def _item_id(lines, start, end, indent):
+    inline = (_ITEM_RE.match(lines[start]).group("rest") or "").strip()
+    if inline:
+        parsed = _match_key(" " * (indent + INDENT) + inline)
+        if parsed and parsed[0] == "id":
+            return _plain_value(parsed[1])
+    for index in range(start + 1, end):
+        line = lines[index]
+        if not _is_content(line) or _indent_of(line) != indent + INDENT:
+            continue
+        parsed = _match_key(line)
+        if parsed and parsed[0] == "id":
+            return _plain_value(parsed[1])
+    return None
+
+
+def upsert_list_entry(text: str, entry_id: str, path: list[str], block: dict, indent: int = 0) -> str:
+    """Insert or update the mapping at *path* inside the list entry *entry_id*.
+
+    The entry is a block-style mapping in a top-level list. An existing entry is
+    merged (only *path* is replaced); otherwise a new "- id: <entry_id>" item is
+    appended, preserving comments and the rest of the document.
+    """
+    if not path:
+        raise ValueError("path must not be empty")
+    if not isinstance(block, dict):
+        raise ConfigError("block must be a mapping")
+    lines = _document_lines(text)
+    for start, end in _list_items(lines, indent, 0, len(lines)):
+        if _item_id(lines, start, end, indent) != entry_id:
+            continue
+        updated = upsert_mapping_block(_join(lines[start:end]), list(path), block, indent + INDENT)
+        return _join(lines[:start] + updated.splitlines() + lines[end:])
+    entry = {"id": entry_id}
+    node = entry
+    for part in path[:-1]:
+        node[part] = {}
+        node = node[part]
+    node[path[-1]] = block
+    new_lines = _emit_list_item(entry, indent)
+    at = _trim_end(lines, 0, len(lines))
+    if at:
+        return _join(lines[:at] + [""] + new_lines + lines[at:])
+    return _join(new_lines + lines)
+
+
 def _mapping_path_exists(text: str, path, base_indent: int = 0) -> bool:
     lines = text.splitlines()
     start, end, indent = 0, len(lines), base_indent
@@ -340,3 +432,29 @@ def write_hermes(config_path: pathlib.Path, entry: dict, dry_run: bool = False) 
     if not dry_run and new_text != old_text:
         _verify_written(path, old_text, verify, "mcp_servers.dap")
     return new_text
+
+def _dsh_has_entry(text: str, entry_id: str = "mcp-manager") -> bool:
+    lines = text.splitlines()
+    try:
+        items = _list_items(lines, 0, 0, len(lines))
+    except ConfigError:
+        return False
+    for start, end in items:
+        if _item_id(lines, start, end, 0) != entry_id:
+            continue
+        return _mapping_path_exists(_join(lines[start:end]), ["config", "servers", "dap"], INDENT)
+    return False
+
+
+def write_dsh(patch_path: pathlib.Path, entry: dict, dry_run: bool = False) -> str:
+    """Upsert mcp-manager.config.servers.dap in the DSH profile patch."""
+    path = pathlib.Path(patch_path)
+    old_text = _read_text(path)
+    new_text = upsert_list_entry(old_text, "mcp-manager", ["config", "servers", "dap"], entry)
+    if not _dsh_has_entry(new_text):
+        raise ConfigError(f"cannot place mcp-manager.config.servers.dap in {path}")
+    _commit(path, old_text, new_text, dry_run)
+    if not dry_run and new_text != old_text:
+        _verify_written(path, old_text, _dsh_has_entry, "mcp-manager.config.servers.dap")
+    return new_text
+

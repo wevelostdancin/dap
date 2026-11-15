@@ -148,6 +148,20 @@ def _hermes_entry(home: pathlib.Path) -> dict:
     }
 
 
+def _dsh_entry(home: pathlib.Path) -> dict:
+    return {
+        "transport": "stdio",
+        "command": _python(),
+        "args": [_adapter_path(home)],
+        "env": _entry_env(home),
+        "cwd": str(home),
+        "enabled": True,
+        "startupTimeoutMs": 60000,
+        "toolCallTimeoutMs": 300000,
+        "reconnect": True,
+    }
+
+
 # ------------------------------------------------------------------ commands
 
 def _cmd_run(_args: argparse.Namespace, home: pathlib.Path) -> int:
@@ -187,8 +201,8 @@ def _cmd_install(args: argparse.Namespace, home: pathlib.Path) -> int:
         writer = config_module.write_hermes
         entry = _hermes_entry(home)
     else:
-        print("dap-mcp: install --client dsh is not implemented yet", file=sys.stderr)
-        return 2
+        writer = config_module.write_dsh
+        entry = _dsh_entry(home)
     try:
         text = writer(config_path, entry, dry_run=args.dry_run)
     except config_module.ConfigError as exc:

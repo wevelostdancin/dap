@@ -187,3 +187,124 @@ class WriteHermesTest(unittest.TestCase):
             MC.write_hermes(self.path, HERMES_ENTRY)
         self.assertEqual(self.path.read_text(encoding="utf-8"), SIBLING_CONFIG)
         self.assertEqual(list(self.dir.glob("config.yaml.bak-*")), [])
+
+DSH_ENTRY = {
+    "transport": "stdio",
+    "command": "/usr/bin/python3",
+    "args": ["/abs/adapters/mcp/dap_mcp.py"],
+    "env": {"DAP_HOME": "/abs/dap"},
+    "cwd": "/abs/dap",
+    "enabled": True,
+    "startupTimeoutMs": 60000,
+    "toolCallTimeoutMs": 300000,
+    "reconnect": True,
+}
+
+
+class WriteDshTest(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(prefix="dap-dsh-")
+        self.addCleanup(self._tmp.cleanup)
+        self.dir = pathlib.Path(self._tmp.name)
+        self.path = self.dir / "cordis.patch.yml"
+        self.fixture = (FIXTURES / "cordis.patch.yml").read_text(encoding="utf-8")
+
+    def test_appends_entry_to_fixture(self):
+        self.path.write_text(self.fixture, encoding="utf-8")
+        text = MC.write_dsh(self.path, DSH_ENTRY)
+        written = self.path.read_text(encoding="utf-8")
+        self.assertEqual(written, text)
+        self.assertIn("- id: mcp-manager", written)
+        self.assertIn("      dap:", written)
+        self.assertIn("        transport: stdio", written)
+        self.assertIn("        reconnect: true", written)
+        self.assertIn("- id: ui-chat", written)
+        self.assertIn("# DSH profile patch", written)
+        backups = sorted(self.dir.glob("cordis.patch.yml.bak-*"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_text(encoding="utf-8"), self.fixture)
+
+    def test_existing_entry_merges_only_servers_dap(self):
+        source = (
+            "# profile patch\n"
+            "- id: mcp-manager\n"
+            "  priority: 10\n"
+            "  config:\n"
+            "    servers:\n"
+            "      other:\n"
+            "        transport: stdio\n"
+        )
+        self.path.write_text(source, encoding="utf-8")
+        MC.write_dsh(self.path, DSH_ENTRY)
+        written = self.path.read_text(encoding="utf-8")
+        self.assertIn("  priority: 10", written)
+        self.assertIn("      other:", written)
+        self.assertIn("      dap:", written)
+        self.assertIn("        command: /usr/bin/python3", written)
+        self.assertEqual(written.count("- id: mcp-manager"), 1)
+
+    def test_servers_missing_is_created(self):
+        source = "- id: mcp-manager\n  config:\n    enabled: true\n"
+        self.path.write_text(source, encoding="utf-8")
+        MC.write_dsh(self.path, DSH_ENTRY)
+        written = self.path.read_text(encoding="utf-8")
+        self.assertIn("    enabled: true", written)
+        self.assertIn("    servers:", written)
+        self.assertIn("      dap:", written)
+
+    def test_existing_dap_entry_is_replaced(self):
+        source = (
+            "- id: mcp-manager\n"
+            "  config:\n"
+            "    servers:\n"
+            "      dap:\n"
+            "        transport: stdio\n"
+            "        command: old\n"
+            "        reconnect: false\n"
+        )
+        self.path.write_text(source, encoding="utf-8")
+        MC.write_dsh(self.path, DSH_ENTRY)
+        written = self.path.read_text(encoding="utf-8")
+        self.assertNotIn("command: old", written)
+        self.assertNotIn("reconnect: false", written)
+        self.assertIn("        command: /usr/bin/python3", written)
+        self.assertEqual(written.count("      dap:"), 1)
+
+    def test_second_run_is_idempotent(self):
+        self.path.write_text(self.fixture, encoding="utf-8")
+        MC.write_dsh(self.path, DSH_ENTRY)
+        first = self.path.read_text(encoding="utf-8")
+        mtime = self.path.stat().st_mtime_ns
+        MC.write_dsh(self.path, DSH_ENTRY)
+        self.assertEqual(self.path.read_text(encoding="utf-8"), first)
+        self.assertEqual(self.path.stat().st_mtime_ns, mtime)
+        self.assertEqual(first.count("- id: mcp-manager"), 1)
+
+    def test_dry_run_does_not_write(self):
+        self.path.write_text(self.fixture, encoding="utf-8")
+        text = MC.write_dsh(self.path, DSH_ENTRY, dry_run=True)
+        self.assertIn("- id: mcp-manager", text)
+        self.assertEqual(self.path.read_text(encoding="utf-8"), self.fixture)
+        self.assertEqual(list(self.dir.glob("*.bak-*")), [])
+
+    def test_empty_patch_creates_entry(self):
+        text = MC.write_dsh(self.path, DSH_ENTRY)
+        self.assertTrue(text.startswith("- id: mcp-manager\n"))
+        self.assertTrue(self.path.is_file())
+
+    def test_non_list_document_raises(self):
+        self.path.write_text("config:\n  servers: {}\n", encoding="utf-8")
+        with self.assertRaises(MC.ConfigError):
+            MC.write_dsh(self.path, DSH_ENTRY)
+
+    def test_flow_style_list_raises(self):
+        self.path.write_text("[{id: mcp-manager}]\n", encoding="utf-8")
+        with self.assertRaises(MC.ConfigError):
+            MC.write_dsh(self.path, DSH_ENTRY)
+
+    def test_flow_style_servers_raises(self):
+        source = "- id: mcp-manager\n  config:\n    servers: {dap: {transport: stdio}}\n"
+        self.path.write_text(source, encoding="utf-8")
+        with self.assertRaises(MC.ConfigError):
+            MC.write_dsh(self.path, DSH_ENTRY)
+

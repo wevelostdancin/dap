@@ -1,0 +1,8 @@
+# DSH profile patch, applied on top of the desktop profile at startup.
+# Entries are merged in order; a later entry wins over an earlier one.
+- id: ui-chat
+  config:
+    layout: sidebar
+    theme: dark
+
+# Keep the profile small: no extra tool plugins here.
