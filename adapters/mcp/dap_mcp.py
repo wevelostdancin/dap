@@ -785,19 +785,38 @@ TOOLS = [
     {
         "name": "dap_report",
         "description": (
-            "Отчёт одним вызовом: ingest (для file), чтение, опциональный SQL (вход как src), "
-            "markdown_report (таблица + профиль) и опциональный график. Возвращает таблицу, "
-            "profile и пути report/chart. Временный workflow удаляется."
+            "Отчёт одним вызовом: ingest (для file), чтение, опциональный SQL (вход как src) "
+            "или батч queries[] (таблица на свой вход отчёта), markdown_report в формате "
+            "md/html/pdf/pptx и опциональный график. Возвращает таблицы, profile, пути "
+            "report/chart и размеры bytes. Временный workflow удаляется."
         ),
         "inputSchema": _obj(
             {
                 "file": _str("путь к CSV/Excel/JSON/Parquet; конвертируется в Parquet-кэш"),
-                "format": _str("формат входного файла: csv, excel, json или parquet; по умолчанию по расширению"),
+                "format": _str(
+                    "формат отчёта: md (по умолчанию), html, pdf или pptx; устаревшие "
+                    "значения csv/excel/json/parquet трактуются как формат входа"
+                ),
                 "dataset": _str(
                     "путь к готовому Parquet-датасету (из dap_ingest) или имя из "
                     "каталога датасетов (dap_dataset action=list)"),
                 "sql": _str("read-only SELECT/WITH; вход доступен как src"),
-                "report": _str("путь к Markdown-отчёту (обязательный)"),
+                "queries": {
+                    "type": "array",
+                    "description": (
+                        "несколько таблиц: по узлу dap.sql_query на элемент, каждый "
+                        "подключён к своему входу отчёта (sections input=i)"
+                    ),
+                    "items": _obj(
+                        {
+                            "sql": _str("один read-only SELECT или WITH"),
+                            "title": _str("заголовок секции таблицы"),
+                            "limit": _int("строк этой таблицы", 20),
+                        },
+                        ["sql"],
+                    ),
+                },
+                "report": _str("путь к файлу отчёта (обязательный)"),
                 "chart": _str("путь к графику .svg/.png; без него график не строится"),
                 "chartType": {
                     "type": "string",
@@ -1726,6 +1745,26 @@ def tool_estimate(args: dict):
 # --------------------------------------------------------------- один вызов
 
 _CHART_TYPES = ("bar", "line", "scatter", "histogram")
+_REPORT_FORMATS = ("md", "html", "pdf", "pptx")
+# dap_report's 'format' used to mean the input file format; keep those values working.
+_SOURCE_FORMATS = ("csv", "excel", "json", "parquet")
+
+
+def _report_format(args: dict) -> tuple[str, str | None]:
+    """(report format, legacy input file format) from the shared 'format' argument."""
+    raw = args.get("format")
+    if raw is None or str(raw).strip() == "":
+        return "md", None
+    value = str(raw).strip().lower()
+    if value in _REPORT_FORMATS:
+        return value, None
+    if value in _SOURCE_FORMATS:
+        return "md", value
+    raise DapError(
+        "'format' должен быть один из: " + ", ".join(_REPORT_FORMATS)
+        + " (или формат входа: " + ", ".join(_SOURCE_FORMATS) + ")",
+        code=-32602,
+    )
 
 
 def _source_args(args: dict) -> tuple[bool, bool]:
@@ -1761,13 +1800,17 @@ def _resolve_dataset(value) -> str:
     return str(path) if path else text
 
 
-def _source(args: dict, has_file: bool) -> tuple[str, bool]:
+_UNSET = object()
+
+
+def _source(args: dict, has_file: bool, source_format=_UNSET) -> tuple[str, bool]:
     """Ingest the file (once, through the engine cache) or take the dataset path."""
     if not has_file:
         return _resolve_dataset(args["dataset"]), False
     body = {"file": args["file"]}
-    if args.get("format"):
-        body["format"] = args["format"]
+    format_value = args.get("format") if source_format is _UNSET else source_format
+    if format_value:
+        body["format"] = format_value
     ingested = call("POST", "/v1/datasets", body)
     path = ingested.get("path") if isinstance(ingested, dict) else None
     if not path:
@@ -1807,9 +1850,9 @@ def _add_node(workflow: str, factory: str, settings: dict) -> str:
     return str(node)
 
 
-def _connect(workflow: str, source: str, target: str) -> None:
+def _connect(workflow: str, source: str, target: str, to_port: int = 0) -> None:
     call("POST", f"/v1/workflows/{_seg(workflow)}/connect",
-         {"from": source, "fromPort": 0, "to": target, "toPort": 0})
+         {"from": source, "fromPort": 0, "to": target, "toPort": to_port})
 
 
 def _drop_workflow(workflow: str, what: str) -> None:
@@ -1827,12 +1870,46 @@ def _file_bytes(path: str) -> int | None:
         return None
 
 
+def _report_queries(args: dict, limit: int) -> list[dict] | None:
+    """Validated queries[] ([{sql, title, limit}]) or None for the single-sql path."""
+    queries = args.get("queries")
+    if queries is None:
+        return None
+    if args.get("sql") is not None:
+        raise DapError("укажите либо 'sql', либо 'queries', не оба", code=-32602)
+    if not isinstance(queries, list) or not queries:
+        raise DapError("'queries' должен быть непустым массивом", code=-32602)
+    plans = []
+    for index, item in enumerate(queries):
+        if not isinstance(item, dict):
+            raise DapError(f"queries[{index}] должен быть объектом", code=-32602)
+        unknown = set(item) - {"sql", "title", "limit"}
+        if unknown:
+            raise DapError(
+                f"queries[{index}]: неизвестные ключи: {', '.join(sorted(unknown))}",
+                code=-32602,
+            )
+        sql = item.get("sql")
+        if sql is None or (isinstance(sql, str) and not sql.strip()):
+            raise DapError(f"queries[{index}]: обязательный аргумент 'sql' не задан",
+                           code=-32602)
+        item_limit = limit
+        if item.get("limit") is not None:
+            item_limit = _sql_limit(item["limit"], f"queries[{index}].limit")
+        title = item.get("title")
+        plans.append({"sql": _read_only_sql(sql),
+                      "title": str(title) if title else None,
+                      "limit": item_limit})
+    return plans
+
+
 def tool_report(args: dict):
     has_file, _ = _source_args(args)
     report = args.get("report")
     if report is None or str(report).strip() == "":
         raise DapError("обязательный аргумент 'report' не задан", code=-32602)
     report = str(report)
+    fmt, legacy_source_format = _report_format(args)
     chart = args.get("chart")
     chart = str(chart) if chart is not None and str(chart).strip() else None
     chart_type = str(args.get("chartType") or "bar")
@@ -1848,26 +1925,51 @@ def tool_report(args: dict):
         if not isinstance(y, list) or any(not str(item).strip() for item in y):
             raise DapError("'y' должен быть массивом непустых имён колонок", code=-32602)
         y = [str(item) for item in y]
-    sql = args.get("sql")
-    sql = _read_only_sql(sql) if sql else None
+    queries = _report_queries(args, limit)
+    sql = None
+    if queries is None:
+        sql = args.get("sql")
+        sql = _read_only_sql(sql) if sql else None
     ensure_service()
-    source, cached = _source(args, has_file)
+    source, cached = _source(args, has_file, legacy_source_format)
     _emit_progress(1, stages, "ingest")
     workflow = _new_workflow("report")
     try:
         reader = _add_node(workflow, "dap.parquet_reader", {"file": source})
-        node = reader
-        if sql:
-            node = _add_node(workflow, "dap.sql_query", {"sql": sql, "inputs": ["src"]})
-            _connect(workflow, reader, node)
-        sections = [{"kind": "table", "limit": limit}]
-        if with_profile:
-            sections.append({"kind": "profile"})
-        report_settings = {"file": report, "sections": sections}
+        if queries is None:
+            node = reader
+            if sql:
+                node = _add_node(workflow, "dap.sql_query",
+                                 {"sql": sql, "inputs": ["src"]})
+                _connect(workflow, reader, node)
+            sections = [{"kind": "table", "limit": limit}]
+            if with_profile:
+                sections.append({"kind": "profile"})
+            table_nodes = [node]
+            table_limits = [limit]
+        else:
+            # One sql node per query, each on its own report input port.
+            table_nodes = []
+            for query in queries:
+                node = _add_node(workflow, "dap.sql_query",
+                                 {"sql": query["sql"], "inputs": ["src"]})
+                _connect(workflow, reader, node)
+                table_nodes.append(node)
+            sections = []
+            for index, query in enumerate(queries):
+                section = {"kind": "table", "input": index, "limit": query["limit"]}
+                if query["title"]:
+                    section["title"] = query["title"]
+                sections.append(section)
+            if with_profile:
+                sections.append({"kind": "profile", "input": 0})
+            table_limits = [query["limit"] for query in queries]
+        report_settings = {"file": report, "format": fmt, "sections": sections}
         if title:
             report_settings["title"] = title
         report_node = _add_node(workflow, "dap.markdown_report", report_settings)
-        _connect(workflow, node, report_node)
+        for port, node in enumerate(table_nodes):
+            _connect(workflow, node, report_node, port)
         if chart:
             chart_settings = {
                 "file": chart,
@@ -1884,14 +1986,29 @@ def tool_report(args: dict):
             _connect(workflow, report_node, chart_node)
         call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
         _emit_progress(2, stages, "run")
-        table = call(
-            "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/table?limit={limit}")
+        tables = []
+        for index, (node, node_limit) in enumerate(zip(table_nodes, table_limits)):
+            tables.append({
+                "index": index,
+                "node": node,
+                "table": call(
+                    "GET",
+                    f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/table"
+                    f"?limit={node_limit}"),
+            })
         _emit_progress(3, stages, "table")
-        result = {"source": source, "cached": cached, "node": node,
-                  "table": table, "report": report}
+        result = {"source": source, "cached": cached, "format": fmt,
+                  "report": report}
+        if queries is None:
+            result["node"] = table_nodes[0]
+            result["table"] = tables[0]["table"]
+        else:
+            result["nodes"] = table_nodes
+            result["tables"] = tables
         if with_profile:
             result["profile"] = call(
-                "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node)}/profile")
+                "GET",
+                f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(table_nodes[0])}/profile")
             _emit_progress(4, stages, "profile")
         if chart:
             result["chart"] = chart
