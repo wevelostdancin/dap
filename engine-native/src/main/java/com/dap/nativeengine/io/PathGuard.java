@@ -87,6 +87,14 @@ public final class PathGuard {
         Set<Path> roots = new LinkedHashSet<>();
         roots.add(Path.of(System.getProperty("user.home")));
         roots.add(Path.of(System.getProperty("java.io.tmpdir")));
+        // macOS keeps java.io.tmpdir under /var/folders while tools and scripts use /tmp;
+        // both are world-writable scratch space and never hold the denied secrets.
+        for (String scratch : new String[]{"/tmp", "/var/tmp"}) {
+            Path path = Path.of(scratch);
+            if (java.nio.file.Files.isDirectory(path)) {
+                roots.add(path);
+            }
+        }
         String dapHome = blankToNull(env.get("DAP_HOME"));
         Path home = dapHome != null ? Path.of(dapHome) : Path.of(System.getProperty("user.home"), ".dap");
         roots.add(home);
