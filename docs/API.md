@@ -362,6 +362,64 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 найден; 500 — ошибка записи.
 Полученный `path` можно передать в `dap.parquet_reader` как `file`.
 
+### `POST /v1/explore`
+
+Один вызов на первичный анализ датасета: профиль колонок, качество, связи,
+различия групп, временной диапазон, гипотезы и рекомендации.
+
+```json
+{"file": "/data/iris.csv", "format": "csv", "maxColumns": 50, "sampleRows": 1000}
+```
+
+Ровно один источник: `file` (конвертируется в Parquet-кэш по правилам
+`POST /v1/datasets`) или `dataset` (путь уже ингестированного Parquet из ответа
+`POST /v1/datasets`). `format` — только для `file`, по умолчанию из расширения;
+вместе с `dataset` даёт 400. `sql` — один read-only `SELECT`/`WITH`,
+уточняющий источник; ингестированный файл доступен как вью `src`. Оба источника
+или ни одного, нестроковые поля, неизвестный формат, не найденный `file`,
+нечисловой или выходящий за границы `maxColumns`/`sampleRows` — 400;
+несуществующий `dataset` — 404 `dataset_not_found`; SQL не является одним
+read-only SELECT — 400 `invalid_sql`.
+
+```json
+{"source": "/data/iris.csv", "rows": 150,
+ "columns": [{"name": "petal_length", "type": "Float64", "missing": 0, "distinct": 43,
+              "min": 1.0, "max": 6.9, "mean": 3.7587, "stddev": 1.7644,
+              "zeros": 0, "negatives": 0, "outliers": 0}],
+ "quality": {"score": 97, "issues": [{"severity": "low", "kind": "duplicate_rows",
+              "count": 3, "detail": "3 of 150 rows are exact duplicates"}]},
+ "relationships": [{"left": "petal_length", "right": "petal_width",
+                    "method": "pearson", "value": 0.9629, "p_value": 0.0,
+                    "n": 150, "strength": "very strong"}],
+ "group_differences": [{"value": "petal_length", "group": "species", "test": "anova",
+                        "statistic": 1180.16, "p_value": 0.0, "effect_size": 0.941}],
+ "hypotheses": [{"id": "h1", "question": "Do petal_length and petal_width move together?",
+                 "test": "pearson", "columns": ["petal_length", "petal_width"],
+                 "rationale": "Very strong correlation (pearson=0.963, p<0.001, n=150).",
+                 "priority": "high"}],
+ "recommendations": ["Model petal_width with petal_length (pearson=0.963, p<0.001)."]}
+```
+
+`columns` — до `maxColumns` первых колонок (по умолчанию 50); `missing` и
+`distinct` точные; `min`/`max`/`mean`/`stddev` (выборочное СКО), `zeros`,
+`negatives` и `outliers` (вне границ 1.5×IQR) — только для числовых колонок.
+`quality.score` — 100 минус штрафы за найденные проблемы (high 12, medium 5,
+low 1), в диапазоне 0..100; `kind` — одно из `missing`, `empty`, `constant`,
+`duplicate_rows`, `high_cardinality`, `outliers`, `mixed_type`.
+
+`relationships` — до 20 пар по убыванию |value|, затем по именам: Pearson для
+числовых пар (p-value по t с n−2 степенями свободы), Cramér's V и p хи-квадрат
+для категориальных (Utf8/Boolean, от 2 до 20 категорий). `group_differences` —
+до 10 пар «числовая × категориальная» по возрастанию p-value: ANOVA, если в
+каждой группе не меньше 5 значений, иначе Kruskal-Wallis; `effect_size` — η²
+или ε². `time` — первый столбец даты/времени: диапазон и оценка гранулярности
+(`day`/`week`/`month`/`year`); без такого столбца поле отсутствует.
+`hypotheses` — от 3 до 5 шаблонных вопросов по самым сильным находкам, порядок:
+priority (`high`/`medium`/`low`), затем `id`; на пустом источнике — пустой
+список. `recommendations` — до 8 конкретных шагов. Профиль и quality считаются
+по всему источнику, связи, различия и гипотезы — по первым `sampleRows` строкам
+(по умолчанию 1000, детерминированно, без случайной выборки).
+
 ## 7. Сохранение, диагностика, остановка
 
 ### `POST /v1/workflows/{workflowId}/save`

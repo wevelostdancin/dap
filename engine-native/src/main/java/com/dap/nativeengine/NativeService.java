@@ -4,6 +4,7 @@ import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.api.CatalogHandlers;
 import com.dap.nativeengine.api.DataHandlers;
 import com.dap.nativeengine.api.DatasetHandlers;
+import com.dap.nativeengine.api.ExploreHandlers;
 import com.dap.nativeengine.api.Http;
 import com.dap.nativeengine.api.JobHandlers;
 import com.dap.nativeengine.api.OpsHandlers;
@@ -350,6 +351,7 @@ public final class NativeService implements AutoCloseable {
         JobHandlers jobs = new JobHandlers(state);
         DataHandlers data = new DataHandlers(state);
         DatasetHandlers datasets = new DatasetHandlers();
+        ExploreHandlers explore = new ExploreHandlers();
         OpsHandlers ops = new OpsHandlers(state, this::shutdownAsync);
 
         app.get("/v1", context -> Http.ok(context, meta()));
@@ -383,6 +385,7 @@ public final class NativeService implements AutoCloseable {
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/table", data::table);
         app.get("/v1/workflows/{workflowId}/nodes/{workflowNodeId}/profile", data::profile);
         app.post("/v1/datasets", datasets::ingest);
+        app.post("/v1/explore", explore::explore);
         app.post("/v1/workflows/{workflowId}/save", ops::save);
         app.get("/v1/workflows/{workflowId}/debug", ops::debug);
         app.post("/v1/shutdown", ops::shutdown);
