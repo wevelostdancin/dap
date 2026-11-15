@@ -70,7 +70,7 @@ public final class LazyPlan {
         return "(" + stripSemicolon(sql) + ")";
     }
 
-    static String stripSemicolon(String sql) {
+    public static String stripSemicolon(String sql) {
         String value = sql.strip();
         while (value.endsWith(";")) {
             value = value.substring(0, value.length() - 1).strip();

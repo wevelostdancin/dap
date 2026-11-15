@@ -63,7 +63,10 @@ class NodeRegistryTest {
             "dap.chart",
             "dap.data_quality",
             "dap.hypothesis_test",
-            "dap.linear_regression");
+            "dap.linear_regression",
+            "dap.sql_query",
+            "dap.db_reader",
+            "dap.file_list");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -116,7 +119,8 @@ class NodeRegistryTest {
     void sourcesHaveNoInputsAndManipulatorsHaveOne() {
         for (NodeSpec spec : registry.all()) {
             if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")
-                    || spec.id().equals("dap.data_quality")) {
+                    || spec.id().equals("dap.data_quality")
+                    || spec.id().equals("dap.sql_query")) {
                 continue;
             }
             if (spec.type().equals("Source")) {
@@ -146,7 +150,7 @@ class NodeRegistryTest {
 
     @Test
     void configSchemasExposeTheNativeVocabulary() {
-        assertEquals(Set.of("file", "delimiter", "header", "columns", "emptyStringIsNull"),
+        assertEquals(Set.of("file", "delimiter", "compression", "header", "columns", "emptyStringIsNull"),
                 registry.require("dap.csv_reader").settingKeys());
         assertEquals(Set.of("logic", "where"), registry.require("dap.row_filter").settingKeys());
         assertEquals(Set.of("include", "exclude"), registry.require("dap.column_filter").settingKeys());
@@ -254,11 +258,11 @@ class NodeRegistryTest {
     @Test
     void categoryPrefixFindsAllIoNodes() {
         List<NodeSpec> hits = registry.search(null, "/IO", 50);
-        assertEquals(9, hits.size());
-        assertEquals(List.of("CSV Reader", "CSV Writer", "Excel Reader", "Excel Writer", "JSON Reader",
-                "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
+        assertEquals(11, hits.size());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Excel Reader", "Excel Writer",
+                "File List", "JSON Reader", "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
                 hits.stream().map(NodeSpec::name).toList());
-        assertEquals(4, registry.search(null, "/IO/Read", 50).size());
+        assertEquals(6, registry.search(null, "/IO/Read", 50).size());
         assertEquals(5, registry.search(null, "/IO/Write", 50).size());
     }
 
@@ -266,7 +270,7 @@ class NodeRegistryTest {
     void searchTokensAreCombinedWithAnd() {
         assertEquals(1, registry.search("reader csv", null, 50).size());
         assertEquals(0, registry.search("reader zzz", null, 50).size());
-        assertEquals(4, registry.search("reader", "/IO", 50).size());
+        assertEquals(5, registry.search("reader", "/IO", 50).size());
     }
 
     @Test

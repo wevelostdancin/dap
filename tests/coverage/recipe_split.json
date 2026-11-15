@@ -1,0 +1,73 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "B10",
+      "title": "Split a column with string_split + unnest",
+      "kind": "recipe",
+      "requires": [],
+      "workflow": {
+        "id": "cov-recipe-split",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "RECIPES"
+            }
+          },
+          {
+            "id": "q",
+            "type": "sql_query",
+            "config": {
+              "sql": "SELECT unnest(string_split(tags, ',')) AS tag FROM src",
+              "inputs": [
+                "src"
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "q"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "q",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "tag",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              "a"
+            ],
+            [
+              "a"
+            ],
+            [
+              "b"
+            ],
+            [
+              "b"
+            ],
+            [
+              "c"
+            ],
+            [
+              "c"
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    }
+  ]
+}

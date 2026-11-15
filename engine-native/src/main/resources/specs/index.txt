@@ -47,3 +47,6 @@ dap.chart.json
 dap.data_quality.json
 dap.hypothesis_test.json
 dap.linear_regression.json
+dap.sql_query.json
+dap.db_reader.json
+dap.file_list.json

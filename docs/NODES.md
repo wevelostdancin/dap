@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 49 узлов `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (49 строк);
+Каталог нативного движка: 52 узла `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (52 строки);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 49 узлов имеют `available: true` и `tier: core`.
+спеке. Все 52 узла имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -135,6 +135,7 @@
 | `dap.diff` | Diff | `/Time Series` | 1 |
 | `dap.date_range` | Date Range | `/Time Series` | — |
 | `dap.excel_writer` | Excel Writer | `/IO/Write` | 1 (pass-through) |
+
 | `dap.markdown_report` | Markdown Report | `/IO/Write` | 1 (pass-through) |
 | `dap.chart` | Chart | `/Visualization` | 1 (pass-through) |
 
@@ -1567,7 +1568,186 @@ NULL отклик.
 }
 ```
 
-## 51. Порядок для агента
+## 51. dap.sql_query
+
+Выполняет один read-only запрос `SELECT`/`WITH` по таблицам подключённых входов.
+Каждый элемент `inputs` называет вход своего порта и становится именем таблицы в запросе
+(идентификатор в кавычках, если id узла не является простым именем). Входы ленивые:
+их SQL оборачивается в CTE, данные читаются только в `/table`/`/profile`.
+Схема выхода определяется запросом через `SELECT * FROM (<sql>) LIMIT 0` +
+`ResultSetMetaData`; `LIST`, `STRUCT`, `MAP` и `TIMESTAMPTZ` отклоняются с именем
+колонки — у движка нет для них Arrow-представления.
+Порты: входы 0 — `Data`, 1 — `Data 2`; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `sql` | string | — | обязателен; один оператор `SELECT` или `WITH` |
+| `inputs` | array<string> | `[]` | имена подключённых входов в порядке портов; число элементов должно совпадать с числом подключённых портов |
+| `limit` | integer | `10000` | максимум строк результата; от 1 до 1000000 |
+
+Проверка до выполнения: запрос должен начинаться с `SELECT`/`WITH`; запрещены
+`INSERT UPDATE DELETE CREATE DROP ALTER ATTACH DETACH COPY INSTALL LOAD PRAGMA SET
+EXPORT IMPORT CALL` и второй оператор (`;` вне кавычек). Ключевые слова внутри
+строковых литералов, quoted-идентификаторов и комментариев не считаются — поэтому
+`SELECT 'a;b'` и колонка `created` допустимы. Нарушение — 400 `sql_not_allowed`
+(в синхронном run виден как 500 `node_failed` с сообщением узла, как у любого узла).
+Дубли имён колонок результата переименовываются детерминированно: `a`, `a_1`, `a_2` —
+поэтому `/profile` работает и для запросов с одинаковыми алиасами.
+Таймаут запроса — общий для `/table`/`/profile` (`DAP_QUERY_TIMEOUT_SEC`).
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT a.category, COUNT(*) AS n FROM src a JOIN other b ON a.id = b.id GROUP BY a.category",
+    "inputs": ["src", "other"],
+    "limit": 1000
+  }
+}
+```
+
+## 52. dap.db_reader
+
+Читает одну таблицу или результат read-only запроса из внешней БД и копирует его в
+таблицу сессии: остальной граф видит обычную таблицу, как после `dap.csv_reader`.
+DuckDB-файл подключается нативно; SQLite, PostgreSQL и MySQL — через расширения
+`sqlite_scanner`, `postgres_scanner`, `mysql_scanner` (ставятся один раз
+`make extensions`; без расширения — ошибка `extension_missing` с этим hint).
+Подключение `READ_ONLY` по умолчанию и отключается после копирования
+(`DETACH`), поэтому файл не остаётся залоченным.
+Порты: входов нет; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `driver` | string | — | обязателен: `duckdb`, `sqlite`, `postgres`, `mysql` |
+| `path` | string | — | обязателен для `duckdb`/`sqlite`; абсолютный путь к файлу БД |
+| `url` | string | — | обязателен для `postgres`/`mysql`; `user`/`password` можно передать отдельно |
+| `table` | string | — | таблица; можно `schema.table`; ровно один из `table`/`query` |
+| `query` | string | — | read-only `SELECT`/`WITH`; таблицы внешней БД доступны по имени; ровно один из `table`/`query` |
+| `read_only` | boolean | `true` | `ATTACH ... (READ_ONLY)` |
+| `user` | string | — | пользователь для `postgres`/`mysql`; не сохраняется в `workflow.json` |
+| `password` | string | — | пароль; не сохраняется в `workflow.json` и маскируется в ошибках |
+
+Схема выхода — колонки скопированной таблицы. `TIMESTAMPTZ`, `LIST`, `STRUCT`,
+`MAP` из внешней БД отклоняются с именем колонки (нет Arrow-представления) —
+выберите другую колонку или `query` с приведением типа.
+При `POST /v1/workflows/{id}/save` из настроек `dap.db_reader` удаляются
+`user`/`password`, а userinfo в `url` заменяется на `***`: после загрузки
+workflow.json учётные данные нужно передать заново.
+`query` видит все таблицы подключённой БД как CTE с именем таблицы (одна схема на
+имя); при дубле имени между схемами используется первая по порядку схем.
+
+```json
+{
+  "factory": "dap.db_reader",
+  "settings": {
+    "driver": "sqlite",
+    "path": "/data/sales.db",
+    "table": "orders"
+  }
+}
+```
+
+## 53. dap.file_list
+
+Перечисляет каталог таблицей: `path` (абсолютный нормализованный), `name`,
+`extension` (без точки; пусто у каталогов и файлов без расширения), `size`
+(байты), `modified` (UTC, `Date&Time (Timestamp)`), `is_directory`.
+Обход — Java NIO `Files.walk` без перехода по символическим ссылкам
+(`LinkOption.NOFOLLOW_LINKS`), поэтому цикл ссылок не зацикливает обход; атрибуты
+берутся из `BasicFileAttributes`. Скрытые записи (имя с точки) пропускаются, пока не
+включён `include_hidden`. Сортировка и `limit` применяются после фильтрации, поэтому
+результат детерминирован (тай-брейк — путь).
+Порты: входов нет; выход 0 — `Data`.
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `directory` | string | — | обязателен; каталог должен существовать |
+| `pattern` | string | `*` | glob по имени файла (`*.csv`), не по пути |
+| `recursive` | boolean | `false` | обходить подкаталоги; по ссылкам не ходит |
+| `include_hidden` | boolean | `false` | включить имена, начинающиеся с точки |
+| `sort` | string | `name` | `name`, `size` или `modified`; по возрастанию |
+| `limit` | integer | `1000` | максимум строк; от 1 до 1000000 |
+
+Отсутствующий каталог, путь-не-каталог, невалидный glob и нецелый `limit` — ошибка
+run. `modified` — в UTC, поэтому результат не зависит от таймзоны процесса.
+Символическая ссылка попадает в список как запись с `is_directory=false`.
+
+```json
+{
+  "factory": "dap.file_list",
+  "settings": {"directory": "/data/incoming", "pattern": "*.csv", "recursive": true}
+}
+```
+
+## 54. Рецепты SQL
+
+Часть задач таксономии покрывается не отдельным узлом, а SQL-выражением поверх
+`dap.sql_query` (YAGNI: одно выражение — не узел). Каждый рецепт имеет
+coverage-сценарий в `tests/coverage/` и проверяется через `/v1` в `SqlRecipeTest`.
+
+### 49.1. Regex-извлечение (B9)
+
+`regexp_extract(колонка, шаблон, группа)` — группа 1..n, 0 — всё совпадение;
+выражение возвращает String. NULL, если шаблон не совпал.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT regexp_extract(code, '[a-z]+-([0-9]+)', 1) AS number FROM src ORDER BY number",
+    "inputs": ["src"]
+  }
+}
+```
+
+### 49.2. Split колонки (B10)
+
+`unnest(string_split(колонка, разделитель))` — одна строка на часть; пустые части
+сохраняются (соседние разделители и хвост дают пустые строки). Порядок строк не
+определён — добавьте `ORDER BY`, если он важен.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT unnest(string_split(tags, ',')) AS tag FROM src",
+    "inputs": ["src"]
+  }
+}
+```
+
+### 49.3. Ковариация (E4)
+
+`covar_samp(a, b)` — выборочная ковариация (делитель n-1); NULL-пары пропускаются,
+меньше двух пар — NULL. Для корреляции есть отдельный узел `dap.correlation`.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT covar_samp(x, y) AS covariance FROM src",
+    "inputs": ["src"]
+  }
+}
+```
+
+### 49.4. Чтение HTTP/API (A8)
+
+`read_csv_auto(url)` / `read_json_auto(url)` через расширение `httpfs`: нужны
+установленное расширение (`make extensions`) и сеть в момент чтения. Остальные
+источники (S3, локальный файл) сети не требуют.
+
+```json
+{
+  "factory": "dap.sql_query",
+  "settings": {
+    "sql": "SELECT COUNT(*) AS n FROM read_csv_auto('https://raw.githubusercontent.com/plotly/datasets/master/iris.csv')"
+  }
+}
+```
+
+## 55. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.

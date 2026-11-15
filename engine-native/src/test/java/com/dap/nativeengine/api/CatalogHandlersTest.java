@@ -55,31 +55,34 @@ class CatalogHandlersTest {
 
     @Test
     void listsAllNodesSortedByName() throws Exception {
-        HttpResponse<String> response = fetch("/nodes", "agent-1");
+        HttpResponse<String> response = fetch("/nodes?limit=100", "agent-1");
         assertEquals(200, response.statusCode());
         assertEquals("1", response.headers().firstValue("X-DAP-Api-Version").orElseThrow());
         assertEquals("agent-1", response.headers().firstValue("X-DAP-Session").orElseThrow());
 
         JsonNode body = body(response);
-        assertEquals(49, body.path("count").asInt());
+        assertEquals(52, body.path("count").asInt());
         JsonNode nodes = body.path("nodes");
-        assertEquals(49, nodes.size());
-                assertEquals(List.of(
-                "Binner", "Chart", "Column Filter", "Column Renamer",
-                "Column Resorter", "Concatenate", "Correlation",
-                "CSV Reader", "CSV Writer", "Data Quality", "Date & Time",
+        assertEquals(52, nodes.size());
+        assertEquals(List.of(
+                "Binner", "Chart", "Column Filter",
+                "Column Renamer", "Column Resorter", "Concatenate",
+                "Correlation", "CSV Reader", "CSV Writer",
+                "Data Quality", "Database Reader", "Date & Time",
                 "Date Range", "Describe", "Diff",
                 "Duplicate Filter", "Encoder", "Excel Reader",
-                "Excel Writer", "Group By", "Histogram",
-                "Hypothesis Test", "Joiner", "JSON Reader", "JSON Writer",
-                "Linear Regression", "Markdown Report", "Math Formula", "Missing Value", "Normalizer",
-                "Outlier Detect", "Outlier Filter", "Parquet Reader",
-                "Parquet Writer", "Pivot", "Quantile",
-                "Resample", "Rolling", "Row Aggregator",
-                "Row Filter", "Rule Engine", "Sample Rows",
-                "Sorter", "String Manipulation", "Top N per Group",
-                "Type Cast", "Unpivot", "Value Counts",
-                "Value Replace", "Window"), names(nodes));
+                "Excel Writer", "File List", "Group By",
+                "Histogram", "Hypothesis Test", "Joiner",
+                "JSON Reader", "JSON Writer", "Linear Regression",
+                "Markdown Report", "Math Formula", "Missing Value",
+                "Normalizer", "Outlier Detect", "Outlier Filter",
+                "Parquet Reader", "Parquet Writer", "Pivot",
+                "Quantile", "Resample", "Rolling",
+                "Row Aggregator", "Row Filter", "Rule Engine",
+                "Sample Rows", "Sorter", "SQL Query",
+                "String Manipulation", "Top N per Group", "Type Cast",
+                "Unpivot", "Value Counts", "Value Replace",
+                "Window"), names(nodes));
 
         JsonNode first = nodes.get(0);
         assertEquals("dap.binner", first.path("id").asText());
@@ -106,13 +109,13 @@ class CatalogHandlersTest {
         assertEquals("dap.csv_writer", csv.path("nodes").get(1).path("id").asText());
 
         JsonNode io = body(fetch("/nodes?category=%2FIO", "s"));
-        assertEquals(9, io.path("count").asInt());
-        assertEquals(List.of("CSV Reader", "CSV Writer", "Excel Reader", "Excel Writer", "JSON Reader",
-                "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
+        assertEquals(11, io.path("count").asInt());
+        assertEquals(List.of("CSV Reader", "CSV Writer", "Database Reader", "Excel Reader", "Excel Writer",
+                "File List", "JSON Reader", "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
                 names(io.path("nodes")));
 
         JsonNode combined = body(fetch("/nodes?q=reader&category=%2FIO", "s"));
-        assertEquals(4, combined.path("count").asInt());
+        assertEquals(5, combined.path("count").asInt());
     }
 
     @Test
@@ -162,7 +165,7 @@ class CatalogHandlersTest {
         assertTrue(body.path("settingsXml").isNull());
         assertTrue(body.path("settingsUnavailable").asText().contains("/v1/nodes/dap.csv_reader/dialog"));
         assertFalse(body.path("description").asText().isBlank());
-        assertEquals(List.of("columns", "delimiter", "emptyStringIsNull", "file", "header"), texts(body.path("settings")));
+        assertEquals(List.of("columns", "compression", "delimiter", "emptyStringIsNull", "file", "header"), texts(body.path("settings")));
         assertEquals(1, body.path("outPorts").size());
     }
 
@@ -197,11 +200,11 @@ class CatalogHandlersTest {
 
         JsonNode schema = body.path("schema");
         assertEquals("dap.csv_reader", schema.path("class").asText());
-        assertEquals("5/5", schema.path("labelCoverage").asText());
+        assertEquals("6/6", schema.path("labelCoverage").asText());
         assertTrue(schema.path("warnings").isArray());
         assertEquals(0, schema.path("warnings").size());
         JsonNode fields = schema.path("fields");
-        assertEquals(5, fields.size());
+        assertEquals(6, fields.size());
 
         JsonNode file = fields.get(0);
         assertEquals("file", file.path("field").asText());
@@ -210,8 +213,8 @@ class CatalogHandlersTest {
         assertEquals("string", file.path("type").asText());
         assertFalse(file.path("optional").asBoolean());
         assertEquals(",", fields.get(1).path("default").asText());
-        assertEquals("array", fields.get(3).path("type").asText());
-        assertEquals("object", fields.get(3).path("items").path("type").asText());
+        assertEquals("array", fields.get(4).path("type").asText());
+        assertEquals("object", fields.get(4).path("items").path("type").asText());
     }
 
     @Test

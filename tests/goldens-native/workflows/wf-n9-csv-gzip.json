@@ -1,0 +1,81 @@
+{
+  "id": "wf-n9-csv-gzip",
+  "title": "P5: read a gzip-compressed CSV with dap.csv_reader",
+  "rationale": "Pins the compression auto-detection: the gzip twin of p2.csv reads to the same table as the plain file.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2_GZIP"
+      }
+    }
+  ],
+  "edges": [],
+  "checks": [
+    {
+      "node": "src",
+      "kind": "expect",
+      "rows": 6,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "score",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "category",
+          "type": "String"
+        }
+      ],
+      "data": [
+        [
+          1,
+          "alpha",
+          1.0,
+          "A"
+        ],
+        [
+          2,
+          "beta",
+          2.0,
+          "B"
+        ],
+        [
+          3,
+          "gamma",
+          3.0,
+          "A"
+        ],
+        [
+          4,
+          "delta",
+          4.0,
+          "C"
+        ],
+        [
+          3,
+          "gamma",
+          3.0,
+          "A"
+        ],
+        [
+          5,
+          "epsilon",
+          5.0,
+          "B"
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "p2.csv.gz is p2.csv compressed with gzip -n (deterministic bytes); compression defaults to auto and detects the 1f 8b magic. Explicit compression none/gzip and zstd rejection are covered by CsvGzipTest."
+}

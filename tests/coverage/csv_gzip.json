@@ -1,0 +1,88 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "A5",
+      "title": "Read a gzip-compressed CSV file",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-csv-gzip",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2_GZIP"
+            }
+          }
+        ],
+        "edges": []
+      },
+      "checks": [
+        {
+          "node": "src",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1.0,
+              "A"
+            ],
+            [
+              2,
+              "beta",
+              2.0,
+              "B"
+            ],
+            [
+              3,
+              "gamma",
+              3.0,
+              "A"
+            ],
+            [
+              4,
+              "delta",
+              4.0,
+              "C"
+            ],
+            [
+              3,
+              "gamma",
+              3.0,
+              "A"
+            ],
+            [
+              5,
+              "epsilon",
+              5.0,
+              "B"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    }
+  ]
+}

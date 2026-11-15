@@ -66,6 +66,7 @@ public final class CsvReaderExecutor implements NodeExecutor {
         }
         boolean header = NodeSql.bool(config, "header", true);
         boolean emptyStringIsNull = NodeSql.bool(config, "emptyStringIsNull", false);
+        CsvTableReader.Compression compression = compression(config);
 
         List<ColumnSpec> columns = new ArrayList<>();
         JsonNode columnsNode = config.get("columns");
@@ -83,6 +84,19 @@ public final class CsvReaderExecutor implements NodeExecutor {
                 columns.add(ColumnSpec.of(name, type));
             }
         }
-        return new CsvTableReader.Options(delimiter.charAt(0), header, columns, emptyStringIsNull);
+        return new CsvTableReader.Options(delimiter.charAt(0), header, columns, emptyStringIsNull,
+                compression);
+    }
+
+    /** auto (default) detects gzip by magic bytes; zstd is not supported. */
+    private static CsvTableReader.Compression compression(JsonNode config) {
+        String value = NodeSql.text(config, "compression", "auto");
+        return switch (value.toLowerCase(java.util.Locale.ROOT)) {
+            case "auto" -> CsvTableReader.Compression.AUTO;
+            case "none" -> CsvTableReader.Compression.NONE;
+            case "gzip" -> CsvTableReader.Compression.GZIP;
+            default -> throw new IllegalArgumentException("csv_reader: 'compression' must be auto, "
+                    + "none or gzip, got '" + value + "'");
+        };
     }
 }

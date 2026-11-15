@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Reads a delimited text file into a data table. Column names and types can be set explicitly or inferred from the header row. A quoted empty string in a typed (numeric or date) column fails with a hint: set emptyStringIsNull=true or type the column as Utf8.",
+  "description": "Reads a delimited text file into a data table. Column names and types can be set explicitly or inferred from the header row. Gzip-compressed files are detected by magic bytes and decompressed transparently; zstd is out of scope. A quoted empty string in a typed (numeric or date) column fails with a hint: set emptyStringIsNull=true or type the column as Utf8.",
   "inPorts": [],
   "outPorts": [
     {
@@ -32,6 +32,17 @@
         "title": "Delimiter",
         "description": "Field separator used by the file; a comma by default.",
         "default": ","
+      },
+      "compression": {
+        "type": "string",
+        "title": "Compression",
+        "description": "auto detects gzip by the file magic bytes; none forces plain text; gzip always decompresses. zstd is not supported.",
+        "enum": [
+          "auto",
+          "none",
+          "gzip"
+        ],
+        "default": "auto"
       },
       "header": {
         "type": "boolean",

@@ -424,5 +424,61 @@
         "missing": 0
       }
     ]
+  },
+  "P2_GZIP": {
+    "file": "p2.csv.gz",
+    "rows": 6,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "id",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "name",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "score",
+        "arrow": "Float64",
+        "missing": 0
+      },
+      {
+        "name": "category",
+        "arrow": "Utf8",
+        "missing": 0
+      }
+    ]
+  },
+  "RECIPES": {
+    "file": "recipes.csv",
+    "rows": 3,
+    "delimiter": ",",
+    "header": true,
+    "columns": [
+      {
+        "name": "code",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "tags",
+        "arrow": "Utf8",
+        "missing": 0
+      },
+      {
+        "name": "x",
+        "arrow": "Int64",
+        "missing": 0
+      },
+      {
+        "name": "y",
+        "arrow": "Int64",
+        "missing": 0
+      }
+    ]
   }
 }

@@ -3,6 +3,7 @@ package com.dap.nativeengine.exec;
 import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.api.Json;
 import com.dap.nativeengine.engine.LazyPlan;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
@@ -236,7 +237,7 @@ public final class Workflow {
             view.put("id", node.id());
             view.put("factory", node.factory());
             view.put("name", node.name());
-            view.set("settings", node.config());
+            view.set("settings", savedSettings(node.factory(), node.config()));
         }
         var edgesArray = document.putArray("connections");
         for (Connection connection : connections) {
@@ -247,5 +248,36 @@ public final class Workflow {
             view.put("toPort", connection.toPort());
         }
         return document;
+    }
+
+    /**
+     * Credentials are never written to workflow.json: db_reader drops user/password and
+     * masks the userinfo of the connection URL. Reloading the file therefore requires
+     * supplying the credentials again.
+     */
+    private static JsonNode savedSettings(String factory, ObjectNode config) {
+        ObjectNode copy = config.deepCopy();
+        if ("dap.db_reader".equals(factory)) {
+            copy.remove("password");
+            copy.remove("user");
+            JsonNode url = copy.get("url");
+            if (url != null && url.isTextual()) {
+                copy.put("url", maskUserInfo(url.textValue()));
+            }
+        }
+        return copy;
+    }
+
+    private static String maskUserInfo(String url) {
+        int scheme = url.indexOf("://");
+        if (scheme < 0) {
+            return url;
+        }
+        int at = url.indexOf('@', scheme + 3);
+        int slash = url.indexOf('/', scheme + 3);
+        if (at < 0 || (slash >= 0 && at > slash)) {
+            return url;
+        }
+        return url.substring(0, scheme + 3) + "***" + url.substring(at);
     }
 }

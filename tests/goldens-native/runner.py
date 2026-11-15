@@ -70,7 +70,8 @@ LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "so
                  "describe", "value_counts", "correlation", "histogram", "quantile",
                  "outlier_detect", "resample", "rolling", "diff", "date_range", "excel_writer",
                  "markdown_report", "chart", "data_quality",
-                 "hypothesis_test", "linear_regression"}
+                 "hypothesis_test", "linear_regression",
+                 "sql_query", "db_reader", "file_list"}
 CHECK_KINDS = {"table", "profile", "equivalent", "expect", "expect_profile", "file"}
 
 
@@ -237,6 +238,12 @@ def native_binding(node_type, config, datasets):
             "columns": _dataset_columns(entry),
             "emptyStringIsNull": False,
         }
+    if node_type in ("db_reader", "file_list"):
+        resolved = dict(config)
+        for key in ("path", "directory"):
+            if isinstance(resolved.get(key), str):
+                resolved[key] = resolved[key].replace("{DATA}", str(DATA_DIR.resolve()))
+        return "dap." + node_type, resolved
     return "dap." + node_type, config
 
 

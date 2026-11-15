@@ -48,6 +48,8 @@ import com.dap.nativeengine.nodes.ColumnFilterExecutor;
 import com.dap.nativeengine.nodes.ColumnRenamerExecutor;
 import com.dap.nativeengine.nodes.CsvReaderExecutor;
 import com.dap.nativeengine.nodes.CsvWriterExecutor;
+import com.dap.nativeengine.nodes.DbReaderExecutor;
+import com.dap.nativeengine.nodes.FileListExecutor;
 import com.dap.nativeengine.nodes.ExcelReaderExecutor;
 import com.dap.nativeengine.nodes.GroupByExecutor;
 import com.dap.nativeengine.nodes.JsonReaderExecutor;
@@ -61,6 +63,7 @@ import com.dap.nativeengine.nodes.ParquetReaderExecutor;
 import com.dap.nativeengine.nodes.ParquetWriterExecutor;
 import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
+import com.dap.nativeengine.nodes.SqlQueryExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
 import io.javalin.Javalin;
 
@@ -625,7 +628,10 @@ public final class NativeService implements AutoCloseable {
                 .register(new MathFormulaExecutor())
                 .register(new MarkdownReportExecutor())
                 .register(new ChartExecutor())
-                .register(new DataQualityExecutor());
+                .register(new DataQualityExecutor())
+                .register(new SqlQueryExecutor())
+                .register(new DbReaderExecutor())
+                .register(new FileListExecutor());
     }
 
     /**
