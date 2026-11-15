@@ -1,9 +1,9 @@
 # NODES — каталог узлов
 
-Каталог нативного движка: 45 узлов `dap.*`. Источник истины — JSON-спеки
-`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (45 строк);
+Каталог нативного движка: 46 узлов `dap.*`. Источник истины — JSON-спеки
+`engine-native/src/main/resources/specs/*.json`, список — `specs/index.txt` (46 строк);
 `NodeRegistry` читает их из classpath и падает при отсутствующем или дублирующем
-спеке. Все 45 узлов имеют `available: true` и `tier: core`.
+спеке. Все 46 узлов имеют `available: true` и `tier: core`.
 
 ## 1. Общие правила
 
@@ -19,7 +19,7 @@
 - Все преобразователи — ленивые SQL-отношения: данные читаются только в `/table`
   и `/profile`; исключения — читатели и писатели (см. ниже).
 - Писатели (`dap.csv_writer`, `dap.parquet_writer`, `dap.json_writer`,
-  `dap.excel_writer`, `dap.markdown_report`) — Sink:
+  `dap.excel_writer`, `dap.markdown_report`, `dap.chart`) — Sink:
   один вход и один выход, входная таблица возвращается неизменной (pass-through),
   поэтому граф можно продолжать за писателем. Файл пишется на run (csv/parquet/json —
   на job-соединении, excel — сборкой книги в памяти); родительские каталоги создаются.
@@ -131,6 +131,7 @@
 | `dap.date_range` | Date Range | `/Time Series` | — |
 | `dap.excel_writer` | Excel Writer | `/IO/Write` | 1 (pass-through) |
 | `dap.markdown_report` | Markdown Report | `/IO/Write` | 1 (pass-through) |
+| `dap.chart` | Chart | `/Visualization` | 1 (pass-through) |
 
 ## 2. dap.csv_reader
 
@@ -1356,7 +1357,60 @@ Apache POI не используется: книга собирается сре
 }
 ```
 
-## 47. Порядок для агента
+## 47. dap.chart
+
+Рисует график по входной таблице и возвращает её без изменений (pass-through).
+`format: svg` — ручной XML: координаты округляются до двух знаков, в файле нет
+времени и случайности, поэтому один и тот же вход даёт побайтово одинаковый
+результат (golden). `format: png` — Java2D + `ImageIO` в headless-режиме
+(`-Djava.awt.headless=true`); PNG побайтово не детерминирован и проверяется только
+smoke-тестом (файл существует, размеры совпадают). Файл пишется атомарно,
+родительские каталоги создаются.
+Порты: вход 0 — `Data`, выход 0 — `Data` (та же таблица).
+
+| Ключ | Тип | По умолчанию | Примечание |
+|---|---|---|---|
+| `file` | string | — | обязателен; путь к `.svg` или `.png` |
+| `format` | `svg` \| `png` | `svg` | SVG детерминирован |
+| `type` | `bar` \| `line` \| `scatter` \| `histogram` | — | обязателен |
+| `x` | string | — | для `bar` — категория (любой тип); для `line`/`scatter`/`histogram` — числовая колонка |
+| `y` | string[] | — | `bar` — ровно одна; `line`/`scatter` — одна или больше; `histogram` — не задаётся |
+| `series` | string | — | необязательная колонка-серия; при ней `y` — ровно одна колонка |
+| `title` | string | — | заголовок графика |
+| `width` / `height` | integer | 640 / 400 | 100…4000 |
+| `limit` | integer | 1000 | 1…100000; сколько строк входа читать |
+| `bins` | integer | 10 | только `histogram`, 1…1000 |
+
+Семантика:
+
+- Строки, где `x` или `y` NULL или не число, пропускаются.
+- `bar` — значения суммируются по категории (и по значению `series`); категории
+  сортируются численно, если все значения — числа, иначе лексикографически;
+  серии — так же; при `series` бары группируются внутри категории.
+- `line`/`scatter` — без `series` одна серия на колонку `y` (имя — имя колонки);
+  с `series` — по серии на значение; точки сортируются по `x`.
+- `histogram` — равные интервалы между min и max `x`; при min = max один бин.
+- Оси: y-деления «круглые» (1/2/5 × 10^n), подписи округляются до двух знаков;
+  легенда рисуется при двух и более сериях.
+
+```json
+{
+  "factory": "dap.chart",
+  "settings": {
+    "file": "/data/chart.svg",
+    "format": "svg",
+    "type": "bar",
+    "x": "category",
+    "y": ["amount"],
+    "series": "region",
+    "title": "Amount by category",
+    "width": 640,
+    "height": 400
+  }
+}
+```
+
+## 48. Порядок для агента
 
 1. `POST /v1/datasets` (инструмент `dap_ingest`) — один раз привести CSV/Excel/JSON
    к Parquet-кэшу, если файл читается многократно.

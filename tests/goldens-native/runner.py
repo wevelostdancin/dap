@@ -69,8 +69,8 @@ LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "so
                  "top_n_per_group", "concatenate",
                  "describe", "value_counts", "correlation", "histogram", "quantile",
                  "outlier_detect", "resample", "rolling", "diff", "date_range", "excel_writer",
-                 "markdown_report"}
-CHECK_KINDS = {"table", "profile", "equivalent", "expect", "expect_profile"}
+                 "markdown_report", "chart"}
+CHECK_KINDS = {"table", "profile", "equivalent", "expect", "expect_profile", "file"}
 
 
 def validate_corpus(workflows, datasets):
@@ -182,6 +182,8 @@ def validate_corpus(workflows, datasets):
                 problems.append("%s: equivalent check needs workflow+node_ref" % workflow_id)
             if check.get("kind") in ("expect", "expect_profile") and "rows" not in check:
                 problems.append("%s: %s check needs rows" % (workflow_id, check.get("kind")))
+            if check.get("kind") == "file" and not (check.get("path") and check.get("content") is not None):
+                problems.append("%s: file check needs path+content" % workflow_id)
         if not workflow.get("checks"):
             problems.append("%s: workflow has no checks" % workflow_id)
     return problems
@@ -310,6 +312,20 @@ def _native_check(api, workflow_id, workflow, nodes, check, observation,
     label = "%s/%s" % (workflow["id"], key)
     problems = observation["checkProblems"]
 
+    if kind == "file":
+        # Output files are not served by /v1; the runner runs on the engine host, so it
+        # compares the written bytes with the pinned golden content.
+        path = pathlib.Path(check["path"])
+        if not path.is_file():
+            problems.append("%s: file %s was not written" % (label, path))
+            return
+        actual = path.read_text(encoding="utf-8")
+        expected = check.get("content")
+        if actual != expected:
+            problems.append("%s: file %s differs from the pinned content (%d vs %d bytes)"
+                            % (label, path, len(actual.encode("utf-8")), len(expected.encode("utf-8"))))
+        observation["checks"][key] = {"kind": "file", "path": str(path)}
+        return
     if kind == "table":
         body = api.table(workflow_id, api_node, limit=check.get("limit", 50))
         observation["checks"][key] = _native_table(body, check.get("order", "unordered"))

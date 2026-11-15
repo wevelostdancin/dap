@@ -1,0 +1,120 @@
+{
+  "id": "dap.chart",
+  "name": "Chart",
+  "category": "/Visualization",
+  "type": "Sink",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Renders a bar, line, scatter or histogram chart from the input table and passes the table through unchanged. SVG is hand-written XML with rounded coordinates and no timestamps, so the same input produces byte-identical output; PNG is drawn with Java2D in headless mode.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Chart configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Output file",
+        "description": "Absolute path of the .svg or .png file to write; parent directories are created.",
+        "placeholder": "/data/chart.svg"
+      },
+      "format": {
+        "type": "string",
+        "title": "Format",
+        "enum": [
+          "svg",
+          "png"
+        ],
+        "default": "svg",
+        "description": "svg is deterministic and golden-tested; png is drawn with Java2D."
+      },
+      "type": {
+        "type": "string",
+        "title": "Chart type",
+        "enum": [
+          "bar",
+          "line",
+          "scatter",
+          "histogram"
+        ],
+        "description": "bar - summed values per category; line/scatter - points over a numeric x; histogram - distribution of the x column."
+      },
+      "x": {
+        "type": "string",
+        "title": "X column",
+        "description": "Category column for bar; numeric column for line, scatter and histogram."
+      },
+      "y": {
+        "type": "array",
+        "title": "Y columns",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        },
+        "description": "Numeric value columns. bar takes exactly one; line and scatter take one or more (one series each); histogram takes none."
+      },
+      "series": {
+        "type": "string",
+        "title": "Series column",
+        "description": "Optional column that splits values into series (one bar group, line or point colour per value); with series, y must contain exactly one column."
+      },
+      "title": {
+        "type": "string",
+        "title": "Title",
+        "description": "Optional chart title."
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 640,
+        "minimum": 100,
+        "maximum": 4000,
+        "description": "Image width in pixels."
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 400,
+        "minimum": 100,
+        "maximum": 4000,
+        "description": "Image height in pixels."
+      },
+      "limit": {
+        "type": "integer",
+        "title": "Row limit",
+        "default": 1000,
+        "minimum": 1,
+        "maximum": 100000,
+        "description": "Maximum input rows read for the chart."
+      },
+      "bins": {
+        "type": "integer",
+        "title": "Histogram bins",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 1000,
+        "description": "Number of equal-width bins for the histogram type."
+      }
+    },
+    "required": [
+      "file",
+      "type",
+      "x"
+    ]
+  }
+}

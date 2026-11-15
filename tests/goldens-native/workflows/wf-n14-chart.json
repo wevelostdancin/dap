@@ -1,0 +1,109 @@
+{
+  "id": "wf-n14-chart",
+  "title": "N14: deterministic SVG chart over the P2 fixture",
+  "rationale": "Pins the chart node end to end: the SVG bytes are compared with the golden content and the input table is passed through unchanged.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "chart",
+      "type": "chart",
+      "config": {
+        "file": "/tmp/dap-goldens/wf-n14-chart.svg",
+        "format": "svg",
+        "type": "bar",
+        "x": "category",
+        "y": [
+          "score"
+        ],
+        "title": "Score by category",
+        "width": 480,
+        "height": 320,
+        "limit": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "chart"
+    }
+  ],
+  "checks": [
+    {
+      "node": "chart",
+      "kind": "expect",
+      "rows": 6,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "score",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "category",
+          "type": "String"
+        }
+      ],
+      "data": [
+        [
+          1,
+          "alpha",
+          1,
+          "A"
+        ],
+        [
+          2,
+          "beta",
+          2,
+          "B"
+        ],
+        [
+          3,
+          "gamma",
+          3,
+          "A"
+        ],
+        [
+          4,
+          "delta",
+          4,
+          "C"
+        ],
+        [
+          3,
+          "gamma",
+          3,
+          "A"
+        ],
+        [
+          5,
+          "epsilon",
+          5,
+          "B"
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "chart",
+      "kind": "file",
+      "path": "/tmp/dap-goldens/wf-n14-chart.svg",
+      "content": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"320\" viewBox=\"0 0 480 320\">\n<title>Score by category</title>\n<rect x=\"0\" y=\"0\" width=\"480\" height=\"320\" fill=\"#ffffff\"/>\n<text x=\"56\" y=\"268\" text-anchor=\"end\" font-family=\"sans-serif\" font-size=\"11\" fill=\"#333333\">0</text>\n<line x1=\"64\" y1=\"202.29\" x2=\"456\" y2=\"202.29\" stroke=\"#e5e5e5\" stroke-width=\"1\"/>\n<text x=\"56\" y=\"206.29\" text-anchor=\"end\" font-family=\"sans-serif\" font-size=\"11\" fill=\"#333333\">2</text>\n<line x1=\"64\" y1=\"140.57\" x2=\"456\" y2=\"140.57\" stroke=\"#e5e5e5\" stroke-width=\"1\"/>\n<text x=\"56\" y=\"144.57\" text-anchor=\"end\" font-family=\"sans-serif\" font-size=\"11\" fill=\"#333333\">4</text>\n<line x1=\"64\" y1=\"78.86\" x2=\"456\" y2=\"78.86\" stroke=\"#e5e5e5\" stroke-width=\"1\"/>\n<text x=\"56\" y=\"82.86\" text-anchor=\"end\" font-family=\"sans-serif\" font-size=\"11\" fill=\"#333333\">6</text>\n<text x=\"129.33\" y=\"280\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"11\" fill=\"#333333\">A</text>\n<rect x=\"77.07\" y=\"48\" width=\"104.53\" height=\"216\" fill=\"#1f77b4\"/>\n<text x=\"260\" y=\"280\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"11\" fill=\"#333333\">B</text>\n<rect x=\"207.73\" y=\"48\" width=\"104.53\" height=\"216\" fill=\"#1f77b4\"/>\n<text x=\"390.67\" y=\"280\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"11\" fill=\"#333333\">C</text>\n<rect x=\"338.4\" y=\"140.57\" width=\"104.53\" height=\"123.43\" fill=\"#1f77b4\"/>\n<line x1=\"64\" y1=\"48\" x2=\"64\" y2=\"264\" stroke=\"#333333\" stroke-width=\"1\"/>\n<line x1=\"64\" y1=\"264\" x2=\"456\" y2=\"264\" stroke=\"#333333\" stroke-width=\"1\"/>\n</svg>\n"
+    }
+  ],
+  "notes": "The SVG is pinned by the file check; PNG is only smoke-checked by ChartExecutorTest."
+}

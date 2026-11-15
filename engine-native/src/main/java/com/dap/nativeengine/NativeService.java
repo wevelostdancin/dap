@@ -13,6 +13,7 @@ import io.javalin.http.Context;
 import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.nodes.BinnerExecutor;
+import com.dap.nativeengine.nodes.ChartExecutor;
 import com.dap.nativeengine.nodes.ColumnResorterExecutor;
 import com.dap.nativeengine.nodes.ConcatenateExecutor;
 import com.dap.nativeengine.nodes.DateTimeExecutor;
@@ -500,7 +501,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new JoinerExecutor())
                 .register(new StringManipulationExecutor())
                 .register(new MathFormulaExecutor())
-                .register(new MarkdownReportExecutor());
+                .register(new MarkdownReportExecutor())
+                .register(new ChartExecutor());
     }
 
     public static void main(String[] args) {
