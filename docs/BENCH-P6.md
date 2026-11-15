@@ -16,7 +16,7 @@ RSS/heap движка и накладные расходы MCP-адаптера.
 - Харнесс готов: engine lifecycle, HTTP-путь, MCP-путь, точность по
   `reference.json`, устойчивость к ошибкам (каждый шаг под таймаутом, ошибка
   записывается и прогон продолжается).
-- Unit-тесты чистых хелперов — `tests/test_p6_bench.py` (43 кейса, движок не
+- Unit-тесты чистых хелперов — `tests/test_p6_bench.py` (44 кейса, движок не
   нужен): `python3 -m unittest tests.test_p6_bench -v`.
 - Smoke на example-манифесте: 2 датасета, 34 шага, 0 ошибок, MCP 9 вызовов,
   0 ошибок (§11).
@@ -269,12 +269,14 @@ smoke-прогона.
 12. **Порт.** Харнесс не проверяет, свободен ли `--port`; занятый порт даёт
     ошибку старта движка (код 2).
 13. **Точность неполная.** Сравниваются rows, средние и group counts; связи и
-    quality из `/explore` не сверяются (нет в reference-контракте).
+    quality из `/explore` не сверяются (нет в reference-контракте). Group counts
+    читаются через `/table?limit=1000`, поэтому при > 1000 групп хвост не
+    сверяется (в JSON он тоже усечён).
 
 ## 13. Воспроизведение
 
 1. `make build-native` (или `engine-native/mvnw -DskipTests package`).
-2. `python3 -m unittest tests.test_p6_bench -v` — 43 кейса, движок не нужен.
+2. `python3 -m unittest tests.test_p6_bench -v` — 44 кейса, движок не нужен.
 3. Smoke: команда из §2, ожидаемо 2 датасета / 34 шага / 0 ошибок и
    `summary.json`, `summary.md`, `<dataset>.json` в `--out`.
 4. Большие данные: манифест + `data/` + (опционально) `reference.json`,

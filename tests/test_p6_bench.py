@@ -126,6 +126,12 @@ class ReferenceDiffTest(HarnessCase):
         self.assertIsNone(self.bench.reference_diff(None, {"rows": 1}))
 
 
+class FileSizeTest(HarnessCase):
+    def test_missing_path_is_none(self):
+        self.assertIsNone(self.bench.file_size(None))
+        self.assertIsNone(self.bench.file_size("/nonexistent/definitely/missing"))
+
+
 class ProcessTest(HarnessCase):
     def test_rss_bytes_from_ps_output(self):
         self.assertEqual(self.bench.rss_bytes("  204800\n"), 204800 * 1024)

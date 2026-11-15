@@ -592,9 +592,11 @@ def java_version(java):
 
 
 def file_size(path):
+    if path is None:
+        return None
     try:
         return pathlib.Path(path).stat().st_size
-    except OSError:
+    except (OSError, TypeError):
         return None
 
 
