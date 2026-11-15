@@ -254,6 +254,23 @@ class ManifestTest(HarnessCase):
             self.bench.select_entries(entries, ("zzz",))
 
 
+class MemorySnapshotTest(HarnessCase):
+    class FakeEngine:
+        rss_error = "ps unavailable: boom"
+
+        def rss(self):
+            return None
+
+        def health(self, client):
+            return {"memory": {"usedMb": 7}}, 0
+
+    def test_snapshot_records_health_and_rss_note(self):
+        snapshot = self.bench.memory_snapshot(self.FakeEngine(), object())
+        self.assertEqual(snapshot["healthMemory"], {"usedMb": 7})
+        self.assertIsNone(snapshot["rssBytes"])
+        self.assertEqual(snapshot["rssNote"], "ps unavailable: boom")
+
+
 class SummaryTest(HarnessCase):
     def summary(self):
         return {
@@ -307,6 +324,18 @@ class SummaryTest(HarnessCase):
         md = self.bench.render_summary_md(self.summary())
         self.assertIn("| iris | rows | 150 | 150 | 0.0 | 0.0 |", md)
         self.assertIn("mean:sepal_length", md)
+
+    def test_markdown_keeps_wall_ms_precision(self):
+        summary = self.summary()
+        summary["datasets"][0]["steps"]["ingest"]["ms"] = 1544.6
+        md = self.bench.render_summary_md(summary)
+        self.assertIn("| iris | ingest | 1544.6 | 400 | yes |", md)
+
+    def test_markdown_keeps_tiny_diffs_readable(self):
+        summary = self.summary()
+        summary["datasets"][0]["accuracy"]["numeric_means"]["sepal_length"]["abs"] = 3.33e-07
+        md = self.bench.render_summary_md(summary)
+        self.assertIn("3.33e-07", md)
 
     def test_markdown_totals_line(self):
         md = self.bench.render_summary_md(self.summary())
