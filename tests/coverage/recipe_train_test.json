@@ -1,0 +1,282 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "C15",
+      "title": "Train/test split with a split flag and two row_filter branches",
+      "kind": "recipe",
+      "requires": [],
+      "workflow": {
+        "id": "cov-recipe-train-test",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "q",
+            "type": "sql_query",
+            "config": {
+              "sql": "SELECT *, ((id * 37) % 10) < 7 AS is_train FROM src",
+              "inputs": [
+                "src"
+              ]
+            }
+          },
+          {
+            "id": "train",
+            "type": "row_filter",
+            "config": {
+              "where": [
+                {
+                  "column": "is_train",
+                  "op": "eq",
+                  "value": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "test",
+            "type": "row_filter",
+            "config": {
+              "where": [
+                {
+                  "column": "is_train",
+                  "op": "eq",
+                  "value": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "train_cols",
+            "type": "column_filter",
+            "config": {
+              "exclude": [
+                "is_train"
+              ]
+            }
+          },
+          {
+            "id": "test_cols",
+            "type": "column_filter",
+            "config": {
+              "exclude": [
+                "is_train"
+              ]
+            }
+          },
+          {
+            "id": "all_rows",
+            "type": "concatenate",
+            "config": {
+              "mode": "name"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "q"
+          },
+          {
+            "from": "q",
+            "to": "train"
+          },
+          {
+            "from": "q",
+            "to": "test"
+          },
+          {
+            "from": "train",
+            "to": "train_cols"
+          },
+          {
+            "from": "test",
+            "to": "test_cols"
+          },
+          {
+            "from": "train_cols",
+            "to": "all_rows",
+            "toPort": 0
+          },
+          {
+            "from": "test_cols",
+            "to": "all_rows",
+            "toPort": 1
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "train",
+          "kind": "expect",
+          "rows": 4,
+          "order": "unordered",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "is_train",
+              "type": "Boolean"
+            }
+          ],
+          "data": [
+            [
+              2,
+              "beta",
+              2.0,
+              "B",
+              "true"
+            ],
+            [
+              3,
+              "gamma",
+              3.0,
+              "A",
+              "true"
+            ],
+            [
+              3,
+              "gamma",
+              3.0,
+              "A",
+              "true"
+            ],
+            [
+              5,
+              "epsilon",
+              5.0,
+              "B",
+              "true"
+            ]
+          ]
+        },
+        {
+          "node": "test",
+          "kind": "expect",
+          "rows": 2,
+          "order": "unordered",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "is_train",
+              "type": "Boolean"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1.0,
+              "A",
+              "false"
+            ],
+            [
+              4,
+              "delta",
+              4.0,
+              "C",
+              "false"
+            ]
+          ]
+        },
+        {
+          "node": "all_rows",
+          "kind": "expect",
+          "rows": 6,
+          "order": "unordered",
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1.0,
+              "A"
+            ],
+            [
+              2,
+              "beta",
+              2.0,
+              "B"
+            ],
+            [
+              3,
+              "gamma",
+              3.0,
+              "A"
+            ],
+            [
+              4,
+              "delta",
+              4.0,
+              "C"
+            ],
+            [
+              3,
+              "gamma",
+              3.0,
+              "A"
+            ],
+            [
+              5,
+              "epsilon",
+              5.0,
+              "B"
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

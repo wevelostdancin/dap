@@ -1,0 +1,75 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "C16",
+      "title": "Rollup totals with GROUP BY ROLLUP",
+      "kind": "recipe",
+      "requires": [],
+      "workflow": {
+        "id": "cov-recipe-rollup",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "q",
+            "type": "sql_query",
+            "config": {
+              "sql": "SELECT category, SUM(score) AS total FROM src GROUP BY ROLLUP(category) ORDER BY category NULLS LAST",
+              "inputs": [
+                "src"
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "q"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "q",
+          "kind": "expect",
+          "rows": 4,
+          "order": "ordered",
+          "columns": [
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "total",
+              "type": "Number (Float)"
+            }
+          ],
+          "data": [
+            [
+              "A",
+              7.0
+            ],
+            [
+              "B",
+              7.0
+            ],
+            [
+              "C",
+              4.0
+            ],
+            [
+              null,
+              18.0
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "E11",
+      "title": "Normality summary with skewness and kurtosis",
+      "kind": "recipe",
+      "requires": [],
+      "workflow": {
+        "id": "cov-recipe-normality",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "IRIS"
+            }
+          },
+          {
+            "id": "q",
+            "type": "sql_query",
+            "config": {
+              "sql": "SELECT skewness(sepal_length) AS skewness, kurtosis(sepal_length) AS kurtosis, COUNT(*) AS n FROM src",
+              "inputs": [
+                "src"
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "q"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "q",
+          "kind": "expect",
+          "rows": 1,
+          "order": "ordered",
+          "columns": [
+            {
+              "name": "skewness",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "kurtosis",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "n",
+              "type": "Number (Integer)"
+            }
+          ],
+          "data": [
+            [
+              0.314910956637,
+              -0.552064041324,
+              150
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
