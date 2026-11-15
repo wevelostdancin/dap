@@ -114,9 +114,14 @@ public final class ResampleTestExecutor implements NodeExecutor {
                 drawn[i] = row[0];
                 drawnY[i] = row.length > 1 ? row[1] : 0.0;
             }
-            double value = bootstrapStatistic(statistic, drawn, drawnY, n);
-            // A degenerate resample (for example all identical x for a correlation) has
-            // no defined statistic; skipping it is the only unbiased choice available.
+            double value;
+            try {
+                value = bootstrapStatistic(statistic, drawn, drawnY, n);
+            } catch (IllegalArgumentException degenerate) {
+                // A degenerate resample (for example all identical x for a correlation)
+                // has no defined statistic; skipping it is the only unbiased choice.
+                value = Double.NaN;
+            }
             if (Double.isFinite(value)) {
                 statistics[valid++] = value;
             }

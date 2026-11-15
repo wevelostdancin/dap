@@ -1,0 +1,197 @@
+{
+  "id": "wf-p6-survival",
+  "title": "Survival: Kaplan-Meier curves with Greenwood intervals and log-rank",
+  "rationale": "Pins dap.survival on two groups with events and censorings: the Kaplan-Meier rows (at risk, events, censorings, survival and the Greenwood log interval) and the log-rank Mantel-Haenszel statistic with its chi-square p-value.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "sql_query",
+      "config": {
+        "sql": "SELECT * FROM (VALUES (1, 1, 'a'), (2, 1, 'a'), (3, 1, 'a'), (4, 0, 'a'), (1, 1, 'b'), (2, 1, 'b'), (2, 0, 'b'), (4, 1, 'b'), (5, 1, 'b')) AS t(time, event, grp)"
+      }
+    },
+    {
+      "id": "km",
+      "type": "survival",
+      "config": {
+        "time": "time",
+        "event": "event",
+        "group": "grp",
+        "mode": "km"
+      }
+    },
+    {
+      "id": "lr",
+      "type": "survival",
+      "config": {
+        "time": "time",
+        "event": "event",
+        "group": "grp",
+        "mode": "logrank"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "km"
+    },
+    {
+      "from": "src",
+      "to": "lr"
+    }
+  ],
+  "checks": [
+    {
+      "node": "km",
+      "kind": "expect",
+      "rows": 7,
+      "columns": [
+        {
+          "name": "grp",
+          "type": "String"
+        },
+        {
+          "name": "time",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n_at_risk",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "events",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "censored",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "survival",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_low",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_high",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          "a",
+          1.0,
+          4,
+          1,
+          0,
+          0.75,
+          0.42593226849798205,
+          1.0
+        ],
+        [
+          "a",
+          2.0,
+          3,
+          1,
+          0,
+          0.5000000000000001,
+          0.18765892870658832,
+          1.0
+        ],
+        [
+          "a",
+          3.0,
+          2,
+          1,
+          0,
+          0.25000000000000006,
+          0.04579075966601819,
+          1.0
+        ],
+        [
+          "b",
+          1.0,
+          5,
+          1,
+          0,
+          0.8,
+          0.5161257603421721,
+          1.0
+        ],
+        [
+          "b",
+          2.0,
+          4,
+          1,
+          1,
+          0.6,
+          0.29331643163832644,
+          1.0
+        ],
+        [
+          "b",
+          4.0,
+          2,
+          1,
+          0,
+          0.30000000000000004,
+          0.06305448425513634,
+          1.0
+        ],
+        [
+          "b",
+          5.0,
+          1,
+          1,
+          0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "lr",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "test",
+          "type": "String"
+        },
+        {
+          "name": "statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "df",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "groups",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "logrank",
+          0.13480827374382098,
+          1,
+          0.713497837586993,
+          2
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "Group a: events at 1, 2, 3 and a censoring at 4; group b: events at 1, 2, 4, 5 and a censoring at 2 (the censoring at an event time shows up in the censored column). The curve, the Greenwood interval exp(log S -/+ z sqrt(sum d/(n(n-d)))) and the Mantel-Haenszel statistic (O-E)^2/V are computed independently in Python; z is the 0.975 normal quantile and the log-rank p-value is 1 - erf(sqrt(statistic/2))."
+}

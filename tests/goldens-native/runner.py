@@ -71,6 +71,7 @@ LOGICAL_TYPES = {"table_source", "csv_reader", "excel_reader", "row_filter", "so
                  "outlier_detect", "resample", "rolling", "diff", "date_range", "excel_writer",
                  "markdown_report", "chart", "data_quality",
                  "hypothesis_test", "linear_regression",
+                 "resample_test", "survival", "ab_test", "time_series",
                  "sql_query", "db_reader", "file_list"}
 CHECK_KINDS = {"table", "profile", "equivalent", "expect", "expect_profile", "file"}
 
