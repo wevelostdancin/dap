@@ -78,7 +78,8 @@ public final class ServiceState implements AutoCloseable {
         Session session = sessions.computeIfAbsent(sessionId, id -> {
             try {
                 return new Session(new DuckDbSession(settings.duckdbMemoryLimit(),
-                        settings.duckdbThreads(), settings.duckdbTempDirectory()),
+                        settings.duckdbThreads(), settings.duckdbTempDirectory(),
+                        settings.duckdbExtensionDirectory()),
                         sessionSequence.incrementAndGet(), System.currentTimeMillis());
             } catch (SQLException failure) {
                 throw new ApiException(500, "cannot open session database: " + failure.getMessage(),

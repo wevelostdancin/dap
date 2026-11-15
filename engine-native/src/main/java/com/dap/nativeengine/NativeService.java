@@ -11,6 +11,7 @@ import com.dap.nativeengine.api.ServiceState;
 import com.dap.nativeengine.api.WorkflowHandlers;
 import io.javalin.http.Context;
 import com.dap.nativeengine.catalog.NodeRegistry;
+import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.nodes.BinnerExecutor;
 import com.dap.nativeengine.nodes.ColumnResorterExecutor;
@@ -58,6 +59,7 @@ import com.dap.nativeengine.nodes.SorterExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
 import io.javalin.Javalin;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -84,7 +86,7 @@ public final class NativeService implements AutoCloseable {
     public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
                            String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
                            int idleTimeoutSec, int queryTimeoutSec, int maxSessions,
-                           int sessionTtlSec, int maxRetainedJobs) {
+                           int sessionTtlSec, int maxRetainedJobs, String duckdbExtensionDirectory) {
         private static final int DEFAULT_IDLE_TIMEOUT_SEC = 900;
         private static final int DEFAULT_QUERY_TIMEOUT_SEC = 60;
         private static final int DEFAULT_MAX_SESSIONS = 64;
@@ -94,6 +96,7 @@ public final class NativeService implements AutoCloseable {
         public Settings {
             duckdbMemoryLimit = blankToNull(duckdbMemoryLimit);
             duckdbTempDirectory = blankToNull(duckdbTempDirectory);
+            duckdbExtensionDirectory = blankToNull(duckdbExtensionDirectory);
             if (duckdbThreads != null && duckdbThreads <= 0) {
                 throw new IllegalArgumentException(
                         "DAP_DUCKDB_THREADS must be a positive integer, got " + duckdbThreads);
@@ -124,7 +127,7 @@ public final class NativeService implements AutoCloseable {
         public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port) {
             this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, null, null, null,
                     DEFAULT_IDLE_TIMEOUT_SEC, DEFAULT_QUERY_TIMEOUT_SEC, DEFAULT_MAX_SESSIONS,
-                    DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS);
+                    DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS, null);
         }
 
         /** Phase-3 settings without an idle timeout keep the 900 s default. */
@@ -132,7 +135,7 @@ public final class NativeService implements AutoCloseable {
                         String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory) {
             this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
                     duckdbTempDirectory, DEFAULT_IDLE_TIMEOUT_SEC, DEFAULT_QUERY_TIMEOUT_SEC,
-                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS);
+                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS, null);
         }
 
         /** Settings without an explicit read timeout keep the 60 s default. */
@@ -141,7 +144,7 @@ public final class NativeService implements AutoCloseable {
                         int idleTimeoutSec) {
             this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
                     duckdbTempDirectory, idleTimeoutSec, DEFAULT_QUERY_TIMEOUT_SEC,
-                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS);
+                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS, null);
         }
 
         /** Settings without explicit session limits keep the 64 sessions / 1800 s defaults. */
@@ -150,7 +153,7 @@ public final class NativeService implements AutoCloseable {
                         int idleTimeoutSec, int queryTimeoutSec) {
             this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
                     duckdbTempDirectory, idleTimeoutSec, queryTimeoutSec,
-                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS);
+                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS, null);
         }
 
         /** Settings without an explicit job cap keep the 200 terminal jobs default. */
@@ -160,7 +163,7 @@ public final class NativeService implements AutoCloseable {
                         int sessionTtlSec) {
             this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
                     duckdbTempDirectory, idleTimeoutSec, queryTimeoutSec, maxSessions, sessionTtlSec,
-                    DEFAULT_MAX_RETAINED_JOBS);
+                    DEFAULT_MAX_RETAINED_JOBS, null);
         }
 
         public static Settings fromEnv() {
@@ -181,7 +184,8 @@ public final class NativeService implements AutoCloseable {
                     nonNegativeIntEnv(env, "DAP_QUERY_TIMEOUT_SEC", DEFAULT_QUERY_TIMEOUT_SEC),
                     positiveIntEnv(env, "DAP_MAX_SESSIONS", DEFAULT_MAX_SESSIONS),
                     nonNegativeIntEnv(env, "DAP_SESSION_TTL_SEC", DEFAULT_SESSION_TTL_SEC),
-                    positiveIntEnv(env, "DAP_MAX_RETAINED_JOBS", DEFAULT_MAX_RETAINED_JOBS));
+                    positiveIntEnv(env, "DAP_MAX_RETAINED_JOBS", DEFAULT_MAX_RETAINED_JOBS),
+                    extensionDirectory(env));
         }
 
         private static int intEnv(Map<String, String> env, String name, int fallback) {
@@ -240,6 +244,23 @@ public final class NativeService implements AutoCloseable {
 
         private static String blankToNull(String value) {
             return value == null || value.isBlank() ? null : value.strip();
+        }
+
+        /**
+         * DAP_DUCKDB_EXTENSION_DIR, else $DAP_HOME/build/duckdb-ext, else ~/.dap/extensions.
+         * A blank override keeps the default.
+         */
+        private static String extensionDirectory(Map<String, String> env) {
+            String configured = blankToNull(env.get("DAP_DUCKDB_EXTENSION_DIR"));
+            if (configured != null) {
+                return configured;
+            }
+            String home = blankToNull(env.get("DAP_HOME"));
+            if (home != null) {
+                return java.nio.file.Path.of(home, "build", "duckdb-ext").toString();
+            }
+            return java.nio.file.Path.of(System.getProperty("user.home"), ".dap", "extensions")
+                    .toString();
         }
     }
 
@@ -377,6 +398,8 @@ public final class NativeService implements AutoCloseable {
         body.put("version", VERSION);
         body.put("api", Http.API_VERSION);
         body.put("generation", generation);
+        body.put("extensions", Map.of("installed",
+                DuckDbSession.installedExtensions(settings.duckdbExtensionDirectory())));
         body.put("nodes", state.registry().size());
         body.put("coreNodes", state.registry().coreCount());
         body.put("workflows", state.workflows().count());
@@ -595,7 +618,43 @@ public final class NativeService implements AutoCloseable {
                 .register(new MathFormulaExecutor());
     }
 
+    /**
+     * CLI mode: install DuckDB extensions into the configured directory and exit 0/1.
+     * {@code java -jar dap-native.jar --install-extensions sqlite postgres httpfs}
+     */
+    public static int installExtensions(String directory, List<String> names) {
+        try {
+            DuckDbSession.installExtensions(directory, names);
+            System.out.println("dap-native: installed " + String.join(", ", names)
+                    + " into " + directory);
+            return 0;
+        } catch (SQLException | RuntimeException failure) {
+            System.err.println("dap-native: cannot install DuckDB extensions into " + directory
+                    + ": " + failure.getMessage());
+            return 1;
+        }
+    }
+
     public static void main(String[] args) {
+        if (args.length > 0 && "--install-extensions".equals(args[0])) {
+            List<String> names = new ArrayList<>(List.of(args).subList(1, args.length));
+            Settings configured;
+            try {
+                configured = Settings.fromEnv();
+            } catch (IllegalArgumentException invalidSettings) {
+                System.err.println("dap-native: " + invalidSettings.getMessage());
+                System.exit(2);
+                return;
+            }
+            if (names.isEmpty()) {
+                System.err.println("dap-native: --install-extensions needs at least one name, "
+                        + "for example: sqlite postgres httpfs");
+                System.exit(2);
+                return;
+            }
+            System.exit(installExtensions(configured.duckdbExtensionDirectory(), names));
+            return;
+        }
         Settings defaults;
         try {
             defaults = Settings.fromEnv();
@@ -618,7 +677,8 @@ public final class NativeService implements AutoCloseable {
         Settings settings = new Settings(defaults.maxWorkflows(), defaults.defaultJobTimeoutSec(), bind, port,
                 defaults.duckdbMemoryLimit(), defaults.duckdbThreads(), defaults.duckdbTempDirectory(),
                 defaults.idleTimeoutSec(), defaults.queryTimeoutSec(), defaults.maxSessions(),
-                defaults.sessionTtlSec(), defaults.maxRetainedJobs());
+                defaults.sessionTtlSec(), defaults.maxRetainedJobs(),
+                defaults.duckdbExtensionDirectory());
         NativeService service = new NativeService(settings, new NodeRegistry(), defaultExecutors());
         Runtime.getRuntime().addShutdownHook(new Thread(service::close, "dap-shutdown-hook"));
         service.start(port);

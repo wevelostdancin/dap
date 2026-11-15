@@ -66,18 +66,15 @@ public final class DuckDbSession implements AutoCloseable {
         this(null, null, null);
     }
 
-    /**
-     * Applies the configured DuckDB resources on the base connection, which owns the database:
-     * duplicated connections inherit them because memory_limit, threads and temp_directory are
-     * database-level settings. Invalid values fail here with a message naming the setting.
-     */
-    public DuckDbSession(String memoryLimit, Integer threads, String tempDirectory) throws SQLException {
+    /** Defaults plus an explicit extension directory; null leaves DuckDB's default. */
+    public DuckDbSession(String memoryLimit, Integer threads, String tempDirectory,
+                         String extensionDirectory) throws SQLException {
         if (threads != null && threads <= 0) {
             throw new IllegalArgumentException("DuckDB threads must be positive, got " + threads);
         }
         this.base = (DuckDBConnection) DriverManager.getConnection("jdbc:duckdb:");
         try {
-            apply(memoryLimit, threads, tempDirectory);
+            apply(memoryLimit, threads, tempDirectory, extensionDirectory);
             this.resources = readResources(memoryLimit);
         } catch (SQLException | RuntimeException failure) {
             closeQuietly(base);
@@ -85,14 +82,25 @@ public final class DuckDbSession implements AutoCloseable {
         }
     }
 
+    /**
+     * Applies the configured DuckDB resources on the base connection, which owns the database:
+     * duplicated connections inherit them because memory_limit, threads and temp_directory are
+     * database-level settings. Invalid values fail here with a message naming the setting.
+     */
+    public DuckDbSession(String memoryLimit, Integer threads, String tempDirectory) throws SQLException {
+        this(memoryLimit, threads, tempDirectory, null);
+    }
+
     public Resources resources() {
         return resources;
     }
 
-    private void apply(String memoryLimit, Integer threads, String tempDirectory) throws SQLException {
+    private void apply(String memoryLimit, Integer threads, String tempDirectory,
+                       String extensionDirectory) throws SQLException {
         try (Statement statement = base.createStatement()) {
             statement.execute("SET TimeZone='UTC'");
         }
+        applyExtensionDirectory(extensionDirectory);
         if (threads != null) {
             try (Statement statement = base.createStatement()) {
                 statement.execute("SET threads=" + threads);
@@ -119,6 +127,35 @@ public final class DuckDbSession implements AutoCloseable {
                 throw new SQLException("invalid DuckDB temp directory '" + tempDirectory + "': "
                         + failure.getMessage(), failure);
             }
+        }
+    }
+
+    /**
+     * Point DuckDB at the configured extension directory and switch autoinstall off: the
+     * engine never downloads extensions on its own, only the explicit installer does.
+     */
+    private void applyExtensionDirectory(String extensionDirectory) throws SQLException {
+        if (extensionDirectory == null) {
+            return;
+        }
+        try {
+            Files.createDirectories(Path.of(extensionDirectory));
+        } catch (IOException failure) {
+            // A read-only home must not keep the engine from starting; extensions are optional.
+            System.err.println("dap-native: cannot create DuckDB extension directory '"
+                    + extensionDirectory + "': " + failure.getMessage());
+            return;
+        }
+        try (Statement statement = base.createStatement()) {
+            statement.execute("SET extension_directory=" + literal(extensionDirectory));
+        } catch (SQLException failure) {
+            throw new SQLException("invalid DuckDB extension directory '" + extensionDirectory
+                    + "': " + failure.getMessage(), failure);
+        }
+        try (Statement statement = base.createStatement()) {
+            statement.execute("SET autoinstall_known_extensions=false");
+        } catch (SQLException ignored) {
+            // Older DuckDB builds have no such setting; explicit installs still work.
         }
     }
 
@@ -510,6 +547,67 @@ public final class DuckDbSession implements AutoCloseable {
             return;
         }
         dropTables(names);
+    }
+
+    /** Suffix of a DuckDB extension file, shared by the installer and the health listing. */
+    public static final String EXTENSION_SUFFIX = ".duckdb_extension";
+
+    /**
+     * Install the named extensions into directory. Explicit and network-bound by design:
+     * the engine itself never auto-installs (autoinstall_known_extensions=false).
+     */
+    public static void installExtensions(String directory, List<String> names) throws SQLException {
+        if (directory == null || directory.isBlank()) {
+            throw new SQLException("DAP_DUCKDB_EXTENSION_DIR is not configured");
+        }
+        if (names == null || names.isEmpty()) {
+            throw new SQLException("no extension names given");
+        }
+        try {
+            Files.createDirectories(Path.of(directory));
+        } catch (IOException failure) {
+            throw new SQLException("cannot create DuckDB extension directory '" + directory
+                    + "': " + failure.getMessage(), failure);
+        }
+        try (Connection connection = DriverManager.getConnection("jdbc:duckdb:");
+             Statement statement = connection.createStatement()) {
+            statement.execute("SET extension_directory=" + literal(directory));
+            try {
+                statement.execute("SET autoinstall_known_extensions=false");
+            } catch (SQLException ignored) {
+                // Older DuckDB builds have no such setting.
+            }
+            for (String name : names) {
+                if (name == null || !name.matches("[A-Za-z0-9_]+")) {
+                    throw new SQLException("invalid extension name '" + name + "'");
+                }
+                statement.execute("INSTALL " + name);
+            }
+        }
+    }
+
+    /** Base names of the extensions installed under directory (sorted, duplicates merged). */
+    public static List<String> installedExtensions(String directory) {
+        if (directory == null || directory.isBlank()) {
+            return List.of();
+        }
+        Path root = Path.of(directory);
+        if (!Files.isDirectory(root)) {
+            return List.of();
+        }
+        try (java.util.stream.Stream<Path> files = Files.walk(root, 4)) {
+            return files.filter(Files::isRegularFile)
+                    .map(path -> path.getFileName().toString())
+                    .filter(name -> name.endsWith(EXTENSION_SUFFIX))
+                    .map(name -> name.substring(0, name.length() - EXTENSION_SUFFIX.length()))
+                    .distinct()
+                    .sorted()
+                    .toList();
+        } catch (IOException failure) {
+            System.err.println("dap-native: cannot list DuckDB extensions in '" + directory
+                    + "': " + failure.getMessage());
+            return List.of();
+        }
     }
 
     public String nextTableName(String prefix) {
