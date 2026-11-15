@@ -42,3 +42,6 @@ dap.rolling.json
 dap.diff.json
 dap.date_range.json
 dap.excel_writer.json
+dap.markdown_report.json
+dap.chart.json
+dap.data_quality.json

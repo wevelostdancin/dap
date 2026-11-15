@@ -13,6 +13,7 @@ import io.javalin.http.Context;
 import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.nodes.BinnerExecutor;
+import com.dap.nativeengine.nodes.ChartExecutor;
 import com.dap.nativeengine.nodes.ColumnResorterExecutor;
 import com.dap.nativeengine.nodes.ConcatenateExecutor;
 import com.dap.nativeengine.nodes.DateTimeExecutor;
@@ -30,6 +31,7 @@ import com.dap.nativeengine.nodes.UnpivotExecutor;
 import com.dap.nativeengine.nodes.ValueReplaceExecutor;
 import com.dap.nativeengine.nodes.WindowExecutor;
 import com.dap.nativeengine.nodes.CorrelationExecutor;
+import com.dap.nativeengine.nodes.DataQualityExecutor;
 import com.dap.nativeengine.nodes.DateRangeExecutor;
 import com.dap.nativeengine.nodes.DescribeExecutor;
 import com.dap.nativeengine.nodes.DiffExecutor;
@@ -49,6 +51,7 @@ import com.dap.nativeengine.nodes.GroupByExecutor;
 import com.dap.nativeengine.nodes.JsonReaderExecutor;
 import com.dap.nativeengine.nodes.JsonWriterExecutor;
 import com.dap.nativeengine.nodes.JoinerExecutor;
+import com.dap.nativeengine.nodes.MarkdownReportExecutor;
 import com.dap.nativeengine.nodes.MathFormulaExecutor;
 import com.dap.nativeengine.nodes.MissingValueExecutor;
 import com.dap.nativeengine.nodes.ParquetReaderExecutor;
@@ -592,7 +595,10 @@ public final class NativeService implements AutoCloseable {
                 .register(new GroupByExecutor())
                 .register(new JoinerExecutor())
                 .register(new StringManipulationExecutor())
-                .register(new MathFormulaExecutor());
+                .register(new MathFormulaExecutor())
+                .register(new MarkdownReportExecutor())
+                .register(new ChartExecutor())
+                .register(new DataQualityExecutor());
     }
 
     public static void main(String[] args) {

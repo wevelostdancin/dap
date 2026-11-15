@@ -87,7 +87,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.5.2</version>
         <configuration>
-          <argLine>--add-opens=java.base/java.nio=ALL-UNNAMED</argLine>
+          <argLine>--add-opens=java.base/java.nio=ALL-UNNAMED -Djava.awt.headless=true</argLine>
           <systemPropertyVariables>
             <dap.project.root>${project.basedir}/..</dap.project.root>
           </systemPropertyVariables>

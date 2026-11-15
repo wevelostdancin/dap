@@ -106,6 +106,25 @@ final class IoNodeSupport {
         }
     }
 
+    /** Write bytes next to the target and rename, so a failed write never leaves a truncated file. */
+    static void writeAtomically(Path target, byte[] content, String node) {
+        Path temporary = target.resolveSibling(target.getFileName() + ".tmp-" + UUID.randomUUID());
+        try {
+            Files.write(temporary, content);
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException failure) {
+            throw new IllegalStateException(node + ": cannot write " + target + ": "
+                    + failure.getMessage(), failure);
+        } finally {
+            try {
+                Files.deleteIfExists(temporary);
+            } catch (IOException ignored) {
+                // best effort: an inert temp file is better than a broken target
+            }
+        }
+    }
+
     /** DuckDB treats file paths as globs; a literal path with glob characters would be ambiguous. */
     private static void rejectGlob(Path path, String node) {
         String value = path.toString();

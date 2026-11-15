@@ -58,7 +58,10 @@ class NodeRegistryTest {
             "dap.rolling",
             "dap.diff",
             "dap.date_range",
-            "dap.excel_writer");
+            "dap.excel_writer",
+            "dap.markdown_report",
+            "dap.chart",
+            "dap.data_quality");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -110,7 +113,8 @@ class NodeRegistryTest {
     @Test
     void sourcesHaveNoInputsAndManipulatorsHaveOne() {
         for (NodeSpec spec : registry.all()) {
-            if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")) {
+            if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")
+                    || spec.id().equals("dap.data_quality")) {
                 continue;
             }
             if (spec.type().equals("Source")) {
@@ -120,6 +124,14 @@ class NodeRegistryTest {
                         spec.inPorts(), spec.id());
             }
         }
+    }
+
+    @Test
+    void dataQualityHasDataAndOptionalReferenceInputs() {
+        assertEquals(List.of(
+                        new NodeSpec.Port(0, "Data", "BufferedDataTable"),
+                        new NodeSpec.Port(1, "Reference", "BufferedDataTable")),
+                registry.require("dap.data_quality").inPorts());
     }
 
     @Test
@@ -239,12 +251,12 @@ class NodeRegistryTest {
     @Test
     void categoryPrefixFindsAllIoNodes() {
         List<NodeSpec> hits = registry.search(null, "/IO", 50);
-        assertEquals(8, hits.size());
+        assertEquals(9, hits.size());
         assertEquals(List.of("CSV Reader", "CSV Writer", "Excel Reader", "Excel Writer", "JSON Reader",
-                "JSON Writer", "Parquet Reader", "Parquet Writer"),
+                "JSON Writer", "Markdown Report", "Parquet Reader", "Parquet Writer"),
                 hits.stream().map(NodeSpec::name).toList());
         assertEquals(4, registry.search(null, "/IO/Read", 50).size());
-        assertEquals(4, registry.search(null, "/IO/Write", 50).size());
+        assertEquals(5, registry.search(null, "/IO/Write", 50).size());
     }
 
     @Test
@@ -257,7 +269,7 @@ class NodeRegistryTest {
     @Test
     void limitCapsTheResultInNameOrder() {
         assertEquals(ALL_IDS.size(), registry.search(null, null, -1).size());
-        assertEquals(List.of("Binner", "Column Filter", "Column Renamer"),
+        assertEquals(List.of("Binner", "Chart", "Column Filter"),
                 registry.search(null, null, 3).stream().map(NodeSpec::name).toList());
         assertTrue(registry.search(null, null, 0).isEmpty());
     }

@@ -1,0 +1,141 @@
+{
+  "id": "dap.data_quality",
+  "name": "Data Quality",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Runs data quality checks over the input table in one combined aggregate statement and returns one row per check (output=long) or one summary row (output=summary): check, column, status, message, failed_rows, total_rows. Checks are not_null, unique, range, pattern, referential, row_count and allowed_values; fail_on decides whether a failed check aborts the run.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 1,
+      "name": "Reference",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Data Quality configuration",
+    "additionalProperties": false,
+    "properties": {
+      "checks": {
+        "type": "array",
+        "title": "Checks",
+        "description": "Checks to run, in output order; at least one is required.",
+        "items": {
+          "type": "object",
+          "title": "Check",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "title": "Kind",
+              "enum": [
+                "not_null",
+                "unique",
+                "range",
+                "pattern",
+                "referential",
+                "row_count",
+                "allowed_values"
+              ],
+              "description": "not_null - no NULLs; unique - no duplicated values; range - min/max bounds; pattern - regex search; referential - values exist in the Reference input; row_count - total row bounds; allowed_values - value domain."
+            },
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Column to check; required for every kind except row_count."
+            },
+            "min": {
+              "type": [
+                "number",
+                "string",
+                "boolean"
+              ],
+              "title": "Minimum",
+              "description": "Lower bound for range, or minimum row count for row_count."
+            },
+            "max": {
+              "type": [
+                "number",
+                "string",
+                "boolean"
+              ],
+              "title": "Maximum",
+              "description": "Upper bound for range, or maximum row count for row_count."
+            },
+            "regex": {
+              "type": "string",
+              "title": "Pattern",
+              "description": "RE2 regular expression (DuckDB regexp_matches) for the pattern kind."
+            },
+            "values": {
+              "type": "array",
+              "title": "Allowed values",
+              "items": {
+                "type": [
+                  "number",
+                  "string",
+                  "boolean"
+                ],
+                "title": "Value"
+              },
+              "description": "Allowed value domain for the allowed_values kind."
+            },
+            "severity": {
+              "type": "string",
+              "title": "Severity",
+              "enum": [
+                "error",
+                "warn"
+              ],
+              "default": "error",
+              "description": "Severity used by fail_on."
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      },
+      "fail_on": {
+        "type": "string",
+        "title": "Fail on",
+        "enum": [
+          "error",
+          "warn",
+          "never"
+        ],
+        "default": "error",
+        "description": "error - abort on failed error checks; warn - abort on any failed check; never - only report."
+      },
+      "output": {
+        "type": "string",
+        "title": "Output",
+        "enum": [
+          "long",
+          "summary"
+        ],
+        "default": "long",
+        "description": "long - one row per check; summary - one aggregated row."
+      }
+    },
+    "required": [
+      "checks"
+    ]
+  }
+}
