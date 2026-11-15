@@ -51,3 +51,4 @@ dap.sql_query.json
 dap.db_reader.json
 dap.file_list.json
 dap.file_reader.json
+dap.db_writer.json
