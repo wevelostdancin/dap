@@ -76,7 +76,11 @@ class NodeRegistryTest {
             "dap.text_normalize",
             "dap.fuzzy_join",
             "dap.geo_distance",
-            "dap.calendar");
+            "dap.calendar",
+            "dap.resample_test",
+            "dap.survival",
+            "dap.ab_test",
+            "dap.time_series");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -300,7 +304,7 @@ class NodeRegistryTest {
     @Test
     void limitCapsTheResultInNameOrder() {
         assertEquals(ALL_IDS.size(), registry.search(null, null, -1).size());
-        assertEquals(List.of("Binner", "Calendar", "Chart"),
+        assertEquals(List.of("A/B Test", "Binner", "Calendar"),
                 registry.search(null, null, 3).stream().map(NodeSpec::name).toList());
         assertTrue(registry.search(null, null, 0).isEmpty());
     }

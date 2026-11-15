@@ -16,6 +16,7 @@ import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.io.DatasetCatalog;
+import com.dap.nativeengine.nodes.AbTestExecutor;
 import com.dap.nativeengine.nodes.BinnerExecutor;
 import com.dap.nativeengine.nodes.CalendarExecutor;
 import com.dap.nativeengine.nodes.LogisticRegressionExecutor;
@@ -73,11 +74,14 @@ import com.dap.nativeengine.nodes.MathFormulaExecutor;
 import com.dap.nativeengine.nodes.MissingValueExecutor;
 import com.dap.nativeengine.nodes.ParquetReaderExecutor;
 import com.dap.nativeengine.nodes.ParquetWriterExecutor;
+import com.dap.nativeengine.nodes.ResampleTestExecutor;
 import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
 import com.dap.nativeengine.nodes.SqlQueryExecutor;
+import com.dap.nativeengine.nodes.SurvivalExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
 import com.dap.nativeengine.nodes.TextNormalizeExecutor;
+import com.dap.nativeengine.nodes.TimeSeriesExecutor;
 import io.javalin.Javalin;
 
 import java.sql.SQLException;
@@ -749,7 +753,11 @@ public final class NativeService implements AutoCloseable {
                 .register(new TextNormalizeExecutor())
                 .register(new FuzzyJoinExecutor())
                 .register(new GeoDistanceExecutor())
-                .register(new CalendarExecutor());
+                .register(new CalendarExecutor())
+                .register(new ResampleTestExecutor())
+                .register(new SurvivalExecutor())
+                .register(new AbTestExecutor())
+                .register(new TimeSeriesExecutor());
     }
 
     /**

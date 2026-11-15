@@ -1,0 +1,226 @@
+{
+  "id": "wf-p6-resample-test",
+  "title": "Resample test: bootstrap intervals and a permutation test",
+  "rationale": "Pins dap.resample_test end to end: the bootstrap mean of 1..10 with seed 42 (200 resamples), the bootstrap correlation of a perfect line (a degenerate-resample-safe exact 1), and the two-sided permutation p-value of two separated groups with seed 42.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "mean_src",
+      "type": "sql_query",
+      "config": {
+        "sql": "SELECT i + 1 AS x FROM range(10) AS t(i)"
+      }
+    },
+    {
+      "id": "corr_src",
+      "type": "sql_query",
+      "config": {
+        "sql": "SELECT i + 1 AS x, 2.0 * (i + 1) + 1.0 AS y FROM range(10) AS t(i)"
+      }
+    },
+    {
+      "id": "perm_src",
+      "type": "sql_query",
+      "config": {
+        "sql": "SELECT i + 1 AS v, 'a' AS g FROM range(5) AS t(i) UNION ALL SELECT i + 10 AS v, 'b' AS g FROM range(5) AS t(i)"
+      }
+    },
+    {
+      "id": "boot_mean",
+      "type": "resample_test",
+      "config": {
+        "mode": "bootstrap",
+        "statistic": "mean",
+        "columns": [
+          "x"
+        ],
+        "resamples": 200,
+        "seed": 42
+      }
+    },
+    {
+      "id": "boot_corr",
+      "type": "resample_test",
+      "config": {
+        "mode": "bootstrap",
+        "statistic": "correlation",
+        "columns": [
+          "x",
+          "y"
+        ],
+        "resamples": 100,
+        "seed": 42
+      }
+    },
+    {
+      "id": "perm",
+      "type": "resample_test",
+      "config": {
+        "mode": "permutation",
+        "statistic": "difference_mean",
+        "value": "v",
+        "group": "g",
+        "permutations": 200,
+        "seed": 42
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "mean_src",
+      "to": "boot_mean"
+    },
+    {
+      "from": "corr_src",
+      "to": "boot_corr"
+    },
+    {
+      "from": "perm_src",
+      "to": "perm"
+    }
+  ],
+  "checks": [
+    {
+      "node": "boot_mean",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "statistic",
+          "type": "String"
+        },
+        {
+          "name": "estimate",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "se",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_low",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_high",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "bias",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "resamples",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "mean",
+          5.5,
+          0.8745938037786687,
+          3.9975,
+          7.3025,
+          0.039499999999994984,
+          10,
+          200
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "boot_corr",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "statistic",
+          "type": "String"
+        },
+        {
+          "name": "estimate",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "se",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_low",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "ci_high",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "bias",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "resamples",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "correlation",
+          1.0,
+          0.0,
+          1.0,
+          1.0,
+          0.0,
+          10,
+          100
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "perm",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "statistic",
+          "type": "String"
+        },
+        {
+          "name": "observed",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "n",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "permutations",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "difference_mean",
+          -9.0,
+          0.01990049751243781,
+          10,
+          200
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "Expectations are an independent Python re-implementation of the documented algorithm: the seeded java.util.Random stream (nextInt draws, Fisher-Yates shuffle), the percentile interval with linear interpolation, the add-one permutation p-value, and the sample standard deviation. The perfect-line correlation is exactly 1 for every resample, so se/bias/interval collapse to 0/1."
+}

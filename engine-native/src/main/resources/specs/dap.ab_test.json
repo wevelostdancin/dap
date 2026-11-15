@@ -1,0 +1,72 @@
+{
+  "id": "dap.ab_test",
+  "name": "A/B Test",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Two-proportion z-test with power and required sample size, aggregated in SQL (the rows are never read into the JVM). The two levels of group are ordered lexicographically: the first is the control, the second the treatment. One output row: control_rate, treatment_rate, lift (relative, treatment/control - 1), z_statistic (pooled two-proportion z), p_value (two-sided normal tail), power (achieved power for the observed effect and group sizes), required_n_per_group (Fleiss formula for the design effect: mde relative lift or the observed lift, control rate baseline or the observed control rate), mde (the lift used) and alpha.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "A/B Test configuration",
+    "additionalProperties": false,
+    "properties": {
+      "group": {
+        "type": "string",
+        "title": "Group column",
+        "description": "Categorical column with exactly two levels: the first in lexicographic order is the control, the second the treatment."
+      },
+      "value": {
+        "type": "string",
+        "title": "Value column",
+        "description": "Conversion column: boolean or numeric 0/1."
+      },
+      "alpha": {
+        "type": "number",
+        "title": "Significance level",
+        "description": "Two-sided significance level of the test and the power formulas.",
+        "default": 0.05,
+        "minimum": 0,
+        "maximum": 1
+      },
+      "power": {
+        "type": "number",
+        "title": "Target power",
+        "description": "Target power of the required sample size formula, in (0, 1).",
+        "default": 0.8,
+        "minimum": 0,
+        "maximum": 1
+      },
+      "mde": {
+        "type": "number",
+        "title": "Minimum detectable effect",
+        "description": "Relative lift used for required_n_per_group; when omitted the observed lift is used."
+      },
+      "baseline": {
+        "type": "number",
+        "title": "Baseline rate",
+        "description": "Control rate used for required_n_per_group; when omitted the observed control rate is used."
+      }
+    },
+    "required": [
+      "group",
+      "value"
+    ]
+  }
+}

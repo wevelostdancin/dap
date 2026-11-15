@@ -1,0 +1,345 @@
+{
+  "id": "wf-p6-time-series",
+  "title": "Time series: decomposition, ACF, lags, drift forecast and ADF",
+  "rationale": "Pins every mode of dap.time_series on the same 24-point series v(t) = 10 + 0.5 t + season(t mod 4), season = [0, 2, 0, -2]: the additive decomposition (exact linear trend and seasonal indices), the ACF/PACF at lags 0..4, the lag columns, the drift forecast with its intervals, and the ADF stationarity row.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "sql_query",
+      "config": {
+        "sql": "SELECT i AS t, CAST(10.0 + 0.5 * i + CASE WHEN i % 4 = 1 THEN 2.0 WHEN i % 4 = 3 THEN -2.0 ELSE 0.0 END AS DOUBLE) AS v FROM range(24) AS t(i)"
+      }
+    },
+    {
+      "id": "dec",
+      "type": "time_series",
+      "config": {
+        "mode": "decompose",
+        "time": "t",
+        "value": "v",
+        "period": 4,
+        "method": "additive"
+      }
+    },
+    {
+      "id": "acf",
+      "type": "time_series",
+      "config": {
+        "mode": "acf",
+        "time": "t",
+        "value": "v",
+        "max_lag": 4
+      }
+    },
+    {
+      "id": "lag",
+      "type": "time_series",
+      "config": {
+        "mode": "lag",
+        "time": "t",
+        "value": "v",
+        "max_lag": 2
+      }
+    },
+    {
+      "id": "fc",
+      "type": "time_series",
+      "config": {
+        "mode": "forecast",
+        "time": "t",
+        "value": "v",
+        "method": "drift",
+        "horizon": 3
+      }
+    },
+    {
+      "id": "st",
+      "type": "time_series",
+      "config": {
+        "mode": "stationarity",
+        "time": "t",
+        "value": "v"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "dec"
+    },
+    {
+      "from": "src",
+      "to": "acf"
+    },
+    {
+      "from": "src",
+      "to": "lag"
+    },
+    {
+      "from": "src",
+      "to": "fc"
+    },
+    {
+      "from": "src",
+      "to": "st"
+    }
+  ],
+  "checks": [
+    {
+      "node": "dec",
+      "kind": "expect",
+      "rows": 24,
+      "columns": [
+        {
+          "name": "time",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "observed",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "trend",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "seasonal",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "residual",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          0.0,
+          10.0,
+          null,
+          0.0,
+          null
+        ],
+        [
+          1.0,
+          12.5,
+          null,
+          2.0,
+          null
+        ],
+        [
+          2.0,
+          11.0,
+          11.0,
+          0.0,
+          0.0
+        ],
+        [
+          3.0,
+          9.5,
+          11.5,
+          -2.0,
+          0.0
+        ],
+        [
+          4.0,
+          12.0,
+          12.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "acf",
+      "kind": "expect",
+      "rows": 5,
+      "columns": [
+        {
+          "name": "lag",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "acf",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "pacf",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          0,
+          1.0,
+          1.0
+        ],
+        [
+          1,
+          0.7706661316211878,
+          0.7706661316211878
+        ],
+        [
+          2,
+          0.5581861958266453,
+          -0.0880137999747198
+        ],
+        [
+          3,
+          0.55276886035313,
+          0.3786322374924441
+        ],
+        [
+          4,
+          0.5337078651685393,
+          -0.03958834796590637
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "lag",
+      "kind": "expect",
+      "rows": 24,
+      "columns": [
+        {
+          "name": "t",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "v",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "value_lag_1",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "value_lag_2",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          0,
+          10.0,
+          null,
+          null
+        ],
+        [
+          1,
+          12.5,
+          10.0,
+          null
+        ],
+        [
+          2,
+          11.0,
+          12.5,
+          10.0
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "fc",
+      "kind": "expect",
+      "rows": 3,
+      "columns": [
+        {
+          "name": "time",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "forecast",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "lower",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "upper",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "method",
+          "type": "String"
+        }
+      ],
+      "data": [
+        [
+          24.0,
+          19.91304347826087,
+          15.908806337720888,
+          23.917280618800852,
+          "drift"
+        ],
+        [
+          25.0,
+          20.32608695652174,
+          14.663240485412032,
+          25.988933427631444,
+          "drift"
+        ],
+        [
+          26.0,
+          20.73913043478261,
+          13.80358826181304,
+          27.67467260775218,
+          "drift"
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "st",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "test",
+          "type": "String"
+        },
+        {
+          "name": "statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "critical_1",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "critical_5",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "critical_10",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "stationary",
+          "type": "Boolean"
+        }
+      ],
+      "data": [
+        [
+          "adf",
+          -1.3684626185608275,
+          0.5885111247204037,
+          -3.43,
+          -2.86,
+          -2.57,
+          "false"
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "The linear trend is recovered exactly by the centred moving average (the weights are symmetric), so the seasonal indices are exactly [0, 2, 0, -2] and the residuals are 0; rows 0 and 1 have no full window, so trend and residual are NULL (the check pins the first five rows of the 24). ACF/PACF, the drift forecast (slope (v23-v0)/23, sigma from the one-step residuals, z = 1.959963984540054) and the ADF regression (constant plus one lagged difference, normal-approximation p-value) are computed independently in Python."
+}
