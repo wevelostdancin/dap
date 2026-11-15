@@ -1,5 +1,6 @@
 package com.dap.nativeengine.engine;
 
+import com.dap.nativeengine.api.ApiException;
 import org.duckdb.DuckDBAppender;
 import org.duckdb.DuckDBConnection;
 
@@ -20,7 +21,14 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -35,6 +43,8 @@ public final class DuckDbSession implements AutoCloseable {
      * distinct values is still counted exactly.
      */
     private static final int REFINE_DISTINCT = MAX_DISTINCT + MAX_DISTINCT / 10;
+    /** Virtual threads for bounded reads: cheap, daemon, and one per materialization. */
+    private static final ExecutorService READS = Executors.newVirtualThreadPerTaskExecutor();
 
     /** Effective database settings, read back from DuckDB (normalized, e.g. 1GB -> 953.6 MiB). */
     public record Resources(String memoryLimit, Integer threads, String tempDirectory) {
@@ -260,8 +270,28 @@ public final class DuckDbSession implements AutoCloseable {
     /** Preview registered against a workflow/node so session close and job cancel can interrupt it. */
     public TableData preview(String sql, List<ColumnSpec> columns, int limit,
                              String workflowId, String nodeId) throws SQLException {
+        return preview(sql, columns, limit, 0L, workflowId, nodeId);
+    }
+
+    /**
+     * Bounded preview: the materialization runs on a virtual thread and is interrupted
+     * (connection closed) after {@code timeoutMillis}, then the call fails with 408
+     * {@code query_timeout}. A non-positive timeout keeps the unbounded behaviour.
+     */
+    public TableData preview(String sql, List<ColumnSpec> columns, int limit, long timeoutMillis,
+                             String workflowId, String nodeId) throws SQLException {
         int safeLimit = Math.max(0, limit);
         DuckDBConnection connection = openRead(workflowId, nodeId);
+        try {
+            return bounded("table", timeoutMillis, workflowId,
+                    () -> readPreview(connection, sql, columns, safeLimit));
+        } finally {
+            endRead(connection);
+        }
+    }
+
+    private static TableData readPreview(DuckDBConnection connection, String sql,
+                                         List<ColumnSpec> columns, int safeLimit) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             long rows = countWith(statement, sql);
             List<List<String>> data = new ArrayList<>();
@@ -276,8 +306,6 @@ public final class DuckDbSession implements AutoCloseable {
                 }
             }
             return new TableData(rows, columns, data);
-        } finally {
-            endRead(connection);
         }
     }
 
@@ -303,7 +331,23 @@ public final class DuckDbSession implements AutoCloseable {
     /** Profile registered against a workflow/node so session close and job cancel can interrupt it. */
     public ProfileData profile(String sql, List<ColumnSpec> columns,
                                String workflowId, String nodeId) throws SQLException {
+        return profile(sql, columns, 0L, workflowId, nodeId);
+    }
+
+    /** Bounded profile: 408 {@code query_timeout} when the scan exceeds {@code timeoutMillis}. */
+    public ProfileData profile(String sql, List<ColumnSpec> columns, long timeoutMillis,
+                               String workflowId, String nodeId) throws SQLException {
         DuckDBConnection connection = openRead(workflowId, nodeId);
+        try {
+            return bounded("profile", timeoutMillis, workflowId,
+                    () -> readProfile(connection, sql, columns));
+        } finally {
+            endRead(connection);
+        }
+    }
+
+    private static ProfileData readProfile(DuckDBConnection connection, String sql,
+                                           List<ColumnSpec> columns) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             long rows = countWith(statement, sql);
             List<ProfileColumn> profile = new ArrayList<>(columns.size());
@@ -340,8 +384,50 @@ public final class DuckDbSession implements AutoCloseable {
                 }
             }
             return new ProfileData(rows, profile);
-        } finally {
-            endRead(connection);
+        }
+    }
+
+    /**
+     * Run one materialization under a timeout. On expiry the registered reads of the
+     * workflow are interrupted (their connections closed) and the caller gets 408.
+     */
+    private <T> T bounded(String operation, long timeoutMillis, String workflowId,
+                          Callable<T> task) throws SQLException {
+        if (timeoutMillis <= 0) {
+            try {
+                return task.call();
+            } catch (SQLException | RuntimeException failure) {
+                throw failure;
+            } catch (Exception failure) {
+                throw new SQLException(failure);
+            }
+        }
+        Future<T> future = READS.submit(task);
+        try {
+            return future.get(timeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException timedOut) {
+            interruptReads(workflowId);
+            future.cancel(true);
+            throw ApiException.timeout("query_timeout",
+                    "the " + operation + " materialization timed out after " + timeoutMillis + " ms",
+                    "narrow the workflow (filter or aggregate before the join) or raise "
+                            + "DAP_QUERY_TIMEOUT_SEC");
+        } catch (ExecutionException failure) {
+            Throwable cause = failure.getCause();
+            if (cause instanceof SQLException sql) {
+                throw sql;
+            }
+            if (cause instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new SQLException(cause);
+        } catch (InterruptedException interrupted) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new SQLException("interrupted while waiting for the " + operation, interrupted);
         }
     }
 

@@ -596,6 +596,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '408':
+          $ref: '#/components/responses/Timeout'
         '409':
           $ref: '#/components/responses/Conflict'
         '500':
@@ -608,7 +610,8 @@ paths:
       description: >-
         Full scan; distinct values up to 100000 per column; numeric min/max/mean where
         available. 409 not_materialized before a run, 409 node_failed for a failed node,
-        404 unknown_node for an unknown workflow node.
+        404 unknown_node for an unknown workflow node, 408 query_timeout after
+        DAP_QUERY_TIMEOUT_SEC.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
         - $ref: '#/components/parameters/WorkflowNodeId'
@@ -625,6 +628,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '408':
+          $ref: '#/components/responses/Timeout'
         '409':
           $ref: '#/components/responses/Conflict'
         '500':
@@ -814,6 +819,14 @@ components:
             $ref: '#/components/schemas/Error'
     NotFound:
       description: Unknown or foreign object, or no matching route
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Timeout:
+      description: >-
+        The materialization exceeded DAP_QUERY_TIMEOUT_SEC; the read connection was closed and
+        the engine stays healthy. code is query_timeout.
       content:
         application/json:
           schema:

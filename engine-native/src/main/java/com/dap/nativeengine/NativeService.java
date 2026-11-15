@@ -81,8 +81,9 @@ public final class NativeService implements AutoCloseable {
     /** Service configuration; production defaults come from the DAP_* environment. */
     public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
                            String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
-                           int idleTimeoutSec) {
+                           int idleTimeoutSec, int queryTimeoutSec) {
         private static final int DEFAULT_IDLE_TIMEOUT_SEC = 900;
+        private static final int DEFAULT_QUERY_TIMEOUT_SEC = 60;
 
         public Settings {
             duckdbMemoryLimit = blankToNull(duckdbMemoryLimit);
@@ -94,6 +95,10 @@ public final class NativeService implements AutoCloseable {
             if (idleTimeoutSec < 0) {
                 throw new IllegalArgumentException(
                         "DAP_IDLE_TIMEOUT_SEC must be a non-negative integer, got " + idleTimeoutSec);
+            }
+            if (queryTimeoutSec < 0) {
+                throw new IllegalArgumentException(
+                        "DAP_QUERY_TIMEOUT_SEC must be a non-negative integer, got " + queryTimeoutSec);
             }
         }
 
@@ -110,6 +115,14 @@ public final class NativeService implements AutoCloseable {
                     duckdbTempDirectory, DEFAULT_IDLE_TIMEOUT_SEC);
         }
 
+        /** Settings without an explicit read timeout keep the 60 s default. */
+        public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
+                        String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
+                        int idleTimeoutSec) {
+            this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
+                    duckdbTempDirectory, idleTimeoutSec, DEFAULT_QUERY_TIMEOUT_SEC);
+        }
+
         public static Settings fromEnv() {
             return fromEnv(System.getenv());
         }
@@ -124,7 +137,8 @@ public final class NativeService implements AutoCloseable {
                     env.get("DAP_DUCKDB_MEMORY_LIMIT"),
                     positiveIntEnv(env, "DAP_DUCKDB_THREADS"),
                     env.get("DAP_DUCKDB_TEMP_DIR"),
-                    nonNegativeIntEnv(env, "DAP_IDLE_TIMEOUT_SEC", DEFAULT_IDLE_TIMEOUT_SEC));
+                    nonNegativeIntEnv(env, "DAP_IDLE_TIMEOUT_SEC", DEFAULT_IDLE_TIMEOUT_SEC),
+                    nonNegativeIntEnv(env, "DAP_QUERY_TIMEOUT_SEC", DEFAULT_QUERY_TIMEOUT_SEC));
         }
 
         private static int intEnv(Map<String, String> env, String name, int fallback) {
@@ -509,7 +523,7 @@ public final class NativeService implements AutoCloseable {
         }
         Settings settings = new Settings(defaults.maxWorkflows(), defaults.defaultJobTimeoutSec(), bind, port,
                 defaults.duckdbMemoryLimit(), defaults.duckdbThreads(), defaults.duckdbTempDirectory(),
-                defaults.idleTimeoutSec());
+                defaults.idleTimeoutSec(), defaults.queryTimeoutSec());
         NativeService service = new NativeService(settings, new NodeRegistry(), defaultExecutors());
         Runtime.getRuntime().addShutdownHook(new Thread(service::close, "dap-shutdown-hook"));
         service.start(port);

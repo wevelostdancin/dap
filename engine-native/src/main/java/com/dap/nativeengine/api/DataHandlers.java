@@ -38,7 +38,7 @@ public final class DataHandlers {
         if (port < 0 || port >= outPorts) {
             throw ApiException.badRequest("node has " + outPorts + " out ports");
         }
-        TableData table = plan.preview(limit, workflow.id(), nodeId);
+        TableData table = plan.preview(limit, timeoutMillis(), workflow.id(), nodeId);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("rows", table.rows());
         body.put("columns", columns(table.columns()));
@@ -54,7 +54,7 @@ public final class DataHandlers {
         WorkflowNode node = node(workflow, nodeId);
         spec(node);
         LazyPlan plan = materialized(workflow, node, null);
-        ProfileData profile = plan.profile(workflow.id(), nodeId);
+        ProfileData profile = plan.profile(timeoutMillis(), workflow.id(), nodeId);
         List<Map<String, Object>> columns = new ArrayList<>();
         for (ProfileColumn column : profile.columns()) {
             Map<String, Object> view = new LinkedHashMap<>();
@@ -78,6 +78,11 @@ public final class DataHandlers {
         body.put("rows", profile.rows());
         body.put("columns", columns);
         Http.ok(ctx, body);
+    }
+
+    /** DAP_QUERY_TIMEOUT_SEC bounds every /table and /profile materialization. */
+    private long timeoutMillis() {
+        return state.settings().queryTimeoutSec() * 1000L;
     }
 
     /** Unknown workflow node: 404 unknown_node on every data route. */
