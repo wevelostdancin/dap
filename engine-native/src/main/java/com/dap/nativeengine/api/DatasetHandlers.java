@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.javalin.http.Context;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -48,7 +50,8 @@ public final class DatasetHandlers {
                             "cannot infer format from the file name, pass 'format': " + file);
                 }
             }
-            result = ingest.ingest(file, format);
+            IngestService.CsvOptions options = csvOptions(request);
+            result = ingest.ingest(file, format, options);
         } catch (IllegalArgumentException invalid) {
             throw ApiException.badRequest(invalid.getMessage());
         }
@@ -61,6 +64,60 @@ public final class DatasetHandlers {
                 .toList());
         body.put("cached", result.cached());
         Http.ok(ctx, body);
+    }
+
+    /** CSV reader options; ignored for non-CSV formats. */
+    private static IngestService.CsvOptions csvOptions(JsonNode request) {
+        IngestService.CsvOptions defaults = IngestService.CsvOptions.defaults();
+        return new IngestService.CsvOptions(
+                bool(request, "header", defaults.header()),
+                text(request, "delimiter", defaults.delimiter()),
+                text(request, "quote", defaults.quote()),
+                text(request, "escape", defaults.escape()),
+                bool(request, "ignoreErrors", defaults.ignoreErrors()),
+                bool(request, "nullPadding", defaults.nullPadding()),
+                bool(request, "strictMode", defaults.strictMode()),
+                strings(request, "nullStrings"));
+    }
+
+    private static boolean bool(JsonNode request, String name, boolean fallback) {
+        JsonNode node = request.get(name);
+        if (node == null || node.isNull()) {
+            return fallback;
+        }
+        if (!node.isBoolean()) {
+            throw ApiException.badRequest("'" + name + "' must be a boolean");
+        }
+        return node.booleanValue();
+    }
+
+    private static List<String> strings(JsonNode request, String name) {
+        JsonNode node = request.get(name);
+        if (node == null || node.isNull()) {
+            return List.of();
+        }
+        if (!node.isArray()) {
+            throw ApiException.badRequest("'" + name + "' must be an array of strings");
+        }
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (!item.isTextual()) {
+                throw ApiException.badRequest("'" + name + "' must be an array of strings");
+            }
+            values.add(item.asText());
+        }
+        return values;
+    }
+
+    private static String text(JsonNode request, String name, String fallback) {
+        JsonNode node = request.get(name);
+        if (node == null || node.isNull()) {
+            return fallback;
+        }
+        if (!node.isTextual() || node.asText().isBlank()) {
+            throw ApiException.badRequest("'" + name + "' must be a non-empty string");
+        }
+        return node.asText();
     }
 
     /** Format from the file extension: .csv/.xlsx/.json/.parquet, or null. */

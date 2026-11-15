@@ -88,6 +88,29 @@ public final class IngestService {
     public record Result(Path path, long rows, List<Column> columns, boolean cached) {
     }
 
+    /** CSV reader options for the streaming path; defaults match the historical reader. */
+    public record CsvOptions(boolean header, String delimiter, String quote, String escape,
+                             boolean ignoreErrors, boolean nullPadding, boolean strictMode,
+                             List<String> nullStrings) {
+        public CsvOptions {
+            nullStrings = nullStrings == null ? List.of() : List.copyOf(nullStrings);
+        }
+
+        public CsvOptions(boolean header, String delimiter, String quote, String escape,
+                          boolean ignoreErrors, boolean nullPadding, boolean strictMode) {
+            this(header, delimiter, quote, escape, ignoreErrors, nullPadding, strictMode, List.of());
+        }
+
+        public static CsvOptions defaults() {
+            return new CsvOptions(true, ",", "\"", "\"", false, false, true, List.of());
+        }
+
+        public boolean isDefault() {
+            return header && ",".equals(delimiter) && "\"".equals(quote) && "\"".equals(escape)
+                    && !ignoreErrors && !nullPadding && strictMode && nullStrings.isEmpty();
+        }
+    }
+
     private enum Format {
         CSV, EXCEL, JSON, PARQUET;
 
@@ -106,7 +129,12 @@ public final class IngestService {
     }
 
     public Result ingest(Path file, String format) {
+        return ingest(file, format, CsvOptions.defaults());
+    }
+
+    public Result ingest(Path file, String format, CsvOptions options) {
         Objects.requireNonNull(file, "file");
+        Objects.requireNonNull(options, "options");
         Format parsed = Format.parse(format);
         Path source = PathGuard.shared().checkRead(file.toAbsolutePath().normalize().toString());
         if (!Files.isRegularFile(source)) {
@@ -115,7 +143,7 @@ public final class IngestService {
 
         Path target;
         try {
-            target = cacheDir.resolve(key(source, parsed) + ".parquet");
+            target = cacheDir.resolve(key(source, parsed, options) + ".parquet");
         } catch (IOException failure) {
             throw new IllegalStateException("cannot read " + file + ": " + failure.getMessage(), failure);
         }
@@ -127,7 +155,7 @@ public final class IngestService {
         try {
             Files.createDirectories(cacheDir);
             try (DuckDbSession db = new DuckDbSession()) {
-                write(db, source, parsed, temporary);
+                write(db, source, parsed, temporary, options);
                 Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
                 return describe(db, target, false);
             }
@@ -142,13 +170,14 @@ public final class IngestService {
         }
     }
 
-    private void write(DuckDbSession db, Path source, Format format, Path target) throws SQLException {
+    private void write(DuckDbSession db, Path source, Format format, Path target,
+                       CsvOptions options) throws SQLException {
         switch (format) {
             case CSV -> {
-                // Large CSVs never become an Arrow table: DuckDB streams read_csv into the
-                // Parquet writer, so heap usage stays bounded by the read buffer.
-                if (stream(source)) {
-                    copy(db, "read_csv(" + literal(source.toString()) + ", header=true)", target);
+                // Large or custom CSVs never become an Arrow table: DuckDB streams read_csv
+                // into the Parquet writer, so heap usage stays bounded by the read buffer.
+                if (stream(source) || !options.isDefault()) {
+                    copy(db, csvRelation(source, options), target);
                 } else {
                     copyArrow(db, CsvTableReader.read(source,
                             new CsvTableReader.Options(',', true, List.of(), false)), target);
@@ -158,6 +187,35 @@ public final class IngestService {
             case JSON -> copy(db, "read_json_auto(" + literal(source.toString()) + ")", target);
             case PARQUET -> copy(db, "read_parquet(" + literal(source.toString()) + ")", target);
         }
+    }
+
+    /** DuckDB read_csv call with explicit options; every value is a SQL literal. */
+    private static String csvRelation(Path source, CsvOptions options) {
+        return "read_csv(" + literal(source.toString())
+                + ", header=" + options.header()
+                + ", delim=" + literal(options.delimiter())
+                + ", quote=" + literal(options.quote())
+                + ", escape=" + literal(options.escape())
+                + ", ignore_errors=" + options.ignoreErrors()
+                + ", null_padding=" + options.nullPadding()
+                + ", strict_mode=" + options.strictMode()
+                + (options.nullStrings().isEmpty() ? ""
+                        : ", nullstr=" + stringList(options.nullStrings()))
+                + ")";
+    }
+
+    private static String stringList(List<String> values) {
+        if (values.isEmpty()) {
+            return "[]";
+        }
+        StringBuilder list = new StringBuilder("[");
+        for (int index = 0; index < values.size(); index++) {
+            if (index > 0) {
+                list.append(", ");
+            }
+            list.append(literal(values.get(index)));
+        }
+        return list.append(']').toString();
     }
 
     /** Whether this source is big enough for the streaming CSV path. */
@@ -249,10 +307,14 @@ public final class IngestService {
         }
     }
 
-    private static String key(Path source, Format format) throws IOException {
+    private static String key(Path source, Format format, CsvOptions options) throws IOException {
         String descriptor = source + "\n" + Files.size(source) + "\n"
                 + Files.getLastModifiedTime(source).to(TimeUnit.NANOSECONDS) + "\n"
-                + format.name().toLowerCase(Locale.ROOT);
+                + format.name().toLowerCase(Locale.ROOT) + "\n"
+                + options.header() + "\n" + options.delimiter() + "\n" + options.quote() + "\n"
+                + options.escape() + "\n" + options.ignoreErrors() + "\n"
+                + options.nullPadding() + "\n" + options.strictMode() + "\n"
+                + String.join("\u0001", options.nullStrings());
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return HexFormat.of().formatHex(digest.digest(descriptor.getBytes(StandardCharsets.UTF_8)));

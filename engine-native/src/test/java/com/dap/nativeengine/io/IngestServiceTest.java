@@ -187,4 +187,64 @@ class IngestServiceTest {
 
         assertTrue(failure.getMessage().contains("absent.csv"), failure.getMessage());
     }
+
+    @Test
+    void headerlessCsvKeepsEveryRowWithHeaderFalse() throws Exception {
+        Path source = write("noheader.csv", "1,alpha\n2,beta\n");
+        IngestService.CsvOptions options = new IngestService.CsvOptions(
+                false, ",", "\"", "\"", false, false, true);
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(2, result.rows(), "a headerless file must not lose its first row");
+        assertEquals(2, result.columns().size());
+    }
+
+    @Test
+    void malformedRowsCanBeSkippedWithIgnoreErrors() throws Exception {
+        Path source = write("ragged.csv", "a,b\n1,2\n3,4,5\n6,7\n");
+        IngestService.CsvOptions options = new IngestService.CsvOptions(
+                true, ",", "\"", "\"", true, false, true);
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(2, result.rows());
+        assertEquals(List.of(
+                new IngestService.Column("a", "Int64"),
+                new IngestService.Column("b", "Int64")), result.columns());
+    }
+
+    @Test
+    void nullStringsBecomeNulls() throws Exception {
+        Path source = write("nulls.csv", "id,value\n1,NA\n2,5\n");
+        IngestService.CsvOptions options = new IngestService.CsvOptions(
+                true, ",", "\"", "\"", false, false, true, List.of("NA"));
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(2, result.rows());
+        try (DuckDbSession db = new DuckDbSession();
+             Connection connection = db.newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("SELECT value FROM read_parquet("
+                     + literal(result.path()) + ") ORDER BY id")) {
+            assertTrue(rows.next());
+            assertEquals(null, rows.getObject(1));
+            assertTrue(rows.next());
+            assertEquals(5, rows.getInt(1));
+        }
+    }
+
+    @Test
+    void csvOptionsArePartOfTheCacheKey() throws Exception {
+        Path source = write("people.csv", "1,alpha\n2,beta\n");
+        IngestService service = service();
+
+        IngestService.Result withHeader = service.ingest(source, "csv");
+        IngestService.Result withoutHeader = service.ingest(source, "csv",
+                new IngestService.CsvOptions(false, ",", "\"", "\"", false, false, true));
+
+        assertFalse(withHeader.path().equals(withoutHeader.path()),
+                "different CSV options must not share a cache entry");
+    }
 }

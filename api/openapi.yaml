@@ -1766,6 +1766,35 @@ components:
           type: string
           enum: [csv, excel, json, parquet]
           description: Defaults to the file extension (.csv/.xlsx/.json/.parquet)
+        header:
+          type: boolean
+          default: true
+          description: CSV first row is a header
+        delimiter:
+          type: string
+          default: ','
+        quote:
+          type: string
+          default: '"'
+        escape:
+          type: string
+          default: '"'
+        ignoreErrors:
+          type: boolean
+          default: false
+          description: Skip malformed CSV rows
+        nullPadding:
+          type: boolean
+          default: false
+          description: Pad short CSV rows with NULL instead of failing
+        strictMode:
+          type: boolean
+          default: true
+        nullStrings:
+          type: array
+          items:
+            type: string
+          description: CSV values to treat as NULL, e.g. ['NA']
       additionalProperties: false
     IngestResult:
       type: object

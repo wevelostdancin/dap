@@ -493,42 +493,87 @@ public final class DuckDbSession implements AutoCloseable {
         }
     }
 
+    /** Above this row count the profile skips the exact-distinct refinement to stay bounded. */
+    private static final long REFINE_ROW_LIMIT = 1_000_000L;
+
     private static ProfileData readProfile(DuckDBConnection connection, String sql,
                                            List<ColumnSpec> columns) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             long rows = countWith(statement, sql);
-            List<ProfileColumn> profile = new ArrayList<>(columns.size());
-            for (ColumnSpec column : columns) {
+            String table = "(" + LazyPlan.stripSemicolon(sql) + ") AS dap_plan";
+            StringBuilder aggregates = new StringBuilder("COUNT(*) AS dap_rows");
+            for (int index = 0; index < columns.size(); index++) {
+                ColumnSpec column = columns.get(index);
                 String quoted = quote(column.name());
                 // KNIME counts distinct exactly up to 100k distinct values per column; above
-                // that the approximate sketch is allowed to differ (docs/QUALITY.md). Decide
-                // from the single COUNT(*) taken for the whole plan, not per column.
+                // that the approximate sketch is allowed to differ (docs/QUALITY.md).
                 String distinctSql = rows > MAX_DISTINCT
                         ? "APPROX_COUNT_DISTINCT(" + quoted + ")"
                         : "COUNT(DISTINCT " + quoted + ")";
-                String stats = "COUNT(*) - COUNT(" + quoted + ") AS missing, " + distinctSql + " AS distinct";
+                aggregates.append(", COUNT(").append(quoted).append(") AS \"c").append(index)
+                        .append("_present\"");
+                aggregates.append(", ").append(distinctSql).append(" AS \"c").append(index)
+                        .append("_distinct\"");
                 if (column.numeric()) {
-                    stats += ", MIN(" + quoted + ") AS min_value, MAX(" + quoted + ") AS max_value, AVG(" + quoted + ") AS mean_value";
+                    aggregates.append(", MIN(").append(quoted).append(") AS \"c").append(index)
+                            .append("_min\"");
+                    aggregates.append(", MAX(").append(quoted).append(") AS \"c").append(index)
+                            .append("_max\"");
+                    aggregates.append(", AVG(").append(quoted).append(") AS \"c").append(index)
+                            .append("_mean\"");
                 }
-                String query = "SELECT " + stats + " FROM (" + LazyPlan.stripSemicolon(sql) + ") AS dap_plan";
-                try (ResultSet result = statement.executeQuery(query)) {
-                    result.next();
-                    long missing = result.getLong("missing");
-                    long distinct = result.getLong("distinct");
-                    Double min = column.numeric() ? asDouble(result.getObject("min_value")) : null;
-                    Double max = column.numeric() ? asDouble(result.getObject("max_value")) : null;
-                    Double mean = column.numeric() ? asDouble(result.getObject("mean_value")) : null;
-                    if (rows > MAX_DISTINCT && distinct <= REFINE_DISTINCT) {
-                        // The sketch may only differ for genuinely large cardinality: when its
-                        // estimate is still near the cap, refine to the exact count so the
-                        // "exact up to 100k" promise survives the sketch's ~3 % error. A second
-                        // statement keeps the open stats ResultSet out of the driver's way.
-                        try (Statement refine = connection.createStatement()) {
-                            distinct = exactDistinct(refine, sql, quoted);
-                        }
+            }
+            long[] present = new long[columns.size()];
+            long[] distinct = new long[columns.size()];
+            Double[] min = new Double[columns.size()];
+            Double[] max = new Double[columns.size()];
+            Double[] mean = new Double[columns.size()];
+            try (ResultSet result = statement.executeQuery(
+                    "SELECT " + aggregates + " FROM " + table)) {
+                result.next();
+                for (int index = 0; index < columns.size(); index++) {
+                    ColumnSpec column = columns.get(index);
+                    present[index] = result.getLong("c" + index + "_present");
+                    distinct[index] = result.getLong("c" + index + "_distinct");
+                    if (column.numeric()) {
+                        min[index] = asDouble(result.getObject("c" + index + "_min"));
+                        max[index] = asDouble(result.getObject("c" + index + "_max"));
+                        mean[index] = asDouble(result.getObject("c" + index + "_mean"));
                     }
-                    profile.add(new ProfileColumn(column.name(), column.knimeType(), missing, distinct, min, max, mean));
                 }
+            }
+            // Refine low-cardinality estimates in one extra scan, not one scan per column.
+            List<Integer> refine = new ArrayList<>();
+            if (rows > MAX_DISTINCT && rows <= REFINE_ROW_LIMIT) {
+                for (int index = 0; index < columns.size(); index++) {
+                    if (distinct[index] <= REFINE_DISTINCT) {
+                        refine.add(index);
+                    }
+                }
+            }
+            if (!refine.isEmpty()) {
+                StringBuilder exact = new StringBuilder();
+                for (int position = 0; position < refine.size(); position++) {
+                    if (position > 0) {
+                        exact.append(", ");
+                    }
+                    int index = refine.get(position);
+                    exact.append("COUNT(DISTINCT ").append(quote(columns.get(index).name()))
+                            .append(") AS \"r").append(index).append('"');
+                }
+                try (ResultSet result = statement.executeQuery(
+                        "SELECT " + exact + " FROM " + table)) {
+                    result.next();
+                    for (int index : refine) {
+                        distinct[index] = result.getLong("r" + index);
+                    }
+                }
+            }
+            List<ProfileColumn> profile = new ArrayList<>(columns.size());
+            for (int index = 0; index < columns.size(); index++) {
+                ColumnSpec column = columns.get(index);
+                profile.add(new ProfileColumn(column.name(), column.knimeType(), rows - present[index],
+                        distinct[index], min[index], max[index], mean[index]));
             }
             return new ProfileData(rows, profile);
         }

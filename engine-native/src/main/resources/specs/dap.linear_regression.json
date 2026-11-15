@@ -83,6 +83,13 @@
         "minimum": 0,
         "maximum": 1
       },
+      "sample_rows": {
+        "type": "integer",
+        "title": "Sample rows",
+        "description": "0 keeps the 100k-row cap and fails above it; a positive N fits on the first N rows instead, so a large table can be modelled without pre-filtering.",
+        "default": 0,
+        "minimum": 0
+      },
       "output": {
         "type": "string",
         "title": "Prediction column",

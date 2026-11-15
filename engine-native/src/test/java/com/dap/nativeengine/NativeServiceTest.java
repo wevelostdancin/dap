@@ -1144,6 +1144,29 @@ class NativeServiceTest {
         assertEquals("sepal_length", table.body().path("columns").get(0).path("name").asText());
     }
 
+    @Test
+    void ingestCsvOptionsHandleHeaderlessAndRaggedFiles() throws Exception {
+        Path headerless = tempDir.resolve("headerless.csv");
+        Files.writeString(headerless, "1,alpha\n2,beta\n", StandardCharsets.UTF_8);
+
+        Resp noHeader = post("/v1/datasets", Map.of("file", headerless.toString(),
+                "format", "csv", "header", false));
+        assertEquals(200, noHeader.status(), noHeader.raw().body());
+        assertEquals(2, noHeader.body().path("rows").asInt());
+        assertEquals(2, noHeader.body().path("columns").size());
+
+        Path ragged = tempDir.resolve("ragged.csv");
+        Files.writeString(ragged, "a,b\n1,2\n3,4,5\n6,7\n", StandardCharsets.UTF_8);
+        Resp tolerant = post("/v1/datasets", Map.of("file", ragged.toString(),
+                "format", "csv", "ignoreErrors", true, "strictMode", true));
+        assertEquals(200, tolerant.status(), tolerant.raw().body());
+        assertEquals(2, tolerant.body().path("rows").asInt());
+
+        Resp invalid = post("/v1/datasets", Map.of("file", headerless.toString(),
+                "format", "csv", "header", "yes"));
+        assertEquals(400, invalid.status(), invalid.raw().body());
+    }
+
     // ------------------------------------------------------- dataset catalog
 
     @Test

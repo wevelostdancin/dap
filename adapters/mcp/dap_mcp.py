@@ -535,6 +535,14 @@ TOOLS = [
             {
                 "file": _str("путь к файлу CSV, XLSX, JSON или Parquet"),
                 "format": _str("csv, excel, json или parquet; по умолчанию по расширению"),
+                "header": {"type": "boolean", "description": "CSV: первая строка — заголовок (по умолчанию true)"},
+                "delimiter": _str("CSV: разделитель, по умолчанию ','"),
+                "quote": _str("CSV: символ кавычки, по умолчанию двойная кавычка"),
+                "escape": _str("CSV: символ escape, по умолчанию двойная кавычка"),
+                "ignoreErrors": {"type": "boolean", "description": "CSV: пропускать битые строки"},
+                "nullPadding": {"type": "boolean", "description": "CSV: дополнять короткие строки NULL"},
+                "strictMode": {"type": "boolean", "description": "CSV: строгий разбор (по умолчанию true)"},
+                "nullStrings": {"type": "array", "items": {"type": "string"}, "description": "CSV: строки, которые считать NULL, например ['NA']"},
             },
             ["file"],
         ),
@@ -1241,11 +1249,19 @@ def tool_profile_table(args: dict):
     return call("GET", f"{_node_url(args)}/profile")
 
 
+def _csv_body(args: dict, body: dict) -> dict:
+    for key in ("header", "delimiter", "quote", "escape", "ignoreErrors",
+                "nullPadding", "strictMode", "nullStrings"):
+        if args.get(key) is not None:
+            body[key] = args[key]
+    return body
+
+
 def tool_ingest(args: dict):
     body = {"file": _need(args, "file")}
     if args.get("format"):
         body["format"] = args["format"]
-    return call("POST", "/v1/datasets", body)
+    return call("POST", "/v1/datasets", _csv_body(args, body))
 
 
 def tool_dataset(args: dict):
@@ -1818,7 +1834,7 @@ def _source(args: dict, has_file: bool, source_format=_UNSET) -> tuple[str, bool
     format_value = args.get("format") if source_format is _UNSET else source_format
     if format_value:
         body["format"] = format_value
-    ingested = call("POST", "/v1/datasets", body)
+    ingested = call("POST", "/v1/datasets", _csv_body(args, body))
     path = ingested.get("path") if isinstance(ingested, dict) else None
     if not path:
         raise DapError("движок не вернул путь Parquet-кэша")

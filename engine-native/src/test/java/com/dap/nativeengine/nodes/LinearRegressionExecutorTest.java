@@ -569,4 +569,28 @@ class LinearRegressionExecutorTest {
             assertTrue(textResponse.getMessage().contains("numeric"), textResponse.getMessage());
         }
     }
+
+    @Test
+    void sampleRowsFitsOnTheFirstNwRowsInsteadOfFailing() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            int n = 150_000;
+            List<ColumnSpec> columns = List.of(ColumnSpec.of("x", "Float64"),
+                    ColumnSpec.of("y", "Float64"));
+            List<Object[]> rows = new ArrayList<>(n);
+            for (int i = 0; i < n; i++) {
+                double x = i % 1000;
+                rows.add(new Object[]{x, 2.0 * x + 1.0});
+            }
+            LazyPlan input = NodeTestSupport.table(db, columns, rows);
+
+            TableData data = run(db, input, """
+                    {"x":["x"],"y":"y","sample_rows":1000}
+                    """);
+
+            assertEquals(2, data.rows());
+            List<String> slope = termRow(data, 0, "x");
+            assertEquals(2.0, number(slope, 1), 1e-9);
+            assertEquals(1000, Integer.parseInt(slope.get(6)));
+        }
+    }
 }

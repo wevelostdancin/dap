@@ -388,6 +388,13 @@ Dag обновляет его на старте и финише каждого �
 
 `format` необязателен: выводится из расширения (`.csv`, `.xlsx`, `.json`,
 `.parquet`). Явно допустимы `csv`, `excel` (или `xlsx`), `json`, `parquet`.
+
+Для CSV доступны опции чтения (все необязательные): `header` (по умолчанию
+`true`), `delimiter`, `quote`, `escape`, `ignoreErrors`, `nullPadding`,
+`strictMode` и `nullStrings` (массив строк, которые считать NULL, например
+`["NA"]`). Опции входят в ключ кэша, поэтому один файл с разными опциями даёт
+разные записи. Файл без заголовка: `{"file":"...","format":"csv","header":false}`;
+битые строки: `ignoreErrors=true`; `NA`/`N/A`: `nullStrings=["NA","N/A"]`.
 Ответ:
 
 ```json

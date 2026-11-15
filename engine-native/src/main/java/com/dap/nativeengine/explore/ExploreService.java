@@ -49,6 +49,12 @@ public final class ExploreService {
     private static final int HIGH_CARDINALITY_MIN_ROWS = 20;
     private static final double HIGH_CARDINALITY_RATIO = 0.9;
     private static final double OUTLIER_FENCE = 1.5;
+    /** Above this row count profile uses approximate distinct/quantiles to stay bounded. */
+    private static final long EXACT_DISTINCT_LIMIT = 100_000;
+    /** Below this cardinality IQR fences are meaningless (e.g. a 1..4 severity score). */
+    private static final long MIN_OUTLIER_DISTINCT = 10;
+    /** Quantiles/outliers/duplicates are sampled above this row count; profile stays exact. */
+    private static final long QUALITY_SAMPLE_ROWS = 100_000;
 
     private final String memoryLimit;
     private final Integer threads;
@@ -169,13 +175,15 @@ public final class ExploreService {
 
     private static Profile profile(Connection connection, String base, List<ColumnSpec> columns)
             throws SQLException {
+        long rowCount = countRows(connection, base);
+        boolean exact = rowCount <= EXACT_DISTINCT_LIMIT;
         StringBuilder aggregates = new StringBuilder("COUNT(*) AS \"dap_rows\"");
         for (int index = 0; index < columns.size(); index++) {
             String ref = "#" + (index + 1);
             aggregates.append(", COUNT(").append(ref).append(") AS \"c").append(index)
                     .append("_present\"");
-            aggregates.append(", COUNT(DISTINCT ").append(ref).append(") AS \"c").append(index)
-                    .append("_distinct\"");
+            aggregates.append(", ").append(exact ? "COUNT(DISTINCT " : "APPROX_COUNT_DISTINCT(")
+                    .append(ref).append(") AS \"c").append(index).append("_distinct\"");
             if (columns.get(index).numeric()) {
                 aggregates.append(", MIN(").append(ref).append(") AS \"c").append(index)
                         .append("_min\"");
@@ -221,9 +229,15 @@ public final class ExploreService {
         }
         Double[] lowerFence = new Double[columns.size()];
         Double[] upperFence = new Double[columns.size()];
-        quantiles(connection, base, columns, lowerFence, upperFence);
-        Long[] outliers = outlierCounts(connection, base, columns, lowerFence, upperFence);
-        long duplicateRows = rows == 0 ? 0 : rows - distinctRows(connection, base);
+        quantiles(connection, base, columns, lowerFence, upperFence, exact);
+        Long[] outliers = outlierCounts(connection, base, columns, lowerFence, upperFence, exact);
+        for (int index = 0; index < columns.size(); index++) {
+            if (columns.get(index).numeric() && distinct[index] <= MIN_OUTLIER_DISTINCT) {
+                outliers[index] = 0L;
+            }
+        }
+        long duplicateRows = rows == 0 ? 0
+                : Math.max(0, rows - distinctRows(connection, base, rows, columns.size()));
         List<ColumnStat> stats = new ArrayList<>(columns.size());
         for (int index = 0; index < columns.size(); index++) {
             stats.add(new ColumnStat(columns.get(index), missing[index], distinct[index],
@@ -236,7 +250,9 @@ public final class ExploreService {
 
     /** First and third quartiles of every numeric column in one scan; null when undefined. */
     private static void quantiles(Connection connection, String base, List<ColumnSpec> columns,
-                                  Double[] lowerFence, Double[] upperFence) throws SQLException {
+                                  Double[] lowerFence, Double[] upperFence, boolean exact)
+            throws SQLException {
+        String q = exact ? "QUANTILE_CONT" : "APPROX_QUANTILE";
         List<String> selects = new ArrayList<>();
         List<Integer> indexes = new ArrayList<>();
         for (int index = 0; index < columns.size(); index++) {
@@ -244,15 +260,15 @@ public final class ExploreService {
                 continue;
             }
             indexes.add(index);
-            selects.add("QUANTILE_CONT(#" + (index + 1) + ", 0.25) AS \"c" + index + "_q1\"");
-            selects.add("QUANTILE_CONT(#" + (index + 1) + ", 0.75) AS \"c" + index + "_q3\"");
+            selects.add(q + "(#" + (index + 1) + ", 0.25) AS \"c" + index + "_q1\"");
+            selects.add(q + "(#" + (index + 1) + ", 0.75) AS \"c" + index + "_q3\"");
         }
         if (selects.isEmpty()) {
             return;
         }
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery("SELECT " + String.join(", ", selects)
-                     + " FROM (" + base + ") AS dap_explore")) {
+                     + " FROM " + qualitySource(base, exact) + " AS dap_explore")) {
             result.next();
             for (int index : indexes) {
                 Double q1 = asDouble(result.getObject("c" + index + "_q1"));
@@ -269,7 +285,8 @@ public final class ExploreService {
 
     /** Rows outside the 1.5x IQR fences of every numeric column in one scan. */
     private static Long[] outlierCounts(Connection connection, String base, List<ColumnSpec> columns,
-                                        Double[] lowerFence, Double[] upperFence) throws SQLException {
+                                        Double[] lowerFence, Double[] upperFence, boolean exact)
+            throws SQLException {
         Long[] outliers = new Long[columns.size()];
         List<String> selects = new ArrayList<>();
         List<Integer> indexes = new ArrayList<>();
@@ -293,7 +310,7 @@ public final class ExploreService {
         }
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery("SELECT " + String.join(", ", selects)
-                     + " FROM (" + base + ") AS dap_explore")) {
+                     + " FROM " + qualitySource(base, exact) + " AS dap_explore")) {
             result.next();
             for (int index : indexes) {
                 outliers[index] = result.getLong("c" + index + "_outliers");
@@ -302,11 +319,52 @@ public final class ExploreService {
         return outliers;
     }
 
-    private static long distinctRows(Connection connection, String base) throws SQLException {
+    private static long distinctRows(Connection connection, String base, long rows, int columnCount)
+            throws SQLException {
+        if (rows <= EXACT_DISTINCT_LIMIT) {
+            try (Statement statement = connection.createStatement();
+                 ResultSet result = statement.executeQuery(
+                         "SELECT COUNT(*) FROM (SELECT DISTINCT * FROM (" + base
+                                 + ") AS dap_explore) AS dap_distinct")) {
+                result.next();
+                return result.getLong(1);
+            }
+        }
+        // Large inputs: estimate duplicate rows from a bounded sample instead of sorting
+        // every column combination (which is what OOMs on 7M x 46 tables).
+        StringBuilder hash = new StringBuilder("hash(");
+        for (int index = 1; index <= columnCount; index++) {
+            if (index > 1) {
+                hash.append(", ");
+            }
+            hash.append('#').append(index);
+        }
+        hash.append(')');
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(
-                     "SELECT COUNT(*) FROM (SELECT DISTINCT * FROM (" + base
-                             + ") AS dap_explore) AS dap_distinct")) {
+                     "SELECT COUNT(*), APPROX_COUNT_DISTINCT(" + hash + ") FROM (SELECT * FROM ("
+                             + base + ") LIMIT " + QUALITY_SAMPLE_ROWS + ") AS dap_explore")) {
+            result.next();
+            long sampleRows = result.getLong(1);
+            long sampleDistinct = result.getLong(2);
+            if (sampleRows == 0) {
+                return rows;
+            }
+            double duplicateRatio = 1.0 - (double) sampleDistinct / sampleRows;
+            return Math.max(0, rows - Math.round(rows * Math.max(0.0, duplicateRatio)));
+        }
+    }
+
+    /** Exact full scan for small inputs; a deterministic bounded sample for large ones. */
+    private static String qualitySource(String base, boolean exact) {
+        return exact ? "(" + base + ")"
+                : "(SELECT * FROM (" + base + ") LIMIT " + QUALITY_SAMPLE_ROWS + ")";
+    }
+
+    private static long countRows(Connection connection, String base) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT COUNT(*) FROM (" + base + ") AS dap_explore")) {
             result.next();
             return result.getLong(1);
         }
@@ -380,7 +438,8 @@ public final class ExploreService {
                                 + " rows; treat it as an identifier, not a category"));
                 penalty += MEDIUM_PENALTY;
             }
-            if (stat.outliers() != null && stat.outliers() > 0) {
+            if (stat.outliers() != null && stat.outliers() > 0
+                    && stat.spec().numeric() && stat.distinct() > MIN_OUTLIER_DISTINCT) {
                 double ratio = (double) stat.outliers() / rows;
                 if (ratio > 0.01) {
                     String severity = ratio > 0.1 ? "medium" : "low";
@@ -734,7 +793,7 @@ public final class ExploreService {
             String sql = "SELECT CAST(MIN(" + ref + ") AS VARCHAR) AS \"from_value\", "
                     + "CAST(MAX(" + ref + ") AS VARCHAR) AS \"to_value\", "
                     + "DATE_DIFF('day', MIN(" + ref + "), MAX(" + ref + ")) AS \"span_days\", "
-                    + "COUNT(DISTINCT " + ref + ") AS \"distinct_values\" "
+                    + "APPROX_COUNT_DISTINCT(" + ref + ") AS \"distinct_values\" "
                     + "FROM (" + base + ") AS dap_explore";
             try (Statement statement = connection.createStatement();
                  ResultSet result = statement.executeQuery(sql)) {
@@ -827,7 +886,8 @@ public final class ExploreService {
             break;
         }
         for (ColumnStat stat : profile.columns()) {
-            if (stat.outliers() == null || stat.outliers() < 3) {
+            if (stat.outliers() == null || stat.outliers() < 3
+                    || stat.distinct() <= MIN_OUTLIER_DISTINCT) {
                 continue;
             }
             candidates.add(new ExploreResult.Hypothesis("",
@@ -946,7 +1006,8 @@ public final class ExploreService {
             if (outliersAdded >= 3) {
                 break;
             }
-            if (stat.outliers() != null && stat.outliers() > 0) {
+            if (stat.outliers() != null && stat.outliers() > 0
+                    && stat.distinct() > MIN_OUTLIER_DISTINCT) {
                 result.add("Inspect " + stat.outliers() + " outliers in " + stat.spec().name()
                         + " (outside 1.5x IQR).");
                 outliersAdded++;

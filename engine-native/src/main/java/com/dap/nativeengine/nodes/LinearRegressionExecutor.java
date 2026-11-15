@@ -94,8 +94,12 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                     + "' (expected none or hc1)");
         }
         double alpha = alpha(config);
+        int sampleRows = config == null ? 0 : config.path("sample_rows").asInt(0);
+        if (sampleRows < 0) {
+            throw new IllegalArgumentException("linear_regression: 'sample_rows' must be 0 or positive");
+        }
         String prediction = "predict".equals(mode) ? predictionName(input, config) : null;
-        List<SampleRow> rows = readRows(context, input, groups, predictors, response);
+        List<SampleRow> rows = readRows(context, input, groups, predictors, response, sampleRows);
         LinkedHashMap<List<Object>, List<SampleRow>> grouped = group(rows, groups.size());
         LinkedHashMap<List<Object>, Model> models = new LinkedHashMap<>();
         if (rows.isEmpty()) {
@@ -134,7 +138,7 @@ public final class LinearRegressionExecutor implements NodeExecutor {
 
     private static List<SampleRow> readRows(NodeContext context, LazyPlan input,
                                             List<ColumnSpec> groups, List<ColumnSpec> predictors,
-                                            ColumnSpec response) throws SQLException {
+                                            ColumnSpec response, int sampleRows) throws SQLException {
         StringJoiner projection = new StringJoiner(", ");
         for (ColumnSpec group : groups) {
             projection.add(NodeSql.quote(group.name()));
@@ -151,7 +155,7 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         String sql = "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input"
                 + " WHERE " + where
                 + (groups.isEmpty() ? "" : " ORDER BY " + groupProjection(groups))
-                + " LIMIT " + (ROW_CAP + 1);
+                + " LIMIT " + (sampleRows > 0 ? sampleRows : ROW_CAP + 1);
         List<SampleRow> rows = new ArrayList<>();
         try (Connection connection = context.db().newConnection();
              Statement statement = connection.createStatement();
@@ -169,9 +173,10 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                         x, result.getDouble(groups.size() + predictors.size() + 1)));
             }
         }
-        if (rows.size() > ROW_CAP) {
+        if (sampleRows == 0 && rows.size() > ROW_CAP) {
             throw new IllegalArgumentException("linear_regression: the fit is computed in memory and needs "
-                    + "at most " + ROW_CAP + " rows, got more");
+                    + "at most " + ROW_CAP + " rows, got more; set sample_rows=N to fit on a "
+                    + "deterministic first-N sample, or pre-filter the input");
         }
         return rows;
     }

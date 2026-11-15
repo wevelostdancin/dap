@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.javalin.http.Context;
 
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -79,7 +80,18 @@ public final class ExploreHandlers {
         } catch (IllegalArgumentException invalid) {
             throw ApiException.badRequest(invalid.getMessage());
         }
-        ExploreResult result = explore.explore(source, parquet, sql, maxColumns, sampleRows);
+        ExploreResult result;
+        try {
+            result = explore.explore(source, parquet, sql, maxColumns, sampleRows);
+        } catch (SQLException failure) {
+            String message = String.valueOf(failure.getMessage());
+            if (message.contains("Out of Memory") || message.contains("memory_limit")) {
+                throw ApiException.badRequest("explore_too_large",
+                        "explore ran out of memory: " + message,
+                        "lower maxColumns/sampleRows or raise DAP_DUCKDB_MEMORY_LIMIT");
+            }
+            throw failure;
+        }
         Http.ok(ctx, result.toMap());
     }
 
