@@ -63,7 +63,9 @@ curl -s http://127.0.0.1:7800/v1/health
 
 (`memory` — текущие `usedMb`/`maxMb` JVM.)
 
-Cold start — около 0.4–0.5 с от `java -jar` до первого `200`. Остановка —
+Cold start — около 0.4–0.5 с от `java -jar` до первого `200`. Сразу после ответа
+`health` движок прогревается в фоне (`DAP_WARMUP`), поэтому первый вызов после
+прогрева не платит инициализацию DuckDB и JIT. Остановка —
 `POST /v1/shutdown`, сигнал процессу или простой дольше `DAP_IDLE_TIMEOUT_SEC`.
 
 Переменные: `DAP_PORT` (7800), `DAP_BIND` (`127.0.0.1`; также `localhost` и
@@ -72,6 +74,7 @@ Cold start — около 0.4–0.5 с от `java -jar` до первого `200
 `DAP_QUERY_TIMEOUT_SEC` (60 с; предел материализации `/table` и `/profile`; `0`
 выключает), `DAP_MAX_SESSIONS` (64; LRU-эвикция), `DAP_SESSION_TTL_SEC` (1800 с;
 `0` выключает TTL), `DAP_MAX_RETAINED_JOBS` (200; cap истории заданий на сессию),
+`DAP_WARMUP` (1; прогрев движка при старте в фоновом потоке; `0` выключает),
 `DAP_DUCKDB_MEMORY_LIMIT`, `DAP_DUCKDB_THREADS`, `DAP_DUCKDB_TEMP_DIR`,
 `DAP_DUCKDB_EXTENSION_DIR` (расширения DuckDB; ставятся `--install-extensions`),
 `DAP_CACHE_DIR` (Parquet-кэш; по умолчанию `$DAP_HOME/build/cache` при заданном
