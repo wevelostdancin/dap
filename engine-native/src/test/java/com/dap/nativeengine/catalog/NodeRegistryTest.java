@@ -69,7 +69,8 @@ class NodeRegistryTest {
             "dap.file_list",
             "dap.file_reader",
             "dap.db_writer",
-            "dap.text_normalize");
+            "dap.text_normalize",
+            "dap.fuzzy_join");
 
     private final NodeRegistry registry = new NodeRegistry();
 
@@ -123,6 +124,7 @@ class NodeRegistryTest {
         for (NodeSpec spec : registry.all()) {
             if (spec.id().equals("dap.joiner") || spec.id().equals("dap.concatenate")
                     || spec.id().equals("dap.data_quality")
+                    || spec.id().equals("dap.fuzzy_join")
                     || spec.id().equals("dap.sql_query")) {
                 continue;
             }

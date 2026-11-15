@@ -53,3 +53,4 @@ dap.file_list.json
 dap.file_reader.json
 dap.db_writer.json
 dap.text_normalize.json
+dap.fuzzy_join.json
