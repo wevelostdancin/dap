@@ -68,7 +68,8 @@ class NodeRegistryTest {
             "dap.db_reader",
             "dap.file_list",
             "dap.file_reader",
-            "dap.db_writer");
+            "dap.db_writer",
+            "dap.text_normalize");
 
     private final NodeRegistry registry = new NodeRegistry();
 

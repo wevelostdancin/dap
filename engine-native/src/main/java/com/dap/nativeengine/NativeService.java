@@ -67,6 +67,7 @@ import com.dap.nativeengine.nodes.RowFilterExecutor;
 import com.dap.nativeengine.nodes.SorterExecutor;
 import com.dap.nativeengine.nodes.SqlQueryExecutor;
 import com.dap.nativeengine.nodes.StringManipulationExecutor;
+import com.dap.nativeengine.nodes.TextNormalizeExecutor;
 import io.javalin.Javalin;
 
 import java.sql.SQLException;
@@ -711,7 +712,8 @@ public final class NativeService implements AutoCloseable {
                 .register(new DbReaderExecutor())
                 .register(new FileListExecutor())
                 .register(new FileReaderExecutor())
-                .register(new DbWriterExecutor());
+                .register(new DbWriterExecutor())
+                .register(new TextNormalizeExecutor());
     }
 
     /**
