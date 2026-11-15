@@ -7,6 +7,8 @@ import com.dap.nativeengine.engine.LazyPlan;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.exec.NodeContext;
 import com.dap.nativeengine.exec.NodeExecutor;
+import com.dap.nativeengine.io.DatasetCatalog;
+import com.dap.nativeengine.io.IngestService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -875,6 +877,22 @@ class NativeServiceTest {
         return started;
     }
 
+    /** Service whose dataset catalog writes to a temp file instead of the shared one. */
+    private NativeService startCatalogService(Path datasetsFile) throws IOException {
+        return startServiceWithCatalog(new DatasetCatalog(datasetsFile,
+                new IngestService(tempDir.resolve("catalog-cache"))));
+    }
+
+    private NativeService startServiceWithCatalog(DatasetCatalog catalog) throws IOException {
+        NativeService started = new NativeService(
+                new NativeService.Settings(100, 600, "127.0.0.1", 0), new NodeRegistry(),
+                NativeService.defaultExecutors(), catalog);
+        started.start(0);
+        base = "http://127.0.0.1:" + started.port();
+        extras.add(started);
+        return started;
+    }
+
     private Path csvFile() throws IOException {
         Path file = tempDir.resolve("people.csv");
         Files.writeString(file, "name,age,city\nalice,34,Berlin\nbob,28,\ncarol,41,Paris\n",
@@ -1010,6 +1028,190 @@ class NativeServiceTest {
         assertEquals(200, table.status(), table.raw().body());
         assertEquals(150, table.body().path("rows").asInt());
         assertEquals("sepal_length", table.body().path("columns").get(0).path("name").asText());
+    }
+
+    // ------------------------------------------------------- dataset catalog
+
+    @Test
+    void datasetCatalogCrudRoutes() throws Exception {
+        Path datasetsFile = tempDir.resolve("catalog").resolve("datasets.json");
+        startCatalogService(datasetsFile);
+
+        Resp empty = get("/v1/catalog/datasets");
+        assertEquals(200, empty.status(), empty.raw().body());
+        assertEquals(0, empty.body().path("count").asInt());
+
+        Path csv = csvFile();
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("name", "people");
+        request.put("file", csv.toString());
+        request.put("format", "csv");
+        request.put("description", "demo data");
+        request.put("tags", List.of("demo", "p6"));
+        request.put("owner", "alice");
+        Resp added = post("/v1/catalog/datasets", request);
+        assertEquals(200, added.status(), added.raw().body());
+        JsonNode entry = added.body();
+        assertEquals("people", entry.path("name").asText());
+        assertEquals("demo data", entry.path("description").asText());
+        assertEquals("alice", entry.path("owner").asText());
+        assertEquals(2, entry.path("tags").size());
+        assertEquals(csv.toAbsolutePath().normalize().toString(), entry.path("source").asText());
+        assertEquals("csv", entry.path("format").asText());
+        assertEquals(3, entry.path("rows").asInt());
+        assertEquals(3, entry.path("columns").asInt());
+        assertEquals(1, entry.path("version").asInt());
+        assertEquals(64, entry.path("contentHash").asText().length());
+        assertTrue(Files.isRegularFile(Path.of(entry.path("path").asText())));
+        assertTrue(Files.isRegularFile(datasetsFile), "the catalog file must be written");
+        assertEquals(0, entry.path("history").size());
+        assertFalse(entry.has("profile"), "a fresh entry has no cached profile");
+
+        Resp duplicate = post("/v1/catalog/datasets", request);
+        assertEquals(409, duplicate.status());
+        assertEquals("dataset_exists", duplicate.body().path("code").asText());
+        assertTrue(duplicate.body().path("hint").asText().contains("refresh"));
+
+        Resp invalidName = post("/v1/catalog/datasets",
+                Map.of("name", "bad name", "file", csv.toString()));
+        assertEquals(400, invalidName.status());
+        assertEquals("invalid_dataset_name", invalidName.body().path("code").asText());
+        Resp missingName = post("/v1/catalog/datasets", Map.of("file", csv.toString()));
+        assertEquals(400, missingName.status());
+        assertEquals("invalid_dataset_name", missingName.body().path("code").asText());
+        assertEquals(400, post("/v1/catalog/datasets", Map.of("name", "nofile")).status());
+        assertEquals(400, post("/v1/catalog/datasets",
+                Map.of("name", "two", "file", csv.toString(), "dataset", entry.path("path").asText()))
+                .status());
+        assertEquals(400, post("/v1/catalog/datasets",
+                Map.of("name", "badformat", "file", csv.toString(), "format", "xml")).status());
+        assertEquals(400, post("/v1/catalog/datasets",
+                Map.of("name", "badtags", "file", csv.toString(), "tags", "not-an-array")).status());
+        Path denied = Path.of(System.getProperty("user.home"), ".ssh", "id_ed25519");
+        Resp deniedSource = post("/v1/catalog/datasets",
+                Map.of("name", "keys", "file", denied.toString()));
+        assertEquals(400, deniedSource.status());
+        assertEquals("path_not_allowed", deniedSource.body().path("code").asText());
+        assertTrue(deniedSource.body().path("hint").asText().contains("DAP_ALLOWED_ROOTS"));
+
+        Resp listed = get("/v1/catalog/datasets");
+        assertEquals(200, listed.status());
+        assertEquals(1, listed.body().path("count").asInt());
+        assertEquals("people", listed.body().path("datasets").get(0).path("name").asText());
+        assertFalse(listed.body().path("datasets").get(0).has("history"),
+                "the listing stays compact");
+
+        Resp fetched = get("/v1/catalog/datasets/people");
+        assertEquals(200, fetched.status());
+        assertEquals("people", fetched.body().path("name").asText());
+        assertEquals(0, fetched.body().path("history").size());
+
+        // An already ingested Parquet dataset is accepted through the dataset field.
+        Resp fromParquet = post("/v1/catalog/datasets", Map.of("name", "people-parquet",
+                "dataset", entry.path("path").asText()));
+        assertEquals(200, fromParquet.status(), fromParquet.raw().body());
+        assertEquals("parquet", fromParquet.body().path("format").asText());
+        assertEquals(3, fromParquet.body().path("rows").asInt());
+        assertEquals(400, post("/v1/catalog/datasets", Map.of("name", "parquet-csv",
+                "dataset", entry.path("path").asText(), "format", "csv")).status());
+
+        // Profile: computed once, then served from the cache.
+        Resp profile = get("/v1/catalog/datasets/people/profile");
+        assertEquals(200, profile.status(), profile.raw().body());
+        assertEquals("people", profile.body().path("name").asText());
+        assertEquals(1, profile.body().path("version").asInt());
+        assertEquals(3, profile.body().path("rows").asInt());
+        assertEquals(3, profile.body().path("columns").size());
+        assertEquals("age", profile.body().path("columns").get(1).path("name").asText());
+        assertEquals("Int64", profile.body().path("columns").get(1).path("type").asText());
+        assertEquals(28.0, profile.body().path("columns").get(1).path("min").asDouble());
+        assertEquals(41.0, profile.body().path("columns").get(1).path("max").asDouble());
+        assertEquals(1, profile.body().path("columns").get(2).path("missing").asInt());
+        assertFalse(profile.body().path("cached").asBoolean());
+        Resp cachedProfile = get("/v1/catalog/datasets/people/profile");
+        assertTrue(cachedProfile.body().path("cached").asBoolean());
+        Resp forcedProfile = get("/v1/catalog/datasets/people/profile?refresh=true");
+        assertFalse(forcedProfile.body().path("cached").asBoolean());
+        assertEquals(profile.body().path("columns"), forcedProfile.body().path("columns"));
+        assertTrue(get("/v1/catalog/datasets/people").body().has("profile"),
+                "the computed profile is cached in the entry");
+
+        Resp patched = patch("/v1/catalog/datasets/people",
+                Map.of("description", "updated", "tags", List.of("x"), "owner", "bob"));
+        assertEquals(200, patched.status(), patched.raw().body());
+        assertEquals("updated", patched.body().path("description").asText());
+        assertEquals("bob", patched.body().path("owner").asText());
+        assertEquals(1, patched.body().path("tags").size());
+        assertEquals(1, patched.body().path("version").asInt());
+        assertEquals(400, patch("/v1/catalog/datasets/people", Map.of("tags", "not-an-array")).status());
+
+        Resp refreshed = post("/v1/catalog/datasets/people/refresh", Map.of());
+        assertEquals(200, refreshed.status(), refreshed.raw().body());
+        assertEquals(2, refreshed.body().path("version").asInt());
+        assertEquals("updated", refreshed.body().path("description").asText(),
+                "refresh keeps the metadata");
+        assertEquals(1, refreshed.body().path("history").size());
+        assertEquals(1, refreshed.body().path("history").get(0).path("version").asInt());
+        assertEquals(2, get("/v1/catalog/datasets/people/profile").body().path("version").asInt());
+
+        Resp unknown = get("/v1/catalog/datasets/nope");
+        assertEquals(404, unknown.status());
+        assertEquals("dataset_not_found", unknown.body().path("code").asText());
+        assertTrue(unknown.body().path("hint").asText().contains("/v1/catalog/datasets"));
+        assertEquals(404, get("/v1/catalog/datasets/nope/profile").status());
+        assertEquals(404, patch("/v1/catalog/datasets/nope", Map.of("description", "x")).status());
+        assertEquals(404, post("/v1/catalog/datasets/nope/refresh", Map.of()).status());
+        assertEquals(404, delete("/v1/catalog/datasets/nope").status());
+
+        Resp removed = delete("/v1/catalog/datasets/people");
+        assertEquals(200, removed.status());
+        assertTrue(removed.body().path("ok").asBoolean());
+        assertEquals("people", removed.body().path("name").asText());
+        assertEquals(404, get("/v1/catalog/datasets/people").status());
+        assertEquals(1, get("/v1/catalog/datasets").body().path("count").asInt());
+    }
+
+    @Test
+    void datasetCatalogSurvivesARestart() throws Exception {
+        Path datasetsFile = tempDir.resolve("catalog-restart").resolve("datasets.json");
+        startCatalogService(datasetsFile);
+        Path csv = csvFile();
+        Resp added = post("/v1/catalog/datasets",
+                Map.of("name", "people", "file", csv.toString(), "description", "demo"));
+        assertEquals(200, added.status(), added.raw().body());
+        assertEquals(200, post("/v1/catalog/datasets/people/refresh", Map.of()).status());
+        assertFalse(get("/v1/catalog/datasets/people/profile").body().path("cached").asBoolean());
+
+        // A new engine process over the same file sees the entry, its history and the cache.
+        DatasetCatalog reloaded = new DatasetCatalog(datasetsFile,
+                new IngestService(tempDir.resolve("catalog-cache")));
+        startServiceWithCatalog(reloaded);
+
+        Resp listed = get("/v1/catalog/datasets");
+        assertEquals(200, listed.status(), listed.raw().body());
+        assertEquals(1, listed.body().path("count").asInt());
+        Resp fetched = get("/v1/catalog/datasets/people");
+        assertEquals("people", fetched.body().path("name").asText());
+        assertEquals("demo", fetched.body().path("description").asText());
+        assertEquals(2, fetched.body().path("version").asInt());
+        assertEquals(1, fetched.body().path("history").size());
+        assertTrue(get("/v1/catalog/datasets/people/profile").body().path("cached").asBoolean(),
+                "the profile cache must survive a restart");
+    }
+
+    @Test
+    void datasetCatalogCorruptFileFailsWithAHint() throws Exception {
+        Path datasetsFile = tempDir.resolve("broken-catalog").resolve("datasets.json");
+        Files.createDirectories(datasetsFile.getParent());
+        Files.writeString(datasetsFile, "{not json", StandardCharsets.UTF_8);
+        startCatalogService(datasetsFile);
+
+        Resp listed = get("/v1/catalog/datasets");
+
+        assertEquals(500, listed.status(), listed.raw().body());
+        assertEquals("datasets_corrupt", listed.body().path("code").asText());
+        assertTrue(listed.body().path("error").asText().contains("datasets.json"));
+        assertTrue(listed.body().path("hint").asText().contains("datasets.json"));
     }
 
     private JsonNode awaitJobState(String jobId, Set<String> states, Duration timeout) throws Exception {

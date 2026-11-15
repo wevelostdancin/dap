@@ -185,9 +185,9 @@ public final class DatasetCatalog {
                 throw duplicate(dataset);
             }
             String now = Instant.now().toString();
-            Entry entry = new Entry(dataset, description, owner, tags, checked.toString(),
-                    normalized, result.path().toString(), result.rows(), result.columns().size(),
-                    1, contentHash, now, now, List.of(), null);
+            Entry entry = new Entry(dataset, description, owner, tags == null ? List.of() : tags,
+                    checked.toString(), normalized, result.path().toString(), result.rows(),
+                    result.columns().size(), 1, contentHash, now, now, List.of(), null);
             entries.put(dataset, entry);
             save();
             return entry;

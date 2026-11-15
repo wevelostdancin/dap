@@ -67,6 +67,12 @@
 
 Метод, не поддержанный для маршрута, даёт 404 `no route: <METHOD> <path>`, а не 405.
 
+Коды каталога датасетов: `dataset_not_found` (404); `dataset_exists` (409);
+`invalid_dataset_name`, `invalid_format`, `dataset_source_not_found`,
+`dataset_source_required`, `invalid_path`, `path_not_allowed` (400);
+`datasets_corrupt`, `datasets_write_failed`, `dataset_ingest_failed`,
+`dataset_profile_failed` (500).
+
 ## 2. Мета и здоровье
 
 ### `GET /v1`
@@ -362,6 +368,77 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 найден; 500 — ошибка записи.
 Полученный `path` можно передать в `dap.parquet_reader` как `file`.
 
+### Каталог датасетов
+
+Постоянный каталог (JSON) поверх Parquet-кэша: имя, описание, владелец, теги,
+источник, версия, content hash и кэш профиля. Файл каталога — `DAP_DATASETS_FILE`,
+иначе `$DAP_HOME/build/datasets.json`, иначе `~/.dap/build/datasets.json`. Запись
+атомарная (tmp + rename), чтение и запись под read/write-lock; битый файл — 500
+`datasets_corrupt` с путём и подсказкой, а не молчаливая перезапись.
+
+Имя датасета — `[A-Za-z0-9._-]{1,64}`; оно же path-параметр маршрутов.
+
+#### `GET /v1/catalog/datasets`
+
+Список без `history` и `profile`, отсортирован по имени:
+
+```json
+{"count": 1, "datasets": [{"name": "iris", "description": "flowers", "owner": "alice",
+  "tags": ["demo"], "source": "/data/iris.csv", "format": "csv",
+  "path": "<cache>/<sha256>.parquet", "rows": 150, "columns": 5, "version": 1,
+  "contentHash": "<sha256>", "createdAt": "...", "updatedAt": "..."}]}
+```
+
+#### `POST /v1/catalog/datasets`
+
+```json
+{"name": "iris", "file": "/data/iris.csv", "format": "csv",
+ "description": "flowers", "tags": ["demo"], "owner": "alice"}
+```
+
+`file` — CSV/XLSX/JSON/Parquet; `dataset` — уже ингестированный Parquet-путь
+(формат тогда всегда `parquet`; передавать `format` с другим значением — 400).
+Нужно ровно одно из `file`/`dataset`. `format` необязателен: выводится из
+расширения. Ответ — запись целиком (как `GET .../{name}`). 400
+`invalid_dataset_name`, `invalid_format`, `dataset_source_not_found`,
+`path_not_allowed`, `dataset_source_required`, `invalid_path`; 409
+`dataset_exists`.
+
+#### `GET /v1/catalog/datasets/{name}`
+
+Запись + `history` (последние 10 вытесненных версий) + `profile`, если он уже
+закэширован. 404 `dataset_not_found`.
+
+#### `PATCH /v1/catalog/datasets/{name}`
+
+`{"description": "...", "tags": ["..."], "owner": "..."}` — только метаданные,
+опущенные поля сохраняют значение; данные, версия и кэш профиля не меняются.
+
+#### `DELETE /v1/catalog/datasets/{name}`
+
+`{"ok": true, "name": "iris"}`. Удаляется только запись каталога; Parquet-файл в
+кэше остаётся.
+
+#### `POST /v1/catalog/datasets/{name}/refresh`
+
+Переингестит записанный источник, `version` += 1, предыдущий снимок уходит в
+`history` (не более 10). Кэш профиля переиспользуется, только если `contentHash`
+не изменился.
+
+#### `GET /v1/catalog/datasets/{name}/profile?refresh=false`
+
+Профиль считается один раз и кэшируется по `contentHash`; `cached` показывает,
+взят ли он из кэша, `refresh=true` форсирует пересчёт:
+
+```json
+{"name": "iris", "version": 1, "contentHash": "<sha256>", "rows": 150, "cached": false,
+ "computedAt": "...", "columns": [{"name": "sepal_length", "type": "Float64",
+ "missing": 0, "distinct": 35, "min": 4.3, "max": 7.9, "mean": 5.843}]}
+```
+
+`min`/`max`/`mean` — только для числовых колонок, у колонки из одних NULL
+опускаются. `columns` в записи каталога — число колонок, схема — в профиле.
+
 ## 7. Сохранение, диагностика, остановка
 
 ### `POST /v1/workflows/{workflowId}/save`
@@ -461,8 +538,8 @@ curl -s -X POST $B/v1/shutdown
 
 - Один пользователь, без auth; сервис должен слушать loopback.
 - Состояние в памяти: workflow, задания и таблицы живут до остановки процесса;
-  на диск сохраняются только `workflow.json` через `/save` и Parquet-кэш
-  `POST /v1/datasets`.
+  на диск сохраняются `workflow.json` через `/save`, Parquet-кэш
+  `POST /v1/datasets` и каталог датасетов (`DAP_DATASETS_FILE`).
 - Workflow нельзя переименовать или получить отдельным запросом: есть список,
   создание, загрузка, удаление и операции над узлами.
 - Файловые источники читают любой путь, доступный процессу.
