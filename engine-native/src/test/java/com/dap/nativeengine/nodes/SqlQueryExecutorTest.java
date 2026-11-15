@@ -268,6 +268,20 @@ class SqlQueryExecutorTest {
     }
 
     @Test
+    void sqlReadingADeniedPathIsRejected() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            NodeContext context = NodeTestSupport.context(db, connection,
+                    config("SELECT * FROM read_csv('/etc/passwd')"));
+
+            ApiException failure = assertThrows(ApiException.class,
+                    () -> new SqlQueryExecutor().execute(context, List.of()));
+            assertEquals(400, failure.status(), failure.getMessage());
+            assertEquals("path_not_allowed", failure.code(), failure.getMessage());
+            assertTrue(failure.hint().contains("allowed roots"), failure.hint());
+        }
+    }
+
+    @Test
     void aliasCountMustMatchConnectedInputs() throws Exception {
         try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
             LazyPlan input = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);

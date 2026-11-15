@@ -74,7 +74,7 @@ public final class IngestService {
     public Result ingest(Path file, String format) {
         Objects.requireNonNull(file, "file");
         Format parsed = Format.parse(format);
-        Path source = file.toAbsolutePath().normalize();
+        Path source = PathGuard.shared().checkRead(file.toAbsolutePath().normalize().toString());
         if (!Files.isRegularFile(source)) {
             throw new IllegalArgumentException("file not found: " + file);
         }

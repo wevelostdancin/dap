@@ -6,6 +6,7 @@ import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
 import com.dap.nativeengine.exec.NodeContext;
 import com.dap.nativeengine.exec.NodeExecutor;
+import com.dap.nativeengine.io.PathGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.IOException;
@@ -90,6 +91,7 @@ public final class FileListExecutor implements NodeExecutor {
             throw new IllegalArgumentException("file_list: invalid directory '" + value + "': "
                     + invalid.getMessage(), invalid);
         }
+        directory = PathGuard.shared().checkRead(directory.toAbsolutePath().toString());
         if (!Files.exists(directory)) {
             throw new IllegalArgumentException("file_list: directory does not exist: " + value);
         }

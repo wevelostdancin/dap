@@ -4,6 +4,7 @@ import com.dap.nativeengine.engine.ColumnSpec;
 import com.dap.nativeengine.engine.LazyPlan;
 import com.dap.nativeengine.engine.TypeMap;
 import com.dap.nativeengine.exec.NodeContext;
+import com.dap.nativeengine.io.PathGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.IOException;
@@ -28,19 +29,20 @@ final class IoNodeSupport {
         return NodeSql.requiredText(config, "file");
     }
 
-    /** An existing regular file to read, as an absolute path. */
+    /** An existing regular file to read, as an absolute path, inside the path allowlist. */
     static Path sourceFile(JsonNode config, String node) {
         Path file = Path.of(requiredFile(config)).toAbsolutePath();
         rejectGlob(file, node);
+        file = PathGuard.shared().checkRead(file.toString());
         if (!Files.isRegularFile(file)) {
             throw new IllegalArgumentException(node + ": file not found: " + file);
         }
         return file;
     }
 
-    /** An absolute target path whose parent directories exist. */
+    /** An absolute target path whose parent directories exist, inside the path allowlist. */
     static Path targetFile(String file, String node) {
-        Path target = Path.of(file).toAbsolutePath();
+        Path target = PathGuard.shared().checkWrite(Path.of(file).toAbsolutePath().toString());
         rejectGlob(target, node);
         Path parent = target.getParent();
         if (parent != null) {

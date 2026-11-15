@@ -1,5 +1,6 @@
 package com.dap.nativeengine.io;
 
+import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.engine.DuckDbSession;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -124,6 +125,15 @@ class IngestServiceTest {
                 () -> service().ingest(source, "xml"));
 
         assertTrue(failure.getMessage().contains("xml"), failure.getMessage());
+    }
+
+    @Test
+    void sourceOutsideTheAllowlistIsRejected() {
+        ApiException failure = assertThrows(ApiException.class,
+                () -> service().ingest(Path.of("/etc/passwd"), "csv"));
+
+        assertEquals(400, failure.status(), failure.getMessage());
+        assertEquals("path_not_allowed", failure.code(), failure.getMessage());
     }
 
     @Test
