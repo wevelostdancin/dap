@@ -18,6 +18,7 @@ import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.io.DatasetCatalog;
 import com.dap.nativeengine.nodes.BinnerExecutor;
 import com.dap.nativeengine.nodes.ChartExecutor;
+import com.dap.nativeengine.nodes.ChartGridExecutor;
 import com.dap.nativeengine.nodes.ColumnResorterExecutor;
 import com.dap.nativeengine.nodes.ConcatenateExecutor;
 import com.dap.nativeengine.nodes.DateTimeExecutor;
@@ -697,6 +698,7 @@ public final class NativeService implements AutoCloseable {
                 .register(new MathFormulaExecutor())
                 .register(new MarkdownReportExecutor())
                 .register(new ChartExecutor())
+                .register(new ChartGridExecutor())
                 .register(new DataQualityExecutor())
                 .register(new SqlQueryExecutor())
                 .register(new DbReaderExecutor())
