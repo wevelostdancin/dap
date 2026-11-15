@@ -72,15 +72,62 @@
         "type": "string",
         "title": "Format",
         "enum": [
-          "md"
+          "md",
+          "html"
         ],
         "default": "md",
-        "description": "Output format: md - Markdown."
+        "description": "Output format: md - Markdown; html - one self-contained HTML file with embedded CSS, tables, images and an optional table of contents."
       },
       "title": {
         "type": "string",
         "title": "Title",
         "description": "Optional document title rendered as a level-1 heading."
+      },
+      "subtitle": {
+        "type": "string",
+        "title": "Subtitle",
+        "description": "Optional subtitle under the title (HTML and PDF)."
+      },
+      "author": {
+        "type": "string",
+        "title": "Author",
+        "description": "Optional author line under the title (HTML and PDF)."
+      },
+      "toc": {
+        "type": "boolean",
+        "title": "Table of contents",
+        "default": false,
+        "description": "Add a table of contents built from section titles (HTML)."
+      },
+      "theme": {
+        "type": "string",
+        "title": "Theme",
+        "enum": [
+          "default",
+          "light",
+          "dark",
+          "mono"
+        ],
+        "default": "default",
+        "description": "Colour palette: default - blue accent; light - grey; dark - dark background (HTML); mono - black and white."
+      },
+      "page_size": {
+        "type": "string",
+        "title": "Page size",
+        "enum": [
+          "a4",
+          "letter"
+        ],
+        "description": "Paper size for paginated formats (default: A4 for HTML/PDF, 16:9 for PPTX)."
+      },
+      "orientation": {
+        "type": "string",
+        "title": "Orientation",
+        "enum": [
+          "portrait",
+          "landscape"
+        ],
+        "description": "Page orientation for paginated formats (default: portrait; PPTX defaults to landscape)."
       },
       "sections": {
         "type": "array",

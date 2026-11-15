@@ -18,6 +18,7 @@ import java.sql.Connection;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -330,5 +331,46 @@ class MarkdownReportExecutorTest {
                         + "{\"kind\":\"text\",\"text\":\"two\"}]");
 
         assertEquals("one\n\n---\n\ntwo\n", markdown);
+    }
+
+    @Test
+    void htmlFormatWritesSelfContainedReport() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            LazyPlan first = input(db);
+            Path file = dir.resolve("report.html");
+            LazyPlan plan = execute(db, job, file,
+                    ",\"format\":\"html\",\"title\":\"Report\",\"toc\":true,"
+                            + "\"sections\":[{\"kind\":\"table\",\"title\":\"Rows\","
+                            + "\"columns\":[\"id\"],\"limit\":2}]",
+                    List.of(first));
+
+            assertSame(first, plan, "html reports still pass input port 0 through");
+            String html = Files.readString(file, StandardCharsets.UTF_8);
+            assertTrue(html.startsWith("<!DOCTYPE html>"), html);
+            assertTrue(html.contains("<h1>Report</h1>"), html);
+            assertTrue(html.contains("<a href=\"#section-1\">Rows</a>"), html);
+            assertTrue(html.contains("<td>1</td>"), html);
+            assertFalse(html.contains("http://"), "self-contained report has no external links");
+        }
+    }
+
+    @Test
+    void rejectsUnknownFormatAndTheme() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            LazyPlan first = input(db);
+
+            IllegalArgumentException format = assertThrows(IllegalArgumentException.class,
+                    () -> execute(db, job, dir.resolve("format.md"),
+                            ",\"format\":\"docx\",\"sections\":[{\"kind\":\"text\",\"text\":\"x\"}]",
+                            List.of(first)));
+            assertTrue(format.getMessage().contains("format"), format.getMessage());
+
+            IllegalArgumentException theme = assertThrows(IllegalArgumentException.class,
+                    () -> execute(db, job, dir.resolve("theme.html"),
+                            ",\"format\":\"html\",\"theme\":\"neon\","
+                                    + "\"sections\":[{\"kind\":\"text\",\"text\":\"x\"}]",
+                            List.of(first)));
+            assertTrue(theme.getMessage().contains("theme"), theme.getMessage());
+        }
     }
 }

@@ -18,6 +18,7 @@ public final class ReportWriter {
     public static byte[] write(ReportDocument document) {
         return switch (document.format()) {
             case MD -> markdown(document).getBytes(StandardCharsets.UTF_8);
+            case HTML -> new HtmlWriter().write(document);
         };
     }
 

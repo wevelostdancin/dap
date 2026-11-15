@@ -74,8 +74,18 @@ public final class MarkdownReportExecutor implements NodeExecutor {
 
     private static ReportDocument document(NodeContext context, List<LazyPlan> inputs, JsonNode config)
             throws Exception {
-        ReportDocument.Format format = format(config);
+        ReportDocument.Format format = enumSetting(config, "format", ReportDocument.Format.class,
+                ReportDocument.Format.MD);
         String title = NodeSql.text(config, "title", null);
+        String subtitle = NodeSql.text(config, "subtitle", null);
+        String author = NodeSql.text(config, "author", null);
+        boolean toc = NodeSql.bool(config, "toc", false);
+        ReportDocument.Theme theme = enumSetting(config, "theme", ReportDocument.Theme.class,
+                ReportDocument.Theme.DEFAULT);
+        ReportDocument.PageSize pageSize = enumSetting(config, "page_size",
+                ReportDocument.PageSize.class, null);
+        ReportDocument.Orientation orientation = enumSetting(config, "orientation",
+                ReportDocument.Orientation.class, null);
         List<Spec> specs = specs(config, inputs);
         Map<Integer, TableData> previews = previews(context, inputs, specs);
         Map<Integer, Long> totals = new HashMap<>();
@@ -92,16 +102,32 @@ public final class MarkdownReportExecutor implements NodeExecutor {
                 default -> new ReportDocument.Section.PageBreak(spec.title());
             });
         }
-        return new ReportDocument(format, title, sections);
+        return new ReportDocument(format, title, subtitle, author, toc, theme, pageSize,
+                orientation, sections);
     }
 
-    private static ReportDocument.Format format(JsonNode config) {
-        String value = NodeSql.text(config, "format", "md");
-        try {
-            return ReportDocument.Format.from(value);
-        } catch (IllegalArgumentException failure) {
-            throw new IllegalArgumentException(NODE + ": " + failure.getMessage(), failure);
+    /** A textual config field that names one constant of an enum, case-insensitively. */
+    private static <E extends Enum<E>> E enumSetting(JsonNode config, String field, Class<E> type,
+                                                     E fallback) {
+        JsonNode node = config.get(field);
+        if (node == null || node.isNull()) {
+            return fallback;
         }
+        if (!node.isTextual()) {
+            throw new IllegalArgumentException(NODE + ": '" + field + "' must be a string");
+        }
+        String value = node.textValue();
+        for (E constant : type.getEnumConstants()) {
+            if (constant.name().equalsIgnoreCase(value)) {
+                return constant;
+            }
+        }
+        StringJoiner expected = new StringJoiner(", ");
+        for (E constant : type.getEnumConstants()) {
+            expected.add(constant.name().toLowerCase(java.util.Locale.ROOT));
+        }
+        throw new IllegalArgumentException(NODE + ": unknown " + field + " '" + value
+                + "', expected one of " + expected);
     }
 
     // ---------------------------------------------------------------- sections
