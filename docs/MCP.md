@@ -113,7 +113,9 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 - `notifications/initialized` → без ответа;
 - `tools/list` → массив инструментов `dap_*`;
 - `tools/call` → `{"content":[{"type":"text","text":"<json>"}]}`;
-- `resources/list` / `resources/read` → каталог узлов и библиотека рецептов;
+- `tools/call` с `params._meta.progressToken` → до финального ответа адаптер пишет
+  `notifications/progress` (см. [Прогресс](#прогресс));
+- `resources/list` / `resources/read` → каталог узлов, рецепты и каталог датасетов;
 - `prompts/list` / `prompts/get` → готовые user-сообщения для типовых анализов.
 
 Ошибки — JSON-RPC `error`:
@@ -126,6 +128,27 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 
 Логи и трассировки — только в stderr, stdout занят протоколом.
 
+## Прогресс
+
+Если клиент прислал в `tools/call` `params._meta.progressToken`, адаптер пишет
+уведомления до финального ответа:
+
+```json
+{"jsonrpc":"2.0","method":"notifications/progress",
+ "params":{"progressToken":"tok-1","progress":1,"total":4,"message":"run"}}
+```
+
+- `dap_run` с токеном идёт через асинхронное задание (`POST /run` с
+  `{"async":true}`), адаптер опрашивает `GET /v1/jobs/{id}` и транслирует
+  `progress` движка (`nodesDone`/`nodesTotal`/`currentNode`) в `progress`/
+  `total`/`message`; финальный ответ — результат задания для `succeeded` или сам
+  job (со `state` и `error`) для `failed`/`cancelled`/`timeout`. Без токена
+  `dap_run` синхронный, как раньше.
+- `dap_analyze`, `dap_report`, `dap_profile`, `dap_estimate` и `dap_explore`
+  сообщают стадии: `ingest`, затем `run`/`explore`/`estimate`, `table` и
+  `profile` (если профиль запрошен).
+- Без `progressToken` уведомлений нет, поведение и ответы не меняются.
+
 ## Инструменты
 
 | Группа | Инструменты |
@@ -134,14 +157,16 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 | workflow | `dap_workflow_create`, `dap_list_workflows`, `dap_delete_workflow`, `dap_save_workflow`, `dap_load_workflow` |
 | граф | `dap_add_node`, `dap_configure_node`, `dap_connect`, `dap_disconnect`, `dap_remove_node` |
 | запуск | `dap_run`, `dap_run_async`, `dap_job_status`, `dap_job_cancel`, `dap_list_jobs` |
-| данные | `dap_get_table`, `dap_profile_table`, `dap_ingest` |
+| данные | `dap_get_table` (пагинация/проекция/фильтр/форматы), `dap_profile_table`, `dap_ingest`, `dap_dataset` |
+| разведка | `dap_explore` (профиль + качество + связи + гипотезы), `dap_estimate` (rows/operators/plan до запуска) |
 | рецепты | `dap_recipe_list`, `dap_recipe_save`, `dap_recipe_run` |
-| SQL | `dap_sql` |
-| одним вызовом | `dap_analyze` (файл → таблица + профиль, опционально SQL), `dap_report` (файл → таблица + Markdown + график), `dap_profile` (файл → только профиль), `dap_workflow_build` (узлы + связи + run + таблицы выходов) |
+| SQL | `dap_sql` (один запрос, батч `queries[]`, `explain`) |
+| одним вызовом | `dap_analyze` (файл → таблица + профиль, опционально SQL), `dap_report` (файл → таблицы + отчёт md/html/pdf/pptx + график), `dap_profile` (файл → только профиль), `dap_workflow_build` (узлы + связи + run + таблицы выходов) |
 | сервис | `dap_shutdown` |
 
-Всего 30 инструментов: 22 базовых, инструменты рецептов, `dap_sql`, `dap_analyze`,
-`dap_report`, `dap_profile` и `dap_workflow_build`. Каталог
+Всего 33 инструмента: 22 базовых, инструменты рецептов, `dap_sql`, `dap_analyze`,
+`dap_report`, `dap_profile`, `dap_workflow_build` и P6-инструменты `dap_estimate`,
+`dap_explore`, `dap_dataset`. Каталог
 движка — 52 узла `dap.*`: `dap_search_nodes` и `dap_node_dialog_schema` видят их все,
 включая узлы волн P2–P4 (`type_cast`, `duplicate_filter`, `pivot`, `window`,
 `concatenate`, `describe`, `value_counts`, `correlation`, `histogram`, `quantile`,
@@ -152,34 +177,41 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 `rows`, `columns` и `cached`; `path` можно сразу передать в `dap.parquet_reader`
 через `dap_add_node`.
 
-Для типовой задачи хватает одного-двух вызовов: `dap_analyze` (файл → таблица и
-профиль, опционально SQL), `dap_report` (файл → таблица, Markdown и график),
-`dap_profile` (только компактный профиль) или `dap_workflow_build` (весь граф, запуск
-и таблицы выходов одним вызовом). Ручная сборка `dap_workflow_create` → `dap_add_node`
-→ `dap_connect` → `dap_run` → `dap_get_table` нужна только для нестандартного графа.
+Для типовой задачи хватает одного-двух вызовов: `dap_explore` (профиль, качество,
+связи и гипотезы), `dap_analyze` (файл → таблица и
+профиль, опционально SQL), `dap_report` (файл → таблицы, отчёт md/html/pdf/pptx и
+график), `dap_profile` (только компактный профиль) или `dap_workflow_build` (весь
+граф, запуск и таблицы выходов одним вызовом). Перед тяжёлым запросом `dap_estimate`
+показывает rows/operators/plan без материализации. Ручная сборка `dap_workflow_create`
+→ `dap_add_node` → `dap_connect` → `dap_run` → `dap_get_table` нужна только для
+нестандартного графа.
 
 Для адаптации пайплайна под задачу вместо ручной сборки графа есть три пути:
-`dap_sql` (один read-only SQL по таблице узла), `dap_recipe_run` (сохранённый
-пайплайн с параметрами) и промпты `analyze_csv`/`quality_check`/`profile_report`
+`dap_sql` (один read-only SQL по таблице узла, батч `queries` или `explain`),
+`dap_recipe_run` (сохранённый пайплайн с параметрами) и промпты
+`analyze_csv`/`quality_check`/`profile_report`
 (готовый план в три шага). Сценарий приёмки — ingest, ресурс `dap://recipes`,
 рецепт или `dap_sql` — укладывается в три tool call и проверяется
 `make mcp-recipe-e2e`.
 
 ## Ресурсы
 
-Адаптер объявляет capability `resources` и отдаёт три вида URI:
+Адаптер объявляет capability `resources` и отдаёт пять видов URI:
 
 | URI | Содержимое |
 |---|---|
 | `dap://catalog` | JSON каталога: `{"count":52,"nodes":[{"id","name","category","type","tier"}]}` |
 | `dap://recipes` | JSON библиотеки: `{"recipes":[{"name","description","tags","params","dataset"}]}` |
 | `dap://recipes/{name}` | workflow JSON рецепта (`dap-native-workflow/1`) с блоком `recipe` |
+| `dap://datasets` | JSON каталога датасетов: `{"count":1,"datasets":[{"name","description","rows","columns","version","updatedAt"}]}` |
+| `dap://datasets/{name}` | запись датасета с `path`, `version` и кэшем `profile` |
 
-`resources/list` возвращает `dap://catalog` и `dap://recipes`; имена рецептов
-берутся из `dap://recipes`. `resources/read` возвращает `contents[0]` с
-`mimeType: application/json`. Чтение `dap://catalog` поднимает движок (как первый
-tool call), библиотека рецептов читается с диска без движка. Неизвестный URI или
-имя рецепта — JSON-RPC `-32602` с `data.uri` / `data.name`.
+`resources/list` возвращает `dap://catalog`, `dap://recipes` и `dap://datasets`;
+имена рецептов берутся из `dap://recipes`, имена датасетов — из `dap://datasets`.
+`resources/read` возвращает `contents[0]` с `mimeType: application/json`. Чтение
+`dap://catalog` и `dap://datasets*` поднимает движок (как первый tool call),
+библиотека рецептов читается с диска без движка. Неизвестный URI, имя рецепта или
+датасета — JSON-RPC `-32602` с `data.uri` / `data.name`.
 
 ## Промпты
 
@@ -188,9 +220,9 @@ tool call), библиотека рецептов читается с диска
 
 | Промпт | Аргументы | Что делает |
 |---|---|---|
-| `analyze_csv` | `path` (обязательный), `question` | ingest → profile → опционально `dap_sql` под вопрос |
-| `quality_check` | `path` | ingest → profile → SQL-проверки NULL/дублей/диапазонов |
-| `profile_report` | `path`, `output` (по умолчанию `profile.md`) | ingest → `dap.markdown_report` → pass-through таблица |
+| `analyze_csv` | `path` (обязательный), `question` | ingest → `dap_explore` → profile → опционально `dap_sql` (при тяжёлом запросе — сначала `dap_estimate`) |
+| `quality_check` | `path` | ingest → `dap_explore` (score и issues) → profile → SQL-проверки NULL/дублей/диапазонов |
+| `profile_report` | `path`, `output` (по умолчанию `profile.md`) | ingest → `dap_report` (обёртка над `dap.markdown_report`, формат md/html/pdf/pptx) → pass-through таблица |
 
 Пропущенный обязательный аргумент — JSON-RPC `-32602` с `data.missing`.
 
@@ -251,12 +283,93 @@ tool call), библиотека рецептов читается с диска
 не считаются SQL. Узел остаётся в workflow — его таблицу можно дочитать
 `dap_get_table`; `limit` задаёт cap строк узла и размер превью.
 
+Батч: вместо `sql` можно передать `queries` — массив `{"sql","limit"?,"node"?}`.
+Адаптер добавляет по узлу `dap.sql_query` на запрос (каждый со своим `inputs`),
+выполняет workflow один раз и возвращает
+`{"workflow":"wf-1","tables":[{"index":0,"node":"1:2","table":{...}}, ...]}`.
+`sql` и `queries` взаимоисключающие; DDL в любом элементе отклоняется до HTTP.
+
+С `explain: true` узел не выполняется: адаптер строит его и читает
+`GET /v1/workflows/{wf}/nodes/{node}/estimate`, возвращая
+`{"workflow","node","estimate":{"rows","operators","plan"}}` (для батча —
+`{"workflow","estimates":[{"index","node","estimate"}]}`). Это дешёвый способ
+понять стоимость запроса до материализации; `dap_estimate` делает то же для
+файла/датасета целиком.
+
+## dap_get_table
+
+`dap_get_table` читает выходную таблицу узла и умеет отдавать её постранично и
+компактно — чтобы не тратить контекст агента на широкие таблицы:
+
+| Аргумент | Смысл |
+|---|---|
+| `port`, `limit` | порт узла и размер страницы (по умолчанию 20, 1–1000) |
+| `offset` | пропустить N строк после фильтра (`>= 0`) |
+| `columns` | проекция: массив имён или строка через запятую; меняет и порядок колонок |
+| `where` | SQL-предикат над выходными колонками, например `total > 10`; запрещены `;`, `--`, `/*`, `SELECT`, `FROM` и `read_*` — иначе `-32602` с `data.code=invalid_filter` |
+| `format` | `json` (по умолчанию), `objects` (строки-объекты по именам колонок), `csv`, `markdown` |
+| `maxCellChars` | обрезать значение ячейки до N символов с многоточием (по умолчанию 200) |
+| `includeColumns` | `false` — не возвращать список колонок (только данные) |
+
+Ответ всегда содержит `offset`, `nextOffset` (null на последней странице) и
+`truncated`; если движок их не прислал, адаптер считает их из `rows`/`data`.
+Для `csv` и `markdown` данные приходят одной строкой:
+`{"format":"csv","text":"...","rows":150,"offset":0,"nextOffset":20,"truncated":true}`.
+Формат проверяется до HTTP-запроса.
+
+```json
+{"name": "dap_get_table", "arguments": {"workflow": "wf-1", "node": "1:2",
+ "offset": 20, "limit": 20, "columns": ["region", "total"],
+ "where": "total > 10", "format": "csv"}}
+```
+
+## dap_estimate и dap_explore
+
+`dap_estimate` отвечает на вопрос «сколько это будет стоить» до запуска: принимает
+`file` или `dataset` (ровно один), опциональные `format`, read-only `sql` (вход
+как `src`) и `limit` (cap строк узла `sql_query`), собирает временный workflow
+`parquet_reader` → [`sql_query`] и читает `/estimate`:
+
+```json
+{"source": "/cache/sales.parquet", "cached": false, "node": "1:2",
+ "rows": 150, "operators": [{"name": "SEQ_SCAN", "rows": 150}],
+ "plan": {...}, "columns": [...]}
+```
+
+`dap_explore` делает разведочный анализ одним вызовом: ingest (для `file`) и
+`POST /v1/explore` с `{dataset, sql?, maxColumns?, sampleRows?}`. Ответ —
+`{source, cached, report}`, где `report` содержит `rows`, `columns` (профиль),
+`quality` (score и issues), `relationships`, `group_differences`, `time`,
+`hypotheses` и `recommendations`. Временных workflow адаптер не создаёт —
+`/v1/explore` управляет ими сам.
+
+## dap_dataset
+
+`dap_dataset` — каталог датасетов: `action` = `list` (по умолчанию), `add`,
+`show`, `refresh`, `remove`; имя — `[A-Za-z0-9._-]{1,64}`. Для `add` нужен
+ровно один источник — `file` (ингестится) или `dataset` (готовый Parquet), плюс
+опциональные `format`, `description`, `tags`, `owner`. `refresh` переингестит
+источник и увеличивает `version`, `remove` удаляет запись. Ответ — JSON движка:
+
+```json
+{"name": "sales", "description": "Sales by region", "rows": 600, "columns": 5,
+ "version": 2, "path": "/cache/sales.parquet", "profile": {...}}
+```
+
+Имя из каталога можно передавать как `dataset` в `dap_analyze`, `dap_profile`,
+`dap_report`, `dap_explore` и `dap_estimate`: если значение не существует как
+путь и похоже на имя каталога, адаптер делает `GET /v1/catalog/datasets/{name}` и
+берёт `path`; на 404 значение используется как путь (прежнее поведение).
+
 ## dap_report и dap_profile
 
 Два инструмента закрывают типовую задачу одним вызовом и не оставляют workflow в сессии.
 
 `dap_report` принимает `file` или `dataset` (ровно один), опциональный read-only
-`sql` (вход как `src`), обязательный `report` — путь Markdown-файла, и опциональные
+`sql` (вход как `src`) или батч `queries` (`[{"sql","title"?,"limit"?}]`),
+обязательный `report` — путь файла отчёта, и опциональные
+`format` (`md` по умолчанию, `html`, `pdf`, `pptx` — уходит в `dap.markdown_report`;
+устаревшие значения `csv`/`excel`/`json`/`parquet` трактуются как формат входа),
 `chart` (путь `.svg`/`.png`), `chartType` (`bar`/`line`/`scatter`/`histogram`,
 по умолчанию `bar`), `x`, `y`, `title`, `profile` (по умолчанию `true`), `limit`
 (20) и `timeoutSec`. Адаптер собирает временный workflow `parquet_reader` →
@@ -274,6 +387,14 @@ tool call), библиотека рецептов читается с диска
 
 `node` — узел, чья таблица возвращена (`sql_query` при `sql`, иначе `parquet_reader`).
 `bytes` — размеры записанных файлов, если они видны процессу адаптера.
+
+С `queries` отчёт получает несколько таблиц: на каждый запрос создаётся свой узел
+`dap.sql_query`, подключённый к отдельному входному порту `dap.markdown_report`,
+а секции выглядят как `[{"kind":"table","input":0,"limit":5,"title":"Totals"},
+{"kind":"table","input":1,"limit":20},{"kind":"profile","input":0}]`. Ответ в этом
+режиме — `{"source","cached","format","nodes":[...],"tables":[{"index","node","table"}],
+"report","profile"?,"chart"?,"bytes"?}`. График по-прежнему строится из pass-through
+таблицы отчёта.
 
 `dap_profile` — тот же вход без SQL, отчёта и графика: `file` или `dataset`, `format`,
 `limit` (10) и `timeoutSec`. Возвращает `{source, cached, profile, rows, columns}` без
