@@ -84,11 +84,12 @@ public final class NativeService implements AutoCloseable {
     public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
                            String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
                            int idleTimeoutSec, int queryTimeoutSec, int maxSessions,
-                           int sessionTtlSec) {
+                           int sessionTtlSec, int maxRetainedJobs) {
         private static final int DEFAULT_IDLE_TIMEOUT_SEC = 900;
         private static final int DEFAULT_QUERY_TIMEOUT_SEC = 60;
         private static final int DEFAULT_MAX_SESSIONS = 64;
         private static final int DEFAULT_SESSION_TTL_SEC = 1800;
+        private static final int DEFAULT_MAX_RETAINED_JOBS = 200;
 
         public Settings {
             duckdbMemoryLimit = blankToNull(duckdbMemoryLimit);
@@ -113,19 +114,25 @@ public final class NativeService implements AutoCloseable {
                 throw new IllegalArgumentException(
                         "DAP_SESSION_TTL_SEC must be a non-negative integer, got " + sessionTtlSec);
             }
+            if (maxRetainedJobs <= 0) {
+                throw new IllegalArgumentException(
+                        "DAP_MAX_RETAINED_JOBS must be a positive integer, got " + maxRetainedJobs);
+            }
         }
 
         /** Phase-1/2 tests build the HTTP settings only; DuckDB resources stay at their defaults. */
         public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port) {
             this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, null, null, null,
-                    DEFAULT_IDLE_TIMEOUT_SEC);
+                    DEFAULT_IDLE_TIMEOUT_SEC, DEFAULT_QUERY_TIMEOUT_SEC, DEFAULT_MAX_SESSIONS,
+                    DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS);
         }
 
         /** Phase-3 settings without an idle timeout keep the 900 s default. */
         public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
                         String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory) {
             this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
-                    duckdbTempDirectory, DEFAULT_IDLE_TIMEOUT_SEC);
+                    duckdbTempDirectory, DEFAULT_IDLE_TIMEOUT_SEC, DEFAULT_QUERY_TIMEOUT_SEC,
+                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS);
         }
 
         /** Settings without an explicit read timeout keep the 60 s default. */
@@ -133,7 +140,8 @@ public final class NativeService implements AutoCloseable {
                         String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
                         int idleTimeoutSec) {
             this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
-                    duckdbTempDirectory, idleTimeoutSec, DEFAULT_QUERY_TIMEOUT_SEC);
+                    duckdbTempDirectory, idleTimeoutSec, DEFAULT_QUERY_TIMEOUT_SEC,
+                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS);
         }
 
         /** Settings without explicit session limits keep the 64 sessions / 1800 s defaults. */
@@ -142,7 +150,17 @@ public final class NativeService implements AutoCloseable {
                         int idleTimeoutSec, int queryTimeoutSec) {
             this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
                     duckdbTempDirectory, idleTimeoutSec, queryTimeoutSec,
-                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC);
+                    DEFAULT_MAX_SESSIONS, DEFAULT_SESSION_TTL_SEC, DEFAULT_MAX_RETAINED_JOBS);
+        }
+
+        /** Settings without an explicit job cap keep the 200 terminal jobs default. */
+        public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
+                        String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
+                        int idleTimeoutSec, int queryTimeoutSec, int maxSessions,
+                        int sessionTtlSec) {
+            this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
+                    duckdbTempDirectory, idleTimeoutSec, queryTimeoutSec, maxSessions, sessionTtlSec,
+                    DEFAULT_MAX_RETAINED_JOBS);
         }
 
         public static Settings fromEnv() {
@@ -162,7 +180,8 @@ public final class NativeService implements AutoCloseable {
                     nonNegativeIntEnv(env, "DAP_IDLE_TIMEOUT_SEC", DEFAULT_IDLE_TIMEOUT_SEC),
                     nonNegativeIntEnv(env, "DAP_QUERY_TIMEOUT_SEC", DEFAULT_QUERY_TIMEOUT_SEC),
                     positiveIntEnv(env, "DAP_MAX_SESSIONS", DEFAULT_MAX_SESSIONS),
-                    nonNegativeIntEnv(env, "DAP_SESSION_TTL_SEC", DEFAULT_SESSION_TTL_SEC));
+                    nonNegativeIntEnv(env, "DAP_SESSION_TTL_SEC", DEFAULT_SESSION_TTL_SEC),
+                    positiveIntEnv(env, "DAP_MAX_RETAINED_JOBS", DEFAULT_MAX_RETAINED_JOBS));
         }
 
         private static int intEnv(Map<String, String> env, String name, int fallback) {
@@ -596,7 +615,7 @@ public final class NativeService implements AutoCloseable {
         Settings settings = new Settings(defaults.maxWorkflows(), defaults.defaultJobTimeoutSec(), bind, port,
                 defaults.duckdbMemoryLimit(), defaults.duckdbThreads(), defaults.duckdbTempDirectory(),
                 defaults.idleTimeoutSec(), defaults.queryTimeoutSec(), defaults.maxSessions(),
-                defaults.sessionTtlSec());
+                defaults.sessionTtlSec(), defaults.maxRetainedJobs());
         NativeService service = new NativeService(settings, new NodeRegistry(), defaultExecutors());
         Runtime.getRuntime().addShutdownHook(new Thread(service::close, "dap-shutdown-hook"));
         service.start(port);

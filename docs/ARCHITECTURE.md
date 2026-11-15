@@ -54,15 +54,16 @@ JobManager ──► Dag (уровни Кана, параллельные вет
 | `DAP_QUERY_TIMEOUT_SEC` | `60` | предел материализации `/table` и `/profile`, с; `0` выключает |
 | `DAP_MAX_SESSIONS` | `64` | максимум открытых сессионных БД, LRU-эвикция |
 | `DAP_SESSION_TTL_SEC` | `1800` | простой сессии до эвикции, с; `0` выключает |
+| `DAP_MAX_RETAINED_JOBS` | `200` | cap терминальных заданий на сессию, старейшие удаляются |
 | `DAP_CACHE_DIR` | `$DAP_HOME/build/cache`, иначе `~/.dap/cache` | каталог Parquet-кэша `POST /v1/datasets` |
 | `DAP_DUCKDB_MEMORY_LIMIT` | умолчание DuckDB | `SET memory_limit` |
 | `DAP_DUCKDB_THREADS` | умолчание DuckDB | `SET threads` |
 | `DAP_DUCKDB_TEMP_DIR` | умолчание DuckDB | `SET temp_directory` |
 
 Нецелое или отрицательное значение `DAP_DUCKDB_THREADS`/`DAP_IDLE_TIMEOUT_SEC`/
-`DAP_QUERY_TIMEOUT_SEC`/`DAP_SESSION_TTL_SEC`, а также неположительное
-`DAP_MAX_SESSIONS` — ошибка конфигурации: `main` печатает сообщение и
-завершается с кодом 2.
+`DAP_QUERY_TIMEOUT_SEC`/`DAP_SESSION_TTL_SEC`, а также неположительные
+`DAP_MAX_SESSIONS`/`DAP_MAX_RETAINED_JOBS` — ошибка конфигурации: `main`
+печатает сообщение и завершается с кодом 2.
 Ресурсы DuckDB — §4.
 
 `DAP_CACHE_DIR` используется как есть. Без него каталог выбирается так:

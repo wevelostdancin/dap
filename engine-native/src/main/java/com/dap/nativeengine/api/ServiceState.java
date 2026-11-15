@@ -51,7 +51,7 @@ public final class ServiceState implements AutoCloseable {
         this.settings = settings;
         this.registry = registry;
         this.workflows = new WorkflowStore(settings.maxWorkflows());
-        this.jobs = new JobManager(workflows, executors);
+        this.jobs = new JobManager(workflows, executors, settings.maxRetainedJobs());
     }
 
     public NativeService.Settings settings() {

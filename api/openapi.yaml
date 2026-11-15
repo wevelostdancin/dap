@@ -548,7 +548,10 @@ paths:
       tags: [jobs]
       operationId: listJobs
       summary: List jobs in the session
-      description: Newest first; results are omitted.
+      description: >-
+        Newest first; results are omitted. Only the last DAP_MAX_RETAINED_JOBS (default 200)
+        jobs of a session are retained: older terminal jobs are dropped and answer 404.
+        Active jobs are never dropped.
       parameters:
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'

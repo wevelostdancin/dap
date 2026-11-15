@@ -33,6 +33,7 @@ scripts/dap-mcp
 | `DAP_QUERY_TIMEOUT_SEC` | `60` | предел материализации `/table` и `/profile`, с; `0` — выключено |
 | `DAP_MAX_SESSIONS` | `64` | максимум открытых сессионных БД, LRU-эвикция |
 | `DAP_SESSION_TTL_SEC` | `1800` | простой сессии до эвикции, с; `0` — выключено |
+| `DAP_MAX_RETAINED_JOBS` | `200` | cap терминальных заданий на сессию |
 | `DAP_CACHE_DIR` | `$DAP_HOME/build/cache` | каталог Parquet-кэша `dap_ingest` |
 | `JAVA_HOME` | — | откуда брать `bin/java` |
 
