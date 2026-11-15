@@ -41,7 +41,8 @@ class P3ReviewRegressionTest {
                     """);
 
             TableData data = new CorrelationExecutor().execute(context, List.of(input)).preview(10);
-            assertEquals(-0.2, Double.parseDouble(data.data().get(0).get(2)), 1e-9,
+            // P6 long output: column_a, column_b, method, n, correlation, p_value, ci_low, ci_high, partial.
+            assertEquals(-0.2, Double.parseDouble(data.data().get(0).get(4)), 1e-9,
                     "Spearman must use average ranks for ties");
         }
     }
