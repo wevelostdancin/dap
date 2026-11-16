@@ -1,0 +1,2924 @@
+{
+ "corpusVersion": 1,
+ "engine": {
+  "api": "v1",
+  "name": "DAP",
+  "version": "1.2.0"
+ },
+ "workflows": {
+  "wf-01-iris-filter-sort": {
+   "checks": {
+    "filter:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "sepal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "sepal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "petal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "petal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "species",
+       "type": "String"
+      }
+     ],
+     "kind": "profile",
+     "rows": 50
+    },
+    "sort:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "sepal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "sepal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "petal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "petal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "species",
+       "type": "String"
+      }
+     ],
+     "kind": "profile",
+     "rows": 50
+    },
+    "sort:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "sepal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 1,
+       "name": "sepal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 2,
+       "name": "petal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 3,
+       "name": "petal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 4,
+       "name": "species",
+       "type": "String"
+      }
+     ],
+     "data": [
+      [
+       "5.8",
+       "4.0",
+       "1.2",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.7",
+       "3.8",
+       "1.7",
+       "0.3",
+       "setosa"
+      ],
+      [
+       "5.7",
+       "4.4",
+       "1.5",
+       "0.4",
+       "setosa"
+      ],
+      [
+       "5.5",
+       "3.5",
+       "1.3",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.5",
+       "4.2",
+       "1.4",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.4",
+       "3.4",
+       "1.5",
+       "0.4",
+       "setosa"
+      ],
+      [
+       "5.4",
+       "3.4",
+       "1.7",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.4",
+       "3.7",
+       "1.5",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.4",
+       "3.9",
+       "1.3",
+       "0.4",
+       "setosa"
+      ],
+      [
+       "5.4",
+       "3.9",
+       "1.7",
+       "0.4",
+       "setosa"
+      ],
+      [
+       "5.3",
+       "3.7",
+       "1.5",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.2",
+       "3.4",
+       "1.4",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.2",
+       "3.5",
+       "1.5",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.2",
+       "4.1",
+       "1.5",
+       "0.1",
+       "setosa"
+      ],
+      [
+       "5.1",
+       "3.3",
+       "1.7",
+       "0.5",
+       "setosa"
+      ],
+      [
+       "5.1",
+       "3.4",
+       "1.5",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.1",
+       "3.5",
+       "1.4",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.1",
+       "3.5",
+       "1.4",
+       "0.3",
+       "setosa"
+      ],
+      [
+       "5.1",
+       "3.7",
+       "1.5",
+       "0.4",
+       "setosa"
+      ],
+      [
+       "5.1",
+       "3.8",
+       "1.5",
+       "0.3",
+       "setosa"
+      ],
+      [
+       "5.1",
+       "3.8",
+       "1.6",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.1",
+       "3.8",
+       "1.9",
+       "0.4",
+       "setosa"
+      ],
+      [
+       "5.0",
+       "3.0",
+       "1.6",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.0",
+       "3.2",
+       "1.2",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.0",
+       "3.3",
+       "1.4",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.0",
+       "3.4",
+       "1.5",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "5.0",
+       "3.4",
+       "1.6",
+       "0.4",
+       "setosa"
+      ],
+      [
+       "5.0",
+       "3.5",
+       "1.3",
+       "0.3",
+       "setosa"
+      ],
+      [
+       "5.0",
+       "3.5",
+       "1.6",
+       "0.6",
+       "setosa"
+      ],
+      [
+       "5.0",
+       "3.6",
+       "1.4",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.9",
+       "3.0",
+       "1.4",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.9",
+       "3.1",
+       "1.5",
+       "0.1",
+       "setosa"
+      ],
+      [
+       "4.9",
+       "3.1",
+       "1.5",
+       "0.1",
+       "setosa"
+      ],
+      [
+       "4.9",
+       "3.1",
+       "1.5",
+       "0.1",
+       "setosa"
+      ],
+      [
+       "4.8",
+       "3.0",
+       "1.4",
+       "0.1",
+       "setosa"
+      ],
+      [
+       "4.8",
+       "3.0",
+       "1.4",
+       "0.3",
+       "setosa"
+      ],
+      [
+       "4.8",
+       "3.1",
+       "1.6",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.8",
+       "3.4",
+       "1.6",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.8",
+       "3.4",
+       "1.9",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.7",
+       "3.2",
+       "1.3",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.7",
+       "3.2",
+       "1.6",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.6",
+       "3.1",
+       "1.5",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.6",
+       "3.2",
+       "1.4",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.6",
+       "3.4",
+       "1.4",
+       "0.3",
+       "setosa"
+      ],
+      [
+       "4.6",
+       "3.6",
+       "1.0",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.5",
+       "2.3",
+       "1.3",
+       "0.3",
+       "setosa"
+      ],
+      [
+       "4.4",
+       "2.9",
+       "1.4",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.4",
+       "3.0",
+       "1.3",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.4",
+       "3.2",
+       "1.3",
+       "0.2",
+       "setosa"
+      ],
+      [
+       "4.3",
+       "3.0",
+       "1.1",
+       "0.1",
+       "setosa"
+      ]
+     ],
+     "kind": "table",
+     "order": "ordered",
+     "rows": 50
+    }
+   },
+   "durationMs": 5,
+   "status": "ok"
+  },
+  "wf-02-iris-groupby": {
+   "checks": {
+    "g:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "species",
+       "type": "String"
+      },
+      {
+       "index": 1,
+       "name": "Mean(sepal_length)",
+       "type": "Number (Float)"
+      }
+     ],
+     "data": [
+      [
+       "setosa",
+       "5.006"
+      ],
+      [
+       "versicolor",
+       "5.936000000000001"
+      ],
+      [
+       "virginica",
+       "6.587999999999998"
+      ]
+     ],
+     "kind": "table",
+     "order": "unordered",
+     "rows": 3
+    },
+    "med:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "species",
+       "type": "String"
+      },
+      {
+       "index": 1,
+       "name": "Median(sepal_length)",
+       "type": "Number (Float)"
+      }
+     ],
+     "data": [
+      [
+       "setosa",
+       "5.0"
+      ],
+      [
+       "versicolor",
+       "5.9"
+      ],
+      [
+       "virginica",
+       "6.5"
+      ]
+     ],
+     "kind": "table",
+     "order": "unordered",
+     "rows": 3
+    },
+    "sort:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "species",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Mean(sepal_length)",
+       "type": "Number (Float)"
+      }
+     ],
+     "kind": "profile",
+     "rows": 3
+    },
+    "sort:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "species",
+       "type": "String"
+      },
+      {
+       "index": 1,
+       "name": "Mean(sepal_length)",
+       "type": "Number (Float)"
+      }
+     ],
+     "data": [
+      [
+       "setosa",
+       "5.006"
+      ],
+      [
+       "versicolor",
+       "5.936000000000001"
+      ],
+      [
+       "virginica",
+       "6.587999999999998"
+      ]
+     ],
+     "kind": "table",
+     "order": "ordered",
+     "rows": 3
+    }
+   },
+   "durationMs": 5,
+   "status": "ok"
+  },
+  "wf-03-adult-filter-groupby": {
+   "checks": {
+    "filter:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "age",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "workclass",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "fnlwgt",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "education",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "education-num",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "marital-status",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "occupation",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "relationship",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "race",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "sex",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "capital-gain",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "capital-loss",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "hours-per-week",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "native-country",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "income",
+       "type": "String"
+      }
+     ],
+     "kind": "profile",
+     "rows": 7103
+    },
+    "sort:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "education",
+       "type": "String"
+      },
+      {
+       "index": 1,
+       "name": "Count(age)",
+       "type": "Number (Integer)"
+      }
+     ],
+     "data": [
+      [
+       "Bachelors",
+       "2027"
+      ],
+      [
+       "HS-grad",
+       "1549"
+      ],
+      [
+       "Some-college",
+       "1251"
+      ],
+      [
+       "Masters",
+       "858"
+      ],
+      [
+       "Prof-school",
+       "369"
+      ],
+      [
+       "Assoc-voc",
+       "320"
+      ],
+      [
+       "Doctorate",
+       "268"
+      ],
+      [
+       "Assoc-acdm",
+       "238"
+      ],
+      [
+       "10th",
+       "55"
+      ],
+      [
+       "11th",
+       "54"
+      ],
+      [
+       "7th-8th",
+       "36"
+      ],
+      [
+       "12th",
+       "32"
+      ],
+      [
+       "9th",
+       "25"
+      ],
+      [
+       "5th-6th",
+       "15"
+      ],
+      [
+       "1st-4th",
+       "6"
+      ]
+     ],
+     "kind": "table",
+     "order": "ordered",
+     "rows": 15
+    }
+   },
+   "durationMs": 182,
+   "status": "ok"
+  },
+  "wf-04-adult-string-columns": {
+   "checks": {
+    "cols:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "age",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "workclass",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "education",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "education-num",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "marital-status",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "occupation",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "relationship",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "race",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "sex",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "hours-per-week",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "income",
+       "type": "String"
+      }
+     ],
+     "kind": "profile",
+     "rows": 32561
+    },
+    "sort:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "occupation",
+       "type": "String"
+      },
+      {
+       "index": 1,
+       "name": "Count(age)",
+       "type": "Number (Integer)"
+      }
+     ],
+     "data": [
+      [
+       "PROF-SPECIALTY",
+       "4140"
+      ],
+      [
+       "CRAFT-REPAIR",
+       "4099"
+      ],
+      [
+       "EXEC-MANAGERIAL",
+       "4066"
+      ],
+      [
+       "ADM-CLERICAL",
+       "3770"
+      ],
+      [
+       "SALES",
+       "3650"
+      ],
+      [
+       "OTHER-SERVICE",
+       "3295"
+      ],
+      [
+       "MACHINE-OP-INSPCT",
+       "2002"
+      ],
+      [
+       "?",
+       "1843"
+      ],
+      [
+       "TRANSPORT-MOVING",
+       "1597"
+      ],
+      [
+       "HANDLERS-CLEANERS",
+       "1370"
+      ],
+      [
+       "FARMING-FISHING",
+       "994"
+      ],
+      [
+       "TECH-SUPPORT",
+       "928"
+      ],
+      [
+       "PROTECTIVE-SERV",
+       "649"
+      ],
+      [
+       "PRIV-HOUSE-SERV",
+       "149"
+      ],
+      [
+       "ARMED-FORCES",
+       "9"
+      ]
+     ],
+     "kind": "table",
+     "order": "ordered",
+     "rows": 15
+    },
+    "str:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "age",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 1,
+       "name": "workclass",
+       "type": "String"
+      },
+      {
+       "index": 2,
+       "name": "fnlwgt",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 3,
+       "name": "education",
+       "type": "String"
+      },
+      {
+       "index": 4,
+       "name": "education-num",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 5,
+       "name": "marital-status",
+       "type": "String"
+      },
+      {
+       "index": 6,
+       "name": "occupation",
+       "type": "String"
+      },
+      {
+       "index": 7,
+       "name": "relationship",
+       "type": "String"
+      },
+      {
+       "index": 8,
+       "name": "race",
+       "type": "String"
+      },
+      {
+       "index": 9,
+       "name": "sex",
+       "type": "String"
+      },
+      {
+       "index": 10,
+       "name": "capital-gain",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 11,
+       "name": "capital-loss",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 12,
+       "name": "hours-per-week",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 13,
+       "name": "native-country",
+       "type": "String"
+      },
+      {
+       "index": 14,
+       "name": "income",
+       "type": "String"
+      }
+     ],
+     "data": [
+      [
+       "39",
+       "State-gov",
+       "77516",
+       "Bachelors",
+       "13",
+       "Never-married",
+       "ADM-CLERICAL",
+       "Not-in-family",
+       "White",
+       "Male",
+       "2174",
+       "0",
+       "40",
+       "United-States",
+       "<=50K"
+      ],
+      [
+       "50",
+       "Self-emp-not-inc",
+       "83311",
+       "Bachelors",
+       "13",
+       "Married-civ-spouse",
+       "EXEC-MANAGERIAL",
+       "Husband",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "13",
+       "United-States",
+       "<=50K"
+      ],
+      [
+       "38",
+       "Private",
+       "215646",
+       "HS-grad",
+       "9",
+       "Divorced",
+       "HANDLERS-CLEANERS",
+       "Not-in-family",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "40",
+       "United-States",
+       "<=50K"
+      ],
+      [
+       "53",
+       "Private",
+       "234721",
+       "11th",
+       "7",
+       "Married-civ-spouse",
+       "HANDLERS-CLEANERS",
+       "Husband",
+       "Black",
+       "Male",
+       "0",
+       "0",
+       "40",
+       "United-States",
+       "<=50K"
+      ],
+      [
+       "28",
+       "Private",
+       "338409",
+       "Bachelors",
+       "13",
+       "Married-civ-spouse",
+       "PROF-SPECIALTY",
+       "Wife",
+       "Black",
+       "Female",
+       "0",
+       "0",
+       "40",
+       "Cuba",
+       "<=50K"
+      ]
+     ],
+     "kind": "table",
+     "order": "unordered",
+     "rows": 32561
+    }
+   },
+   "durationMs": 167,
+   "status": "ok"
+  },
+  "wf-06-worldbank-missing": {
+   "checks": {
+    "cols:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "Country Code",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Short Name",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "2-alpha code",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Currency Unit",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Region",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Income Group",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "WB-2 code",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "National accounts base year",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "National accounts reference year",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "SNA price valuation",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Lending category",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Other groups",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "System of National Accounts",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "PPP survey year",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Balance of Payments Manual in use",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "External debt Reporting status",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "System of trade",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Government Accounting concept",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "IMF data dissemination standard",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Latest population census",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Vital registration complete",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Latest agricultural census",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Latest industrial data",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "Latest trade data",
+       "type": "Number (Integer)"
+      }
+     ],
+     "kind": "profile",
+     "rows": 265
+    },
+    "fix:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "Country Code",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Short Name",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Table Name",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Long Name",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "2-alpha code",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Currency Unit",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Special Notes",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Region",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Income Group",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "WB-2 code",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "National accounts base year",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "National accounts reference year",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "SNA price valuation",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Lending category",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Other groups",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "System of National Accounts",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Alternative conversion factor",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "PPP survey year",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Balance of Payments Manual in use",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "External debt Reporting status",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "System of trade",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Government Accounting concept",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "IMF data dissemination standard",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Latest population census",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Latest household survey",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Source of most recent Income and expenditure data",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Vital registration complete",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Latest agricultural census",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Latest industrial data",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "Latest trade data",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "Column30",
+       "type": "String"
+      }
+     ],
+     "kind": "profile",
+     "rows": 265
+    },
+    "fix:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "Country Code",
+       "type": "String"
+      },
+      {
+       "index": 1,
+       "name": "Short Name",
+       "type": "String"
+      },
+      {
+       "index": 2,
+       "name": "Table Name",
+       "type": "String"
+      },
+      {
+       "index": 3,
+       "name": "Long Name",
+       "type": "String"
+      },
+      {
+       "index": 4,
+       "name": "2-alpha code",
+       "type": "String"
+      },
+      {
+       "index": 5,
+       "name": "Currency Unit",
+       "type": "String"
+      },
+      {
+       "index": 6,
+       "name": "Special Notes",
+       "type": "String"
+      },
+      {
+       "index": 7,
+       "name": "Region",
+       "type": "String"
+      },
+      {
+       "index": 8,
+       "name": "Income Group",
+       "type": "String"
+      },
+      {
+       "index": 9,
+       "name": "WB-2 code",
+       "type": "String"
+      },
+      {
+       "index": 10,
+       "name": "National accounts base year",
+       "type": "String"
+      },
+      {
+       "index": 11,
+       "name": "National accounts reference year",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 12,
+       "name": "SNA price valuation",
+       "type": "String"
+      },
+      {
+       "index": 13,
+       "name": "Lending category",
+       "type": "String"
+      },
+      {
+       "index": 14,
+       "name": "Other groups",
+       "type": "String"
+      },
+      {
+       "index": 15,
+       "name": "System of National Accounts",
+       "type": "String"
+      },
+      {
+       "index": 16,
+       "name": "Alternative conversion factor",
+       "type": "String"
+      },
+      {
+       "index": 17,
+       "name": "PPP survey year",
+       "type": "String"
+      },
+      {
+       "index": 18,
+       "name": "Balance of Payments Manual in use",
+       "type": "String"
+      },
+      {
+       "index": 19,
+       "name": "External debt Reporting status",
+       "type": "String"
+      },
+      {
+       "index": 20,
+       "name": "System of trade",
+       "type": "String"
+      },
+      {
+       "index": 21,
+       "name": "Government Accounting concept",
+       "type": "String"
+      },
+      {
+       "index": 22,
+       "name": "IMF data dissemination standard",
+       "type": "String"
+      },
+      {
+       "index": 23,
+       "name": "Latest population census",
+       "type": "String"
+      },
+      {
+       "index": 24,
+       "name": "Latest household survey",
+       "type": "String"
+      },
+      {
+       "index": 25,
+       "name": "Source of most recent Income and expenditure data",
+       "type": "String"
+      },
+      {
+       "index": 26,
+       "name": "Vital registration complete",
+       "type": "String"
+      },
+      {
+       "index": 27,
+       "name": "Latest agricultural census",
+       "type": "String"
+      },
+      {
+       "index": 28,
+       "name": "Latest industrial data",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 29,
+       "name": "Latest trade data",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 30,
+       "name": "Column30",
+       "type": "String"
+      }
+     ],
+     "data": [
+      [
+       "ABW",
+       "Aruba",
+       "Aruba",
+       "Aruba",
+       "AW",
+       "Aruban florin",
+       null,
+       "Latin America & Caribbean",
+       "High income",
+       "AW",
+       "2013",
+       null,
+       "Value added at basic prices (VAB)",
+       null,
+       null,
+       "Country uses the 2008 System of National Accounts methodology",
+       null,
+       null,
+       "BPM6",
+       null,
+       "General trade system",
+       null,
+       "Enhanced General Data Dissemination System (e-GDDS)",
+       "2020 (expected)",
+       null,
+       null,
+       "Yes",
+       null,
+       null,
+       "2018",
+       null
+      ],
+      [
+       "AFE",
+       "Africa Eastern and Southern",
+       "Africa Eastern and Southern",
+       "Africa Eastern and Southern",
+       "ZH",
+       "UNKNOWN",
+       "26 countries, stretching from the Red Sea in the North to the Cape of Good Hope in the South (https://www.worldbank.org/en/region/afr/eastern-and-southern-africa)",
+       null,
+       null,
+       "ZH",
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null
+      ],
+      [
+       "AFG",
+       "Afghanistan",
+       "Afghanistan",
+       "Islamic State of Afghanistan",
+       "AF",
+       "Afghan afghani",
+       "The reporting period for national accounts data is designated as either calendar year basis (CY) or fiscal year basis (FY). For this country, it is fiscal year-based (fiscal year-end: March 20). Also, an estimate (PA.NUS.ATLS) of the exchange rate covers the same period and thus differs from the official exchange rate (CY).\n\nIn addition, the World Bank systematically assesses the appropriateness of official exchange rates as conversion factors. In this country, multiple or dual exchange rate activity exists and must be accounted for appropriately in underlying statistics. An alternative estimate (“alternative conversion factor” - PA.NUS.ATLS) is thus calculated as a weighted average of the different exchange rates in use in the country. Doing so better reflects economic reality and leads to more accurate cross-country comparisons and country classifications by income level. For this country, this applies to the period 1960-2006. Alternative conversion factors are used in the Atlas methodology and elsewhere in World Development Indicators as single-year conversion factors.",
+       "South Asia",
+       "Low income",
+       "AF",
+       "2016",
+       null,
+       "Value added at basic prices (VAB)",
+       "IDA",
+       "HIPC",
+       "Country uses the 1993 System of National Accounts methodology",
+       null,
+       null,
+       "BPM6",
+       "Estimate",
+       "General trade system",
+       "Consolidated central government",
+       "Enhanced General Data Dissemination System (e-GDDS)",
+       "1979",
+       "Demographic and Health Survey, 2015",
+       "Integrated household survey (IHS), 2016/17",
+       null,
+       null,
+       null,
+       "2018",
+       null
+      ],
+      [
+       "AFW",
+       "Africa Western and Central",
+       "Africa Western and Central",
+       "Africa Western and Central",
+       "ZI",
+       "UNKNOWN",
+       "22 countries, stretching from the westernmost point of Africa, across the equator, and partly along the Atlantic Ocean till the Republic of Congo in the South (https://www.worldbank.org/en/region/afr/western-and-central-africa)",
+       null,
+       null,
+       "ZI",
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null,
+       null
+      ],
+      [
+       "AGO",
+       "Angola",
+       "Angola",
+       "People's Republic of Angola",
+       "AO",
+       "Angolan kwanza",
+       "The World Bank systematically assesses the appropriateness of official exchange rates as conversion factors. In this country, multiple or dual exchange rate activity exists and must be accounted for appropriately in underlying statistics. An alternative estimate (“alternative conversion factor” - PA.NUS.ATLS) is thus calculated as a weighted average of the different exchange rates in use in the country. Doing so better reflects economic reality and leads to more accurate cross-country comparisons and country classifications by income level. For this country, this applies to the period 1994-2022. Alternative conversion factors are used in the Atlas methodology and elsewhere in World Development Indicators as single-year conversion factors.",
+       "Sub-Saharan Africa",
+       "Lower middle income",
+       "AO",
+       "2002",
+       null,
+       "Value added at basic prices (VAB)",
+       "IBRD",
+       null,
+       "Country uses the 1993 System of National Accounts methodology",
+       null,
+       null,
+       "BPM6",
+       "Actual",
+       "General trade system",
+       "Budgetary central government",
+       "Enhanced General Data Dissemination System (e-GDDS)",
+       "2014",
+       "Demographic and Health Survey, 2015/16",
+       "Integrated household survey (IHS), 2008/09",
+       null,
+       null,
+       null,
+       "2018",
+       null
+      ]
+     ],
+     "kind": "table",
+     "order": "unordered",
+     "rows": 265
+    },
+    "sort:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "Income Group",
+       "type": "String"
+      },
+      {
+       "index": 1,
+       "name": "Count(Country Code)",
+       "type": "Number (Integer)"
+      }
+     ],
+     "data": [
+      [
+       "High income",
+       "82"
+      ],
+      [
+       "Lower middle income",
+       "54"
+      ],
+      [
+       "Upper middle income",
+       "54"
+      ],
+      [
+       null,
+       "49"
+      ],
+      [
+       "Low income",
+       "26"
+      ]
+     ],
+     "kind": "table",
+     "order": "ordered",
+     "rows": 5
+    }
+   },
+   "durationMs": 10,
+   "status": "ok"
+  },
+  "wf-07-adult-join": {
+   "checks": {
+    "agg:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "education",
+       "type": "String"
+      },
+      {
+       "index": 1,
+       "name": "Mean(hours-per-week)",
+       "type": "Number (Float)"
+      }
+     ],
+     "data": [
+      [
+       "10th",
+       "37.05251875669885"
+      ],
+      [
+       "11th",
+       "33.92595744680852"
+      ],
+      [
+       "12th",
+       "35.78060046189377"
+      ],
+      [
+       "1st-4th",
+       "38.25595238095238"
+      ],
+      [
+       "5th-6th",
+       "38.897897897897906"
+      ],
+      [
+       "7th-8th",
+       "39.366873065015504"
+      ],
+      [
+       "9th",
+       "38.044747081712025"
+      ],
+      [
+       "Assoc-acdm",
+       "40.50421743205246"
+      ],
+      [
+       "Assoc-voc",
+       "41.61070911722135"
+      ],
+      [
+       "Bachelors",
+       "42.61400560224091"
+      ],
+      [
+       "Doctorate",
+       "46.97336561743339"
+      ],
+      [
+       "HS-grad",
+       "40.57537377392623"
+      ],
+      [
+       "Masters",
+       "43.83633197910617"
+      ],
+      [
+       "Preschool",
+       "36.64705882352941"
+      ],
+      [
+       "Prof-school",
+       "47.42534722222223"
+      ],
+      [
+       "Some-college",
+       "38.85228363736111"
+      ]
+     ],
+     "kind": "table",
+     "order": "unordered",
+     "rows": 16
+    },
+    "join:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "age",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "workclass",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "fnlwgt",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "education",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "education-num",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "marital-status",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "occupation",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "relationship",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "race",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "sex",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "capital-gain",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "capital-loss",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "hours-per-week",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "native-country",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "income",
+       "type": "String"
+      },
+      {
+       "index": null,
+       "name": "Mean(hours-per-week)",
+       "type": "Number (Float)"
+      }
+     ],
+     "kind": "profile",
+     "rows": 32561
+    },
+    "sort:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "age",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 1,
+       "name": "workclass",
+       "type": "String"
+      },
+      {
+       "index": 2,
+       "name": "fnlwgt",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 3,
+       "name": "education",
+       "type": "String"
+      },
+      {
+       "index": 4,
+       "name": "education-num",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 5,
+       "name": "marital-status",
+       "type": "String"
+      },
+      {
+       "index": 6,
+       "name": "occupation",
+       "type": "String"
+      },
+      {
+       "index": 7,
+       "name": "relationship",
+       "type": "String"
+      },
+      {
+       "index": 8,
+       "name": "race",
+       "type": "String"
+      },
+      {
+       "index": 9,
+       "name": "sex",
+       "type": "String"
+      },
+      {
+       "index": 10,
+       "name": "capital-gain",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 11,
+       "name": "capital-loss",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 12,
+       "name": "hours-per-week",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 13,
+       "name": "native-country",
+       "type": "String"
+      },
+      {
+       "index": 14,
+       "name": "income",
+       "type": "String"
+      },
+      {
+       "index": 15,
+       "name": "Mean(hours-per-week)",
+       "type": "Number (Float)"
+      }
+     ],
+     "data": [
+      [
+       "19",
+       "Private",
+       "311974",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Machine-op-inspct",
+       "Other-relative",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "40",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "19",
+       "Private",
+       "340567",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Handlers-cleaners",
+       "Not-in-family",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "55",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "19",
+       "Private",
+       "472807",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Handlers-cleaners",
+       "Other-relative",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "52",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "20",
+       "Private",
+       "472789",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Farming-fishing",
+       "Not-in-family",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "30",
+       "El-Salvador",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "21",
+       "Private",
+       "200089",
+       "1st-4th",
+       "2",
+       "Married-civ-spouse",
+       "Other-service",
+       "Other-relative",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "40",
+       "England",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "22",
+       "Private",
+       "238917",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Machine-op-inspct",
+       "Not-in-family",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "24",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "22",
+       "Private",
+       "464103",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Craft-repair",
+       "Not-in-family",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "40",
+       "Guatemala",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "23",
+       "Private",
+       "133582",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Farming-fishing",
+       "Not-in-family",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "36",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "23",
+       "Private",
+       "180771",
+       "1st-4th",
+       "2",
+       "Married-civ-spouse",
+       "Machine-op-inspct",
+       "Wife",
+       "Amer-Indian-Eskimo",
+       "Female",
+       "0",
+       "0",
+       "35",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "23",
+       "Self-emp-not-inc",
+       "409230",
+       "1st-4th",
+       "2",
+       "Married-civ-spouse",
+       "Sales",
+       "Other-relative",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "40",
+       "United-States",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "24",
+       "Private",
+       "52028",
+       "1st-4th",
+       "2",
+       "Married-civ-spouse",
+       "Other-service",
+       "Own-child",
+       "Asian-Pac-Islander",
+       "Female",
+       "0",
+       "0",
+       "5",
+       "Vietnam",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "24",
+       "Private",
+       "240137",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Handlers-cleaners",
+       "Not-in-family",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "55",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "24",
+       "Private",
+       "281356",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Farming-fishing",
+       "Not-in-family",
+       "Other",
+       "Male",
+       "0",
+       "0",
+       "66",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "24",
+       "Private",
+       "427686",
+       "1st-4th",
+       "2",
+       "Married-civ-spouse",
+       "Handlers-cleaners",
+       "Other-relative",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "40",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "25",
+       "Private",
+       "71351",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Other-service",
+       "Other-relative",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "25",
+       "El-Salvador",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "25",
+       "Private",
+       "195994",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Priv-house-serv",
+       "Not-in-family",
+       "White",
+       "Female",
+       "0",
+       "0",
+       "40",
+       "Guatemala",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "25",
+       "Private",
+       "195994",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Priv-house-serv",
+       "Not-in-family",
+       "White",
+       "Female",
+       "0",
+       "0",
+       "40",
+       "Guatemala",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "25",
+       "Private",
+       "195994",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Priv-house-serv",
+       "Not-in-family",
+       "White",
+       "Female",
+       "0",
+       "0",
+       "40",
+       "Guatemala",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "25",
+       "Private",
+       "248990",
+       "1st-4th",
+       "2",
+       "Never-married",
+       "Machine-op-inspct",
+       "Not-in-family",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "24",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ],
+      [
+       "25",
+       "Private",
+       "458549",
+       "1st-4th",
+       "2",
+       "Married-civ-spouse",
+       "Farming-fishing",
+       "Husband",
+       "White",
+       "Male",
+       "0",
+       "0",
+       "96",
+       "Mexico",
+       "<=50K",
+       "38.25595238095238"
+      ]
+     ],
+     "kind": "table",
+     "order": "ordered",
+     "rows": 32561
+    }
+   },
+   "durationMs": 304,
+   "status": "ok"
+  },
+  "wf-08-air-quality-filter": {
+   "checks": {
+    "filter:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "Date",
+       "type": "Date"
+      },
+      {
+       "index": null,
+       "name": "Time",
+       "type": "Time"
+      },
+      {
+       "index": null,
+       "name": "CO(GT)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "PT08.S1(CO)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "NMHC(GT)",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": null,
+       "name": "C6H6(GT)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "PT08.S2(NMHC)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "NOx(GT)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "PT08.S3(NOx)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "NO2(GT)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "PT08.S4(NO2)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "PT08.S5(O3)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "T",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "RH",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "AH",
+       "type": "Number (Float)"
+      }
+     ],
+     "kind": "profile",
+     "rows": 2072
+    },
+    "sort:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "Date",
+       "type": "Date"
+      },
+      {
+       "index": 1,
+       "name": "Time",
+       "type": "Time"
+      },
+      {
+       "index": 2,
+       "name": "CO(GT)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 3,
+       "name": "PT08.S1(CO)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 4,
+       "name": "NMHC(GT)",
+       "type": "Number (Integer)"
+      },
+      {
+       "index": 5,
+       "name": "C6H6(GT)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 6,
+       "name": "PT08.S2(NMHC)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 7,
+       "name": "NOx(GT)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 8,
+       "name": "PT08.S3(NOx)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 9,
+       "name": "NO2(GT)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 10,
+       "name": "PT08.S4(NO2)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 11,
+       "name": "PT08.S5(O3)",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 12,
+       "name": "T",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 13,
+       "name": "RH",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 14,
+       "name": "AH",
+       "type": "Number (Float)"
+      }
+     ],
+     "data": [
+      [
+       "2004-08-08",
+       "12:00",
+       "1.4",
+       "1031.5",
+       "-200",
+       "4.62027438141923",
+       "744.0",
+       "87.0",
+       "813.25",
+       "79.0",
+       "1694.5",
+       "777.75",
+       "25.449999809265",
+       "68.000000953674",
+       "2.18063931919973"
+      ],
+      [
+       "2004-08-13",
+       "06:00",
+       "0.8",
+       "940.0",
+       "-200",
+       "3.96437479775143",
+       "708.75",
+       "47.0",
+       "955.5",
+       "52.0",
+       "1640.75",
+       "588.0",
+       "25.174999713898",
+       "67.075000762939",
+       "2.11638717065238"
+      ],
+      [
+       "2004-09-12",
+       "16:00",
+       "-200.0",
+       "1254.0",
+       "-200",
+       "6.61120372298817",
+       "839.66666666667",
+       "-200.0",
+       "787.33333333333",
+       "-200.0",
+       "1602.3333333333",
+       "846.0",
+       "26.133333206177",
+       "66.833332061768",
+       "2.23103571558319"
+      ],
+      [
+       "2004-08-12",
+       "05:00",
+       "0.7",
+       "930.5",
+       "-200",
+       "4.1920614157232",
+       "721.25",
+       "47.0",
+       "888.0",
+       "37.0",
+       "1651.25",
+       "798.5",
+       "25.825000286102",
+       "64.649997711182",
+       "2.11945022567833"
+      ],
+      [
+       "2004-08-12",
+       "02:00",
+       "0.9",
+       "932.5",
+       "-200",
+       "3.81708048302603",
+       "700.5",
+       "57.0",
+       "906.0",
+       "62.0",
+       "1638.0",
+       "689.5",
+       "25.89999961853",
+       "64.52499961853",
+       "2.12469097073247"
+      ],
+      [
+       "2004-08-11",
+       "06:00",
+       "1.1",
+       "1073.6666666667",
+       "-200",
+       "7.21176418049906",
+       "866.0",
+       "78.0",
+       "717.0",
+       "42.0",
+       "1768.0",
+       "1075.3333333333",
+       "26.06666692098",
+       "63.666666666667",
+       "2.11703346532004"
+      ],
+      [
+       "2004-08-11",
+       "05:00",
+       "0.7",
+       "941.0",
+       "-200",
+       "3.54680417647915",
+       "685.0",
+       "50.0",
+       "895.0",
+       "32.0",
+       "1631.75",
+       "834.25",
+       "25.949999809265",
+       "63.64999961853",
+       "2.10204020839072"
+      ],
+      [
+       "2004-08-12",
+       "03:00",
+       "0.6",
+       "868.5",
+       "-200",
+       "2.42268501841219",
+       "614.25",
+       "-200.0",
+       "1000.5",
+       "-200.0",
+       "1565.25",
+       "674.0",
+       "25.625",
+       "63.474999427795",
+       "2.05660641695565"
+      ],
+      [
+       "2004-08-13",
+       "04:00",
+       "0.5",
+       "816.5",
+       "-200",
+       "1.66544717756192",
+       "558.25",
+       "7.0",
+       "1232.0",
+       "11.0",
+       "1485.25",
+       "451.75",
+       "25.400000572205",
+       "63.125000953674",
+       "2.01835341744019"
+      ],
+      [
+       "2004-08-02",
+       "03:00",
+       "0.3",
+       "881.75",
+       "-200",
+       "2.15228594945215",
+       "595.25",
+       "-200.0",
+       "1096.5",
+       "-200.0",
+       "1462.75",
+       "406.25",
+       "25.525000095367",
+       "62.824999809265",
+       "2.02360294924897"
+      ],
+      [
+       "2004-08-13",
+       "03:00",
+       "0.4",
+       "810.25",
+       "-200",
+       "1.49525659504461",
+       "544.25",
+       "-200.0",
+       "1264.0",
+       "-200.0",
+       "1484.5",
+       "446.75",
+       "25.97500038147",
+       "62.699999809265",
+       "2.07370718046555"
+      ],
+      [
+       "2004-08-02",
+       "05:00",
+       "0.4",
+       "910.0",
+       "-200",
+       "2.66088757767165",
+       "630.25",
+       "29.0",
+       "1060.75",
+       "35.0",
+       "1504.25",
+       "467.75",
+       "25.10000038147",
+       "62.39999961853",
+       "1.96018315078622"
+      ],
+      [
+       "2004-08-13",
+       "07:00",
+       "1.6",
+       "1075.5",
+       "-200",
+       "8.6058859089994",
+       "923.75",
+       "101.0",
+       "719.5",
+       "80.0",
+       "1806.0",
+       "908.75",
+       "25.999999523163",
+       "61.925000190735",
+       "2.05108209670396"
+      ],
+      [
+       "2004-08-02",
+       "04:00",
+       "0.2",
+       "854.0",
+       "-200",
+       "1.60070998962509",
+       "553.0",
+       "2.0",
+       "1203.25",
+       "5.0",
+       "1417.5",
+       "395.75",
+       "25.474999904633",
+       "61.75",
+       "1.98313045842337"
+      ],
+      [
+       "2004-08-12",
+       "07:00",
+       "1.7",
+       "1139.25",
+       "-200",
+       "10.956516647622",
+       "1012.75",
+       "87.0",
+       "672.25",
+       "60.0",
+       "1931.5",
+       "1033.75",
+       "26.400000572205",
+       "61.72500038147",
+       "2.09294684209089"
+      ],
+      [
+       "2004-08-02",
+       "02:00",
+       "0.7",
+       "941.5",
+       "-200",
+       "3.74213122161112",
+       "696.25",
+       "45.0",
+       "916.25",
+       "51.0",
+       "1541.5",
+       "464.5",
+       "26.150000095367",
+       "61.574999809265",
+       "2.05751100744175"
+      ],
+      [
+       "2004-08-09",
+       "01:00",
+       "1.1",
+       "967.25",
+       "-200",
+       "6.25905106009058",
+       "823.75",
+       "40.0",
+       "774.0",
+       "51.0",
+       "1637.25",
+       "862.0",
+       "25.5",
+       "61.574999809265",
+       "1.98042334915893"
+      ],
+      [
+       "2004-08-11",
+       "04:00",
+       "0.5",
+       "903.25",
+       "-200",
+       "3.15737181658935",
+       "661.75",
+       "16.0",
+       "932.0",
+       "24.0",
+       "1589.5",
+       "760.0",
+       "26.449999809265",
+       "61.550001144409",
+       "2.09312775140518"
+      ],
+      [
+       "2004-08-06",
+       "10:00",
+       "2.6",
+       "1220.0",
+       "-200",
+       "14.150622610387",
+       "1121.5",
+       "245.0",
+       "600.75",
+       "107.0",
+       "1974.25",
+       "1428.0",
+       "25.599999427795",
+       "61.22500038147",
+       "1.98079031723901"
+      ],
+      [
+       "2004-08-13",
+       "02:00",
+       "0.7",
+       "853.25",
+       "-200",
+       "2.58917830277434",
+       "625.5",
+       "22.0",
+       "1044.5",
+       "33.0",
+       "1556.5",
+       "515.5",
+       "26.650000572205",
+       "61.049999237061",
+       "2.10054255681802"
+      ]
+     ],
+     "kind": "table",
+     "order": "ordered",
+     "rows": 2072
+    }
+   },
+   "durationMs": 46,
+   "status": "ok"
+  },
+  "wf-09-empty-result": {
+   "checks": {
+    "filter:profile": {
+     "columns": [
+      {
+       "index": null,
+       "name": "sepal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "sepal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "petal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "petal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": null,
+       "name": "species",
+       "type": "String"
+      }
+     ],
+     "kind": "profile",
+     "rows": 0
+    },
+    "filter:table": {
+     "columns": [
+      {
+       "index": 0,
+       "name": "sepal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 1,
+       "name": "sepal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 2,
+       "name": "petal_length",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 3,
+       "name": "petal_width",
+       "type": "Number (Float)"
+      },
+      {
+       "index": 4,
+       "name": "species",
+       "type": "String"
+      }
+     ],
+     "data": [],
+     "kind": "table",
+     "order": "unordered",
+     "rows": 0
+    }
+   },
+   "durationMs": 2,
+   "status": "ok"
+  }
+ }
+}

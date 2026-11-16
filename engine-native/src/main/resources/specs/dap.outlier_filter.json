@@ -1,0 +1,59 @@
+{
+  "id": "dap.outlier_filter",
+  "name": "Outlier Filter",
+  "category": "/Manipulation/Row/Filter",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Drops rows whose numeric values fall outside a per-column outlier range: IQR fences (q1 - k*iqr, q3 + k*iqr) or z-score bounds (mean +- k*stddev). Multiple columns are combined with AND, missing values always pass, and the statistics come from the whole input table.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Outlier Filter configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "Numeric columns whose outliers are filtered; a row must pass every listed column.",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        }
+      },
+      "method": {
+        "type": "string",
+        "title": "Method",
+        "description": "iqr uses quartile fences, zscore uses the distance from the mean in standard deviations.",
+        "enum": [
+          "iqr",
+          "zscore"
+        ]
+      },
+      "threshold": {
+        "type": "number",
+        "title": "Threshold",
+        "description": "Multiplier for the fence width: the IQR multiplier (default 1.5) or the z-score limit (default 3)."
+      }
+    },
+    "required": [
+      "columns",
+      "method"
+    ]
+  }
+}

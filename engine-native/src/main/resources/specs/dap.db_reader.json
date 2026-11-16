@@ -1,0 +1,80 @@
+{
+  "id": "dap.db_reader",
+  "name": "Database Reader",
+  "category": "/IO/Read",
+  "type": "Source",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Reads one table or the result of a read-only query from an external database into the session. DuckDB files are attached natively; SQLite, PostgreSQL and MySQL need the matching DuckDB extension (sqlite_scanner, postgres_scanner, mysql_scanner), installed once with make extensions. The attachment is read-only by default and detached after the copy; credentials are never saved to workflow.json and are masked in errors.",
+  "inPorts": [],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Database Reader configuration",
+    "additionalProperties": false,
+    "properties": {
+      "driver": {
+        "type": "string",
+        "title": "Driver",
+        "description": "Database family: duckdb and sqlite read a file from 'path', postgres and mysql connect through 'url'.",
+        "enum": [
+          "duckdb",
+          "sqlite",
+          "postgres",
+          "mysql"
+        ]
+      },
+      "path": {
+        "type": "string",
+        "title": "Database file",
+        "description": "Absolute path to the .duckdb or .db file; used by the duckdb and sqlite drivers.",
+        "placeholder": "/data/warehouse.duckdb"
+      },
+      "url": {
+        "type": "string",
+        "title": "Connection URL",
+        "description": "Connection string for the postgres and mysql drivers, e.g. postgresql://host:5432/db; user and password may be separate settings.",
+        "placeholder": "postgresql://localhost:5432/analytics"
+      },
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Table to read, optionally schema-qualified (schema.table). Exactly one of table or query is required.",
+        "placeholder": "public.orders"
+      },
+      "query": {
+        "type": "string",
+        "title": "Query",
+        "description": "Read-only SELECT/WITH query over the tables of the external database (bare table names work). Exactly one of table or query is required.",
+        "placeholder": "SELECT * FROM orders WHERE amount > 0"
+      },
+      "read_only": {
+        "type": "boolean",
+        "title": "Read only",
+        "description": "Attach the external database read-only; disable only when the source must be writable.",
+        "default": true
+      },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "Database user for the postgres and mysql drivers; never persisted in workflow.json."
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "description": "Database password for the postgres and mysql drivers; never persisted in workflow.json and masked in error messages."
+      }
+    },
+    "required": [
+      "driver"
+    ]
+  }
+}

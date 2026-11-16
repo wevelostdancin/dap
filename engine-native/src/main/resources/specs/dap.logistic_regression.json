@@ -1,0 +1,102 @@
+{
+  "id": "dap.logistic_regression",
+  "name": "Logistic Regression",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Binary logistic regression of a 0/1 (or boolean) response on one or more numeric predictors, fitted by iteratively reweighted least squares (Newton-Raphson). coefficients mode returns one row per term with the log-odds coefficient, standard error (classical or HC1 sandwich), Wald z and p, the confidence interval on the log-odds scale, the odds ratio, and the model-level McFadden pseudo R2 and AUC; predict mode adds the predicted probability and the 0/1 class. An optional L2 penalty keeps perfectly separated data finite.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Logistic Regression configuration",
+    "additionalProperties": false,
+    "properties": {
+      "x": {
+        "type": "array",
+        "title": "Predictors",
+        "description": "One or more numeric predictor columns; every predictor is a term of the model.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "y": {
+        "type": "string",
+        "title": "Response",
+        "description": "Binary response column: numeric with values 0/1, or boolean. Both classes must be present."
+      },
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "coefficients returns one row per term with the fit statistics; predict returns the input rows plus probability and prediction.",
+        "enum": [
+          "coefficients",
+          "predict"
+        ],
+        "default": "coefficients"
+      },
+      "robust": {
+        "type": "string",
+        "title": "Standard errors",
+        "description": "none uses the inverse Fisher information; hc1 uses the heteroskedasticity-consistent sandwich estimator with the n/(n-p) correction.",
+        "enum": [
+          "none",
+          "hc1"
+        ],
+        "default": "none"
+      },
+      "max_iterations": {
+        "type": "integer",
+        "title": "Maximum iterations",
+        "description": "Upper bound on Newton-Raphson iterations; positive.",
+        "default": 50
+      },
+      "tolerance": {
+        "type": "number",
+        "title": "Convergence tolerance",
+        "description": "Stop when the largest coefficient change is below this value; positive.",
+        "default": 1e-08
+      },
+      "l2": {
+        "type": "number",
+        "title": "L2 penalty",
+        "description": "Optional ridge penalty added to the diagonal of X'WX for the non-intercept terms; 0 disables it.",
+        "default": 0,
+        "minimum": 0
+      },
+      "alpha": {
+        "type": "number",
+        "title": "Significance level",
+        "description": "Confidence level of the log-odds interval: 1 - alpha. Must be in (0, 1).",
+        "default": 0.05,
+        "minimum": 0,
+        "maximum": 1
+      },
+      "output": {
+        "type": "string",
+        "title": "Probability column",
+        "description": "Name of the probability column added by predict mode.",
+        "default": "probability"
+      }
+    },
+    "required": [
+      "x",
+      "y"
+    ]
+  }
+}

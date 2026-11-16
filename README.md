@@ -1,97 +1,143 @@
 # DAP
 
-**DAP** — автономный аналитический движок для агентов. Один JVM-процесс поднимает HTTP API над
-vendored-рантаймом KNIME 5.12: каталог из 832 узлов, 733 доступные схемы настроек,
-141 core-узел, сборка и исполнение workflow, чтение таблиц и профилей. Без GUI, без
-установленного KNIME и без внешней БД.
+**DAP** — локальный аналитический бэкенд для агента: один JVM-процесс с HTTP API
+`/v1` и stdio MCP-адаптер. Агент собирает workflow из JSON-узлов, запускает его и
+получает таблицу и профиль колонок. Вычисления идут в процессе, данные не покидают
+машину.
 
-Версия: **1.0.0**. API: **/v1**. Лицензия: **GPLv3** (см. раздел «Лицензия»).
+Движок: Javalin 6.7 + DuckDB 1.5.6 (in-memory) + Arrow 19.0, Java 21. Каталог —
+66 узлов `dap.*`, контракт — 30 операций `/v1`. Версия: **1.2.0**.
 
-## Что такое DAP
+## Что это
 
-DAP — это «движок за API», а не приложение для аналитика. Агент (MCP-клиент, скрипт, сервис)
-получает машиночитаемое описание узлов и их настроек, собирает workflow из JSON-вызовов,
-запускает его и забирает результат в виде строк таблицы и профиля колонок. Вся аналитика
-исполняется локально, в одном процессе, на данных, которые не покидают машину.
+- **Аналитика по запросу.** Адаптер поднимает движок при первом вызове; отдельного
+  демона, Docker и внешней БД в ежедневном пути нет.
+- **Два интерфейса.** MCP (stdio, 33 инструмента `dap_*`) для агента и HTTP `/v1`
+  для скриптов и тестов.
+- **Узлы как данные.** Узел описывается JSON-спекой: id, порты, `configSchema`.
+  Агент читает схему настроек и собирает граф без XML и без GUI.
+- **66 узлов.** IO (5 читателей, multi-file/glob `file_reader`, SQL-БД и список
+  файлов, 4 писателя, `db_writer`), очистка (фильтры, дедупликация, замена значений,
+  приведение типов, порядок колонок, выбросы, regex/split, `text_normalize`),
+  преобразование (дата/время, правила, бины, нормализация, кодирование, выборка,
+  train/test, `calendar`, `geo_distance`), агрегация и форма (group_by с
+  median/percentile, построчные агрегаты, pivot/unpivot, window, top-N,
+  joiner/concatenate/asof/cross, `fuzzy_join`), статистика (describe, value_counts,
+  correlation с p-value/partial, hypothesis_test с post-hoc и непараметрикой,
+  linear/logistic regression, outlier_detect с DBSCAN/LOF/IF, cluster, PCA,
+  resample_test, survival, ab_test, histogram, quantile), временные ряды (resample,
+  rolling, diff, date_range, `time_series`), SQL (`sql_query`), визуализация и отчёты
+  (`chart` с pie/boxplot/heatmap/map/facets, `chart_grid`, `markdown_report` в
+  md/html/pdf/pptx), качество (`data_quality`).
+- **DuckDB внутри.** Преобразования — ленивые SQL-отношения; данные материализуются
+  только при чтении таблицы или профиля.
+- **Parquet-кэш.** `POST /v1/datasets` (инструмент `dap_ingest`) один раз конвертирует
+  CSV/Excel/JSON/Parquet в `$DAP_HOME/build/cache` (или `~/.dap/cache`); повторный
+  анализ читает Parquet.
 
-Типовой цикл:
+DAP не является GUI, многопользовательским сервисом или облачным решением.
+Пользователь один, данные локальные, интерфейс — чат агента.
 
-1. `GET /v1/nodes?q=csv` — найти узел.
-2. `GET /v1/nodes/{id}/dialog` — узнать поля, типы, умолчания и допустимые значения.
-3. `POST /v1/workflows` → `POST .../nodes` → `POST .../connect` — собрать граф.
-4. `POST .../run` или `POST .../jobs` — выполнить (синхронно или асинхронно).
-5. `GET .../nodes/{node}/table` и `.../profile` — забрать данные и статистику.
-6. `POST .../save` — сохранить workflow как каталог KNIME.
+## Требования
 
-## Чем отличается
-
-| Свойство | DAP | KNIME Analytics Platform |
-|---|---|---|
-| Интерфейс | HTTP **/v1** + MCP (stdio) | desktop GUI |
-| Профиль запуска | headless, один JVM, без дисплея | интерактивная среда |
-| Установка | runtime уже внутри дистрибутива | установщик + workspace |
-| Контракт для агента | каталог, схемы, JSON workflow, jobs | действия человека в UI |
-| Состояние | workflow и jobs в памяти процесса | проект на диске |
-| Лицензия | GPLv3 | GPLv3 + EPL-компоненты |
-
-DAP **не является** независимой реализацией аналитического движка. Это производная KNIME
-5.12: движок линкуется с `org.knime.core` и использует `WorkflowManager`, `NodeFactory`,
-`NodeModel` и таблицы KNIME. Подробный и честный разбор — в
-[docs/INDEPENDENCE.md](docs/INDEPENDENCE.md).
+- **JDK 21** (проверено на Temurin 21.0.13). Путь задаётся `DAP_JDK`.
+- **Python 3.10+** — для MCP-адаптера и проверок; только стандартная библиотека.
+- macOS или Linux, x86_64/aarch64. Jar содержит native-библиотеку DuckDB платформы
+  сборки; для кросс-платформенной упаковки — `-Ddap.duckdb.native=all`.
+- Внешняя БД и Docker не нужны.
 
 ## Быстрый старт
 
-### Требования
-
-- JDK 21 (проверено на Temurin 21.0.13).
-- Python 3.10+ — для MCP-адаптера и проверок.
-- Linux или macOS, x86_64/aarch64.
-- Установленный KNIME **не нужен**. Нужен только каталог `runtime/knime`.
-
-`runtime/` не хранится в git (см. [.gitignore](.gitignore)): в релизном артефакте и OCI-образе
-он уже внутри; в исходном дереве его получают из релиза или собирают скриптом
-`scripts/vendor-runtime.sh` из установленного KNIME (только для разработки самого runtime).
-
-### Сборка и запуск
-
 ```bash
-make build-engine      # собрать com.dap.engine_1.0.0.jar против runtime/knime
-make build-catalog     # пересобрать catalog/catalog.json и catalog/schemas/*.json
-make run               # поднять сервис на 127.0.0.1:7800 (блокирующий процесс)
-make test              # golden + contract на отдельном экземпляре :7810
-```
+export DAP_JDK=/path/to/jdk-21        # по умолчанию ~/Projects/tools/jdk-21.0.13+9/Contents/Home
 
-`make test` поднимает собственный экземпляр на `127.0.0.1:7810` и не трогает сервис на
-7800; подробности — [tests/README.md](tests/README.md).
+make build-native                     # engine-native/target/dap-native.jar (~44 MiB)
+make run-native                       # 127.0.0.1:7800, блокирующий процесс
+```
 
 В другом терминале:
 
 ```bash
 curl -s http://127.0.0.1:7800/v1/health
-curl -s 'http://127.0.0.1:7800/v1/nodes?q=csv&limit=5'
 ```
 
-Если JDK лежит не в `$HOME/Projects/tools/jdk-21.0.13+9/Contents/Home`, задайте путь:
+```json
+{"ok":true,"name":"DAP","version":"1.2.0","api":"1","nodes":66,"coreNodes":66,
+ "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
+```
+
+(`memory` — текущие `usedMb`/`maxMb` JVM.)
+
+Cold start — около 0.4–0.5 с от `java -jar` до первого `200`. Сразу после ответа
+`health` движок прогревается в фоне (`DAP_WARMUP`), поэтому первый вызов после
+прогрева не платит инициализацию DuckDB и JIT. Остановка —
+`POST /v1/shutdown`, сигнал процессу или простой дольше `DAP_IDLE_TIMEOUT_SEC`.
+
+Переменные: `DAP_PORT` (7800), `DAP_BIND` (`127.0.0.1`; также `localhost` и
+`0.0.0.0`), `DAP_MAX_WORKFLOWS` (100 на сессию), `DAP_JOB_TIMEOUT` (600 с),
+`DAP_IDLE_TIMEOUT_SEC` (900 с; `0` выключает автозавершение),
+`DAP_QUERY_TIMEOUT_SEC` (60 с; предел материализации `/table` и `/profile`; `0`
+выключает), `DAP_MAX_SESSIONS` (64; LRU-эвикция), `DAP_SESSION_TTL_SEC` (1800 с;
+`0` выключает TTL), `DAP_MAX_RETAINED_JOBS` (200; cap истории заданий на сессию),
+`DAP_WARMUP` (1; прогрев движка при старте в фоновом потоке; `0` выключает),
+`DAP_ALLOW_STALE_ENGINE` (0; MCP-адаптер сверяет версию отвечающего движка с
+`VERSION` и заменяет движок старой сборки на текущий jar; если jar или java не
+готовы, движок не гасится — адаптер возвращает ошибку и оставляет порт живым;
+`1` — подключиться к нему как есть),
+`DAP_DUCKDB_MEMORY_LIMIT`, `DAP_DUCKDB_THREADS`, `DAP_DUCKDB_TEMP_DIR`,
+`DAP_DUCKDB_EXTENSION_DIR` (расширения DuckDB; ставятся `--install-extensions`),
+`DAP_CACHE_DIR` (Parquet-кэш; по умолчанию `$DAP_HOME/build/cache` при заданном
+`DAP_HOME`, иначе `~/.dap/cache`; в sandbox — `$TMPDIR/dap-cache`).
+
+## Пример вызова
 
 ```bash
-make run DAP_JDK=/path/to/jdk-21
-# или
-DAP_JDK=/path/to/jdk-21 make build-engine
+B=http://127.0.0.1:7800
+
+# 1. workflow
+curl -s -X POST $B/v1/workflows -H 'Content-Type: application/json' \
+  -d '{"name":"demo"}'
+# {"id":"wf-1","name":"demo","session":"default","nodes":0}
+
+# 2. источник
+curl -s -X POST $B/v1/workflows/wf-1/nodes -H 'Content-Type: application/json' -d '{
+  "factory":"dap.csv_reader",
+  "settings":{"file":"/data/iris.csv","delimiter":",","header":true}
+}'
+# {"node":"1:1","name":"CSV Reader"}
+
+# 3. фильтр
+curl -s -X POST $B/v1/workflows/wf-1/nodes -H 'Content-Type: application/json' -d '{
+  "factory":"dap.row_filter",
+  "settings":{"logic":"and","where":[{"column":"species","op":"eq","value":"setosa"}]}
+}'
+# {"node":"1:2","name":"Row Filter"}
+
+# 4. связь и запуск
+curl -s -X POST $B/v1/workflows/wf-1/connect -H 'Content-Type: application/json' \
+  -d '{"from":"1:1","to":"1:2"}'
+curl -s -X POST $B/v1/workflows/wf-1/run -H 'Content-Type: application/json' -d '{}'
+# {"ok":true,"durationMs":…,"workflow":"wf-1","nodes":[{"node":"1:1","name":"CSV Reader","state":"EXECUTED"}, …]}
+
+# 5. таблица и профиль
+curl -s "$B/v1/workflows/wf-1/nodes/1:2/table?limit=5"
+curl -s "$B/v1/workflows/wf-1/nodes/1:2/profile"
 ```
 
-Все переменные окружения и сценарии эксплуатации — в [docs/OPERATIONS.md](docs/OPERATIONS.md).
+Идентификатор узла — `<номер workflow>:<индекс>`, например `1:2` для `wf-1`.
+Сессия — заголовок `X-DAP-Session` или `?session=`, по умолчанию `default`.
+Асинхронный запуск — `POST .../run?async=true` или `POST .../jobs` (202 + `job-N`).
 
-### MCP
+## MCP-адаптер
 
-Адаптер — тонкий stdio-транспорт JSON-RPC 2.0; вычисления остаются в JVM. Запускайте сервис
-заранее (адаптер умеет стартовать его сам, но пути автостарта зашиты в адаптере и могут не
-совпадать с вашим деревом).
+Адаптер — тонкий stdio-транспорт JSON-RPC 2.0; вычисления остаются в движке.
 
 ```bash
 python3 adapters/mcp/dap_mcp.py
 ```
 
-Конфигурация MCP-клиента:
+Если движок не отвечает на `/v1/health`, адаптер запускает jar сам и ждёт готовности
+до 60 с; уже работающий сервис не перезапускает. Конфигурация MCP-клиента:
 
 ```json
 {
@@ -99,106 +145,99 @@ python3 adapters/mcp/dap_mcp.py
     "dap": {
       "command": "python3",
       "args": ["/absolute/path/to/dap/adapters/mcp/dap_mcp.py"],
-      "env": { "KNIME_SERVICE_PORT": "7800" }
+      "env": {
+        "DAP_HOME": "/absolute/path/to/dap",
+        "DAP_PORT": "7800",
+        "DAP_SESSION": "agent"
+      }
     }
   }
 }
 ```
 
-Инструменты: `knime_search_nodes`, `knime_node_details`, `knime_node_dialog_schema`,
-`knime_workflow_create`, `knime_add_node`, `knime_configure_node`, `knime_connect`,
-`knime_disconnect`, `knime_remove_node`, `knime_run`, `knime_get_table`,
-`knime_profile_table`, `knime_list_workflows`, `knime_save_workflow`.
+Подключить одной командой (stdlib-CLI, идемпотентно, с бэкапом и `--dry-run`):
 
-## API-обзор
+```bash
+python3 adapters/mcp/dap_cli.py install --client hermes   # или --client dsh
+python3 adapters/mcp/dap_cli.py doctor --client hermes
+```
 
-База: `http://127.0.0.1:7800/v1`. Тело и ответы — `application/json; charset=utf-8`.
-Сессия — заголовок `X-DAP-Session` или параметр `?session=` (по умолчанию `default`).
+Дистрибутив: `make dist` → `dist/` (jar, адаптер, CLI, `SHA256SUMS`); проверка
+установки из него — `make install-e2e`. Подробности — [docs/MCP.md](docs/MCP.md).
 
-| Метод и путь | Назначение |
-|---|---|
-| `GET /v1` | мета: имя, версия, список разделов |
-| `GET /v1/health` | здоровье, счётчики, память |
-| `GET /v1/nodes?q=&category=&limit=` | поиск узлов |
-| `GET /v1/nodes/{id}` | полное описание узла и `settingsXml` |
-| `GET /v1/nodes/{id}/dialog` | схема настроек (precomputed или live) |
-| `GET/POST /v1/workflows` | список / создание workflow |
-| `DELETE /v1/workflows/{id}` | удалить workflow |
-| `GET/POST /v1/workflows/{id}/nodes` | список / добавление узла |
-| `PATCH/DELETE /v1/workflows/{id}/nodes/{node}` | настройка / удаление узла |
-| `POST /v1/workflows/{id}/connect`, `/disconnect` | соединения |
-| `POST /v1/workflows/{id}/run` | запуск (sync; `async=true` → 202) |
-| `POST /v1/workflows/{id}/jobs` | запуск (всегда 202) |
-| `GET /v1/jobs`, `GET /v1/jobs/{id}`, `DELETE /v1/jobs/{id}` | задания и отмена |
-| `GET .../nodes/{node}/table`, `.../profile` | данные и профиль |
-| `POST /v1/workflows/{id}/save` | сохранить на диск |
+Инструменты: `dap_search_nodes`, `dap_node_dialog_schema`, `dap_workflow_create`,
+`dap_add_node`, `dap_connect`, `dap_run`, `dap_get_table`, `dap_profile_table`,
+`dap_ingest`, `dap_save_workflow`, `dap_load_workflow`, `dap_shutdown` и остальные
+`dap_*` — 30 штук, плюс MCP resources (`dap://catalog`, `dap://recipes`) и prompts. Полный список с аргументами —
+[adapters/mcp/README.md](adapters/mcp/README.md).
 
-Коды: `200` успех, `202` задание принято, `400` неверный запрос/настройки,
-`404` неизвестный объект или маршрут, `408` таймаут sync-запуска, `409` отмена
-неактивного job, `500` ошибка исполнения или внутренняя ошибка.
+## Проверки
 
-Полный человекочитаемый контракт — [docs/API.md](docs/API.md); машинный —
-[api/openapi.yaml](api/openapi.yaml).
+```bash
+make test-native    # JUnit: 534 теста
+make goldens        # 25 golden-workflow на отдельном экземпляре :7811
+make coverage       # 69 задач таксономии через /v1 (сейчас 68/69, F6 — не-цель)
+make smoke          # чёрный smoke по HTTP против запущенного движка (DAP_BASE)
+make mcp-e2e        # create → add_node → connect → run → table → delete через MCP
+make mcp-recipe-e2e # resources/prompts/recipes/dap_sql через MCP
+make install-e2e    # установка из dist/ во временный HOME + stdio preflight
+make extensions     # sqlite/postgres/mysql/httpfs в $DAP_HOME/build/duckdb-ext
+make soak           # 200 × create/run/table/delete
+make lint           # статические проверки репозитория
+make check          # test-native + goldens + goldens-validate + test-mcp + mcp-e2e + mcp-recipe-e2e + lint
+```
 
-## Tier: core и experimental
+## Структура репозитория
 
-Tier — это **обещание поддержки**, а не ограничение исполнения. Оба tier доступны через API.
-
-- **core** — 141 узел: схема и поведение зафиксированы, изменения ломают контракт только
-  осознанно. Golden-сценарии лежат в `tests/golden` и запускаются `make test`; они
-  покрывают ключевые core-сценарии, но не все 141 узла.
-- **experimental** — 691 узел: доступны, но схема может быть неполной, а поведение —
-  измениться между релизами.
-
-Список core задаётся в `catalog/curated.json` и применяется при старте; это источник
-истины. Фактическое число отдаёт `GET /v1/health` → `coreNodes`. Как добавить узел —
-[docs/NODES.md](docs/NODES.md).
-
-## Ограничения
-
-- **Один JVM, один worker.** Все workflow исполняются последовательно; одновременно активны
-  не более 8 jobs (жёсткий лимит в коде). HTTP-диспетчер по умолчанию тоже обрабатывает
-  запросы последовательно: синхронный `run` блокирует другие HTTP-вызовы до завершения.
-- **Состояние в памяти.** Workflow, jobs и результаты живут до перезапуска процесса.
-  `save` — единственный способ сохранить workflow.
-- **Нет аутентификации.** По умолчанию сервис слушает `127.0.0.1`. Не выставляйте его в
-  сеть без внешнего прокси/аутентификации.
-- **99 узлов из 832 не отдают схему** (нет ни аннотаций, ни Swing-диалога). Для них доступен
-  `settingsXml` из `GET /v1/nodes/{id}`, но не готовый список полей.
-- **21 узел не сериализует настройки по умолчанию** (`settingsUnavailable`): настройки
-  такого узла нельзя применить через API.
-- **Зависимые choices неполны.** Статическая схема узла не знает входных таблиц; варианты,
-  зависящие от колонок/других полей, появляются только у узла в workflow и могут честно
-  возвращать `choicesError`/`choicesNote`.
-- **Нет обновления workflow.** Нельзя переименовать workflow или получить его метаданные
-  отдельным запросом; есть список, создание, удаление и операции над узлами.
-- **Частичный эффект при ошибке.** `POST .../nodes` сначала добавляет узел, затем применяет
-  настройки; при 400 узел уже может остаться в workflow.
-- **Таймаут считается с момента постановки в очередь**, а не с начала исполнения.
-- **Часть list-настроек требует проверки.** Пустые list-массивы (`array-size=0`) теперь
-  поддерживаются, но для отдельных вложенных списков без шаблона в XML всё ещё возможен
-  400. Актуальный список ограничений — SKIP-проверки в [tests/README.md](tests/README.md).
-- **Состояние job при прерывании неоднозначно.** timeout/cancel может завершиться как
-  `timeout`/`cancelled`, так и `failed` с `InterruptedException` — зависит от окна
-  прерывания.
-- **Лимит workflow на сессию** (по умолчанию 100) при превышении возвращает 500, а не 409.
-- **Размер runtime** — около 662 МБ, 610 OSGi-бандлов.
-
-## Лицензия
-
-DAP распространяется под **GNU GPL v3**. В дистрибутив входит производный от KNIME 5.12
-рантайм (GPLv3, с дополнительными разрешениями KNIME по разделу 7) и EPL-компоненты Eclipse.
-Полный текст — [LICENSE](LICENSE), сведения об источниках и изменениях — [NOTICE](NOTICE).
-Гарантий нет; см. `LICENSE`.
+```
+engine-native/   движок: Java 21, specs/*.json, JUnit-тесты
+adapters/mcp/    stdio MCP-адаптер (Python, только stdlib)
+api/             контракт /v1: openapi.yaml
+docs/            ARCHITECTURE, NODES, QUALITY, ROADMAP, API, MCP, BENCH
+tests/           goldens-native/, native_smoke.py, mcp_e2e.py, install_e2e.py, bench.py
+deploy/          опциональный Dockerfile (Docker не нужен для локальной работы)
+scripts/         статические проверки репозитория
+Makefile         build-native, test-native, run-native, goldens, dist, check
+```
 
 ## Документация
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — слои, процессы, jobs, сессии, каталог.
-- [docs/API.md](docs/API.md) — контракт HTTP API.
-- [api/openapi.yaml](api/openapi.yaml) — OpenAPI 3.1.
-- [docs/OPERATIONS.md](docs/OPERATIONS.md) — запуск, env, OCI, диагностика.
-- [docs/NODES.md](docs/NODES.md) — каталог, tiers, добавление узла.
-- [docs/INDEPENDENCE.md](docs/INDEPENDENCE.md) — зависимость от KNIME и план замены.
-- [docs/PARITY.md](docs/PARITY.md) — правила parity с KNIME и известные расхождения.
-- [docs/ROADMAP-NATIVE.md](docs/ROADMAP-NATIVE.md) — план нативного движка dap-native.
-- [docs/CI.md](docs/CI.md) — CI, runtime-ассет и self-hosted runner.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — компоненты, жизненный цикл запроса,
+  память и ресурсы DuckDB, отмена, MCP-адаптер.
+- [docs/NODES.md](docs/NODES.md) — 66 узлов: назначение, config, примеры JSON.
+- [docs/QUALITY.md](docs/QUALITY.md) — unit-тесты, goldens, правила сравнения,
+  контракт ошибок, критерий готовности узла.
+- [docs/ROADMAP.md](docs/ROADMAP.md) — план продукта и пул узлов.
+- [docs/API.md](docs/API.md) — человекочитаемый контракт `/v1`;
+- [docs/MCP.md](docs/MCP.md) — подключение одной командой, локальные Postgres/MySQL,
+  сценарий «два вызова», инструменты и lifecycle;
+  [api/openapi.yaml](api/openapi.yaml) — машинный.
+- [docs/BENCH.md](docs/BENCH.md) — замеры ingest, cold start, памяти;
+  [docs/BENCH-P6.md](docs/BENCH-P6.md) — 10 больших датасетов, MCP overhead,
+  точность и найденные слабые места.
+
+## Ограничения
+
+- Один пользователь, аутентификации нет: сервис слушает loopback и не должен
+  выставляться в сеть без прокси.
+- Состояние в памяти: workflow, задания и таблицы исчезают при остановке процесса;
+  `POST .../save` пишет `workflow.json`, `POST /v1/workflows/load` читает его обратно.
+  На диске остаётся только явно сохранённый `workflow.json` и Parquet-кэш ingest.
+- Остановка — явная (`POST /v1/shutdown`, сигнал процессу) или автоматическая по
+  простою: `DAP_IDLE_TIMEOUT_SEC` (900 с по умолчанию, `0` выключает), если нет
+  активных jobs.
+- Каталог — 66 узлов; файловые источники и SQL подчиняются allowlist путей
+  (`DAP_ALLOWED_ROOTS`; по умолчанию home, tmp, DAP_HOME и cache, всегда запрещены
+  `~/.ssh`, `~/.dsh` и другие секреты). `DAP_DENY_ROOTS` расширяет запреты.
+  Расширения DuckDB (sqlite/postgres/httpfs) ставятся один раз `make extensions`
+  в `$DAP_HOME/build/duckdb-ext` и дальше работают офлайн.
+- Out-of-core по умолчанию: `parquet_reader` строит ленивый `read_parquet`, CSV
+  больше `DAP_INGEST_STREAM_MB` (64 МБ) идёт через DuckDB `read_csv` без Arrow в heap,
+  `DAP_DUCKDB_MEMORY_LIMIT=512MB` и spill в `$DAP_HOME/build/duckdb-tmp` включены по
+  умолчанию. Потолок теперь задаёт диск, а не `-Xmx`.
+
+## Лицензия
+
+Текст лицензии — [LICENSE](LICENSE). Движок собирается из собственного кода и
+сторонних библиотек, перечисленных в [engine-native/pom.xml](engine-native/pom.xml);
+гарантий нет.

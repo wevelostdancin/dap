@@ -1,0 +1,46 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "A8",
+      "title": "Read a remote CSV with read_csv_auto over httpfs",
+      "kind": "recipe",
+      "requires": [
+        "httpfs",
+        "network"
+      ],
+      "workflow": {
+        "id": "cov-recipe-http",
+        "nodes": [
+          {
+            "id": "q",
+            "type": "sql_query",
+            "config": {
+              "sql": "SELECT COUNT(*) AS n FROM read_csv_auto('https://raw.githubusercontent.com/plotly/datasets/master/iris.csv')"
+            }
+          }
+        ],
+        "edges": []
+      },
+      "checks": [
+        {
+          "node": "q",
+          "kind": "expect",
+          "rows": 1,
+          "columns": [
+            {
+              "name": "n",
+              "type": "Number (Integer)"
+            }
+          ],
+          "data": [
+            [
+              150
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    }
+  ]
+}

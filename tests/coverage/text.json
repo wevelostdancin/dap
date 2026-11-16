@@ -1,0 +1,113 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "G1",
+      "title": "Concatenate text into a new column",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-text-concat",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "s",
+            "type": "string_manipulation",
+            "config": {
+              "column": "name",
+              "op": "concat",
+              "mode": "append",
+              "value": "_x"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "s"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "s",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "new column",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1,
+              "A",
+              "alpha_x"
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B",
+              "beta_x"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A",
+              "gamma_x"
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C",
+              "delta_x"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A",
+              "gamma_x"
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B",
+              "epsilon_x"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "id": "dap.concatenate",
+  "name": "Concatenate",
+  "category": "/Manipulation/Row/Join",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Stacks the rows of two tables. In name mode the tables are matched by column name (UNION ALL BY NAME), so columns missing on one side become NULL; in position mode columns are matched by position and both inputs must have the same number of columns. Both input ports are required.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Top",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 1,
+      "name": "Bottom",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Concatenate configuration",
+    "additionalProperties": false,
+    "properties": {
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "name matches columns by name, position matches them by position.",
+        "enum": [
+          "name",
+          "position"
+        ]
+      }
+    },
+    "required": [
+      "mode"
+    ]
+  }
+}

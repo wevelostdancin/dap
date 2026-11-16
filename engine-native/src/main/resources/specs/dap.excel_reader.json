@@ -1,0 +1,85 @@
+{
+  "id": "dap.excel_reader",
+  "name": "Excel Reader",
+  "category": "/IO/Read",
+  "type": "Source",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Reads a worksheet from an Excel workbook into a data table. Cells become typed columns from the header or the explicit column schema; blank header names get columnN placeholders and duplicate header names are rejected. Time-only cells (formats without a date part) are read as Timestamp on the workbook epoch date, because Time is not offered yet.",
+  "inPorts": [],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Excel Reader configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Input file",
+        "description": "Absolute path to the Excel workbook to read.",
+        "placeholder": "/data/input.xlsx"
+      },
+      "sheet": {
+        "type": "string",
+        "title": "Sheet",
+        "description": "Worksheet name or zero-based index as a string, e.g. \"0\"; the first sheet is used when omitted."
+      },
+      "header": {
+        "type": "boolean",
+        "title": "Header row",
+        "description": "Whether the first row contains column names.",
+        "default": true
+      },
+      "columns": {
+        "type": "array",
+        "title": "Column schema",
+        "description": "Optional explicit column names and Arrow types; when omitted the header and type inference define the schema.",
+        "items": {
+          "type": "object",
+          "title": "Column",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name",
+              "description": "Column name in the output table."
+            },
+            "type": {
+              "type": "string",
+              "title": "Type",
+              "description": "Arrow data type of the column.",
+              "enum": [
+                "Int64",
+                "Float64",
+                "Utf8",
+                "Boolean",
+                "Date32",
+                "Timestamp"
+              ]
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      "emptyStringIsNull": {
+        "type": "boolean",
+        "title": "Empty string is null",
+        "description": "Treat empty cells as NULL instead of empty strings.",
+        "default": false
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}

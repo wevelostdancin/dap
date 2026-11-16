@@ -1,0 +1,71 @@
+{
+  "id": "dap.db_writer",
+  "name": "Database Writer",
+  "category": "/IO/Write",
+  "type": "Sink",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Writes the input table into a DuckDB file, an SQLite file or a PostgreSQL/MySQL database and passes the input through unchanged, so the node can sit in the middle of a workflow. The target is attached as a DuckDB database, the table is created (create), recreated (replace) or appended to (append), and the attachment is detached again. A local file path is validated against the path allowlist; a remote DSN may carry credentials, which are masked in every error message.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Database Writer configuration",
+    "additionalProperties": false,
+    "properties": {
+      "driver": {
+        "type": "string",
+        "title": "Driver",
+        "description": "Target database type.",
+        "enum": [
+          "duckdb",
+          "sqlite",
+          "postgres",
+          "mysql"
+        ]
+      },
+      "connection": {
+        "type": "string",
+        "title": "Connection",
+        "description": "File path for duckdb/sqlite, or a DSN such as postgresql://user:pass@host/db for postgres/mysql.",
+        "placeholder": "/data/analytics.duckdb"
+      },
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Target table name; a dotted name selects a schema.",
+        "placeholder": "analytics.events"
+      },
+      "mode": {
+        "type": "string",
+        "title": "Write mode",
+        "description": "create fails if the table exists, replace recreates it, append inserts the rows.",
+        "enum": [
+          "create",
+          "replace",
+          "append"
+        ],
+        "default": "create"
+      }
+    },
+    "required": [
+      "driver",
+      "connection",
+      "table"
+    ]
+  }
+}

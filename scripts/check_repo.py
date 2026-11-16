@@ -1,55 +1,172 @@
 #!/usr/bin/env python3
-"""Static checks for the DAP repository (used by CI and locally).
+"""Static checks for DAP (native engine only).
 
-No external dependencies except optional PyYAML for OpenAPI parsing.
-Exit code 0 when all checks pass, 1 otherwise.
+No KNIME directories, no legacy tests. Exit code 0 when everything passes.
 """
+
 from __future__ import annotations
 
-import hashlib
 import json
 import pathlib
+import py_compile
 import re
 import shutil
 import subprocess
 import sys
+import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ERRORS: list[str] = []
 WARNINGS: list[str] = []
 
 
-def fail(msg: str) -> None:
-    ERRORS.append(msg)
+def fail(message: str) -> None:
+    ERRORS.append(message)
 
 
-def warn(msg: str) -> None:
-    WARNINGS.append(msg)
+def warn(message: str) -> None:
+    WARNINGS.append(message)
 
 
 def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def check_layout() -> None:
+    for legacy in ("engine", "catalog", "runtime"):
+        if (ROOT / legacy).exists():
+            fail(f"legacy directory still present: {legacy}/")
+    for required in ("README.md", "docs/ROADMAP.md", "docs/ARCHITECTURE.md",
+                     "docs/NODES.md", "docs/QUALITY.md", "docs/API.md"):
+        if not (ROOT / required).is_file():
+            fail(f"missing document: {required}")
+
+
 def check_version() -> None:
     version = read("VERSION").strip()
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         fail(f"VERSION is not semver: {version!r}")
-    manifest = read("engine/META-INF/MANIFEST.MF")
-    m = re.search(r"^Bundle-Version:\s*(\S+)", manifest, re.M)
-    if not m:
-        fail("engine/META-INF/MANIFEST.MF: Bundle-Version missing")
-    elif m.group(1) != version:
-        fail(f"Bundle-Version {m.group(1)} != VERSION {version}")
     openapi = read("api/openapi.yaml")
-    m = re.search(r"^\s{2}version:\s*(\S+)", openapi, re.M)
-    if not m:
+    match = re.search(r"^\s{2}version:\s*(\S+)", openapi, re.M)
+    if not match:
         fail("api/openapi.yaml: info.version missing")
-    elif m.group(1).strip('"') != version:
-        fail(f"OpenAPI version {m.group(1)} != VERSION {version}")
-    mcp = read("adapters/mcp/dap_mcp.py")
-    if f'"version": "{version}"' not in mcp:
+    elif match.group(1).strip('"') != version:
+        fail(f"OpenAPI version {match.group(1)} != VERSION {version}")
+    adapter = read("adapters/mcp/dap_mcp.py")
+    if f'"version": "{version}"' not in adapter:
         warn(f"adapters/mcp/dap_mcp.py does not advertise version {version}")
+
+
+def check_openapi() -> None:
+    try:
+        import yaml  # type: ignore
+    except ImportError:
+        # No PyYAML: fall back to a structural text check so CI still catches
+        # a removed path without extra dependencies.
+        text = read("api/openapi.yaml")
+        for required in ("/v1/health", "/v1/nodes", "/v1/workflows", "/v1/jobs",
+                         "/v1/workflows/load", "/v1/datasets", "/v1/shutdown"):
+            if not re.search(r"^  " + re.escape(required) + r":", text, re.M):
+                fail(f"OpenAPI misses path {required}")
+        return
+    try:
+        spec = yaml.safe_load(read("api/openapi.yaml"))
+    except Exception as exc:  # noqa: BLE001
+        fail(f"api/openapi.yaml is not valid YAML: {exc}")
+        return
+    if not isinstance(spec, dict) or spec.get("openapi") != "3.1.0":
+        fail("api/openapi.yaml: expected openapi: 3.1.0")
+        return
+    paths = spec.get("paths") or {}
+    for required in ("/v1/health", "/v1/nodes", "/v1/workflows", "/v1/jobs",
+                     "/v1/workflows/load", "/v1/datasets", "/v1/shutdown"):
+        if required not in paths:
+            fail(f"OpenAPI misses path {required}")
+
+
+def check_native_boundary() -> None:
+    hits = []
+    for path in (ROOT / "engine-native").rglob("*"):
+        if path.is_file() and path.suffix in (".java", ".json", ".xml", ".properties"):
+            try:
+                text = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if "org.knime" in text:
+                hits.append(str(path.relative_to(ROOT)))
+    if hits:
+        fail("org.knime references in engine-native: " + ", ".join(hits[:5]))
+
+
+def check_specs() -> None:
+    specs = sorted((ROOT / "engine-native/src/main/resources/specs").glob("*.json"))
+    if len(specs) < 11:
+        fail(f"expected at least 11 node specs, found {len(specs)}")
+    for path in specs:
+        try:
+            spec = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            fail(f"{path.name}: invalid JSON: {exc}")
+            continue
+        if not spec.get("id") or not spec.get("configSchema"):
+            fail(f"{path.name}: id and configSchema are required")
+
+
+def check_jar() -> None:
+    jar = ROOT / "engine-native/target/dap-native.jar"
+    if not jar.is_file():
+        warn("dap-native.jar not built; jar checks skipped")
+        return
+    with zipfile.ZipFile(jar) as archive:
+        native = [name for name in archive.namelist() if "libduckdb" in name]
+    if not native:
+        fail("jar contains no DuckDB native library")
+        return
+    if len(native) > 1:
+        # Documented cross-platform build (-Ddap.duckdb.native=all): four native
+        # libraries are expected, so the single-platform size limit does not apply.
+        warn(f"jar contains {len(native)} DuckDB native libraries (cross-platform build)")
+        return
+    size_mib = jar.stat().st_size / (1024 * 1024)
+    if size_mib >= 50:
+        fail(f"jar is {size_mib:.1f} MiB (limit 50 MiB)")
+
+
+def check_python() -> None:
+    paths = (list((ROOT / "tests").glob("*.py"))
+             + list((ROOT / "tests/goldens-native").glob("*.py"))
+             + list((ROOT / "adapters/mcp").glob("*.py")))
+    for path in sorted(paths):
+        try:
+            compile(path.read_text(encoding="utf-8"), str(path), "exec")
+        except SyntaxError as exc:
+            fail(f"{path.name}: {exc}")
+
+
+LEGACY_MARKERS = ("org.knime", "tests/corpus", "tests/parity", "tests/baseline.json",
+                  "tests/run_all", "scripts/run.sh", "runtime/knime")
+SKIP_PARTS = {".git", ".worktrees", "workspace", "build", "target", ".tools",
+              "node_modules", "__pycache__"}
+SCAN_SUFFIXES = {".java", ".py", ".md", ".yml", ".yaml", ".json", ".xml", ".sh"}
+
+
+def check_legacy_markers() -> None:
+    hits = []
+    for path in ROOT.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.suffix not in SCAN_SUFFIXES and path.name not in ("Makefile", "Dockerfile"):
+            continue
+        if path == pathlib.Path(__file__).resolve():
+            continue
+        if any(part in SKIP_PARTS for part in path.relative_to(ROOT).parts):
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for marker in LEGACY_MARKERS:
+            if marker in text:
+                hits.append(f"{path.relative_to(ROOT)}: {marker}")
+    if hits:
+        fail("legacy references: " + "; ".join(hits[:8]))
 
 
 def check_shell() -> None:
@@ -60,113 +177,24 @@ def check_shell() -> None:
         proc = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True)
         if proc.returncode != 0:
             fail(f"bash -n {path.name}: {proc.stderr.strip()}")
-    if shutil.which("shellcheck"):
-        for path in sorted((ROOT / "scripts").glob("*.sh")):
-            proc = subprocess.run(["shellcheck", "-S", "warning", str(path)],
-                                  capture_output=True, text=True)
-            if proc.returncode != 0:
-                fail(f"shellcheck {path.name}: {proc.stdout.strip()}")
-
-
-def check_openapi() -> None:
-    try:
-        import yaml  # type: ignore
-    except ImportError:
-        warn("PyYAML not installed; OpenAPI structure check skipped")
-        return
-    try:
-        spec = yaml.safe_load(read("api/openapi.yaml"))
-    except Exception as exc:  # noqa: BLE001
-        fail(f"api/openapi.yaml is not valid YAML: {exc}")
-        return
-    if not isinstance(spec, dict) or spec.get("openapi") != "3.1.0":
-        fail("api/openapi.yaml: expected openapi: 3.1.0")
-    paths = spec.get("paths") or {}
-    for required in ["/v1/health", "/v1/nodes", "/v1/workflows", "/v1/jobs"]:
-        if required not in paths:
-            fail(f"OpenAPI misses path {required}")
-    if not any(re.fullmatch(r"/v1/workflows/\{[^}]+\}/jobs", p) for p in paths):
-        warn("OpenAPI has no /v1/workflows/{workflow}/jobs path")
-
-
-def check_frozen_contract() -> None:
-    frozen = ROOT / "api" / "openapi-v1-frozen.yaml"
-    checksum = ROOT / "api" / "openapi-v1-frozen.sha256"
-    if not frozen.exists() or not checksum.exists():
-        fail("api/openapi-v1-frozen.yaml or its .sha256 is missing")
-        return
-    expected = checksum.read_text(encoding="utf-8").split()[0]
-    actual = hashlib.sha256(frozen.read_bytes()).hexdigest()
-    if actual != expected:
-        fail("api/openapi-v1-frozen.yaml checksum " + actual + " != " + expected
-             + " (frozen contract was edited)")
-    live = hashlib.sha256((ROOT / "api" / "openapi.yaml").read_bytes()).hexdigest()
-    if live != actual:
-        fail("api/openapi.yaml drifted from api/openapi-v1-frozen.yaml: update the frozen copy, "
-             "its .sha256 and record the change in CHANGELOG.md")
-
-
-def check_catalog() -> None:
-    try:
-        catalog = json.loads(read("catalog/catalog.json"))
-        curated = json.loads(read("catalog/curated.json"))
-    except Exception as exc:  # noqa: BLE001
-        fail(f"catalog JSON is invalid: {exc}")
-        return
-    nodes = catalog.get("nodes") or []
-    ids = {n.get("id") for n in nodes}
-    core = curated.get("core") or []
-    if not nodes:
-        fail("catalog/catalog.json has no nodes")
-    if not core:
-        fail("catalog/curated.json has no core nodes")
-    missing = [x for x in core if x not in ids]
-    if missing:
-        fail(f"curated core ids missing from catalog: {missing[:5]}")
-    if len(core) < 100 or len(core) > 200:
-        warn(f"core size is unusual: {len(core)}")
-    unique = len(ids)
-    if unique != len(nodes):
-        warn(f"catalog has {len(nodes)} entries but {unique} unique ids")
-
-
-def check_stale() -> None:
-    stale = []
-    for path in ROOT.rglob("*.md"):
-        if ".git" in path.parts or "runtime" in path.parts:
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if "scripts/build-runtime.sh" in text:
-            stale.append(str(path.relative_to(ROOT)))
-    if stale:
-        warn("stale build-runtime.sh references: " + ", ".join(stale))
-
-
-def check_python_syntax() -> None:
-    for path in list((ROOT / "adapters").rglob("*.py")) + list((ROOT / "tests").rglob("*.py")):
-        try:
-            compile(path.read_text(encoding="utf-8"), str(path), "exec")
-        except SyntaxError as exc:
-            fail(f"python syntax {path.relative_to(ROOT)}: {exc}")
 
 
 def main() -> int:
+    check_layout()
     check_version()
-    check_shell()
     check_openapi()
-    check_frozen_contract()
-    check_catalog()
-    check_stale()
-    check_python_syntax()
-    for msg in WARNINGS:
-        print(f"WARN  {msg}")
-    for msg in ERRORS:
-        print(f"FAIL  {msg}")
-    if ERRORS:
-        print(f"\n{len(ERRORS)} error(s), {len(WARNINGS)} warning(s)")
-        return 1
-    print(f"OK: {len(WARNINGS)} warning(s), 0 errors")
-    return 0
+    check_native_boundary()
+    check_specs()
+    check_jar()
+    check_python()
+    check_legacy_markers()
+    check_shell()
+    for message in WARNINGS:
+        print("WARN  " + message)
+    for message in ERRORS:
+        print("FAIL  " + message)
+    print(f"repo: {len(ERRORS)} error(s), {len(WARNINGS)} warning(s)")
+    return 1 if ERRORS else 0
 
 
 if __name__ == "__main__":

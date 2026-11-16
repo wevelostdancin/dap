@@ -1,0 +1,25 @@
+#!/bin/sh
+# MCP entrypoint for DSH and other stdio clients.
+#
+# Resolves the repository root from this script's location and execs the
+# dap-mcp CLI. With no subcommand it runs the stdio MCP server; an explicit
+# subcommand (run|install|doctor|version) is passed through to the CLI.
+#
+#   scripts/dap-mcp                  # stdio MCP server
+#   scripts/dap-mcp version          # CLI: versions
+#   scripts/dap-mcp install --client hermes
+#
+# Environment is passed through unchanged (DAP_PORT, DAP_SESSION, DAP_HEAP,
+# DAP_IDLE_TIMEOUT_SEC, JAVA_HOME, ...). Set DAP_HOME to override the root.
+set -eu
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+: "${DAP_HOME:=$here}"
+export DAP_HOME
+
+case "${1:-}" in
+  run|install|doctor|version) ;;
+  *) set -- run "$@" ;;
+esac
+
+exec "${PYTHON:-python3}" "$here/adapters/mcp/dap_cli.py" "$@"

@@ -1,0 +1,124 @@
+{
+  "id": "dap.resample_test",
+  "name": "Resample Test",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Bootstrap confidence intervals and two-sample permutation tests computed in Java over at most max_rows rows. Bootstrap (mode bootstrap) resamples the observations with replacement and reports statistic, estimate, se, ci_low/ci_high (percentile, confidence), bias, n and resamples for mean, median, sd, correlation (two columns) or slope (OLS of the second column on the first). Permutation (mode permutation) shuffles the labels of group between the two levels of value and reports statistic, observed (difference of means or medians, first group minus second in sorted order), p_value (add-one estimator; alternative two-sided, less, greater), n and permutations. A seed makes every draw reproducible.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Resample Test configuration",
+    "additionalProperties": false,
+    "properties": {
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "bootstrap resamples rows with replacement; permutation shuffles the group labels of value.",
+        "enum": [
+          "bootstrap",
+          "permutation"
+        ],
+        "default": "bootstrap"
+      },
+      "statistic": {
+        "type": "string",
+        "title": "Statistic",
+        "description": "Statistic to resample: mean, median, sd, correlation, slope (bootstrap) or difference_mean, difference_median (permutation).",
+        "enum": [
+          "mean",
+          "median",
+          "sd",
+          "correlation",
+          "slope",
+          "difference_mean",
+          "difference_median"
+        ]
+      },
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "One numeric column for mean/median/sd, two for correlation/slope (first = x, second = y). Ignored in permutation mode.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "value": {
+        "type": "string",
+        "title": "Value column",
+        "description": "Permutation: numeric column whose values are reshuffled between the two groups."
+      },
+      "group": {
+        "type": "string",
+        "title": "Group column",
+        "description": "Permutation: categorical column with exactly two levels."
+      },
+      "resamples": {
+        "type": "integer",
+        "title": "Resamples",
+        "description": "Number of bootstrap resamples.",
+        "default": 1000,
+        "minimum": 1
+      },
+      "permutations": {
+        "type": "integer",
+        "title": "Permutations",
+        "description": "Number of permutations.",
+        "default": 1000,
+        "minimum": 1
+      },
+      "confidence": {
+        "type": "number",
+        "title": "Confidence",
+        "description": "Confidence level of the bootstrap interval, in (0, 1).",
+        "default": 0.95,
+        "minimum": 0,
+        "maximum": 1
+      },
+      "alternative": {
+        "type": "string",
+        "title": "Alternative hypothesis",
+        "description": "Tail used by the permutation p-value.",
+        "enum": [
+          "two-sided",
+          "less",
+          "greater"
+        ],
+        "default": "two-sided"
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "description": "Seed of the random stream; the same seed gives the same numbers.",
+        "default": 42
+      },
+      "max_rows": {
+        "type": "integer",
+        "title": "Max rows",
+        "description": "The resampling runs in memory: at most this many rows are read.",
+        "default": 100000,
+        "minimum": 1
+      }
+    },
+    "required": [
+      "mode",
+      "statistic"
+    ]
+  }
+}

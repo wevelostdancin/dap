@@ -1,0 +1,42 @@
+{
+  "id": "dap.duplicate_filter",
+  "name": "Duplicate Filter",
+  "category": "/Manipulation/Row",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Keeps one row per key combination, or only distinct rows when no keys are given. Row order is not defined: the output order is arbitrary and, with keys, the surviving row of each key is arbitrary too.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Duplicate Filter configuration",
+    "additionalProperties": false,
+    "properties": {
+      "keys": {
+        "type": "array",
+        "title": "Keys",
+        "description": "Columns that define a duplicate key. When omitted or empty, rows are compared across all columns and only distinct rows are kept.",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        }
+      }
+    },
+    "required": []
+  }
+}

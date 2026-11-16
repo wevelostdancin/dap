@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: DAP API
-  version: 1.0.0
+  version: 1.2.0
   description: |
     Headless analytical engine for agents. Canonical HTTP contract at /v1.
 
@@ -10,8 +10,7 @@ info:
     and job objects are isolated by session; foreign objects return 404.
 
     There is no authentication. Keep the service on loopback or behind an
-    authenticating proxy. Legacy paths without the /v1 prefix are also accepted
-    by the server but are not part of this contract.
+    authenticating proxy. Only /v1 paths are served.
 
     Data port indices are 0-based and refer to data ports only; the hidden Flow
     Variable port is handled by the server. Job timeouts count from submission,
@@ -40,6 +39,15 @@ tags:
     description: Table previews and column profiles
   - name: ops
     description: Save and diagnostics
+  - name: sessions
+    description: Open session databases, TTL and LRU limits
+  - name: datasets
+    description: One-time conversion of source files into the Parquet cache
+  - name: dataset-catalog
+    description: Persistent dataset catalog with versions and profile cache
+  - name: explore
+    description: >-
+      One-call dataset exploration: profile, quality, relationships and hypotheses
 paths:
   /v1:
     get:
@@ -72,6 +80,58 @@ paths:
                 $ref: '#/components/schemas/Health'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/sessions:
+    get:
+      tags: [sessions]
+      operationId: listSessions
+      summary: Open session databases
+      description: >-
+        Process-wide list, least recently used first. A session database is created on the
+        first data request of a session and evicted after DAP_SESSION_TTL_SEC of inactivity
+        or when the DAP_MAX_SESSIONS cap (LRU) is exceeded.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Session list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/sessions/{sessionId}:
+    delete:
+      tags: [sessions]
+      operationId: deleteSession
+      summary: Close one session
+      description: >-
+        Cancels the session jobs, deletes its workflows and closes its DuckDB database.
+        Unknown sessions return 404.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9._-]{1,64}$'
+          example: default
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Session closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkId'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/ServerError'
   /v1/nodes:
@@ -178,7 +238,9 @@ paths:
       tags: [workflows]
       operationId: createWorkflow
       summary: Create an empty workflow
-      description: A per-session limit applies; exceeding it returns 500.
+      description: >-
+        A per-session limit applies (DAP_MAX_WORKFLOWS, default 100); exceeding it returns
+        409 with code workflow_limit and the cap in limit.
       parameters:
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'
@@ -191,6 +253,34 @@ paths:
       responses:
         '200':
           description: Created workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/workflows/load:
+    post:
+      tags: [workflows]
+      operationId: loadWorkflow
+      summary: Create a workflow from a saved workflow.json
+      description: Reads dir/workflow.json written by POST /v1/workflows/{id}/save.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoadRequest'
+      responses:
+        '200':
+          description: Loaded workflow
           content:
             application/json:
               schema:
@@ -273,7 +363,7 @@ paths:
       tags: [nodes]
       operationId: configureNode
       summary: Apply a settings delta
-      description: Only nodes created through this service are accepted. Settings JSON follows the settings XML structure.
+      description: Only nodes created through this service are accepted. Settings JSON follows the node configSchema; unknown keys are rejected with 400.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
         - $ref: '#/components/parameters/WorkflowNodeId'
@@ -463,7 +553,10 @@ paths:
       tags: [jobs]
       operationId: listJobs
       summary: List jobs in the session
-      description: Newest first; results are omitted.
+      description: >-
+        Newest first; results are omitted. Only the last DAP_MAX_RETAINED_JOBS (default 200)
+        jobs of a session are retained: older terminal jobs are dropped and answer 404.
+        Active jobs are never dropped.
       parameters:
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'
@@ -533,7 +626,10 @@ paths:
       tags: [data]
       operationId: getNodeTable
       summary: Preview an output table
-      description: If the requested port is not a table, the first table port is used silently.
+      description: >-
+        If the requested port is not a table, the first table port is used silently. Before a
+        run the node has no table: 409 not_materialized; when the node failed: 409 node_failed
+        with the node message. Unknown workflow nodes are 404 unknown_node.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
         - $ref: '#/components/parameters/WorkflowNodeId'
@@ -549,11 +645,36 @@ paths:
           schema:
             type: integer
             default: 50
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip after the optional where filter (>= 0).
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: columns
+          in: query
+          required: false
+          description: >-
+            Comma-separated projection of output column names; the response columns and the
+            value order follow it. An unknown name is 400 unknown_column.
+          schema:
+            type: string
+        - name: where
+          in: query
+          required: false
+          description: >-
+            Boolean SQL predicate over the output columns. ;, --, /*, SELECT, FROM, read_,
+            ATTACH, COPY and PRAGMA are rejected with 400 invalid_filter; an unboundable
+            predicate is 400 invalid_filter too.
+          schema:
+            type: string
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'
       responses:
         '200':
-          description: Table preview
+          description: Table preview page
           content:
             application/json:
               schema:
@@ -562,6 +683,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '408':
+          $ref: '#/components/responses/Timeout'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/ServerError'
   /v1/workflows/{workflowId}/nodes/{workflowNodeId}/profile:
@@ -569,7 +694,11 @@ paths:
       tags: [data]
       operationId: getNodeProfile
       summary: Profile the first table output
-      description: Full scan; distinct values up to 100000 per column; numeric min/max/mean where available.
+      description: >-
+        Full scan; distinct values up to 100000 per column; numeric min/max/mean where
+        available. 409 not_materialized before a run, 409 node_failed for a failed node,
+        404 unknown_node for an unknown workflow node, 408 query_timeout after
+        DAP_QUERY_TIMEOUT_SEC.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
         - $ref: '#/components/parameters/WorkflowNodeId'
@@ -586,6 +715,40 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '408':
+          $ref: '#/components/responses/Timeout'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/workflows/{workflowId}/nodes/{workflowNodeId}/estimate:
+    get:
+      tags: [data]
+      operationId: estimateNodePlan
+      summary: Estimated plan cost of a materialized node
+      description: >-
+        Runs EXPLAIN (FORMAT JSON) over the node plan without executing it and returns the
+        estimated row count of the root operator, the operator tree and the raw DuckDB plan.
+        Before a run the node has no plan: 409 estimate_unavailable; a failed node is
+        409 node_failed; an unknown workflow node is 404 unknown_node.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+        - $ref: '#/components/parameters/WorkflowNodeId'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Plan estimate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Estimate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/ServerError'
   /v1/workflows/{workflowId}/nodes/{workflowNodeId}/dialog:
@@ -679,6 +842,262 @@ paths:
                 $ref: '#/components/schemas/Ok'
         '500':
           $ref: '#/components/responses/ServerError'
+  /v1/datasets:
+    post:
+      tags: [datasets]
+      operationId: ingestDataset
+      summary: Ingest a file into the Parquet cache
+      description: |
+        Converts CSV, XLSX, JSON or Parquet once and stores the result as
+        <cache>/<sha256>.parquet, keyed by the file's absolute path, size,
+        modification time and format. An unchanged source returns the existing
+        file with cached=true instead of converting again. The cache directory is
+        DAP_CACHE_DIR, or ~/.dap/cache. CSV uses the csv_reader rules (comma,
+        header row, type inference); Excel uses the first worksheet; JSON uses
+        DuckDB read_json_auto; Parquet is copied through read_parquet.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        '200':
+          description: Cached Parquet dataset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/catalog/datasets:
+    get:
+      tags: [dataset-catalog]
+      operationId: listCatalogDatasets
+      summary: List catalogued datasets
+      description: |
+        Datasets recorded in the persistent catalog (DAP_DATASETS_FILE, else
+        $DAP_HOME/build/datasets.json, else ~/.dap/build/datasets.json), sorted by
+        name. The listing is compact: history and the profile cache are omitted.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Catalog listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetList'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [dataset-catalog]
+      operationId: addCatalogDataset
+      summary: Ingest a source and record it in the catalog
+      description: |
+        Ingests a CSV/XLSX/JSON/Parquet file, or copies an already ingested Parquet
+        dataset passed as dataset, and records it under name. The cached Parquet
+        path, row/column counts and the SHA-256 content hash are stored; the first
+        version is 1. Errors: 400 invalid_dataset_name, invalid_format,
+        dataset_source_not_found, path_not_allowed; 409 dataset_exists.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatasetAddRequest'
+      responses:
+        '200':
+          description: Created catalog entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetEntryDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/catalog/datasets/{name}:
+    get:
+      tags: [dataset-catalog]
+      operationId: getCatalogDataset
+      summary: Show one catalogued dataset
+      description: |
+        The entry with its version history and the cached profile, when one was
+        computed.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Catalog entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetEntryDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [dataset-catalog]
+      operationId: updateCatalogDataset
+      summary: Merge dataset metadata
+      description: |
+        Updates description, tags and owner; omitted fields keep their value. Data
+        fields and the version are untouched.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatasetUpdateRequest'
+      responses:
+        '200':
+          description: Updated catalog entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetEntryDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [dataset-catalog]
+      operationId: removeCatalogDataset
+      summary: Delete a catalogued dataset
+      description: Removes the catalog entry; the cached Parquet file stays on disk.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetRemoveResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/catalog/datasets/{name}/refresh:
+    post:
+      tags: [dataset-catalog]
+      operationId: refreshCatalogDataset
+      summary: Re-ingest the source and bump the version
+      description: |
+        Re-ingests the recorded source, increments version and keeps the previous
+        snapshot in history (the last ten). The profile cache is reused only when
+        the content hash did not change.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      responses:
+        '200':
+          description: Refreshed catalog entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetEntryDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/catalog/datasets/{name}/profile:
+    get:
+      tags: [dataset-catalog]
+      operationId: getCatalogDatasetProfile
+      summary: Profile of a catalogued dataset
+      description: |
+        Returns the stored profile when it was computed for the current content
+        hash, otherwise computes and caches it. cached reports which path was
+        taken; refresh=true forces a recomputation.
+      parameters:
+        - $ref: '#/components/parameters/DatasetName'
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+        - name: refresh
+          in: query
+          required: false
+          description: Recompute the profile instead of serving the cache
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Dataset profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetProfileResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /v1/explore:
+    post:
+      tags: [explore]
+      operationId: exploreDataset
+      summary: Profile a dataset and suggest next steps
+      description: |
+        One call over an ingested dataset: column profile, deterministic quality
+        score with issues, pairwise relationships (Pearson for numeric pairs,
+        Cramer's V for categorical pairs), group differences (ANOVA, or
+        Kruskal-Wallis when a group has fewer than five values), the time span of
+        the first date column, three to five templated hypotheses and concrete
+        recommendations.
+
+        Exactly one source is required: file (converted once through the Parquet
+        cache with the same rules as POST /v1/datasets) or dataset (a path
+        returned by POST /v1/datasets). format applies to file only and defaults
+        to the file extension. sql refines the source with one read-only
+        SELECT/WITH statement; the ingested Parquet file is available as the
+        view src.
+
+        Profile aggregates scan the whole relation. Relationships, group
+        differences and hypotheses read at most sampleRows rows (default 1000,
+        deterministic first rows in scan order) and are capped at 20, 10 and 5
+        entries. Ordering is deterministic: relationships by descending |value|
+        then names, group differences by p-value then names, hypotheses by
+        priority then id.
+      parameters:
+        - $ref: '#/components/parameters/SessionHeader'
+        - $ref: '#/components/parameters/SessionQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExploreRequest'
+      responses:
+        '200':
+          description: Exploration result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
 components:
   parameters:
     SessionHeader:
@@ -702,10 +1121,10 @@ components:
       name: nodeTypeId
       in: path
       required: true
-      description: Java factory class name
+      description: Native node id
       schema:
         type: string
-      example: org.knime.base.node.util.sampledata.SampleDataNodeFactory
+      example: dap.csv_reader
     WorkflowId:
       name: workflowId
       in: path
@@ -731,6 +1150,15 @@ components:
         type: string
         pattern: '^job-[0-9]+$'
       example: job-5
+    DatasetName:
+      name: name
+      in: path
+      required: true
+      description: Dataset name from the catalog
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._-]{1,64}$'
+      example: iris
   responses:
     BadRequest:
       description: Invalid request, settings, session id, or disallowed operation
@@ -740,6 +1168,23 @@ components:
             $ref: '#/components/schemas/Error'
     NotFound:
       description: Unknown or foreign object, or no matching route
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Timeout:
+      description: >-
+        The materialization exceeded DAP_QUERY_TIMEOUT_SEC; the read connection was closed and
+        the engine stays healthy. code is query_timeout.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: >-
+        The request conflicts with the current state: workflow_limit (session workflow cap),
+        not_materialized (node has no table output yet), node_failed (the node failed during
+        the run; error carries its message).
       content:
         application/json:
           schema:
@@ -765,7 +1210,7 @@ components:
           type: string
     Health:
       type: object
-      required: [ok, name, version, api, nodes, coreNodes, workflows, sessions, jobs, memory]
+      required: [ok, name, version, api, generation, extensions, nodes, coreNodes, workflows, sessions, jobs, memory]
       properties:
         ok:
           type: boolean
@@ -775,6 +1220,22 @@ components:
           type: string
         api:
           type: string
+        generation:
+          type: string
+          description: >-
+            Boot id (UUID) of this engine process; it changes on every restart, so clients
+            can tell a lost workflow apart from a plain 404.
+        extensions:
+          type: object
+          required: [installed]
+          properties:
+            installed:
+              type: array
+              description: >-
+                Base names of the DuckDB extensions installed in DAP_DUCKDB_EXTENSION_DIR
+                (for example sqlite_scanner); empty when none are installed.
+              items:
+                type: string
         nodes:
           type: integer
         coreNodes:
@@ -951,7 +1412,7 @@ components:
           type: boolean
         schemaKind:
           type: string
-          enum: [annotations, swing]
+          enum: [annotations]
         precomputed:
           type: boolean
         schema:
@@ -982,11 +1443,6 @@ components:
             empty:
               type: boolean
           additionalProperties: true
-        swing:
-          type: object
-          additionalProperties: true
-        swingError:
-          type: string
         reason:
           type: string
       additionalProperties: true
@@ -1120,10 +1576,15 @@ components:
           type: integer
         error:
           type: string
+        code:
+          type: string
+          description: Machine-readable error code of a failed run (node_failed)
         result:
           oneOf:
             - $ref: '#/components/schemas/RunResult'
             - type: 'null'
+        progress:
+          $ref: '#/components/schemas/JobProgress'
         statusUrl:
           type: string
       additionalProperties: true
@@ -1147,6 +1608,14 @@ components:
           type: string
         job:
           $ref: '#/components/schemas/Job'
+        error:
+          type: string
+          description: Present when the job was already terminal and could not be cancelled
+        code:
+          type: string
+          description: not_cancellable when the job was already terminal
+        hint:
+          type: string
       additionalProperties: true
     TableColumn:
       type: object
@@ -1176,10 +1645,64 @@ components:
               type: [string, 'null']
         preview:
           type: integer
+        offset:
+          type: integer
+          description: Requested row offset after the where filter.
+        nextOffset:
+          type: integer
+          nullable: true
+          description: Offset of the next page; null when this page is the last one.
+        truncated:
+          type: boolean
+          description: Whether more rows follow this page.
         note:
           type: string
         port:
           type: integer
+      additionalProperties: true
+    EstimateOperator:
+      type: object
+      required: [name, rows]
+      properties:
+        name:
+          type: string
+        rows:
+          type: integer
+      additionalProperties: true
+    Estimate:
+      type: object
+      required: [node, rows, operators, plan]
+      properties:
+        node:
+          type: string
+        rows:
+          type: integer
+          description: Estimated rows of the root operator (the first estimated one when the root has none).
+        operators:
+          type: array
+          items:
+            $ref: '#/components/schemas/EstimateOperator'
+        plan:
+          type: object
+          description: Raw DuckDB EXPLAIN (FORMAT JSON) output.
+          additionalProperties: true
+      additionalProperties: true
+    JobProgress:
+      type: object
+      required: [nodesTotal, nodesDone, currentNode, percent]
+      properties:
+        nodesTotal:
+          type: integer
+        nodesDone:
+          type: integer
+        currentNode:
+          type: string
+          nullable: true
+          description: Node that started or just finished; null between levels.
+        percent:
+          type: integer
+          minimum: 0
+          maximum: 100
       additionalProperties: true
     ProfileColumn:
       type: object
@@ -1216,6 +1739,14 @@ components:
       properties:
         dir:
           type: string
+    LoadRequest:
+      type: object
+      required: [dir]
+      properties:
+        dir:
+          type: string
+        name:
+          type: string
     SaveResult:
       type: object
       required: [ok, dir]
@@ -1224,12 +1755,109 @@ components:
           type: boolean
         dir:
           type: string
+    IngestRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          description: Path to a CSV, XLSX, JSON or Parquet file
+        format:
+          type: string
+          enum: [csv, excel, json, parquet]
+          description: Defaults to the file extension (.csv/.xlsx/.json/.parquet)
+        header:
+          type: boolean
+          default: true
+          description: CSV first row is a header
+        delimiter:
+          type: string
+          default: ','
+        quote:
+          type: string
+          default: '"'
+        escape:
+          type: string
+          default: '"'
+        ignoreErrors:
+          type: boolean
+          default: false
+          description: Skip malformed CSV rows
+        nullPadding:
+          type: boolean
+          default: false
+          description: Pad short CSV rows with NULL instead of failing
+        strictMode:
+          type: boolean
+          default: true
+        nullStrings:
+          type: array
+          items:
+            type: string
+          description: CSV values to treat as NULL, e.g. ['NA']
+      additionalProperties: false
+    IngestResult:
+      type: object
+      required: [path, rows, columns, cached]
+      properties:
+        path:
+          type: string
+          description: Absolute path of the cached Parquet file
+        rows:
+          type: integer
+        columns:
+          type: array
+          items:
+            type: object
+            required: [name, type]
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+                description: Arrow type name, e.g. Int64 or Utf8
+        cached:
+          type: boolean
+          description: True when the cache entry already existed and was not rewritten
+      additionalProperties: false
     Ok:
       type: object
       required: [ok]
       properties:
         ok:
           type: boolean
+      additionalProperties: true
+    OkId:
+      type: object
+      required: [ok, id]
+      properties:
+        ok:
+          type: boolean
+        id:
+          type: string
+      additionalProperties: true
+    Session:
+      type: object
+      required: [id, lastAccess, workflows]
+      properties:
+        id:
+          type: string
+        lastAccess:
+          type: integer
+          description: Epoch milliseconds of the last data request of this session
+        workflows:
+          type: integer
+      additionalProperties: true
+    SessionList:
+      type: object
+      required: [count, sessions]
+      properties:
+        count:
+          type: integer
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
       additionalProperties: true
     OkNode:
       type: object
@@ -1255,13 +1883,410 @@ components:
       additionalProperties: true
     Error:
       type: object
-      required: [error]
+      required: [error, code]
       properties:
         error:
           type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: >-
+            Machine-readable error code. Defaults from the status when the error has no
+            specific one: bad_request (400), not_found (404), conflict (409), server_error (500).
+        hint:
+          type: string
+          description: Actionable suggestion for fixing the request; omitted when there is none
         ports:
           type: array
           items:
             type: object
             additionalProperties: true
+      additionalProperties: true
+    DatasetAddRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          pattern: '^[A-Za-z0-9._-]{1,64}$'
+        file:
+          type: string
+          description: Source path; exactly one of file and dataset is required
+        dataset:
+          type: string
+          description: Already ingested Parquet path; implies format parquet
+        format:
+          type: string
+          enum: [csv, excel, json, parquet]
+          description: Defaults to the file extension; dataset input is always parquet
+        description:
+          type: string
+        owner:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    DatasetUpdateRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        owner:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    DatasetEntry:
+      type: object
+      required: [name, tags, source, format, path, rows, columns, version, contentHash, createdAt, updatedAt]
+      properties:
+        name:
+          type: string
+          pattern: '^[A-Za-z0-9._-]{1,64}$'
+        description:
+          type: [string, 'null']
+        owner:
+          type: [string, 'null']
+        tags:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+          description: Absolute path of the ingested source
+        format:
+          type: string
+          enum: [csv, excel, json, parquet]
+        path:
+          type: string
+          description: Absolute path of the cached Parquet file
+        rows:
+          type: integer
+        columns:
+          type: integer
+          description: Column count; the per-column schema lives in the profile
+        version:
+          type: integer
+          description: Starts at 1 and grows on every refresh
+        contentHash:
+          type: string
+          description: SHA-256 of the cached Parquet bytes; keys the profile cache
+        createdAt:
+          type: string
+          description: ISO-8601 instant
+        updatedAt:
+          type: string
+          description: ISO-8601 instant
+      additionalProperties: true
+    DatasetVersion:
+      type: object
+      required: [version, contentHash, rows, columns, path, updatedAt]
+      properties:
+        version:
+          type: integer
+        contentHash:
+          type: string
+        rows:
+          type: integer
+        columns:
+          type: integer
+        path:
+          type: string
+        updatedAt:
+          type: string
+      additionalProperties: false
+    DatasetEntryDetail:
+      allOf:
+        - $ref: '#/components/schemas/DatasetEntry'
+        - type: object
+          properties:
+            history:
+              type: array
+              description: Superseded versions, oldest first, at most ten
+              items:
+                $ref: '#/components/schemas/DatasetVersion'
+            profile:
+              $ref: '#/components/schemas/DatasetProfile'
+    DatasetList:
+      type: object
+      required: [count, datasets]
+      properties:
+        count:
+          type: integer
+        datasets:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatasetEntry'
+      additionalProperties: false
+    DatasetProfile:
+      type: object
+      required: [contentHash, rows, computedAt, columns]
+      properties:
+        contentHash:
+          type: string
+        rows:
+          type: integer
+        computedAt:
+          type: string
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatasetProfileColumn'
+      additionalProperties: false
+    DatasetProfileColumn:
+      type: object
+      required: [name, type, missing, distinct]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: Arrow type name, e.g. Int64 or Utf8
+        missing:
+          type: integer
+        distinct:
+          type: integer
+        min:
+          type: number
+          description: Numeric columns only
+        max:
+          type: number
+          description: Numeric columns only
+        mean:
+          type: number
+          description: Numeric columns only
+      additionalProperties: false
+    DatasetProfileResult:
+      type: object
+      required: [name, version, contentHash, rows, cached, computedAt, columns]
+      properties:
+        name:
+          type: string
+        version:
+          type: integer
+        contentHash:
+          type: string
+        rows:
+          type: integer
+        cached:
+          type: boolean
+          description: True when the stored profile was served without recomputation
+        computedAt:
+          type: string
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatasetProfileColumn'
+      additionalProperties: false
+    DatasetRemoveResult:
+      type: object
+      required: [ok, name]
+      properties:
+        ok:
+          type: boolean
+        name:
+          type: string
+      additionalProperties: false
+
+    ExploreRequest:
+      type: object
+      description: Exactly one of file or dataset is required.
+      properties:
+        file:
+          type: string
+          description: Path to a CSV, XLSX, JSON or Parquet file, ingested first
+        dataset:
+          type: string
+          description: Path of an already ingested Parquet file (POST /v1/datasets)
+        format:
+          type: string
+          enum: [csv, excel, xlsx, json, parquet]
+          description: Source format for file; defaults to the extension; rejected with dataset
+        sql:
+          type: string
+          description: >-
+            One read-only SELECT or WITH statement refining the source; the ingested
+            Parquet file is available as the view src.
+        maxColumns:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+          description: Number of leading columns to profile
+        sampleRows:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          default: 1000
+          description: Rows read for relationships, group differences and hypotheses
+      additionalProperties: false
+    ExploreColumn:
+      type: object
+      required: [name, type, missing, distinct]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: Arrow type name, e.g. Float64 or Utf8
+        missing:
+          type: integer
+        distinct:
+          type: integer
+        min:
+          type: number
+        max:
+          type: number
+        mean:
+          type: number
+        stddev:
+          type: number
+          description: Sample standard deviation
+        zeros:
+          type: integer
+        negatives:
+          type: integer
+        outliers:
+          type: integer
+          description: Rows outside the 1.5x IQR fences
+      additionalProperties: true
+    ExploreIssue:
+      type: object
+      required: [severity, kind, detail]
+      properties:
+        severity:
+          type: string
+          enum: [high, medium, low]
+        kind:
+          type: string
+          description: >-
+            missing, empty, constant, duplicate_rows, high_cardinality, outliers or
+            mixed_type
+        column:
+          type: string
+        count:
+          type: integer
+        detail:
+          type: string
+      additionalProperties: true
+    ExploreQuality:
+      type: object
+      required: [score, issues]
+      properties:
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreIssue'
+    ExploreRelationship:
+      type: object
+      required: [left, right, method, value, n, strength]
+      properties:
+        left:
+          type: string
+        right:
+          type: string
+        method:
+          type: string
+          enum: [pearson, cramers_v]
+        value:
+          type: number
+        p_value:
+          type: number
+          description: May be 0.0 when the true p-value underflows a double
+        n:
+          type: integer
+        strength:
+          type: string
+          enum: [very strong, strong, moderate, weak, very weak]
+    ExploreGroupDifference:
+      type: object
+      required: [value, group, test, statistic, p_value]
+      properties:
+        value:
+          type: string
+        group:
+          type: string
+        test:
+          type: string
+          enum: [anova, kruskal]
+        statistic:
+          type: number
+        p_value:
+          type: number
+          description: May be 0.0 when the true p-value underflows a double
+        effect_size:
+          type: number
+          description: Eta squared for anova, epsilon squared for kruskal
+    ExploreTime:
+      type: object
+      required: [column, granularity, from, to]
+      properties:
+        column:
+          type: string
+        granularity:
+          type: string
+          enum: [day, week, month, year]
+        from:
+          type: string
+        to:
+          type: string
+    ExploreHypothesis:
+      type: object
+      required: [id, question, test, columns, rationale, priority]
+      properties:
+        id:
+          type: string
+        question:
+          type: string
+        test:
+          type: string
+        columns:
+          type: array
+          items:
+            type: string
+        rationale:
+          type: string
+        priority:
+          type: string
+          enum: [high, medium, low]
+    ExploreResult:
+      type: object
+      required: [source, rows, columns, quality, relationships, group_differences, hypotheses, recommendations]
+      properties:
+        source:
+          type: string
+        rows:
+          type: integer
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreColumn'
+        quality:
+          $ref: '#/components/schemas/ExploreQuality'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreRelationship'
+        group_differences:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreGroupDifference'
+        time:
+          $ref: '#/components/schemas/ExploreTime'
+        hypotheses:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreHypothesis'
+        recommendations:
+          type: array
+          items:
+            type: string
       additionalProperties: true

@@ -6,7 +6,7 @@ stdio-сервер [Model Context Protocol](https://modelcontextprotocol.io) н�
 
 - Python 3.10+, только стандартная библиотека (без pip-зависимостей).
 - JSON-RPC 2.0, по одному объекту на строку: запросы в stdin, ответы в stdout.
-- Инструменты — только `dap_*` (19 штук). Ошибки движка приходят как JSON-RPC `error`.
+- Инструменты — только `dap_*` (33 штуки). Ошибки движка приходят как JSON-RPC `error`.
 
 ## Быстрый старт
 
@@ -22,10 +22,11 @@ DAP_SESSION=claude python3 adapters/mcp/dap_mcp.py
 
 | Переменная | По умолчанию | Назначение |
 |---|---|---|
-| `DAP_HOME` | `~/Projects/dap` | корень репозитория DAP: здесь ищутся `scripts/run.sh` и пишется `service.log` |
+| `DAP_HOME` | `~/Projects/dap` | корень репозитория: здесь `engine-native/target/dap-native.jar` и `service.log` |
 | `DAP_PORT` | `7800` | порт движка |
 | `DAP_SESSION` | `default` | сессия агента, уходит заголовком `X-DAP-Session` в каждом запросе |
 | `DAP_BIND` | `127.0.0.1` | адрес движка; `0.0.0.0` и `::` для запросов заменяются на `127.0.0.1` |
+| `DAP_HEAP` | `2g` | `-Xmx` для jar |
 
 Базовый URL: `http://$DAP_BIND:$DAP_PORT`. Таймаут HTTP-запроса — 600 с.
 
@@ -34,12 +35,72 @@ DAP_SESSION=claude python3 adapters/mcp/dap_mcp.py
 При первом `tools/call` адаптер проверяет `GET /v1/health`:
 
 1. движок отвечает `200` — работаем с ним;
-2. не отвечает — запускает `bash "$DAP_HOME/scripts/run.sh"` (stdout и stderr — в
-   `$DAP_HOME/service.log`) и ждёт health до 60 с.
+2. не отвечает — запускает `java -Xmx$DAP_HEAP -jar
+   engine-native/target/dap-native.jar` (stdout и stderr — в `$DAP_HOME/service.log`)
+   и ждёт health до 60 с.
 
-Уже запущенный сервис адаптер не перезапускает и не останавливает: при выходе
-движок продолжает работать. Если `run.sh` не найден или сервис не поднялся за
-60 с, инструмент вернёт JSON-RPC error `-32001` с путём к логу.
+Уже запущенный сервис адаптер не перезапускает и не останавливает: после успешного
+запуска он не следит за движком и при выходе оставляет его работать. Но собственный
+запуск контролируется: пока ждём health, адаптер опрашивает дочерний процесс. Если
+тот умер (например, `JAVA_HOME` указывает не туда или jar падает на старте),
+инструмент сразу вернёт `-32001` с кодом выхода и хвостом `$DAP_HOME/service.log`.
+Если health не наступил за 60 с, адаптер гасит дочерний процесс (SIGTERM, затем
+SIGKILL) и тоже отдаёт хвост лога. Сервис, который уже работал до адаптера, при
+этом не затрагивается.
+
+## Движок
+
+```bash
+# один раз: собрать jar (нужен JDK 21)
+cd engine-native && ./mvnw -DskipTests package && cd ..
+
+# адаптер сам запустит jar при первом tools/call
+DAP_PORT=7923 DAP_SESSION=claude python3 adapters/mcp/dap_mcp.py
+```
+
+Java ищется в `$JAVA_HOME/bin/java`, иначе в `PATH`; jar — всегда
+`$DAP_HOME/engine-native/target/dap-native.jar`. Если jar нет, первый вызов вернёт
+`-32001` с командой сборки.
+
+Что важно для агента:
+
+- каталог — 33 узла с id `dap.*`, у каждого `configSchema` с `configKey`;
+- настройки — плоский JSON по `configKey` из `dap_node_dialog_schema`, без XML;
+- `/v1` — единственный контракт: legacy-алиасы без `/v1` не зарегистрированы;
+- sync `dap_run` не блокирует HTTP-диспетчер (виртуальный поток), но
+  `dap_run_async` + `dap_job_status` предпочтительны для долгих workflow;
+- файловые ридеры читают путь, доступный процессу jar (loopback, без auth).
+
+### Сквозная проверка (e2e)
+
+`tests/mcp_e2e.py` — stdlib-клиент MCP: поднимает адаптер на свободном
+порту, ждёт health, проходит `dap_workflow_create` → `dap_add_node` (csv_reader, sorter)
+→ `dap_connect` → `dap_run` → `dap_get_table` → `dap_delete_workflow`, проверяет
+отсортированные значения и гасит сервис через `POST /v1/shutdown`.
+
+```bash
+cd engine-native && ./mvnw -o -DskipTests package && cd ..
+python3 tests/mcp_e2e.py                  # порт 7923, общий лимит 120 с
+python3 tests/mcp_e2e.py --port 7924      # другой порт
+```
+
+Docker не нужен. Код возврата 0 — успех, 1 — провал с
+сообщением; stderr адаптера печатается при ошибке. В `finally` e2e всегда пытается
+погасить движок: `POST /v1/shutdown`, а если endpoint не отвечает — SIGTERM/SIGKILL
+процессу, который адаптер объявил в stderr строкой `dap-mcp: native engine pid=N`.
+Сервис, работавший до старта адаптера, e2e не трогает.
+
+### Юнит-тесты запуска (без jar и JVM)
+
+`tests/test_mcp_launch.py` проверяет жизненный цикл дочернего процесса на
+monkeypatch-заглушках: отсутствие jar (`-32001` с подсказкой сборки), мгновенный
+выход java (быстрый отказ, хвост лога, процесс убран), таймаут health (SIGTERM),
+команда запуска с `-Xmx2g` и отсутствие jar. Запуск — доли секунды, сеть и Java не нужны:
+
+```bash
+python3 -m unittest tests.test_mcp_launch -v
+# или: python3 tests/test_mcp_launch.py -v
+```
 
 ## Подключение к агенту
 
@@ -95,9 +156,23 @@ printf '%s\n' \
 | `dap_job_status` | состояние задания, для завершённого — `result` | `job` |
 | `dap_job_cancel` | отменить активное задание | `job` |
 | `dap_list_jobs` | задания сессии, новые сверху | — |
-| `dap_get_table` | колонки, число строк, первые N строк | `workflow`, `node`, `port` (0), `limit` (20) |
+| `dap_get_table` | колонки, число строк и строки; пагинация, проекция, фильтр, компактные форматы | `workflow`, `node`, `port` (0), `limit` (20), `offset`?, `columns`?, `where`?, `format`? (json/objects/csv/markdown), `maxCellChars`? (200), `includeColumns`? (true) |
 | `dap_profile_table` | профиль: пропуски, уникальные, min/max/mean | `workflow`, `node` |
-| `dap_save_workflow` | сохранить workflow на диск | `workflow`, `dir` |
+| `dap_ingest` | один раз конвертировать CSV/Excel/JSON/Parquet в Parquet-кэш | `file`, `format`? |
+| `dap_dataset` | каталог датасетов: list/add/show/refresh/remove | `action` (list), `name`?, `file`?/`dataset`?, `format`?, `description`?, `tags`?, `owner`? |
+| `dap_explore` | один вызов: профиль, качество, связи, гипотезы (`POST /v1/explore`) | `file`?/`dataset`?, `format`?, `sql`?, `maxColumns`?, `sampleRows`? |
+| `dap_estimate` | один вызов: rows/operators/plan до запуска (`/estimate`) | `file`?/`dataset`?, `format`?, `sql`?, `limit`? |
+| `dap_analyze` | один вызов: файл/датасет → таблица + профиль, опционально SQL по `src` | `file`?/`dataset`?, `format`?, `sql`?, `profile` (true), `limit` (20), `timeoutSec`? |
+| `dap_report` | один вызов: файл/датасет → таблицы + отчёт md/html/pdf/pptx + график | `file`?/`dataset`?, `format`? (md/html/pdf/pptx), `sql`?/`queries`[]?, `report`, `chart`?, `chartType`? (bar), `x`?, `y`[]?, `title`?, `profile` (true), `limit` (20), `timeoutSec`? |
+| `dap_profile` | один вызов: компактный профиль файла/датасета без таблицы | `file`?/`dataset`?, `format`?, `limit` (10), `timeoutSec`? |
+| `dap_workflow_build` | один вызов: узлы + связи + запуск + таблицы выходов | `nodes`, `edges`?, `run` (false), `outputs`?, `limit` (20), `timeoutSec`? |
+| `dap_sql` | read-only SQL по таблице узла или по входу `src`; батч `queries`[] и `explain` | `workflow`, `sql`?/`queries`[]?, `node`?, `explain`? (false), `limit` |
+| `dap_recipe_list` | рецепты библиотеки | — |
+| `dap_recipe_save` | сохранить workflow как рецепт | `name`, `workflow` |
+| `dap_recipe_run` | запустить рецепт с датасетом и параметрами | `name`, `dataset`?, `params`?, `limit` (20) |
+| `dap_save_workflow` | сохранить workflow в каталог (`workflow.json`) | `workflow`, `dir` |
+| `dap_load_workflow` | создать workflow из сохранённого каталога | `dir`, `name`? |
+| `dap_shutdown` | остановить движок; следующий вызов поднимет его заново | — |
 
 `settings` — плоский объект по `configKey` из `dap_node_dialog_schema`, например
 `{"dataset": "IRIS"}`.
@@ -126,6 +201,12 @@ printf '%s\n' \
   вернётся JSON-RPC error (движок отвечает `409`).
 - В движке одновременно исполняется одно задание (worker-поток), остальные ждут в
   `queued`; активных заданий не больше 8.
+- Если клиент прислал в `tools/call` `params._meta.progressToken`, `dap_run` сам
+  уходит в async (`{"async":true}`), опрашивает `GET /v1/jobs/{id}` и пишет
+  `notifications/progress` из `job.progress` до финального ответа; без токена
+  поведение прежнее (синхронный `POST /run`). `dap_analyze`, `dap_report`,
+  `dap_profile`, `dap_estimate` и `dap_explore` сообщают стадии
+  `ingest`/`run`/`table`/`profile`.
 
 ## Ошибки
 
@@ -134,8 +215,14 @@ printf '%s\n' \
 ```json
 {"jsonrpc":"2.0","id":77,
  "error":{"code":-32000,"message":"unknown node no.such.NodeFactory",
-          "data":{"status":404,"body":{"error":"unknown node no.such.NodeFactory"}}}}
+          "data":{"status":404,"code":"unknown_node","body":{"error":"unknown node no.such.NodeFactory"}}}}
 ```
+
+`data.code` и `data.hint` (если движок их прислал) лежат на верхнем уровне
+`data`, а исходное тело ответа — в `data.body` для совместимости.
+
+Если `generation` из `/v1/health` изменилась (движок перезапустился), к
+следующей ошибке добавляется префикс `engine restarted; workflows lost: `.
 
 | Код | Когда |
 |---|---|
@@ -145,7 +232,7 @@ printf '%s\n' \
 | `-32602` | неизвестный инструмент или нет обязательного аргумента |
 | `-32603` | внутренняя ошибка адаптера |
 | `-32000` | движок вернул ошибку (`data.status`, `data.body`) |
-| `-32001` | движок недоступен или не поднялся за 60 с (`data.log`) |
+| `-32001` | движок недоступен, умер при запуске или не поднялся за 60 с; дочерний процесс погашен (`data.log`, `data.tail`) |
 
 ## Пример: IRIS от узла до таблицы
 
@@ -155,8 +242,8 @@ printf '%s\n' \
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"dap_workflow_create","arguments":{"name":"iris"}}}
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dap_add_node","arguments":{
   "workflow":"wf-1",
-  "factory":"org.knime.base.node.io.filehandling.csv.sample.ReadDatasetNodeFactory",
-  "settings":{"dataset":"IRIS"}}}}
+  "factory":"dap.csv_reader",
+  "settings":{"file":"/data/iris.csv","header":true}}}}
 {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"dap_run","arguments":{"workflow":"wf-1"}}}
 {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"dap_get_table","arguments":{
   "workflow":"wf-1","node":"0:1","limit":5}}}
@@ -166,9 +253,9 @@ printf '%s\n' \
 
 ```json
 {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"{\"id\": \"wf-1\", \"name\": \"iris\", \"session\": \"claude\"}"}]}}
-{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"{\"node\": \"0:1\", \"name\": \"Example Data Reader\"}"}]}}
-{"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"{\"ok\": true, \"durationMs\": 136, \"workflow\": \"wf-1\", \"nodes\": [{\"node\": \"0:1\", \"name\": \"Example Data Reader\", \"state\": \"EXECUTED\"}]}"}]}}
-{"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"{\"rows\": 150, \"columns\": [{\"index\": 0, \"name\": \"sepal_length\", \"type\": \"Number (double)\"}, ...], \"data\": [[5.1, 3.5, 1.4, 0.2, \"Iris-setosa\"], ...], \"preview\": 5}"}]}}
+{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"{\"node\": \"0:1\", \"name\": \"CSV Reader\"}"}]}}
+{"jsonrpc":"2.0","id":4,"result":{"content":[{"type":"text","text":"{\"ok\": true, \"durationMs\": 136, \"workflow\": \"wf-1\", \"nodes\": [{\"node\": \"0:1\", \"name\": \"CSV Reader\", \"state\": \"EXECUTED\"}]}"}]}}
+{"jsonrpc":"2.0","id":5,"result":{"content":[{"type":"text","text":"{\"rows\": 150, \"columns\": [{\"index\": 0, \"name\": \"sepal_length\", \"type\": \"Number (Float)\"}, ...], \"data\": [[\"5.1\", \"3.5\", \"1.4\", \"0.2\", \"setosa\"], ...], \"preview\": 5}"}]}}
 ```
 
 Асинхронный вариант:
@@ -195,5 +282,7 @@ printf '%s\n' \
   (`DAP_SESSION`); для второй сессии запускается второй процесс.
 - HTTP-таймаут 600 с; долгие workflow надёжнее гонять через `dap_run_async`.
 - Только stdlib: адаптер ставится копированием файла, без venv и pip.
-- Адаптер не управляет жизненным циклом сервиса: не перезапускает и не
-  останавливает уже работающий движок.
+- Адаптер не перезапускает уже работающий движок и не следит за успешно запущенным
+  после старта. Остановить его можно явно — `dap_shutdown` (или `POST /v1/shutdown`).
+  Собственный дочерний процесс гасится только при ошибке запуска (выход java или
+  таймаут health).

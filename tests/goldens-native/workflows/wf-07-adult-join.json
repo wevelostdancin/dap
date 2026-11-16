@@ -1,0 +1,102 @@
+{
+  "id": "wf-07-adult-join",
+  "title": "Adult census: per-education mean hours joined back to every row",
+  "rationale": "Converging two-branch DAG (source fans out, aggregate joins back); exercises Joiner and branch parallelism.",
+  "kind": "baseline",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "table_source",
+      "config": {
+        "dataset": "ADULT"
+      }
+    },
+    {
+      "id": "agg",
+      "type": "group_by",
+      "config": {
+        "keys": [
+          "education"
+        ],
+        "aggregations": [
+          {
+            "column": "hours-per-week",
+            "fn": "mean"
+          }
+        ]
+      }
+    },
+    {
+      "id": "join",
+      "type": "joiner",
+      "config": {
+        "how": "inner",
+        "left_keys": [
+          "education"
+        ],
+        "right_keys": [
+          "education"
+        ],
+        "merge_keys": true
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "education",
+            "direction": "asc"
+          },
+          {
+            "column": "age",
+            "direction": "asc"
+          },
+          {
+            "column": "fnlwgt",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "agg"
+    },
+    {
+      "from": "src",
+      "to": "join",
+      "toPort": 0
+    },
+    {
+      "from": "agg",
+      "to": "join",
+      "toPort": 1
+    },
+    {
+      "from": "join",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "agg",
+      "kind": "table",
+      "limit": 20,
+      "order": "unordered"
+    },
+    {
+      "node": "join",
+      "kind": "profile"
+    },
+    {
+      "node": "sort",
+      "kind": "table",
+      "limit": 20,
+      "order": "ordered"
+    }
+  ]
+}

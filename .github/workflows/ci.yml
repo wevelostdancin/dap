@@ -2,9 +2,12 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, phase3-native]
   pull_request:
   workflow_dispatch:
+  schedule:
+    # Nightly soak: 200 daily loops on the built engine.
+    - cron: "0 3 * * *"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,86 +17,60 @@ permissions:
   contents: read
 
 jobs:
-  static:
-    name: static checks
+  soak:
+    name: nightly soak
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install validation deps
-        run: |
-          python -m pip install --disable-pip-version-check pyyaml
-          sudo apt-get update
-          sudo apt-get install -y shellcheck zstd
-      - name: Repository checks
-        run: python scripts/check_repo.py
-      - name: Python syntax
-        run: |
-          python -m py_compile adapters/mcp/dap_mcp.py tests/run_all.py tests/dap_client.py tests/golden/*.py tests/contract/*.py
-      - name: Shell syntax
-        run: |
-          for f in scripts/*.sh; do bash -n "$f"; done
-
-  engine:
-    name: engine + golden tests + image
-    needs: static
-    # Два режима:
-    #  - vars.DAP_RUNTIME_URL задан: рантайм скачивается из release-ассета;
-    #  - vars.DAP_ENGINE_RUNNER задан: self-hosted runner уже имеет runtime/knime.
-    if: ${{ vars.DAP_RUNTIME_URL != '' || vars.DAP_ENGINE_RUNNER != '' }}
-    runs-on: ${{ vars.DAP_ENGINE_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        if: vars.DAP_ENGINE_RUNNER == ''
         with:
           distribution: temurin
           java-version: "21"
-      - name: Fetch vendored runtime
-        if: vars.DAP_RUNTIME_URL != ''
-        env:
-          DAP_RUNTIME_URL: ${{ vars.DAP_RUNTIME_URL }}
-          DAP_RUNTIME_SHA256: ${{ vars.DAP_RUNTIME_SHA256 }}
-        run: ./scripts/fetch-runtime.sh
-      - name: Build engine
-        run: DAP_JDK="$JAVA_HOME" make build-engine
-      - name: Build catalog and schemas
-        run: DAP_JDK="$JAVA_HOME" make build-catalog
-      - name: Golden and contract tests
-        run: DAP_JDK="$JAVA_HOME" make test
-      - name: Upload catalog
-        uses: actions/upload-artifact@v4
+      - name: Soak (200 x create/run/table/delete)
+        run: make soak
+
+  native:
+    name: native engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          name: dap-catalog
-          path: catalog/
-          retention-days: 14
-      - name: Upload engine jar
-        uses: actions/upload-artifact@v4
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@v5
         with:
-          name: dap-engine-jar
-          path: build/com.dap.engine_1.0.0.jar
-          retention-days: 14
-      - name: Build single-arch image
-        run: ./scripts/package-oci.sh --single-arch
-      - name: Run image and check health
+          python-version: "3.12"
+      - name: Unit tests
+        run: cd engine-native && ./mvnw -B test
+      - name: Package
+        run: cd engine-native && ./mvnw -B -DskipTests package
+      - name: Static checks
         run: |
-          docker rm -f dap-ci >/dev/null 2>&1 || true
-          docker run -d --name dap-ci -p 7800:7800 dap:1.0.0
-          for _ in $(seq 1 60); do
-            status="$(docker inspect -f '{{.State.Health.Status}}' dap-ci 2>/dev/null || echo none)"
-            [ "$status" = healthy ] && break
-            sleep 2
+          python3 -m pip install --disable-pip-version-check pyyaml
+          python3 scripts/check_repo.py
+      - name: Golden structure
+        run: python3 tests/goldens-native/runner.py --validate
+      - name: Golden suite
+        run: python3 tests/run_goldens.py
+      - name: DuckDB extensions
+        run: make extensions
+      - name: Coverage suite
+        run: make coverage
+      - name: MCP launch tests
+        run: python3 tests/test_mcp_launch.py
+      - name: MCP end-to-end
+        run: python3 tests/mcp_e2e.py
+      - name: Black-box smoke
+        run: |
+          java -Ddap.port=7861 -jar engine-native/target/dap-native.jar >/tmp/dap-native.log 2>&1 &
+          native_pid=$!
+          trap 'kill $native_pid 2>/dev/null || true' EXIT
+          for _ in $(seq 1 100); do
+            if curl -fsS -m 1 http://127.0.0.1:7861/v1/health >/dev/null 2>&1; then break; fi
+            sleep 0.1
           done
-          curl -fsS http://127.0.0.1:7800/v1/health
-          docker rm -f dap-ci
-      - name: Save image
-        run: docker save dap:1.0.0 | gzip -1 > build/dap-ci-amd64.tar.gz
-      - name: Upload image
-        uses: actions/upload-artifact@v4
-        with:
-          name: dap-image-amd64
-          path: build/dap-ci-amd64.tar.gz
-          retention-days: 7
+          python3 tests/native_smoke.py --base http://127.0.0.1:7861

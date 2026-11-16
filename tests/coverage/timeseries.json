@@ -1,0 +1,462 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "F1",
+      "title": "Resample a timestamp column into buckets",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-resample",
+        "nodes": [
+          {
+            "id": "dr",
+            "type": "date_range",
+            "config": {
+              "start": "2026-01-01",
+              "end": "2026-01-03",
+              "step": "12 hours"
+            }
+          },
+          {
+            "id": "r",
+            "type": "resample",
+            "config": {
+              "timeColumn": "date",
+              "every": "1 day",
+              "aggregations": [
+                {
+                  "column": "date",
+                  "fn": "count",
+                  "output": "n"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "dr",
+            "to": "r"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "r",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "date",
+              "type": "Date&Time (Timestamp)"
+            },
+            {
+              "name": "n",
+              "type": "Number (Integer)"
+            }
+          ],
+          "data": [
+            [
+              "2026-01-01T00:00",
+              2
+            ],
+            [
+              "2026-01-02T00:00",
+              2
+            ],
+            [
+              "2026-01-03T00:00",
+              1
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    },
+    {
+      "task": "F2",
+      "title": "Rolling window aggregate",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-rolling",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "r",
+            "type": "rolling",
+            "config": {
+              "column": "score",
+              "output": "score_ma",
+              "window": 2,
+              "fn": "mean",
+              "orderBy": [
+                {
+                  "column": "id",
+                  "direction": "asc"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "r"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "r",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "score_ma",
+              "type": "Number (Float)"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1,
+              "A",
+              1
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B",
+              1.5
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A",
+              2.5
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A",
+              3
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C",
+              3.5
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B",
+              4.5
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    },
+    {
+      "task": "F3",
+      "title": "Difference against the previous row",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-diff",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "d",
+            "type": "diff",
+            "config": {
+              "column": "score",
+              "output": "score_delta",
+              "orderBy": [
+                {
+                  "column": "id",
+                  "direction": "asc"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "d"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "d",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "score_delta",
+              "type": "Number (Float)"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1,
+              "A",
+              null
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B",
+              1
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A",
+              1
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A",
+              0
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C",
+              1
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B",
+              1
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    },
+    {
+      "task": "F4",
+      "title": "Generate a date range",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-date-range",
+        "nodes": [
+          {
+            "id": "dr",
+            "type": "date_range",
+            "config": {
+              "start": "2026-01-01",
+              "end": "2026-01-03",
+              "step": "1 day"
+            }
+          }
+        ],
+        "edges": []
+      },
+      "checks": [
+        {
+          "node": "dr",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "date",
+              "type": "Date&Time (Timestamp)"
+            }
+          ],
+          "data": [
+            [
+              "2026-01-01T00:00"
+            ],
+            [
+              "2026-01-02T00:00"
+            ],
+            [
+              "2026-01-03T00:00"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    },
+    {
+      "task": "F5",
+      "title": "Extract and format parts of a timestamp",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-date-time",
+        "nodes": [
+          {
+            "id": "dr",
+            "type": "date_range",
+            "config": {
+              "start": "2026-01-01",
+              "end": "2026-01-03",
+              "step": "1 day"
+            }
+          },
+          {
+            "id": "ex",
+            "type": "date_time",
+            "config": {
+              "column": "date",
+              "output": "month",
+              "op": "extract",
+              "unit": "month"
+            }
+          },
+          {
+            "id": "fm",
+            "type": "date_time",
+            "config": {
+              "column": "date",
+              "output": "date_str",
+              "op": "format",
+              "format": "%Y/%m/%d"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "dr",
+            "to": "ex"
+          },
+          {
+            "from": "dr",
+            "to": "fm"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "ex",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "date",
+              "type": "Date&Time (Timestamp)"
+            },
+            {
+              "name": "month",
+              "type": "Number (Integer)"
+            }
+          ],
+          "data": [
+            [
+              "2026-01-01T00:00",
+              1
+            ],
+            [
+              "2026-01-02T00:00",
+              1
+            ],
+            [
+              "2026-01-03T00:00",
+              1
+            ]
+          ],
+          "order": "ordered"
+        },
+        {
+          "node": "fm",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "date",
+              "type": "Date&Time (Timestamp)"
+            },
+            {
+              "name": "date_str",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              "2026-01-01T00:00",
+              "2026/01/01"
+            ],
+            [
+              "2026-01-02T00:00",
+              "2026/01/02"
+            ],
+            [
+              "2026-01-03T00:00",
+              "2026/01/03"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    }
+  ]
+}

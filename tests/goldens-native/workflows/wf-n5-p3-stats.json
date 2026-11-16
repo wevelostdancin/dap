@@ -1,0 +1,61 @@
+{
+  "id": "wf-n5-p3-stats",
+  "title": "P3: value counts over the tiny fixture",
+  "rationale": "Pins the statistics wave end to end on a deterministic fixture.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "vc",
+      "type": "value_counts",
+      "config": {
+        "column": "category"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "vc"
+    }
+  ],
+  "checks": [
+    {
+      "node": "vc",
+      "kind": "expect",
+      "rows": 3,
+      "columns": [
+        {
+          "name": "value",
+          "type": "String"
+        },
+        {
+          "name": "count",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          "A",
+          3
+        ],
+        [
+          "B",
+          2
+        ],
+        [
+          "C",
+          1
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "p2.csv: A=3, B=2, C=1; counts are deterministic."
+}

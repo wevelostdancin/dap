@@ -1,0 +1,99 @@
+{
+  "id": "dap.csv_reader",
+  "name": "CSV Reader",
+  "category": "/IO/Read",
+  "type": "Source",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Reads a delimited text file into a data table. Column names and types can be set explicitly or inferred from the header row. Gzip-compressed files are detected by magic bytes and decompressed transparently; zstd is out of scope. A quoted empty string in a typed (numeric or date) column fails with a hint: set emptyStringIsNull=true or type the column as Utf8.",
+  "inPorts": [],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "CSV Reader configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Input file",
+        "description": "Absolute path to the CSV file to read.",
+        "placeholder": "/data/input.csv"
+      },
+      "delimiter": {
+        "type": "string",
+        "title": "Delimiter",
+        "description": "Field separator used by the file; a comma by default.",
+        "default": ","
+      },
+      "compression": {
+        "type": "string",
+        "title": "Compression",
+        "description": "auto detects gzip by the file magic bytes; none forces plain text; gzip always decompresses. zstd is not supported.",
+        "enum": [
+          "auto",
+          "none",
+          "gzip"
+        ],
+        "default": "auto"
+      },
+      "header": {
+        "type": "boolean",
+        "title": "Header row",
+        "description": "Whether the first row contains column names.",
+        "default": true
+      },
+      "columns": {
+        "type": "array",
+        "title": "Column schema",
+        "description": "Optional explicit column names and Arrow types; when omitted the header and type inference define the schema.",
+        "items": {
+          "type": "object",
+          "title": "Column",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Name",
+              "description": "Column name in the output table."
+            },
+            "type": {
+              "type": "string",
+              "title": "Type",
+              "description": "Arrow data type of the column.",
+              "enum": [
+                "Int64",
+                "Float64",
+                "Utf8",
+                "Boolean",
+                "Date32",
+                "Time64",
+                "Timestamp",
+                "Decimal128"
+              ]
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      "emptyStringIsNull": {
+        "type": "boolean",
+        "title": "Empty string is null",
+        "description": "Unquoted empty fields are always NULL; set this to also treat quoted empty strings (\"\" ) as NULL. Without it a quoted empty string in a typed column is a parse error with a hint to set this flag.",
+        "default": false
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}

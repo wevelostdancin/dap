@@ -1,0 +1,47 @@
+{
+  "id": "dap.json_writer",
+  "name": "JSON Writer",
+  "category": "/IO/Write",
+  "type": "Sink",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Writes the input table as a JSON array or newline-delimited JSON. The input table is passed through unchanged.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "JSON Writer configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Output file",
+        "description": "Absolute path of the JSON file to write; parent directories are created.",
+        "placeholder": "/data/output.json"
+      },
+      "array": {
+        "type": "boolean",
+        "title": "JSON array",
+        "description": "Write one JSON array; when false, write newline-delimited JSON objects.",
+        "default": true
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}

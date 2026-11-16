@@ -1,0 +1,105 @@
+{
+  "id": "dap.linear_regression",
+  "name": "Linear Regression",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Least-squares regression of one numeric response on one or more numeric predictors, optionally per group. coefficients mode returns one row per term (intercept and each predictor) with std_error, t_statistic, p_value, ci_low, ci_high and vif plus the model fit (r2, adj_r2, f_statistic, f_p_value, rmse, df_residual); diagnostics mode returns one row per fit with the model-level statistics including Durbin-Watson, AIC and BIC; predict mode keeps every input row and adds the prediction, residual and prediction interval. Standard errors are classical or HC1 heteroskedasticity-consistent. Categorical predictors are not supported (encode them first); n must exceed the number of parameters.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Linear Regression configuration",
+    "additionalProperties": false,
+    "properties": {
+      "x": {
+        "type": "array",
+        "title": "Predictors",
+        "description": "One or more numeric predictor columns; every predictor is a term of the model.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "y": {
+        "type": "string",
+        "title": "Response",
+        "description": "Numeric response column."
+      },
+      "group_by": {
+        "type": "array",
+        "title": "Group by",
+        "description": "Optional grouping columns: one fit per group.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "mode": {
+        "type": "string",
+        "title": "Mode",
+        "description": "coefficients returns one row per term; diagnostics returns one row per fit; predict returns the input rows plus prediction, residual and prediction interval.",
+        "enum": [
+          "coefficients",
+          "predict",
+          "diagnostics"
+        ],
+        "default": "coefficients"
+      },
+      "intercept": {
+        "type": "boolean",
+        "title": "Fit intercept",
+        "description": "When false the model has no intercept term.",
+        "default": true
+      },
+      "robust": {
+        "type": "string",
+        "title": "Standard errors",
+        "description": "none uses the classical residual-variance covariance; hc1 uses the heteroskedasticity-consistent sandwich estimator with the n/(n-p) correction.",
+        "enum": [
+          "none",
+          "hc1"
+        ],
+        "default": "none"
+      },
+      "alpha": {
+        "type": "number",
+        "title": "Significance level",
+        "description": "Confidence level of the coefficient and prediction intervals: 1 - alpha. Must be in (0, 1).",
+        "default": 0.05,
+        "minimum": 0,
+        "maximum": 1
+      },
+      "sample_rows": {
+        "type": "integer",
+        "title": "Sample rows",
+        "description": "0 keeps the 100k-row cap and fails above it; a positive N fits on the first N rows instead, so a large table can be modelled without pre-filtering.",
+        "default": 0,
+        "minimum": 0
+      },
+      "output": {
+        "type": "string",
+        "title": "Prediction column",
+        "description": "Name of the prediction column added by predict mode.",
+        "default": "prediction"
+      }
+    },
+    "required": [
+      "x",
+      "y"
+    ]
+  }
+}

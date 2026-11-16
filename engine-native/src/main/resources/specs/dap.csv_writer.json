@@ -1,0 +1,53 @@
+{
+  "id": "dap.csv_writer",
+  "name": "CSV Writer",
+  "category": "/IO/Write",
+  "type": "Sink",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Writes the input table to a delimited text file. The input table is passed through unchanged.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "CSV Writer configuration",
+    "additionalProperties": false,
+    "properties": {
+      "file": {
+        "type": "string",
+        "title": "Output file",
+        "description": "Absolute path of the CSV file to write; parent directories are created.",
+        "placeholder": "/data/output.csv"
+      },
+      "delimiter": {
+        "type": "string",
+        "title": "Delimiter",
+        "description": "Field separator written to the file; a comma by default.",
+        "default": ","
+      },
+      "header": {
+        "type": "boolean",
+        "title": "Header row",
+        "description": "Whether to write column names as the first row.",
+        "default": true
+      }
+    },
+    "required": [
+      "file"
+    ]
+  }
+}

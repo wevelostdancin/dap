@@ -1,0 +1,89 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "D6",
+      "title": "HAVING semantics with group_by followed by row_filter",
+      "kind": "recipe",
+      "requires": [],
+      "workflow": {
+        "id": "cov-recipe-having",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "g",
+            "type": "group_by",
+            "config": {
+              "keys": [
+                "category"
+              ],
+              "aggregations": [
+                {
+                  "column": "id",
+                  "fn": "count"
+                }
+              ]
+            }
+          },
+          {
+            "id": "f",
+            "type": "row_filter",
+            "config": {
+              "where": [
+                {
+                  "column": "Count(id)",
+                  "op": "ge",
+                  "value": 2
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "g"
+          },
+          {
+            "from": "g",
+            "to": "f"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "f",
+          "kind": "expect",
+          "rows": 2,
+          "order": "unordered",
+          "columns": [
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "Count(id)",
+              "type": "Number (Integer)"
+            }
+          ],
+          "data": [
+            [
+              "A",
+              3
+            ],
+            [
+              "B",
+              2
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

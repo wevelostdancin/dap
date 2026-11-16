@@ -1,0 +1,91 @@
+{
+  "id": "wf-p6-ab-test",
+  "title": "A/B test: two-proportion z-test with power and required n",
+  "rationale": "Pins dap.ab_test on 10/100 control and 20/100 treatment conversions with alpha 0.05, target power 0.8, mde 0.2 and baseline 0.10: the pooled z, its two-sided p-value, the achieved power for the observed effect, the Fleiss required sample size (3841 per group) and the echoed mde/alpha.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "sql_query",
+      "config": {
+        "sql": "SELECT i < 10 AS converted, 'control' AS variant FROM range(100) AS t(i) UNION ALL SELECT i < 20 AS converted, 'treatment' AS variant FROM range(100) AS t(i)"
+      }
+    },
+    {
+      "id": "test",
+      "type": "ab_test",
+      "config": {
+        "group": "variant",
+        "value": "converted",
+        "mde": 0.2,
+        "baseline": 0.1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "test"
+    }
+  ],
+  "checks": [
+    {
+      "node": "test",
+      "kind": "expect",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "control_rate",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "treatment_rate",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "lift",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "z_statistic",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "p_value",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "power",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "required_n_per_group",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "mde",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "alpha",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          0.1,
+          0.2,
+          1.0,
+          1.9802950859533488,
+          0.04767038065616136,
+          0.5081910681877364,
+          3841,
+          0.2,
+          0.05
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "Expectations from the Fleiss formulas with the normal CDF/quantile of Python's statistics.NormalDist: z = 1.9802950859533488, p = 0.04767038065616136, achieved power = 0.5081910681877364, required n = 3841 per group."
+}

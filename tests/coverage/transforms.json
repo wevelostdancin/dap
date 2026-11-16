@@ -1,0 +1,746 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "B1",
+      "title": "Filter rows with dap.row_filter",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-filter",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "f",
+            "type": "row_filter",
+            "config": {
+              "where": [
+                {
+                  "column": "score",
+                  "op": "ge",
+                  "value": 3
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "f"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "f",
+          "kind": "expect",
+          "rows": 4,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B"
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    },
+    {
+      "task": "B2",
+      "title": "Select, rename and reorder columns",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-columns",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "cf",
+            "type": "column_filter",
+            "config": {
+              "include": [
+                "id",
+                "name",
+                "score"
+              ]
+            }
+          },
+          {
+            "id": "rn",
+            "type": "column_renamer",
+            "config": {
+              "renames": [
+                {
+                  "from": "id",
+                  "to": "key"
+                }
+              ]
+            }
+          },
+          {
+            "id": "cr",
+            "type": "column_resorter",
+            "config": {
+              "columns": [
+                "name",
+                "key",
+                "score"
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "cf"
+          },
+          {
+            "from": "cf",
+            "to": "rn"
+          },
+          {
+            "from": "rn",
+            "to": "cr"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "cr",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "key",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            }
+          ],
+          "data": [
+            [
+              "alpha",
+              1,
+              1
+            ],
+            [
+              "beta",
+              2,
+              2
+            ],
+            [
+              "gamma",
+              3,
+              3
+            ],
+            [
+              "delta",
+              4,
+              4
+            ],
+            [
+              "gamma",
+              3,
+              3
+            ],
+            [
+              "epsilon",
+              5,
+              5
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    },
+    {
+      "task": "B3",
+      "title": "Cast a column to another type",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-cast",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "c",
+            "type": "type_cast",
+            "config": {
+              "columns": [
+                {
+                  "column": "score",
+                  "type": "Int64"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "c"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "c",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1,
+              "A"
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    },
+    {
+      "task": "B4",
+      "title": "Fill missing values with a constant",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-missing",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "WORLDBANK_COUNTRIES"
+            }
+          },
+          {
+            "id": "m",
+            "type": "missing_value",
+            "config": {
+              "rules": [
+                {
+                  "column": "Currency Unit",
+                  "method": "constant",
+                  "value": "UNKNOWN"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "m"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "m",
+          "kind": "expect_profile",
+          "rows": 265,
+          "columns": [
+            {
+              "name": "Currency Unit",
+              "type": "String",
+              "missing": 0,
+              "distinct": 152
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "task": "B5",
+      "title": "Remove duplicate rows by key",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-dedupe",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "d",
+            "type": "duplicate_filter",
+            "config": {
+              "keys": [
+                "id"
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "d"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "d",
+          "kind": "expect",
+          "rows": 5,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              1,
+              "A"
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C"
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B"
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    },
+    {
+      "task": "B6",
+      "title": "Replace exact values",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-replace",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "r",
+            "type": "value_replace",
+            "config": {
+              "rules": [
+                {
+                  "column": "category",
+                  "from": "A",
+                  "to": "Z"
+                },
+                {
+                  "column": "score",
+                  "from": 1,
+                  "to": 9
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "r"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "r",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "alpha",
+              9,
+              "Z"
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "Z"
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "Z"
+            ],
+            [
+              5,
+              "epsilon",
+              5,
+              "B"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    },
+    {
+      "task": "B7",
+      "title": "Drop outliers with IQR fences",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-outlier-filter",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "IRIS"
+            }
+          },
+          {
+            "id": "o",
+            "type": "outlier_filter",
+            "config": {
+              "columns": [
+                "sepal_width"
+              ],
+              "method": "iqr",
+              "threshold": 1.5
+            }
+          },
+          {
+            "id": "g",
+            "type": "group_by",
+            "config": {
+              "keys": [
+                "species"
+              ],
+              "aggregations": [
+                {
+                  "column": "sepal_width",
+                  "fn": "count"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "o"
+          },
+          {
+            "from": "o",
+            "to": "g"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "g",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "species",
+              "type": "String"
+            },
+            {
+              "name": "Count(sepal_width)",
+              "type": "Number (Integer)"
+            }
+          ],
+          "data": [
+            [
+              "setosa",
+              47
+            ],
+            [
+              "versicolor",
+              49
+            ],
+            [
+              "virginica",
+              50
+            ]
+          ],
+          "order": "unordered"
+        }
+      ]
+    },
+    {
+      "task": "B8",
+      "title": "Change string case in place",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-string",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "s",
+            "type": "string_manipulation",
+            "config": {
+              "column": "name",
+              "op": "upper",
+              "mode": "replace"
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "s"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "s",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              1,
+              "ALPHA",
+              1,
+              "A"
+            ],
+            [
+              2,
+              "BETA",
+              2,
+              "B"
+            ],
+            [
+              3,
+              "GAMMA",
+              3,
+              "A"
+            ],
+            [
+              4,
+              "DELTA",
+              4,
+              "C"
+            ],
+            [
+              3,
+              "GAMMA",
+              3,
+              "A"
+            ],
+            [
+              5,
+              "EPSILON",
+              5,
+              "B"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    }
+  ]
+}

@@ -1,21 +1,26 @@
-# Vendored KNIME runtime (obtained from a release or scripts/vendor-runtime.sh)
-runtime/
-
-# Eclipse workspace and KNIME metadata
-workspace/
-
 # Build outputs
 build/
+dist/
+engine-native/target/
+engine-native/.tools/
+.tools/
+
+# Agent scratch and worktrees
+.worktrees/
+.superpowers/
+workspace/
 
 # Python
 __pycache__/
+*.pyc
+
+# The coverage suite is part of the repo; the user-global gitignore skips coverage/.
+!tests/coverage/
+!tests/coverage/**
 
 # Logs and OS metadata
 *.log
 .DS_Store
 
-# Generated audit report (large, reproducible)
-catalog/schema-report.json
-
-# Contract artifacts are intentionally NOT ignored:
-# catalog/, catalog/schemas/, catalog/catalog.json, catalog/curated.json
+# Coverage scenarios (global gitignore ignores coverage/)
+!tests/coverage/

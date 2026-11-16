@@ -1,0 +1,105 @@
+{
+  "id": "dap.outlier_detect",
+  "name": "Outlier Detect",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Flags rows with an added Boolean 'outlier' column: IQR fences (q1 - k*iqr, q3 + k*iqr) or z-score bounds (mean +- k*stddev) per numeric column, or a distance-based model on the selected columns - DBSCAN noise, a local outlier factor above the (1 - contamination) quantile, or the top contamination fraction of an isolation-forest anomaly score. The distance-based methods standardize the features first and also add a Float64 'score' (k-th-neighbour distance, LOF value or normalized anomaly score).",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Outlier Detect configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "Numeric columns checked for outliers; a row is flagged when any of them is outside its range (iqr, zscore) or when the row is an outlier in the selected feature space (dbscan, lof, isolation_forest).",
+        "items": {
+          "type": "string",
+          "title": "Column"
+        }
+      },
+      "method": {
+        "type": "string",
+        "title": "Method",
+        "description": "iqr uses quartile fences, zscore the distance from the mean in standard deviations, dbscan flags noise points, lof the local outlier factor and isolation_forest the anomaly score of an isolation forest.",
+        "enum": [
+          "iqr",
+          "zscore",
+          "dbscan",
+          "lof",
+          "isolation_forest"
+        ]
+      },
+      "threshold": {
+        "type": "number",
+        "title": "Threshold",
+        "description": "Multiplier for the fence width: the IQR multiplier (default 1.5) or the z-score limit (default 3). Used by iqr and zscore only.",
+        "exclusiveMinimum": 0
+      },
+      "eps": {
+        "type": "number",
+        "title": "DBSCAN radius",
+        "description": "Neighbourhood radius in the standardized feature space; positive. Used by dbscan only.",
+        "default": 0.5,
+        "exclusiveMinimum": 0
+      },
+      "min_points": {
+        "type": "integer",
+        "title": "DBSCAN minimum points",
+        "description": "Minimum neighbourhood size (including the point itself) for a core point; positive. Used by dbscan only.",
+        "default": 5,
+        "minimum": 1
+      },
+      "k": {
+        "type": "integer",
+        "title": "Neighbours",
+        "description": "Number of neighbours for the DBSCAN k-th-neighbour score and for the LOF density; positive. Clamped to rows - 1.",
+        "default": 5,
+        "minimum": 1
+      },
+      "contamination": {
+        "type": "number",
+        "title": "Contamination",
+        "description": "Expected fraction of outliers in [0, 0.5]; lof and isolation_forest flag scores above the (1 - contamination) quantile, so 0 disables flagging.",
+        "default": 0.05,
+        "minimum": 0,
+        "maximum": 0.5
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Random seed",
+        "description": "Seed of the isolation-forest sampling; the same seed and input give the same scores.",
+        "default": 42
+      },
+      "max_rows": {
+        "type": "integer",
+        "title": "Maximum rows",
+        "description": "Distance-based methods are computed in memory and support at most this many rows; a larger input is an error with a hint to raise the cap or pre-filter.",
+        "default": 50000,
+        "minimum": 1
+      }
+    },
+    "required": [
+      "columns",
+      "method"
+    ]
+  }
+}

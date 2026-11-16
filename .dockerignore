@@ -4,20 +4,17 @@
 .gitattributes
 **/.DS_Store
 
-# Состояние запущенного сервиса и артефакты сборки
+# Service state and build artifacts
 workspace/
 build/classes/
 build/*.tar
 build/*.oci
 *.log
 
-# Не нужны в образе
+# Not needed in the image
 tests/
 docs/
 
-# Python-кэш (gen-bundles-info.py запускается только при сборке)
+# Python cache
 **/__pycache__/
 **/*.pyc
-
-# Большой отчёт-артефакт; catalog/schemas нужны и остаются в образе
-catalog/schema-report.json

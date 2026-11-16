@@ -1,0 +1,55 @@
+{
+  "id": "dap.unpivot",
+  "name": "Unpivot",
+  "category": "/Manipulation/Column",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Stacks the selected columns into a name/value pair using DuckDB UNPIVOT. Columns that are not selected are kept; the selected columns must share one type. Rows whose selected value is NULL are dropped by DuckDB UNPIVOT.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Unpivot configuration",
+    "additionalProperties": false,
+    "properties": {
+      "columns": {
+        "type": "array",
+        "title": "Columns",
+        "description": "Columns to stack into name/value rows.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "nameColumn": {
+        "type": "string",
+        "title": "Name column",
+        "description": "Name of the column holding the source column names.",
+        "default": "variable"
+      },
+      "valueColumn": {
+        "type": "string",
+        "title": "Value column",
+        "description": "Name of the column holding the stacked values.",
+        "default": "value"
+      }
+    },
+    "required": [
+      "columns"
+    ]
+  }
+}

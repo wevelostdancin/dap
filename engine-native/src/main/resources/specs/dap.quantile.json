@@ -1,0 +1,52 @@
+{
+  "id": "dap.quantile",
+  "name": "Quantile",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Continuous quantiles of one numeric column: one output row per requested probability, interpolating between adjacent values.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Quantile configuration",
+    "additionalProperties": false,
+    "properties": {
+      "column": {
+        "type": "string",
+        "title": "Column",
+        "description": "Numeric input column whose quantiles are computed."
+      },
+      "quantiles": {
+        "type": "array",
+        "title": "Quantiles",
+        "description": "Probabilities between 0 and 1 inclusive, one output row each.",
+        "items": {
+          "type": "number",
+          "title": "Quantile",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "required": [
+      "column",
+      "quantiles"
+    ]
+  }
+}

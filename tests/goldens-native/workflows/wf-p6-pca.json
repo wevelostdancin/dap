@@ -1,0 +1,265 @@
+{
+  "id": "wf-p6-pca",
+  "title": "PCA scores, loadings and explained variance on correlated 2D data",
+  "rationale": "Pins all three dap.pca modes end to end: the explained-variance table, the loadings matrix and the per-row component scores, with the deterministic sign convention.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "source",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "PCA_CORRELATED"
+      }
+    },
+    {
+      "id": "explained",
+      "type": "pca",
+      "config": {
+        "columns": [
+          "x",
+          "y"
+        ],
+        "components": 2,
+        "standardize": true,
+        "mode": "explained"
+      }
+    },
+    {
+      "id": "loadings",
+      "type": "pca",
+      "config": {
+        "columns": [
+          "x",
+          "y"
+        ],
+        "components": 2,
+        "standardize": true,
+        "mode": "loadings"
+      }
+    },
+    {
+      "id": "scores",
+      "type": "pca",
+      "config": {
+        "columns": [
+          "x",
+          "y"
+        ],
+        "components": 2,
+        "standardize": true,
+        "mode": "scores"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source",
+      "to": "explained"
+    },
+    {
+      "from": "source",
+      "to": "loadings"
+    },
+    {
+      "from": "source",
+      "to": "scores"
+    }
+  ],
+  "checks": [
+    {
+      "node": "explained",
+      "kind": "expect",
+      "rows": 2,
+      "columns": [
+        {
+          "name": "component",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "eigenvalue",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "explained_variance",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "cumulative",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          1,
+          1.999221428755769,
+          0.9996107143778845,
+          0.9996107143778845
+        ],
+        [
+          2,
+          0.0007785712442309745,
+          0.00038928562211548723,
+          1
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "loadings",
+      "kind": "expect",
+      "rows": 4,
+      "columns": [
+        {
+          "name": "component",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "column",
+          "type": "String"
+        },
+        {
+          "name": "loading",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          1,
+          "x",
+          0.7071067811865476
+        ],
+        [
+          1,
+          "y",
+          0.7071067811865475
+        ],
+        [
+          2,
+          "x",
+          -0.7071067811865474
+        ],
+        [
+          2,
+          "y",
+          0.7071067811865476
+        ]
+      ],
+      "order": "ordered"
+    },
+    {
+      "node": "scores",
+      "kind": "expect",
+      "rows": 12,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "x",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "y",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "pc1",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "pc2",
+          "type": "Number (Float)"
+        }
+      ],
+      "data": [
+        [
+          1,
+          -5.5,
+          -5.3,
+          -2.12890239262552,
+          0.028375093894503767
+        ],
+        [
+          2,
+          -4.5,
+          -4.3919395388,
+          -1.7526082980553694,
+          0.012436918188286628
+        ],
+        [
+          3,
+          -3.5,
+          -3.5832293673,
+          -1.3960273539107586,
+          -0.023214407943470405
+        ],
+        [
+          4,
+          -2.5,
+          -2.6979984993,
+          -1.0242631223763818,
+          -0.043682446685461895
+        ],
+        [
+          5,
+          -1.5,
+          -1.6307287242,
+          -0.6163786100677944,
+          -0.028030204653242297
+        ],
+        [
+          6,
+          -0.5,
+          -0.4432675629,
+          -0.18464564313296167,
+          0.011470492005222349
+        ],
+        [
+          7,
+          0.5,
+          0.6920340573,
+          0.23673779303617026,
+          0.040621657897986274
+        ],
+        [
+          8,
+          1.5,
+          1.6507804509,
+          0.6230890239556673,
+          0.034740618541115265
+        ],
+        [
+          9,
+          2.5,
+          2.4708999932,
+          0.981933823027328,
+          0.0013531473364080115
+        ],
+        [
+          10,
+          3.5,
+          3.3177739476,
+          1.3460872503059802,
+          -0.026725695661308002
+        ],
+        [
+          11,
+          4.5,
+          4.3321856942,
+          1.7434836375153413,
+          -0.02156157872831499
+        ],
+        [
+          12,
+          5.5,
+          5.5008851396,
+          2.171493892328299,
+          0.014216405808275212
+        ]
+      ],
+      "order": "unordered"
+    }
+  ],
+  "notes": "Fixture: 12 points x = i - 5.5, y = x + 0.2*cos(i). Expectations computed independently with the closed-form 2x2 covariance eigen decomposition: sample standard deviation (n-1), covariance of the standardized columns, eigenvalues (a+c)/2 +- sqrt(((a-c)/2)^2 + b^2), eigenvectors from (b, lambda - a), normalized and sign-fixed so the largest absolute loading is positive. PC1 explains 99.96% of the variance."
+}

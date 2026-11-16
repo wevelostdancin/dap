@@ -1,0 +1,138 @@
+{
+  "id": "wf-n4-p2-clean",
+  "title": "P2: cast, replace, dedupe, sort on a tiny fixture",
+  "rationale": "Pins the cleaning wave end to end on a deterministic fixture.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "P2"
+      }
+    },
+    {
+      "id": "cast",
+      "type": "type_cast",
+      "config": {
+        "columns": [
+          {
+            "column": "score",
+            "type": "Int64"
+          }
+        ]
+      }
+    },
+    {
+      "id": "replace",
+      "type": "value_replace",
+      "config": {
+        "rules": [
+          {
+            "column": "category",
+            "from": "A",
+            "to": "Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "dedupe",
+      "type": "duplicate_filter",
+      "config": {
+        "keys": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "id",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "cast"
+    },
+    {
+      "from": "cast",
+      "to": "replace"
+    },
+    {
+      "from": "replace",
+      "to": "dedupe"
+    },
+    {
+      "from": "dedupe",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "sort",
+      "kind": "expect",
+      "rows": 5,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "score",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "category",
+          "type": "String"
+        }
+      ],
+      "data": [
+        [
+          1,
+          "alpha",
+          1,
+          "Z"
+        ],
+        [
+          2,
+          "beta",
+          2,
+          "B"
+        ],
+        [
+          3,
+          "gamma",
+          3,
+          "Z"
+        ],
+        [
+          4,
+          "delta",
+          4,
+          "C"
+        ],
+        [
+          5,
+          "epsilon",
+          5,
+          "B"
+        ]
+      ],
+      "order": "ordered"
+    }
+  ],
+  "notes": "Fixture p2.csv; expected values computed by hand."
+}

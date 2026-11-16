@@ -1,0 +1,75 @@
+{
+  "id": "wf-n8-file-list",
+  "title": "P5: list a fixture directory through dap.file_list",
+  "rationale": "Pins the file_list schema and the deterministic listing of a small committed tree (names, extensions, directories, distinct counts). Absolute paths and mtimes are machine-specific, so values are asserted in FileListExecutorTest instead.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "files",
+      "type": "file_list",
+      "config": {
+        "directory": "{DATA}/file_list",
+        "recursive": true,
+        "sort": "name",
+        "limit": 100
+      }
+    }
+  ],
+  "edges": [],
+  "checks": [
+    {
+      "node": "files",
+      "kind": "expect",
+      "rows": 6,
+      "columns": [
+        {
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "extension",
+          "type": "String"
+        },
+        {
+          "name": "size",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "modified",
+          "type": "Date&Time (Timestamp)"
+        },
+        {
+          "name": "is_directory",
+          "type": "Boolean"
+        }
+      ]
+    },
+    {
+      "node": "files",
+      "kind": "expect_profile",
+      "rows": 6,
+      "columns": [
+        {
+          "name": "name",
+          "type": "String",
+          "distinct": 6
+        },
+        {
+          "name": "extension",
+          "type": "String",
+          "distinct": 3
+        },
+        {
+          "name": "is_directory",
+          "type": "Boolean",
+          "distinct": 2
+        }
+      ]
+    }
+  ],
+  "notes": "fixture tree: alpha.csv, beta.csv, notes.txt, nested/gamma.csv, nested/empty_dir/.gitkeep (hidden, skipped), directories nested and empty_dir. Six entries; extensions csv/txt/empty; three files + two directories."
+}

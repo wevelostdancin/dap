@@ -1,0 +1,92 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "I1",
+      "title": "Arbitrary SQL over the outputs of two workflow nodes",
+      "kind": "node",
+      "requires": [],
+      "workflow": {
+        "id": "cov-sql-query",
+        "nodes": [
+          {
+            "id": "src_a",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "src_b",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "q",
+            "type": "sql_query",
+            "config": {
+              "sql": "SELECT a.category, COUNT(*) AS n, SUM(a.score) AS total FROM src_a a JOIN src_b b ON a.id = b.id GROUP BY a.category ORDER BY a.category",
+              "inputs": [
+                "src_a",
+                "src_b"
+              ],
+              "limit": 100
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src_a",
+            "to": "q"
+          },
+          {
+            "from": "src_b",
+            "to": "q",
+            "toPort": 1
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "q",
+          "kind": "expect",
+          "rows": 3,
+          "columns": [
+            {
+              "name": "category",
+              "type": "String"
+            },
+            {
+              "name": "n",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "total",
+              "type": "Number (Float)"
+            }
+          ],
+          "data": [
+            [
+              "A",
+              5,
+              13.0
+            ],
+            [
+              "B",
+              2,
+              7.0
+            ],
+            [
+              "C",
+              1,
+              4.0
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    }
+  ]
+}

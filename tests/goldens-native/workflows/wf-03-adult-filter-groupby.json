@@ -1,0 +1,92 @@
+{
+  "id": "wf-03-adult-filter-groupby",
+  "title": "Adult census: high earners working 40h+, count by education",
+  "rationale": "Two-predicate filter over 32.5k rows, count aggregate, order by the aggregate.",
+  "kind": "baseline",
+  "nodes": [
+    {
+      "id": "src",
+      "type": "table_source",
+      "config": {
+        "dataset": "ADULT"
+      }
+    },
+    {
+      "id": "filter",
+      "type": "row_filter",
+      "config": {
+        "logic": "and",
+        "where": [
+          {
+            "column": "hours-per-week",
+            "op": "ge",
+            "value": 40
+          },
+          {
+            "column": "income",
+            "op": "eq",
+            "value": ">50K"
+          }
+        ]
+      }
+    },
+    {
+      "id": "g",
+      "type": "group_by",
+      "config": {
+        "keys": [
+          "education"
+        ],
+        "aggregations": [
+          {
+            "column": "age",
+            "fn": "count"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sort",
+      "type": "sorter",
+      "config": {
+        "keys": [
+          {
+            "column": "Count(age)",
+            "direction": "desc"
+          },
+          {
+            "column": "education",
+            "direction": "asc"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "src",
+      "to": "filter"
+    },
+    {
+      "from": "filter",
+      "to": "g"
+    },
+    {
+      "from": "g",
+      "to": "sort"
+    }
+  ],
+  "checks": [
+    {
+      "node": "filter",
+      "kind": "profile"
+    },
+    {
+      "node": "sort",
+      "kind": "table",
+      "limit": 20,
+      "order": "ordered"
+    }
+  ],
+  "notes": "Count(age) follows the engine aggregate naming convention."
+}

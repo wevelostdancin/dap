@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Minimal Maven bootstrap for dap-native.
+# Downloads the pinned Maven distribution into .tools/ (git-ignored) and runs it
+# with a project-local repository, so the build needs nothing but a JDK.
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+TOOLS="${DAP_TOOLS:-${ROOT}/.tools}"
+MAVEN_VERSION="${DAP_MAVEN_VERSION:-3.9.11}"
+MAVEN_HOME="${TOOLS}/apache-maven-${MAVEN_VERSION}"
+MAVEN_REPO="${DAP_M2:-${TOOLS}/m2}"
+
+if [ ! -x "${MAVEN_HOME}/bin/mvn" ]; then
+  mkdir -p "${TOOLS}"
+  archive="${TOOLS}/apache-maven-${MAVEN_VERSION}-bin.tar.gz"
+  if [ ! -f "${archive}" ]; then
+    url="https://repo1.maven.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz"
+    echo "dap-native: downloading Maven ${MAVEN_VERSION}" >&2
+    curl -fsSL -o "${archive}.tmp" "${url}"
+    mv "${archive}.tmp" "${archive}"
+  fi
+  tar xzf "${archive}" -C "${TOOLS}"
+fi
+
+if [ -z "${JAVA_HOME:-}" ] && [ -n "${DAP_JDK:-}" ]; then
+  export JAVA_HOME="${DAP_JDK}"
+fi
+if [ -n "${JAVA_HOME:-}" ]; then
+  export PATH="${JAVA_HOME}/bin:${PATH}"
+fi
+
+# Maven Central is dual-stack; some local networks blackhole IPv6.
+case " ${MAVEN_OPTS:-} " in
+  *" -Djava.net.preferIPv4Stack="*) ;;
+  *) export MAVEN_OPTS="${MAVEN_OPTS:-} -Djava.net.preferIPv4Stack=true" ;;
+esac
+
+exec "${MAVEN_HOME}/bin/mvn" -Dmaven.repo.local="${MAVEN_REPO}" -Dstyle.color=never "$@"

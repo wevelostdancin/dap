@@ -1,0 +1,98 @@
+{
+  "id": "dap.joiner",
+  "name": "Joiner",
+  "category": "/Manipulation/Row/Join",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Joins two tables on key columns using an inner, left, right, full, semi or anti join, as an asof join on a time column, or as a cross join. Semi and anti joins keep only the left columns. Key columns can be merged into one output column. An asof join matches every left row with the nearest right row whose time is before (asof_inequality >=) or after (<=) its own time, optionally restricted by equality keys. A cross join returns every combination and uses no keys. A right-side column whose name already appears in the output is renamed with the suffix \" (Right)\".",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Left",
+      "type": "BufferedDataTable"
+    },
+    {
+      "index": 1,
+      "name": "Right",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Joiner configuration",
+    "additionalProperties": false,
+    "properties": {
+      "how": {
+        "type": "string",
+        "title": "Join type",
+        "description": "Join mode between the left and right inputs; semi and anti keep the left rows that do (semi) or do not (anti) have a match, and return only the left columns.",
+        "enum": [
+          "inner",
+          "left",
+          "right",
+          "full",
+          "semi",
+          "anti",
+          "asof",
+          "cross"
+        ],
+        "default": "inner"
+      },
+      "left_keys": {
+        "type": "array",
+        "title": "Left keys",
+        "description": "Key columns from the left input.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "right_keys": {
+        "type": "array",
+        "title": "Right keys",
+        "description": "Key columns from the right input, matched positionally with the left keys.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "merge_keys": {
+        "type": "boolean",
+        "title": "Merge keys",
+        "description": "Merge the key columns into one output column.",
+        "default": true
+      },
+      "left_time": {
+        "type": "string",
+        "title": "Left time column",
+        "description": "Time column of the left input for an asof join.",
+        "placeholder": "trade_time"
+      },
+      "right_time": {
+        "type": "string",
+        "title": "Right time column",
+        "description": "Time column of the right input for an asof join.",
+        "placeholder": "quote_time"
+      },
+      "asof_inequality": {
+        "type": "string",
+        "title": "Asof inequality",
+        "description": ">= matches the nearest previous right row, <= the nearest following one.",
+        "enum": [
+          ">=",
+          "<="
+        ],
+        "default": ">="
+      }
+    },
+    "required": []
+  }
+}

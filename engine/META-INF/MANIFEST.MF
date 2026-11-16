@@ -1,7 +1,0 @@
-Manifest-Version: 1.0
-Bundle-ManifestVersion: 2
-Bundle-Name: DAP Engine
-Bundle-SymbolicName: com.dap.engine;singleton:=true
-Bundle-Version: 1.0.0
-Bundle-RequiredExecutionEnvironment: JavaSE-21
-Require-Bundle: org.knime.core, org.knime.core.ui, org.knime.core.util, org.eclipse.equinox.app, org.eclipse.core.runtime, com.fasterxml.jackson.core.jackson-core, com.fasterxml.jackson.core.jackson-databind, com.fasterxml.jackson.core.jackson-annotations

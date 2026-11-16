@@ -1,0 +1,106 @@
+{
+  "format": "dap-coverage-scenario/1",
+  "cases": [
+    {
+      "task": "I2",
+      "title": "Save a workflow and load it back as a recipe",
+      "kind": "recipe",
+      "requires": [],
+      "mode": "save_load",
+      "workflow": {
+        "id": "cov-recipe-save-load",
+        "nodes": [
+          {
+            "id": "src",
+            "type": "csv_reader",
+            "config": {
+              "dataset": "P2"
+            }
+          },
+          {
+            "id": "s",
+            "type": "sorter",
+            "config": {
+              "keys": [
+                {
+                  "column": "id",
+                  "direction": "desc"
+                }
+              ]
+            }
+          }
+        ],
+        "edges": [
+          {
+            "from": "src",
+            "to": "s"
+          }
+        ]
+      },
+      "checks": [
+        {
+          "node": "s",
+          "kind": "expect",
+          "rows": 6,
+          "columns": [
+            {
+              "name": "id",
+              "type": "Number (Integer)"
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "score",
+              "type": "Number (Float)"
+            },
+            {
+              "name": "category",
+              "type": "String"
+            }
+          ],
+          "data": [
+            [
+              5,
+              "epsilon",
+              5,
+              "B"
+            ],
+            [
+              4,
+              "delta",
+              4,
+              "C"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              3,
+              "gamma",
+              3,
+              "A"
+            ],
+            [
+              2,
+              "beta",
+              2,
+              "B"
+            ],
+            [
+              1,
+              "alpha",
+              1,
+              "A"
+            ]
+          ],
+          "order": "ordered"
+        }
+      ]
+    }
+  ]
+}

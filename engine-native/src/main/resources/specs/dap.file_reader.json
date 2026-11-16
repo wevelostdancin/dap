@@ -1,0 +1,104 @@
+{
+  "id": "dap.file_reader",
+  "name": "File Reader",
+  "category": "/IO/Read",
+  "type": "Source",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Reads many files as one table: a list of files, a glob or a directory (recursively when 'recursive' is true). Supports csv, parquet and json (a JSON array or newline-delimited JSON); ORC and Avro are rejected with a conversion hint. Files are expanded in the engine, sorted, capped at 10000 and validated against the path allowlist, then read by DuckDB's streaming readers, so nothing is loaded into the heap. 'union_by_name' merges different schemas and 'filename' adds the source file column; CSV options mirror DuckDB read_csv.",
+  "inPorts": [],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "File Reader configuration",
+    "additionalProperties": false,
+    "properties": {
+      "path": {
+        "type": "string",
+        "title": "Path",
+        "description": "A file, a directory or a glob pattern such as /data/*.csv. Exactly one of 'path' or 'paths' is required.",
+        "placeholder": "/data/events/*.parquet"
+      },
+      "paths": {
+        "type": "array",
+        "title": "Paths",
+        "description": "Several files, directories or glob patterns.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "format": {
+        "type": "string",
+        "title": "Format",
+        "description": "File format of every selected file.",
+        "enum": [
+          "csv",
+          "parquet",
+          "json"
+        ]
+      },
+      "recursive": {
+        "type": "boolean",
+        "title": "Recursive",
+        "description": "Walk a directory or a glob root recursively.",
+        "default": false
+      },
+      "union_by_name": {
+        "type": "boolean",
+        "title": "Union by name",
+        "description": "Merge files with different schemas by column name instead of failing.",
+        "default": false
+      },
+      "filename": {
+        "type": "boolean",
+        "title": "Add filename",
+        "description": "Add a 'filename' column with the source file path.",
+        "default": false
+      },
+      "delimiter": {
+        "type": "string",
+        "title": "CSV delimiter",
+        "description": "CSV field delimiter, one character.",
+        "default": ","
+      },
+      "header": {
+        "type": "boolean",
+        "title": "Header",
+        "description": "The first CSV line is a header row.",
+        "default": true
+      },
+      "quote": {
+        "type": "string",
+        "title": "Quote character",
+        "description": "CSV quote character, one character."
+      },
+      "escape": {
+        "type": "string",
+        "title": "Escape character",
+        "description": "CSV escape character, one character."
+      },
+      "nullstr": {
+        "type": "string",
+        "title": "Null string",
+        "description": "Text that reads as a missing value."
+      },
+      "ignore_errors": {
+        "type": "boolean",
+        "title": "Ignore errors",
+        "description": "Skip malformed CSV rows instead of failing.",
+        "default": false
+      }
+    },
+    "required": [
+      "format"
+    ]
+  }
+}

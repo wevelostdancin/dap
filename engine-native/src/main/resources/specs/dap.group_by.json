@@ -1,0 +1,87 @@
+{
+  "id": "dap.group_by",
+  "name": "Group By",
+  "category": "/Manipulation/Row/GroupBy",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Groups rows by key columns and computes aggregate values per group. Aggregate columns are named like Mean(age), Median(age) or Percentile(age, 0.9).",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Group By configuration",
+    "additionalProperties": false,
+    "properties": {
+      "keys": {
+        "type": "array",
+        "title": "Group keys",
+        "description": "Input columns to group by.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "aggregations": {
+        "type": "array",
+        "title": "Aggregations",
+        "description": "Aggregate expressions computed per group; output columns are named like Mean(age) or Percentile(age, 0.9).",
+        "items": {
+          "type": "object",
+          "title": "Aggregation",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "title": "Column",
+              "description": "Input column to aggregate."
+            },
+            "fn": {
+              "type": "string",
+              "title": "Function",
+              "description": "Aggregate function; count_distinct works on any column type, median and percentile need a numeric column.",
+              "enum": [
+                "mean",
+                "sum",
+                "count",
+                "min",
+                "max",
+                "count_distinct",
+                "median",
+                "percentile"
+              ]
+            },
+            "p": {
+              "type": "number",
+              "title": "Percentile probability",
+              "description": "Probability in [0, 1]; required by fn=percentile and ignored by the other functions.",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "column",
+            "fn"
+          ]
+        }
+      }
+    },
+    "required": [
+      "keys",
+      "aggregations"
+    ]
+  }
+}

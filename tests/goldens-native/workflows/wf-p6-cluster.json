@@ -1,0 +1,117 @@
+{
+  "id": "wf-p6-cluster",
+  "title": "K-means clustering of three blobs with per-row silhouette",
+  "rationale": "Pins dap.cluster end to end: k-means++ on three well separated blobs, the cluster label and the silhouette column, plus a group_by count proving each blob forms one cluster of ten rows.",
+  "kind": "native",
+  "nodes": [
+    {
+      "id": "blobs",
+      "type": "csv_reader",
+      "config": {
+        "dataset": "CLUSTER_BLOBS"
+      }
+    },
+    {
+      "id": "cluster",
+      "type": "cluster",
+      "config": {
+        "columns": [
+          "x",
+          "y"
+        ],
+        "method": "kmeans",
+        "k": 3,
+        "standardize": false,
+        "seed": 42
+      }
+    },
+    {
+      "id": "counts",
+      "type": "group_by",
+      "config": {
+        "keys": [
+          "cluster"
+        ],
+        "aggregations": [
+          {
+            "column": "id",
+            "fn": "count"
+          }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "blobs",
+      "to": "cluster"
+    },
+    {
+      "from": "cluster",
+      "to": "counts"
+    }
+  ],
+  "checks": [
+    {
+      "node": "cluster",
+      "kind": "expect",
+      "rows": 30,
+      "columns": [
+        {
+          "name": "id",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "x",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "y",
+          "type": "Number (Float)"
+        },
+        {
+          "name": "cluster",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "silhouette",
+          "type": "Number (Float)",
+          "min": 0.9701782157321818,
+          "max": 0.9838439152598573,
+          "mean": 0.9785995532153952
+        }
+      ]
+    },
+    {
+      "node": "counts",
+      "kind": "expect",
+      "rows": 3,
+      "columns": [
+        {
+          "name": "cluster",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "Count(id)",
+          "type": "Number (Integer)"
+        }
+      ],
+      "data": [
+        [
+          0,
+          10
+        ],
+        [
+          1,
+          10
+        ],
+        [
+          2,
+          10
+        ]
+      ],
+      "order": "unordered"
+    }
+  ],
+  "notes": "Fixture: three blobs of ten points around (0,0), (10,0) and (0,10). Silhouette expectations computed independently in Python on the blob labels: a = mean distance to the same blob (self excluded), b = smallest mean distance to another blob, s = (b - a) / max(a, b). K-means++ with seed 42 and standardize=false assigns exactly one blob per cluster; the label numbering is arbitrary, so only the per-cluster counts (10 each) and the permutation-invariant silhouette statistics are pinned."
+}

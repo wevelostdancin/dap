@@ -1,0 +1,107 @@
+{
+  "id": "dap.hypothesis_test",
+  "name": "Hypothesis Test",
+  "category": "/Statistics",
+  "type": "Manipulator",
+  "contributor": "dap-native",
+  "tier": "core",
+  "deprecated": false,
+  "available": true,
+  "description": "Runs one or more hypothesis tests over the input and returns one row per comparison: test, statistic, df, p_value, n, comparison, p_adjusted, effect_size, effect_size_name, ci_low, ci_high. Parametric tests: two-sample (Welch) and paired Student's t, one-sample t, chi-square test of independence, one-way ANOVA. Nonparametric tests: Mann-Whitney U, Kruskal-Wallis H, Wilcoxon signed rank (normal approximation with tie correction). Tukey's HSD emits one row per group pair with the studentized-range p-value. correction none/bonferroni/holm/bh fills p_adjusted. p-values are computed by the engine's own incomplete beta/gamma implementation and the studentized range quadrature because DuckDB has no erf/beta.",
+  "inPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "outPorts": [
+    {
+      "index": 0,
+      "name": "Data",
+      "type": "BufferedDataTable"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "title": "Hypothesis Test configuration",
+    "additionalProperties": false,
+    "properties": {
+      "test": {
+        "type": "string",
+        "title": "Test",
+        "description": "Hypothesis test to run.",
+        "enum": [
+          "t_test_two_sample",
+          "t_test_paired",
+          "t_test_one_sample",
+          "chi_square",
+          "anova",
+          "mann_whitney",
+          "kruskal_wallis",
+          "wilcoxon_signed_rank",
+          "tukey_hsd"
+        ]
+      },
+      "value": {
+        "type": "string",
+        "title": "Value column",
+        "description": "Numeric measurement column for the t tests, ANOVA, Tukey and the rank tests, categorical column for chi_square."
+      },
+      "group": {
+        "type": "string",
+        "title": "Group column",
+        "description": "Categorical grouping column for t_test_two_sample, chi_square, anova, mann_whitney, kruskal_wallis and tukey_hsd."
+      },
+      "group_a": {
+        "type": "string",
+        "title": "First group",
+        "description": "t_test_two_sample/mann_whitney: a value of the group column, compared as text. t_test_paired/wilcoxon_signed_rank: the first numeric column."
+      },
+      "group_b": {
+        "type": "string",
+        "title": "Second group",
+        "description": "t_test_two_sample/mann_whitney: a value of the group column, compared as text. t_test_paired/wilcoxon_signed_rank: the second numeric column."
+      },
+      "mu": {
+        "type": "number",
+        "title": "Hypothesised mean",
+        "description": "Null-hypothesis mean for t_test_one_sample.",
+        "default": 0
+      },
+      "alpha": {
+        "type": "number",
+        "title": "Significance level",
+        "description": "Validated to be in (0, 1); sets the confidence level of the effect-size interval.",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "alternative": {
+        "type": "string",
+        "title": "Alternative hypothesis",
+        "description": "Tail used by the t tests, mann_whitney and wilcoxon_signed_rank; chi_square, anova, kruskal_wallis and tukey_hsd always use the upper tail.",
+        "enum": [
+          "two-sided",
+          "less",
+          "greater"
+        ],
+        "default": "two-sided"
+      },
+      "correction": {
+        "type": "string",
+        "title": "Multiple comparison correction",
+        "description": "Adjusts p_adjusted over the rows the node emits: none, bonferroni, holm (step-down) or bh (Benjamini-Hochberg step-up).",
+        "enum": [
+          "none",
+          "bonferroni",
+          "holm",
+          "bh"
+        ],
+        "default": "none"
+      }
+    },
+    "required": [
+      "test"
+    ]
+  }
+}
