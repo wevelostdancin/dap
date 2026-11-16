@@ -91,7 +91,7 @@ class NativeLaunchTest(unittest.TestCase):
     def test_missing_jar_reports_build_hint(self):
         module = load_adapter(DAP_HOME=str(self.home))
         self.assertFalse(pathlib.Path(module.NATIVE_JAR).exists())
-        with mock.patch.object(module, "health", return_value=False):
+        with mock.patch.object(module, "probe", return_value=None):
             with self.assertRaises(module.DapError) as caught:
                 module.ensure_service()
         error = caught.exception
@@ -164,7 +164,7 @@ class NativeLaunchTest(unittest.TestCase):
 
         started_at = time.monotonic()
         with contextlib.redirect_stderr(io.StringIO()), \
-                mock.patch.object(module, "health", return_value=False), \
+                mock.patch.object(module, "probe", return_value=None), \
                 mock.patch.object(module, "_java", return_value=sys.executable), \
                 mock.patch.object(module.time, "sleep", return_value=None), \
                 mock.patch.object(module, "START_WAIT", 3.0), \
@@ -189,7 +189,7 @@ class NativeLaunchTest(unittest.TestCase):
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         try:
             with contextlib.redirect_stderr(io.StringIO()), \
-                    mock.patch.object(module, "health", return_value=False), \
+                    mock.patch.object(module, "probe", return_value=None), \
                     mock.patch.object(module, "_launch_native", return_value=child), \
                     mock.patch.object(module.time, "sleep", return_value=None), \
                     mock.patch.object(module, "START_WAIT", 0.05):
@@ -208,7 +208,7 @@ class NativeLaunchTest(unittest.TestCase):
         make_home(self.home)
         child = FakeChild()
         with contextlib.redirect_stderr(io.StringIO()), \
-                mock.patch.object(module, "health", return_value=False), \
+                mock.patch.object(module, "probe", return_value=None), \
                 mock.patch.object(module, "START_WAIT", 0), \
                 mock.patch.object(module, "_launch_native", return_value=child) as launch:
             with self.assertRaises(module.DapError):

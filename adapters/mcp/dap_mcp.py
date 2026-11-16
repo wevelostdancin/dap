@@ -50,6 +50,10 @@ _CHILD: subprocess.Popen | None = None
 # Boot generation of the engine we talked to last, and a pending restart notice.
 _GENERATION: str | None = None
 _RESTART_PENDING = False
+# A stale engine is replaced at most once per adapter process: if the jar on
+# disk still reports another version, the adapter attaches and warns instead of
+# killing the engine on every tool call.
+_REPLACED = False
 # progressToken of the tools/call in flight (params._meta.progressToken), if any.
 _PROGRESS_TOKEN = None
 # How often dap_run polls GET /v1/jobs/{id} while it forwards job progress.
@@ -123,6 +127,71 @@ def _restart_note() -> str:
         return ""
     _RESTART_PENDING = False
     return "engine restarted; workflows lost: "
+
+
+VERSION_FILE = os.path.join(DAP_HOME, "VERSION")
+STOP_WAIT = 15.0
+
+
+def expected_version() -> str | None:
+    """Версия сборки на диске (DAP_HOME/VERSION); None, если файла нет."""
+    try:
+        with open(VERSION_FILE, "r", encoding="utf-8") as stream:
+            return stream.read().strip() or None
+    except OSError:
+        return None
+
+
+def _allow_stale_engine() -> bool:
+    """DAP_ALLOW_STALE_ENGINE=1 — осознанно подключиться к движку другой сборки."""
+    return (os.environ.get("DAP_ALLOW_STALE_ENGINE") or "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
+def _version_tuple(text: str) -> tuple:
+    """1.2.0 -> (1, 2, 0); нечисловые хвосты игнорируются."""
+    parts = []
+    for chunk in str(text).split("."):
+        digits = "".join(ch for ch in chunk if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def _stale_reason(body: dict) -> str | None:
+    """Почему отвечающий движок — не сборка с диска; None, если это она или понять нельзя."""
+    running = str(body.get("version") or "").strip()
+    expected = expected_version()
+    if not running or not expected or running == expected:
+        return None
+    if _version_tuple(running) > _version_tuple(expected):
+        # Движок новее файла VERSION: заменять нечем, jar на диске старше.
+        return None
+    return f"engine {running} is running, build on disk is {expected}"
+
+
+def _stop_stale_engine(body: dict, reason: str) -> None:
+    """Погасить движок старой сборки, чтобы ensure_service поднял текущий jar."""
+    print(f"dap-mcp: replacing stale {reason}", file=sys.stderr, flush=True)
+    try:
+        with open(LOG, "ab") as log:
+            log.write(f"dap-mcp: replacing stale {reason}\n".encode("utf-8"))
+    except OSError:
+        pass
+    try:
+        call("POST", "/v1/shutdown", timeout=10)
+    except DapError:
+        pass
+    deadline = time.monotonic() + STOP_WAIT
+    while time.monotonic() < deadline:
+        if probe() is None:
+            return
+        time.sleep(0.2)
+    raise DapError(
+        f"движок {body.get('version')} не остановился за {STOP_WAIT:g} с; "
+        f"остановите процесс на {BASE} или задайте DAP_ALLOW_STALE_ENGINE=1",
+        code=-32001,
+        data={"base": BASE, "version": body.get("version"), "expected": expected_version()},
+    )
 
 
 def _java() -> str:
@@ -215,10 +284,23 @@ def _wait_for_warmup() -> None:
 
 
 def ensure_service() -> None:
-    """Поднять движок, если он ещё не запущен; чужой сервис не трогаем."""
-    if health():
-        _wait_for_warmup()
-        return
+    """Поднять движок, если он ещё не запущен; движок старой сборки заменить один раз."""
+    global _REPLACED
+    body = probe()
+    if body is not None:
+        reason = _stale_reason(body)
+        if reason is None or _allow_stale_engine():
+            _note_generation(body.get("generation"))
+            _wait_for_warmup()
+            return
+        if _REPLACED:
+            print(f"dap-mcp: {reason}; attaching anyway, already replaced once",
+                  file=sys.stderr, flush=True)
+            _note_generation(body.get("generation"))
+            _wait_for_warmup()
+            return
+        _REPLACED = True
+        _stop_stale_engine(body, reason)
     _reap_child()
     env = dict(os.environ)
     env.update({"DAP_HOME": DAP_HOME, "DAP_PORT": str(PORT), "DAP_BIND": BIND})
@@ -338,7 +420,7 @@ TOOLS = [
             {
                 "query": _str("подстрока имени узла, например 'reader' или 'filter'"),
                 "category": _str("категория каталога, например /io/read"),
-                "limit": _int("сколько узлов вернуть", 20),
+                "limit": _int("сколько узлов вернуть (по умолчанию — весь каталог)", 200),
             }
         ),
     },
@@ -902,7 +984,7 @@ def tool_search_nodes(args: dict):
         {
             "q": args.get("query") or "",
             "category": args.get("category") or "",
-            "limit": int(args.get("limit", 20)),
+            "limit": int(args.get("limit", 200)),
         }
     )
     return call("GET", f"/v1/nodes?{query}")
