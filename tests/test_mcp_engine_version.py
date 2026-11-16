@@ -9,7 +9,9 @@ stopped and the current jar is started instead.
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import os
 import pathlib
 import tempfile
@@ -142,6 +144,19 @@ class EngineBuildGuardTest(unittest.TestCase):
     def test_replacement_flag_is_set_after_a_successful_stop(self):
         self._run_ensure([{"version": "1.1.0", "generation": "old"}])
         self.assertTrue(self.mod._REPLACED)
+
+    def test_attaching_to_a_stale_engine_warns_once(self):
+        """A VERSION file ahead of the jar must not spam stderr on every call."""
+        self.mod._REPLACED = True
+        bodies = [{"version": "1.1.0"}, {"version": "1.1.0"}, {"version": "1.1.0"}]
+        stderr = io.StringIO()
+
+        with mock.patch.object(self.mod, "probe", side_effect=lambda: bodies.pop(0)), \
+             mock.patch.object(self.mod, "_wait_for_warmup"), \
+             contextlib.redirect_stderr(stderr):
+            for _ in range(3):
+                self.mod.ensure_service()
+        self.assertEqual(stderr.getvalue().count("attaching anyway"), 1)
 
     # ------------------------------------------------------------- preflight
 

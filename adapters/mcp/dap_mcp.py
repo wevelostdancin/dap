@@ -52,8 +52,9 @@ _GENERATION: str | None = None
 _RESTART_PENDING = False
 # A stale engine is replaced at most once per adapter process: if the jar on
 # disk still reports another version, the adapter attaches and warns instead of
-# killing the engine on every tool call.
+# killing the engine on every tool call. The warning is printed once as well.
 _REPLACED = False
+_WARNED_STALE = False
 # progressToken of the tools/call in flight (params._meta.progressToken), if any.
 _PROGRESS_TOKEN = None
 # How often dap_run polls GET /v1/jobs/{id} while it forwards job progress.
@@ -313,7 +314,7 @@ def _wait_for_warmup() -> None:
 
 def ensure_service() -> None:
     """Поднять движок, если он ещё не запущен; движок старой сборки заменить один раз."""
-    global _REPLACED
+    global _REPLACED, _WARNED_STALE
     body = probe()
     if body is not None:
         reason = _stale_reason(body)
@@ -322,8 +323,10 @@ def ensure_service() -> None:
             _wait_for_warmup()
             return
         if _REPLACED:
-            print(f"dap-mcp: {reason}; attaching anyway, already replaced once",
-                  file=sys.stderr, flush=True)
+            if not _WARNED_STALE:
+                _WARNED_STALE = True
+                print(f"dap-mcp: {reason}; attaching anyway, already replaced once",
+                      file=sys.stderr, flush=True)
             _note_generation(body.get("generation"))
             _wait_for_warmup()
             return
