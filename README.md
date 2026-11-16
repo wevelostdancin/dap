@@ -81,8 +81,9 @@ Cold start — около 0.4–0.5 с от `java -jar` до первого `200
 `0` выключает TTL), `DAP_MAX_RETAINED_JOBS` (200; cap истории заданий на сессию),
 `DAP_WARMUP` (1; прогрев движка при старте в фоновом потоке; `0` выключает),
 `DAP_ALLOW_STALE_ENGINE` (0; MCP-адаптер сверяет версию отвечающего движка с
-`VERSION` и заменяет движок старой сборки на текущий jar; `1` — подключиться к
-нему как есть),
+`VERSION` и заменяет движок старой сборки на текущий jar; если jar или java не
+готовы, движок не гасится — адаптер возвращает ошибку и оставляет порт живым;
+`1` — подключиться к нему как есть),
 `DAP_DUCKDB_MEMORY_LIMIT`, `DAP_DUCKDB_THREADS`, `DAP_DUCKDB_TEMP_DIR`,
 `DAP_DUCKDB_EXTENSION_DIR` (расширения DuckDB; ставятся `--install-extensions`),
 `DAP_CACHE_DIR` (Parquet-кэш; по умолчанию `$DAP_HOME/build/cache` при заданном

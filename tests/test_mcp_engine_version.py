@@ -81,7 +81,7 @@ class EngineBuildGuardTest(unittest.TestCase):
 
     # --------------------------------------------------------------- lifecycle
 
-    def _run_ensure(self, bodies):
+    def _run_ensure(self, bodies, blocker=None):
         """Run ensure_service with probe() answering bodies in order, then None."""
         calls = []
         queue = list(bodies)
@@ -92,6 +92,7 @@ class EngineBuildGuardTest(unittest.TestCase):
         with mock.patch.object(self.mod, "probe", side_effect=fake_probe), \
              mock.patch.object(self.mod, "health", return_value=True), \
              mock.patch.object(self.mod, "_wait_for_warmup"), \
+             mock.patch.object(self.mod, "_launch_blocker", return_value=blocker), \
              mock.patch.object(self.mod, "_launch_native",
                                return_value=FakeChild()) as launch, \
              mock.patch.object(self.mod, "call",
@@ -130,12 +131,66 @@ class EngineBuildGuardTest(unittest.TestCase):
         with mock.patch.object(self.mod, "probe", side_effect=fake_probe), \
              mock.patch.object(self.mod, "health", return_value=True), \
              mock.patch.object(self.mod, "_wait_for_warmup"), \
+             mock.patch.object(self.mod, "_launch_blocker", return_value=None), \
              mock.patch.object(self.mod, "_launch_native", return_value=FakeChild()), \
              mock.patch.object(self.mod, "call",
                                side_effect=lambda m, p, **kw: calls.append((m, p))):
             self.mod.ensure_service()
             self.mod.ensure_service()
         self.assertEqual(calls.count(("POST", "/v1/shutdown")), 1)
+
+    def test_replacement_flag_is_set_after_a_successful_stop(self):
+        self._run_ensure([{"version": "1.1.0", "generation": "old"}])
+        self.assertTrue(self.mod._REPLACED)
+
+    # ------------------------------------------------------------- preflight
+
+    def test_stale_engine_is_kept_when_the_jar_is_missing(self):
+        """Without a jar the old engine must survive: stopping it leaves no engine."""
+        (self.home / "engine-native" / "target" / "dap-native.jar").unlink()
+        calls = []
+
+        with mock.patch.object(self.mod, "probe", return_value={"version": "1.1.0"}), \
+             mock.patch.object(self.mod, "_wait_for_warmup"), \
+             mock.patch.object(self.mod, "call",
+                               side_effect=lambda m, p, **kw: calls.append((m, p))):
+            with self.assertRaises(self.mod.DapError) as caught:
+                self.mod.ensure_service()
+        self.assertEqual(calls, [])
+        self.assertIn("jar", str(caught.exception).lower())
+        self.assertFalse(self.mod._REPLACED)
+
+    def test_stale_engine_is_kept_when_java_does_not_run(self):
+        """A broken java must be reported before the old engine is stopped."""
+        calls = []
+
+        with mock.patch.object(self.mod, "probe", return_value={"version": "1.1.0"}), \
+             mock.patch.object(self.mod, "_java", return_value="/nonexistent/java"), \
+             mock.patch.object(self.mod, "_wait_for_warmup"), \
+             mock.patch.object(self.mod, "call",
+                               side_effect=lambda m, p, **kw: calls.append((m, p))):
+            with self.assertRaises(self.mod.DapError) as caught:
+                self.mod.ensure_service()
+        self.assertEqual(calls, [])
+        self.assertIn("java", str(caught.exception).lower())
+        self.assertFalse(self.mod._REPLACED)
+
+    def test_replacement_is_retried_when_the_old_engine_does_not_stop(self):
+        """A failed stop must not mark the engine as replaced: next call retries."""
+        calls = []
+
+        with mock.patch.object(self.mod, "probe", return_value={"version": "1.1.0"}), \
+             mock.patch.object(self.mod, "_launch_blocker", return_value=None), \
+             mock.patch.object(self.mod, "STOP_WAIT", 0.0), \
+             mock.patch.object(self.mod, "_wait_for_warmup"), \
+             mock.patch.object(self.mod, "call",
+                               side_effect=lambda m, p, **kw: calls.append((m, p))):
+            with self.assertRaises(self.mod.DapError):
+                self.mod.ensure_service()
+            self.assertFalse(self.mod._REPLACED)
+            with self.assertRaises(self.mod.DapError):
+                self.mod.ensure_service()
+        self.assertEqual(calls.count(("POST", "/v1/shutdown")), 2)
 
     # ---------------------------------------------------------------- catalog
 

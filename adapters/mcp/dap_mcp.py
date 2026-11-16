@@ -131,6 +131,7 @@ def _restart_note() -> str:
 
 VERSION_FILE = os.path.join(DAP_HOME, "VERSION")
 STOP_WAIT = 15.0
+JAVA_CHECK_TIMEOUT = 15
 
 
 def expected_version() -> str | None:
@@ -192,6 +193,33 @@ def _stop_stale_engine(body: dict, reason: str) -> None:
         code=-32001,
         data={"base": BASE, "version": body.get("version"), "expected": expected_version()},
     )
+
+
+def _java_blocker(java: str) -> str | None:
+    """Почему java не запускается; None, если запускается."""
+    try:
+        done = subprocess.run([java, "-version"], capture_output=True,
+                              timeout=JAVA_CHECK_TIMEOUT)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"java не запускается ({java}): {exc}"
+    if done.returncode == 0:
+        return None
+    raw = done.stderr or done.stdout or b""
+    lines = raw.decode("utf-8", "replace").strip().splitlines()
+    detail = lines[0] if lines else f"exit code {done.returncode}"
+    return f"java не запускается ({java}): {detail}"
+
+
+def _launch_blocker() -> str | None:
+    """Почему текущую сборку нельзя запустить; None, если можно.
+
+    Проверяется до гашения движка старой сборки: иначе он уже остановлен, а
+    поднять вместо него нечего и порт остаётся пустым.
+    """
+    if not os.path.isfile(NATIVE_JAR):
+        return (f"нет jar {NATIVE_JAR}; соберите: cd engine-native && "
+                "./mvnw -DskipTests package")
+    return _java_blocker(_java())
 
 
 def _java() -> str:
@@ -299,8 +327,18 @@ def ensure_service() -> None:
             _note_generation(body.get("generation"))
             _wait_for_warmup()
             return
-        _REPLACED = True
+        blocker = _launch_blocker()
+        if blocker is not None:
+            raise DapError(
+                f"{reason}, но заменить его нечем: {blocker.rstrip('.')}. "
+                "Движок оставлен как есть; задайте JAVA_HOME (JDK 21) или "
+                "DAP_ALLOW_STALE_ENGINE=1, чтобы подключиться к нему осознанно.",
+                code=-32001,
+                data={"base": BASE, "version": body.get("version"),
+                      "expected": expected_version(), "blocker": blocker},
+            )
         _stop_stale_engine(body, reason)
+        _REPLACED = True
     _reap_child()
     env = dict(os.environ)
     env.update({"DAP_HOME": DAP_HOME, "DAP_PORT": str(PORT), "DAP_BIND": BIND})
