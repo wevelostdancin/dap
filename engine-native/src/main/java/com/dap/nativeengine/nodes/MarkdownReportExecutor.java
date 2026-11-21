@@ -1,23 +1,23 @@
 package com.dap.nativeengine.nodes;
 
-import com.dap.nativeengine.api.Json;
 import com.dap.nativeengine.engine.ColumnSpec;
+import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
+import com.dap.nativeengine.engine.ProfileColumn;
+import com.dap.nativeengine.engine.ProfileData;
 import com.dap.nativeengine.engine.TableData;
 import com.dap.nativeengine.exec.NodeContext;
 import com.dap.nativeengine.exec.NodeExecutor;
+import com.dap.nativeengine.io.PathGuard;
 import com.dap.nativeengine.report.ReportDocument;
 import com.dap.nativeengine.report.ReportWriter;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
-import com.dap.nativeengine.io.PathGuard;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -74,6 +74,10 @@ public final class MarkdownReportExecutor implements NodeExecutor {
                         int input, String path, String alt, int width) {
     }
 
+    /** Profile sections sharing an input and column selection share one statistics scan. */
+    private record ProfileKey(int input, List<String> columns) {
+    }
+
     private static ReportDocument document(NodeContext context, List<LazyPlan> inputs, JsonNode config)
             throws Exception {
         ReportDocument.Format format = enumSetting(config, "format", ReportDocument.Format.class,
@@ -90,13 +94,14 @@ public final class MarkdownReportExecutor implements NodeExecutor {
                 ReportDocument.Orientation.class, null);
         List<Spec> specs = specs(config, inputs);
         Map<Integer, TableData> previews = previews(context, inputs, specs);
+        Map<ProfileKey, ProfileData> profiles = new HashMap<>();
         Map<Integer, Long> totals = new HashMap<>();
         List<ReportDocument.Section> sections = new ArrayList<>();
         for (Spec spec : specs) {
             LazyPlan input = inputs.get(spec.input());
             sections.add(switch (spec.kind()) {
                 case "table" -> table(spec, input, previews.get(spec.input()));
-                case "profile" -> profile(context, spec, input);
+                case "profile" -> profile(context, spec, input, profiles);
                 case "metrics" -> metrics(context, spec, input,
                         totalRows(context, input, spec.input(), previews, totals));
                 case "text" -> new ReportDocument.Section.Text(spec.title(), spec.text());
@@ -305,17 +310,46 @@ public final class MarkdownReportExecutor implements NodeExecutor {
         return new ReportDocument.Section.Table(spec.title(), selected, data);
     }
 
-    private static ReportDocument.Section.Table profile(NodeContext context, Spec spec, LazyPlan input)
+    private static ReportDocument.Section.Table profile(NodeContext context, Spec spec, LazyPlan input,
+                                                        Map<ProfileKey, ProfileData> profiles)
             throws Exception {
-        ObjectNode describeConfig = Json.object();
-        ArrayNode selected = describeConfig.putArray("columns");
-        spec.columns().forEach(selected::add);
-        NodeContext describeContext = new NodeContext(context.workflowId(), context.nodeId(),
-                context.sessionId(), describeConfig, context.db(), context.jobConnection());
-        LazyPlan profile = new DescribeExecutor().execute(describeContext, List.of(input));
-        TableData data = profile.preview(spec.limit(), context.workflowId(), context.nodeId());
-        List<String> headers = data.columns().stream().map(ColumnSpec::name).toList();
-        return new ReportDocument.Section.Table(spec.title(), headers, data.data());
+        List<ColumnSpec> columns = spec.columns().isEmpty()
+                ? input.columns()
+                : spec.columns().stream().map(name -> NodeSql.column(input.columns(), name)).toList();
+        ProfileKey key = new ProfileKey(spec.input(), columns.stream().map(ColumnSpec::name).toList());
+        ProfileData data = profiles.get(key);
+        if (data == null) {
+            // The same key is used by GET /profile of the upstream node; DuckDbSession keeps
+            // one statistics scan per workflow run and (node, plan, columns) combination.
+            String nodeId = spec.input() < context.inputNodeIds().size()
+                    ? context.inputNodeIds().get(spec.input()) : null;
+            LazyPlan plan = columns.equals(input.columns())
+                    ? input
+                    : new LazyPlan(input.session(), input.sql(), columns);
+            data = plan.profile(0L, context.workflowId(), nodeId);
+            profiles.put(key, data);
+        }
+        List<List<String>> rows = new ArrayList<>();
+        for (ProfileColumn column : data.columns()) {
+            if (rows.size() >= spec.limit()) {
+                break;
+            }
+            rows.add(Arrays.asList(
+                    column.name(), column.type(),
+                    Long.toString(data.rows() - column.missing()),
+                    Long.toString(column.missing()),
+                    Long.toString(column.distinctExact()),
+                    number(column.min()), number(column.max()), number(column.mean()),
+                    number(column.stddev())));
+        }
+        return new ReportDocument.Section.Table(spec.title(), PROFILE_HEADERS, rows);
+    }
+
+    private static final List<String> PROFILE_HEADERS = List.of(
+            "column", "type", "count", "missing", "distinct", "min", "max", "mean", "stddev");
+
+    private static String number(Double value) {
+        return value == null ? null : DuckDbSession.format(value);
     }
 
     private static ReportDocument.Section.Table metrics(NodeContext context, Spec spec, LazyPlan input,

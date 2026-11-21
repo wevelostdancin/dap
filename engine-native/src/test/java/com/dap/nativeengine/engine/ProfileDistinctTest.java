@@ -156,6 +156,28 @@ class ProfileDistinctTest {
         }
     }
 
+    @Test
+    void aboveTheRefinementLimitSmallCardinalityIsStillExact() throws Exception {
+        int rows = 1_000_001;
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("id", "Int64"), ColumnSpec.of("v", "Int64"));
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan plan = new LazyPlan(db,
+                    "SELECT i AS \"id\", i % 8 AS \"v\" FROM range(" + rows + ") t(i)", columns);
+
+            ProfileData profile = plan.profile();
+
+            assertEquals(rows, profile.rows());
+            ProfileColumn v = profile.columns().get(1);
+            assertEquals(8, v.distinct(), "eight categories above 1M rows must not print as 9");
+            assertEquals(8, v.distinctExact(), "the report section uses the refined exact count");
+            ProfileColumn id = profile.columns().get(0);
+            assertTrue(id.distinct() < rows, "high cardinality must keep the sketch");
+            assertEquals(id.distinct(), id.distinctExact(),
+                    "an exact count over a million unique ids is deliberately not computed");
+        }
+    }
+
     private static LazyPlan sequentialPlan(DuckDbSession db, String tablePrefix, int rows) throws Exception {
         List<ColumnSpec> columns = List.of(ColumnSpec.of("id", "Int64"));
         List<Object[]> data = new ArrayList<>(rows);
