@@ -1,6 +1,5 @@
 package com.dap.nativeengine.io;
 
-import com.dap.nativeengine.csv.CsvTableReader;
 import com.dap.nativeengine.engine.ArrowTable;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.TypeMap;
@@ -21,7 +20,6 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -35,49 +33,16 @@ import java.util.concurrent.TimeUnit;
  * while an unchanged source returns the existing Parquet file untouched.
  */
 public final class IngestService {
-    /** CSVs above this size are streamed through DuckDB instead of parsed into Arrow. */
-    private static final long DEFAULT_STREAM_MB = 64;
-
     private final Path cacheDir;
-    private final long streamThresholdMb;
 
     /** Production service: {@code DAP_CACHE_DIR} or {@code ~/.dap/cache}. */
     public IngestService() {
-        this(defaultCacheDir(), streamThresholdMb(System.getenv()));
+        this(defaultCacheDir());
     }
 
-    /** Test seam: an explicit cache directory and the default streaming threshold. */
+    /** Test seam: an explicit cache directory. */
     public IngestService(Path cacheDir) {
-        this(cacheDir, streamThresholdMb(System.getenv()));
-    }
-
-    /** Test seam: an explicit cache directory and streaming threshold in megabytes (0 = always stream). */
-    public IngestService(Path cacheDir, long streamThresholdMb) {
         this.cacheDir = Objects.requireNonNull(cacheDir, "cacheDir");
-        if (streamThresholdMb < 0) {
-            throw new IllegalArgumentException("DAP_INGEST_STREAM_MB must be non-negative, got "
-                    + streamThresholdMb);
-        }
-        this.streamThresholdMb = streamThresholdMb;
-    }
-
-    /** {@code DAP_INGEST_STREAM_MB}, 64 by default; a blank or invalid value keeps the default. */
-    static long streamThresholdMb(Map<String, String> env) {
-        String raw = env.get("DAP_INGEST_STREAM_MB");
-        if (raw == null || raw.isBlank()) {
-            return DEFAULT_STREAM_MB;
-        }
-        try {
-            long value = Long.parseLong(raw.strip());
-            return value < 0 ? DEFAULT_STREAM_MB : value;
-        } catch (NumberFormatException ignored) {
-            return DEFAULT_STREAM_MB;
-        }
-    }
-
-    /** A source larger than the threshold is ingested by DuckDB's streaming CSV reader. */
-    static boolean shouldStream(long bytes, long thresholdMb) {
-        return bytes > thresholdMb * 1024L * 1024L;
     }
 
     /** One output column of the ingested dataset, in Arrow type names. */
@@ -105,10 +70,6 @@ public final class IngestService {
             return new CsvOptions(true, ",", "\"", "\"", false, false, true, List.of());
         }
 
-        public boolean isDefault() {
-            return header && ",".equals(delimiter) && "\"".equals(quote) && "\"".equals(escape)
-                    && !ignoreErrors && !nullPadding && strictMode && nullStrings.isEmpty();
-        }
     }
 
     private enum Format {
@@ -173,16 +134,9 @@ public final class IngestService {
     private void write(DuckDbSession db, Path source, Format format, Path target,
                        CsvOptions options) throws SQLException {
         switch (format) {
-            case CSV -> {
-                // Large or custom CSVs never become an Arrow table: DuckDB streams read_csv
-                // into the Parquet writer, so heap usage stays bounded by the read buffer.
-                if (stream(source) || !options.isDefault()) {
-                    copy(db, csvRelation(source, options), target);
-                } else {
-                    copyArrow(db, CsvTableReader.read(source,
-                            new CsvTableReader.Options(',', true, List.of(), false)), target);
-                }
-            }
+            // All CSVs go through DuckDB read_csv, so ingest shares the csv_reader NULL
+            // semantics and heap usage stays bounded by DuckDB's read buffer.
+            case CSV -> copy(db, csvRelation(source, options), target);
             case EXCEL -> copyArrow(db, excel(source), target);
             case JSON -> copy(db, "read_json_auto(" + literal(source.toString()) + ")", target);
             case PARQUET -> copy(db, "read_parquet(" + literal(source.toString()) + ")", target);
@@ -216,15 +170,6 @@ public final class IngestService {
             list.append(literal(values.get(index)));
         }
         return list.append(']').toString();
-    }
-
-    /** Whether this source is big enough for the streaming CSV path. */
-    private boolean stream(Path source) throws SQLException {
-        try {
-            return shouldStream(Files.size(source), streamThresholdMb);
-        } catch (IOException failure) {
-            throw new SQLException("cannot read " + source + ": " + failure.getMessage(), failure);
-        }
     }
 
     private static ArrowTable excel(Path source) {
