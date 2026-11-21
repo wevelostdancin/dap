@@ -1092,7 +1092,8 @@ class NativeServiceTest {
         Resp readerEstimate = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/estimate");
         assertEquals(200, readerEstimate.status(), readerEstimate.raw().body());
         assertEquals(reader, readerEstimate.body().path("node").asText());
-        assertEquals(150, readerEstimate.body().path("rows").asInt());
+        // A lazy read_csv plan reports DuckDB's estimate, not an exact materialized row count.
+        assertTrue(readerEstimate.body().path("rows").asInt() >= 150, readerEstimate.raw().body());
         assertFalse(readerEstimate.body().path("operators").isEmpty());
         assertTrue(readerEstimate.body().path("plan").has("physical_plan"));
 

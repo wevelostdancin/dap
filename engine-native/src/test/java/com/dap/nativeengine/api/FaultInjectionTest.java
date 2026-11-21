@@ -149,23 +149,26 @@ class FaultInjectionTest {
         Resp table = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/table");
         assertEquals(409, table.status(), table.raw().body());
         assertEquals("node_failed", table.body().path("code").asText());
-        assertTrue(table.body().path("error").asText().contains("cannot read CSV file"),
+        assertTrue(table.body().path("error").asText().contains("file not found"),
                 table.raw().body());
     }
 
     @Test
-    void malformedCsvFailsWithTheParserMessage() throws Exception {
+    void malformedCsvFailsWithTheDuckDbConversionMessage() throws Exception {
         Path broken = tempDir.resolve("broken.csv");
         Files.writeString(broken, "a\n1\nabc\n", StandardCharsets.UTF_8);
         String workflow = createWorkflow("malformed-csv");
-        addNode(workflow, "dap.csv_reader", Map.of(
+        String reader = addNode(workflow, "dap.csv_reader", Map.of(
                 "file", broken.toString(),
                 "columns", List.of(Map.of("name", "a", "type", "Int64"))));
 
+        // read_csv is lazy: the file is scanned by the first /table call, not by run.
         Resp run = post("/v1/workflows/" + workflow + "/run", Map.of());
-        assertEquals(500, run.status(), run.raw().body());
-        assertTrue(run.body().path("error").asText().contains("cannot parse value 'abc'"),
-                run.raw().body());
+        assertEquals(200, run.status(), run.raw().body());
+
+        Resp table = get("/v1/workflows/" + workflow + "/nodes/" + reader + "/table");
+        assertTrue(table.status() >= 400, table.raw().body());
+        assertTrue(table.body().path("error").asText().contains("abc"), table.raw().body());
     }
 
     @Test

@@ -75,7 +75,7 @@ class StatusCodeContractTest {
         Resp failedNode = tableOfFailedNode();
         assertEquals(409, failedNode.status(), failedNode.raw().body());
         assertEquals("node_failed", failedNode.body().path("code").asText());
-        assertTrue(failedNode.body().path("error").asText().contains("cannot read CSV file"),
+        assertTrue(failedNode.body().path("error").asText().contains("file not found"),
                 "node_failed must carry the node message: " + failedNode.raw().body());
 
         assertEquals(404, tableOfUnknownNode().status());

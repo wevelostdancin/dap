@@ -8,13 +8,18 @@ import com.dap.nativeengine.exec.NodeContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.zip.GZIPOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -50,33 +55,38 @@ class CsvReaderExecutorTest {
     }
 
     @Test
-    void unquotedEmptyFieldIsNullAndQuotedEmptyFieldIsEmptyString() throws Exception {
-        Path file = write("empty.csv", "id,note\n1,\n2,\"\"\n");
+    void unquotedAndQuotedEmptyFieldsAreNull() throws Exception {
+        Path file = write("empty.csv", "txt,num\n,1\n\"\",2\n\"x\",3\n");
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
             NodeContext context = NodeTestSupport.context(db, job, fileConfig(file));
             LazyPlan plan = new CsvReaderExecutor().execute(context, List.of());
 
-            assertEquals(List.of(ColumnSpec.of("id", "Int64"), ColumnSpec.of("note", "Utf8")), plan.columns());
+            assertEquals(List.of(ColumnSpec.of("txt", "Utf8"), ColumnSpec.of("num", "Int64")), plan.columns());
             TableData data = plan.preview(10);
-            assertEquals(2, data.rows());
-            assertNull(data.data().get(0).get(1));
-            assertEquals("", data.data().get(1).get(1));
+            assertEquals(3, data.rows());
+            assertNull(data.data().get(0).get(0));
+            assertNull(data.data().get(1).get(0));
+            assertEquals("x", data.data().get(2).get(0));
         }
     }
 
     @Test
-    void emptyStringIsNullTurnsQuotedEmptyIntoSqlNull() throws Exception {
-        Path file = write("empty-null.csv", "id,note\n1,\n2,\"\"\n");
+    void emptyStringIsNullIsAcceptedButHasNoEffect() throws Exception {
+        Path file = write("empty-null.csv", "txt,num\n,1\n\"\",2\n\"x\",3\n");
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
-            NodeContext context = NodeTestSupport.context(db, job,
-                    "{\"file\":\"" + NodeTestSupport.path(file) + "\",\"emptyStringIsNull\":true}");
-            LazyPlan plan = new CsvReaderExecutor().execute(context, List.of());
+            for (boolean flag : new boolean[]{false, true}) {
+                String config = "{\"file\":\"" + NodeTestSupport.path(file)
+                        + "\",\"emptyStringIsNull\":" + flag + "}";
+                LazyPlan plan = new CsvReaderExecutor().execute(
+                        NodeTestSupport.context(db, job, config), List.of());
 
-            TableData data = plan.preview(10);
-            assertEquals(2, data.rows());
-            assertNull(data.data().get(0).get(1));
-            assertNull(data.data().get(1).get(1));
-            assertEquals(2, plan.profile().columns().get(1).missing());
+                TableData data = plan.preview(10);
+                assertEquals(3, data.rows());
+                assertNull(data.data().get(0).get(0));
+                assertNull(data.data().get(1).get(0));
+                assertEquals(2, plan.profile().columns().get(0).missing());
+                assertEquals("x", data.data().get(2).get(0));
+            }
         }
     }
 
@@ -130,6 +140,31 @@ class CsvReaderExecutorTest {
     }
 
     @Test
+    void tabDelimiterEscapeIsHonored() throws Exception {
+        Path file = write("tab.csv", "id\tnote\n1\talpha\n2\tbeta\n");
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            String config = "{\"file\":\"" + NodeTestSupport.path(file) + "\",\"delimiter\":\"\\\\t\"}";
+            LazyPlan plan = new CsvReaderExecutor().execute(
+                    NodeTestSupport.context(db, job, config), List.of());
+            assertEquals(List.of("1", "2"), firstColumn(plan));
+        }
+    }
+
+    @Test
+    void gzipIsDetectedAndDecompressedByDuckDb() throws Exception {
+        Path file = dir.resolve("gzip.csv.gz");
+        try (OutputStream out = new GZIPOutputStream(Files.newOutputStream(file))) {
+            out.write("id,name\n1,alpha\n2,beta\n".getBytes(StandardCharsets.UTF_8));
+        }
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            LazyPlan plan = new CsvReaderExecutor().execute(
+                    NodeTestSupport.context(db, job, fileConfig(file)), List.of());
+            assertEquals(List.of("alpha", "beta"),
+                    plan.preview(10).data().stream().map(row -> row.get(1)).toList());
+        }
+    }
+
+    @Test
     void missingFileFailsWithReadableMessage() throws Exception {
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
             Path absent = dir.resolve("absent.csv");
@@ -150,25 +185,74 @@ class CsvReaderExecutorTest {
             IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
                     () -> new CsvReaderExecutor().execute(NodeTestSupport.context(db, job, config), List.of()));
             assertTrue(failure.getMessage().contains("missing"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("header"), failure.getMessage());
         }
     }
 
     @Test
-    void unparseableTypedValueNamesRowAndColumn() throws Exception {
+    void unsupportedColumnTypeFails() throws Exception {
+        Path file = write("bad-type.csv", "id\n1\n");
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            String config = """
+                    {"file":"%s","columns":[{"name":"id","type":"Mystery"}]}
+                    """.formatted(NodeTestSupport.path(file));
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> new CsvReaderExecutor().execute(NodeTestSupport.context(db, job, config), List.of()));
+            assertTrue(failure.getMessage().contains("unsupported type"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("Mystery"), failure.getMessage());
+        }
+    }
+
+    @Test
+    void unparseableTypedValueNamesColumn() throws Exception {
         Path file = write("bad-value.csv", "id\nnope\n");
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
             String config = """
                     {"file":"%s","columns":[{"name":"id","type":"Int64"}]}
                     """.formatted(NodeTestSupport.path(file));
-            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-                    () -> new CsvReaderExecutor().execute(NodeTestSupport.context(db, job, config), List.of()));
+            LazyPlan plan = new CsvReaderExecutor().execute(
+                    NodeTestSupport.context(db, job, config), List.of());
+            SQLException failure = assertThrows(SQLException.class, () -> plan.preview(10));
             assertTrue(failure.getMessage().contains("id"), failure.getMessage());
-            assertTrue(failure.getMessage().toLowerCase(java.util.Locale.ROOT).contains("row"), failure.getMessage());
         }
     }
 
     @Test
-    void quotedEmptyValueForcesUtf8InferenceAndKeepsEmptyString() throws Exception {
+    void zstdFileIsRejectedWithReadableMessage() throws Exception {
+        Path file = dir.resolve("sample.csv.zst");
+        Files.write(file, new byte[]{0x28, (byte) 0xb5, 0x2f, (byte) 0xfd, 0, 0, 0, 0});
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> new CsvReaderExecutor().execute(
+                            NodeTestSupport.context(db, job, fileConfig(file)), List.of()));
+            assertTrue(failure.getMessage().toLowerCase(Locale.ROOT).contains("zstd"), failure.getMessage());
+        }
+    }
+
+    @Test
+    void compressionMismatchFailsWithReadableMessage() throws Exception {
+        Path plain = write("plain.csv", "id\n1\n");
+        Path gzipped = dir.resolve("plain.csv.gz");
+        try (OutputStream out = new GZIPOutputStream(Files.newOutputStream(gzipped))) {
+            out.write("id\n1\n".getBytes(StandardCharsets.UTF_8));
+        }
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            String plainPath = NodeTestSupport.path(plain);
+            String gzipPath = NodeTestSupport.path(gzipped);
+            IllegalArgumentException plainAsGzip = assertThrows(IllegalArgumentException.class,
+                    () -> new CsvReaderExecutor().execute(NodeTestSupport.context(db, job,
+                            "{\"file\":\"" + plainPath + "\",\"compression\":\"gzip\"}"), List.of()));
+            assertTrue(plainAsGzip.getMessage().contains("not gzip-compressed"), plainAsGzip.getMessage());
+
+            IllegalArgumentException gzipAsNone = assertThrows(IllegalArgumentException.class,
+                    () -> new CsvReaderExecutor().execute(NodeTestSupport.context(db, job,
+                            "{\"file\":\"" + gzipPath + "\",\"compression\":\"none\"}"), List.of()));
+            assertTrue(gzipAsNone.getMessage().contains("gzip-compressed"), gzipAsNone.getMessage());
+        }
+    }
+
+    @Test
+    void quotedEmptyValueIsNullWithInferredType() throws Exception {
         Path file = write("infer-quoted-empty.csv", "id,note\n1,\"\"\n2,\"\"\n");
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
             LazyPlan plan = new CsvReaderExecutor().execute(
@@ -176,38 +260,40 @@ class CsvReaderExecutorTest {
 
             assertEquals(List.of(ColumnSpec.of("id", "Int64"), ColumnSpec.of("note", "Utf8")), plan.columns());
             TableData data = plan.preview(10);
-            assertEquals("", data.data().get(0).get(1));
-            assertEquals("", data.data().get(1).get(1));
+            assertNull(data.data().get(0).get(1));
+            assertNull(data.data().get(1).get(1));
         }
     }
 
     @Test
-    void mixedNumbersAndQuotedEmptyInferUtf8Strings() throws Exception {
+    void mixedNumbersAndQuotedEmptyInferInt64WithNull() throws Exception {
         Path file = write("infer-mixed.csv", "value\n1\n2\n\"\"\n");
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
             LazyPlan plan = new CsvReaderExecutor().execute(
                     NodeTestSupport.context(db, job, fileConfig(file)), List.of());
 
-            assertEquals(List.of(ColumnSpec.of("value", "Utf8")), plan.columns());
-            assertEquals(List.of("1", "2", ""), firstColumn(plan));
+            assertEquals(List.of(ColumnSpec.of("value", "Int64")), plan.columns());
+            assertEquals(Arrays.asList("1", "2", null), firstColumn(plan));
         }
     }
 
     @Test
-    void duplicateHeaderNamesAreRejected() throws Exception {
-        Path file = write("duplicate-header.csv", "a,a\n1,2\n");
+    void duplicateHeaderNamesAreRenamedByDuckDb() throws Exception {
+        Path file = write("duplicate-header.csv", "a,a,b\n1,2,3\n");
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
-            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-                    () -> new CsvReaderExecutor().execute(
-                            NodeTestSupport.context(db, job, fileConfig(file)), List.of()));
-            assertTrue(failure.getMessage().toLowerCase(java.util.Locale.ROOT).contains("duplicate"),
-                    failure.getMessage());
-            assertTrue(failure.getMessage().contains("a"), failure.getMessage());
+            LazyPlan plan = new CsvReaderExecutor().execute(
+                    NodeTestSupport.context(db, job, fileConfig(file)), List.of());
+
+            assertEquals(List.of(ColumnSpec.of("a", "Int64"),
+                    ColumnSpec.of("a_1", "Int64"),
+                    ColumnSpec.of("b", "Int64")), plan.columns());
+            assertEquals(List.of("1", "2", "3"),
+                    List.copyOf(plan.preview(10).data().get(0)));
         }
     }
 
     @Test
-    void rerunReplacesStableTableInsteadOfCreatingAnother() throws Exception {
+    void rerunReadsCurrentFileWithoutCreatingTables() throws Exception {
         Path first = write("run-1.csv", "id\n1\n2\n");
         Path second = write("run-2.csv", "id\n3\n4\n5\n");
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
@@ -218,9 +304,9 @@ class CsvReaderExecutorTest {
             LazyPlan two = new CsvReaderExecutor().execute(
                     NodeTestSupport.context(db, job, fileConfig(second)), List.of());
             assertEquals(List.of("3", "4", "5"), firstColumn(two));
+            assertEquals(List.of("1", "2"), firstColumn(one));
 
-            assertEquals(1, tableCount(db, "lower(table_name) = 'csv_wf_node'"));
-            assertEquals(1, tableCount(db, "lower(table_name) LIKE 'csv_%'"));
+            assertEquals(0, tableCount(db, "lower(table_name) LIKE 'csv_%'"));
         }
     }
 }
