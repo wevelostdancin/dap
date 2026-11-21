@@ -10,6 +10,7 @@ import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /** Profiles are shared across a run, but never across runs, nodes or column selections. */
@@ -63,6 +64,21 @@ class ProfileCacheTest {
             for (Future<ProfileData> read : reads) {
                 assertEquals(first, read.get(), "parallel materializations must return the same data");
             }
+        }
+    }
+
+    @Test
+    void reportScanWarmsThePlainProfileEntry() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan plan = plan(db, "cache_warm");
+            ProfileData report = plan.profile(0L, "wf", "node", true);
+            assertEquals(1.0, report.columns().get(0).stddev(), 1e-9,
+                    "a report scan computes stddev");
+            ProfileData plain = plan.profile(0L, "wf", "node");
+            assertNull(plain.columns().get(0).stddev(),
+                    "/profile never returns stddev, even after a report warmed the entry");
+            assertEquals(report.withoutStddev(), plain,
+                    "the warmed entry carries the same statistics");
         }
     }
 

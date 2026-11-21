@@ -326,7 +326,7 @@ public final class MarkdownReportExecutor implements NodeExecutor {
             LazyPlan plan = columns.equals(input.columns())
                     ? input
                     : new LazyPlan(input.session(), input.sql(), columns);
-            data = plan.profile(0L, context.workflowId(), nodeId);
+            data = plan.profile(0L, context.workflowId(), nodeId, true);
             profiles.put(key, data);
         }
         List<List<String>> rows = new ArrayList<>();

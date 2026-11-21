@@ -61,6 +61,12 @@ public final class LazyPlan {
         return session.profile(sql, columns, timeoutMillis, workflowId, nodeId);
     }
 
+    /** Bounded profile that also computes stddev; used by markdown report sections. */
+    public ProfileData profile(long timeoutMillis, String workflowId, String nodeId,
+                               boolean withStddev) throws SQLException {
+        return session.profile(sql, columns, timeoutMillis, workflowId, nodeId, withStddev);
+    }
+
     public long count() throws SQLException {
         return session.count(sql);
     }

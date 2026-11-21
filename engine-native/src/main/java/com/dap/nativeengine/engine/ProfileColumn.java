@@ -11,4 +11,10 @@ package com.dap.nativeengine.engine;
 public record ProfileColumn(String name, String type, long missing, long distinct,
                             Double min, Double max, Double mean, Double stddev,
                             long distinctExact) {
+
+    /** Same statistics without the stddev that only report sections render. */
+    public ProfileColumn withoutStddev() {
+        return stddev == null ? this
+                : new ProfileColumn(name, type, missing, distinct, min, max, mean, null, distinctExact);
+    }
 }

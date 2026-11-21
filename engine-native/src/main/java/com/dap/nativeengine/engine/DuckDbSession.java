@@ -486,15 +486,31 @@ public final class DuckDbSession implements AutoCloseable {
     /** Bounded profile: 408 {@code query_timeout} when the scan exceeds {@code timeoutMillis}. */
     public ProfileData profile(String sql, List<ColumnSpec> columns, long timeoutMillis,
                                String workflowId, String nodeId) throws SQLException {
-        ProfileData cached = profiles.get(workflowId, nodeId, sql, columns);
+        return profile(sql, columns, timeoutMillis, workflowId, nodeId, false);
+    }
+
+    /**
+     * Same as the five-argument profile; {@code withStddev} also computes the sample
+     * standard deviation that report sections render. The flag is part of the cache key,
+     * so {@code /profile} never pays for statistics it does not return.
+     */
+    public ProfileData profile(String sql, List<ColumnSpec> columns, long timeoutMillis,
+                               String workflowId, String nodeId, boolean withStddev)
+            throws SQLException {
+        ProfileData cached = profiles.get(workflowId, nodeId, sql, columns, withStddev);
         if (cached != null) {
             return cached;
         }
         DuckDBConnection connection = openRead(workflowId, nodeId);
         try {
             ProfileData data = bounded("profile", timeoutMillis, workflowId,
-                    () -> readProfile(connection, sql, columns));
-            profiles.put(workflowId, nodeId, sql, columns, data);
+                    () -> readProfile(connection, sql, columns, withStddev));
+            profiles.put(workflowId, nodeId, sql, columns, withStddev, data);
+            if (withStddev) {
+                // A report section warms the plain entry too: the same scan answers the
+                // following GET /profile, which never returns stddev.
+                profiles.put(workflowId, nodeId, sql, columns, false, data.withoutStddev());
+            }
             return data;
         } finally {
             endRead(connection);
@@ -517,13 +533,15 @@ public final class DuckDbSession implements AutoCloseable {
     private static final long REFINE_SMALL_DISTINCT = 10_000L;
 
     private static ProfileData readProfile(DuckDBConnection connection, String sql,
-                                           List<ColumnSpec> columns) throws SQLException {
+                                           List<ColumnSpec> columns, boolean withStddev)
+            throws SQLException {
         try (Statement statement = connection.createStatement()) {
             long rows = countWith(statement, sql);
-            boolean approximate = rows > MAX_DISTINCT;
-            // Exact distinct is computed in the main query up to the refinement limit;
-            // above it only columns with a small sketch estimate get a cheap exact pass.
-            boolean exactDistinct = rows <= REFINE_ROW_LIMIT;
+            // Up to MAX_DISTINCT rows the exact count is cheap and comes from the main scan;
+            // above it the sketch is used and small columns are refined afterwards
+            // (docs/QUALITY.md pins the policy).
+            boolean exactDistinct = rows <= MAX_DISTINCT;
+            boolean approximate = !exactDistinct;
             String table = "(" + LazyPlan.stripSemicolon(sql) + ") AS dap_plan";
             StringBuilder aggregates = new StringBuilder("COUNT(*) AS dap_rows");
             for (int index = 0; index < columns.size(); index++) {
@@ -548,8 +566,10 @@ public final class DuckDbSession implements AutoCloseable {
                             .append("_max\"");
                     aggregates.append(", AVG(").append(quoted).append(") AS \"c").append(index)
                             .append("_mean\"");
-                    aggregates.append(", STDDEV_SAMP(").append(quoted).append(") AS \"c")
-                            .append(index).append("_stddev\"");
+                    if (withStddev) {
+                        aggregates.append(", STDDEV_SAMP(").append(quoted).append(") AS \"c")
+                                .append(index).append("_stddev\"");
+                    }
                 }
             }
             long[] present = new long[columns.size()];
@@ -567,33 +587,32 @@ public final class DuckDbSession implements AutoCloseable {
                     present[index] = result.getLong("c" + index + "_present");
                     if (exactDistinct) {
                         exact[index] = result.getLong("c" + index + "_exact");
-                        distinct[index] = approximate
-                                ? result.getLong("c" + index + "_approx") : exact[index];
-                        // Same refinement as before, but the exact value came from the scan above.
-                        if (approximate && distinct[index] <= REFINE_DISTINCT) {
-                            distinct[index] = exact[index];
-                        }
+                        distinct[index] = exact[index];
                     } else {
-                        distinct[index] = result.getLong("c" + index + "_approx");
-                        // High-cardinality columns stay approximate by design; the extra pass
-                        // below only replaces columns whose estimate is small.
-                        exact[index] = distinct[index];
+                        // The sketch is the value until the refinement pass below replaces it.
+                        exact[index] = result.getLong("c" + index + "_approx");
+                        distinct[index] = exact[index];
                     }
                     if (column.numeric()) {
                         min[index] = asDouble(result.getObject("c" + index + "_min"));
                         max[index] = asDouble(result.getObject("c" + index + "_max"));
                         mean[index] = asDouble(result.getObject("c" + index + "_mean"));
-                        stddev[index] = asDouble(result.getObject("c" + index + "_stddev"));
+                        if (withStddev) {
+                            stddev[index] = asDouble(result.getObject("c" + index + "_stddev"));
+                        }
                     }
                 }
             }
-            if (approximate && !exactDistinct) {
+            if (approximate) {
                 // A sketch can say "9" for eight categories. One extra query counts DISTINCT
-                // only for the cheap low-cardinality columns; high-cardinality ones keep the
-                // sketch so a large profile stays bounded.
+                // for the cheap low-cardinality columns; high-cardinality ones keep the sketch
+                // so a large profile stays bounded. Up to REFINE_ROW_LIMIT the threshold is the
+                // documented 110k; above it only very small columns, where sketch error is most
+                // visible.
+                long refineLimit = rows <= REFINE_ROW_LIMIT ? REFINE_DISTINCT : REFINE_SMALL_DISTINCT;
                 List<Integer> refine = new ArrayList<>();
                 for (int index = 0; index < columns.size(); index++) {
-                    if (distinct[index] <= REFINE_SMALL_DISTINCT) {
+                    if (distinct[index] <= refineLimit) {
                         refine.add(index);
                     }
                 }

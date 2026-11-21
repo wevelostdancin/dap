@@ -8,7 +8,9 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Run-scoped cache of column statistics. A profile is shared by the markdown_report
  * profile section and GET /profile of the same node; both ask for the same plan and
- * columns during one workflow run, so only one DuckDB scan is needed.
+ * columns during one workflow run, so only one DuckDB scan is needed. Report sections
+ * additionally ask for stddev, which GET /profile never returns, so that flag is part of
+ * the key: the endpoint does not pay for statistics it does not use.
  *
  * <p>The generation is bumped at the start of every run, which invalidates the previous
  * run's entries without a map-wide clear. The SQL text of the plan is part of the key, so
@@ -22,7 +24,7 @@ public final class ProfileCache {
     private static final int MAX_ENTRIES = 256;
 
     private record Key(String workflowId, String nodeId, String sql, List<String> columns,
-                       long generation) {
+                       boolean stddev, long generation) {
     }
 
     private final ConcurrentHashMap<Key, ProfileData> entries = new ConcurrentHashMap<>();
@@ -35,18 +37,19 @@ public final class ProfileCache {
         }
     }
 
-    public ProfileData get(String workflowId, String nodeId, String sql, List<ColumnSpec> columns) {
+    public ProfileData get(String workflowId, String nodeId, String sql, List<ColumnSpec> columns,
+                           boolean stddev) {
         if (workflowId == null || nodeId == null) {
             return null;
         }
         AtomicLong generation = generations.get(workflowId);
         return entries.get(new Key(workflowId, nodeId, sql,
-                columns.stream().map(ColumnSpec::name).toList(),
+                columns.stream().map(ColumnSpec::name).toList(), stddev,
                 generation == null ? 0L : generation.get()));
     }
 
     public void put(String workflowId, String nodeId, String sql, List<ColumnSpec> columns,
-                    ProfileData data) {
+                    boolean stddev, ProfileData data) {
         if (workflowId == null || nodeId == null) {
             return;
         }
@@ -55,7 +58,7 @@ public final class ProfileCache {
         }
         AtomicLong generation = generations.computeIfAbsent(workflowId, ignored -> new AtomicLong());
         entries.putIfAbsent(new Key(workflowId, nodeId, sql,
-                Objects.requireNonNull(columns).stream().map(ColumnSpec::name).toList(),
+                Objects.requireNonNull(columns).stream().map(ColumnSpec::name).toList(), stddev,
                 generation.get()), Objects.requireNonNull(data));
     }
 }
