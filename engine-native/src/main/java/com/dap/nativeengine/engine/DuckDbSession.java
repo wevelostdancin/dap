@@ -506,16 +506,23 @@ public final class DuckDbSession implements AutoCloseable {
         profiles.invalidate(workflowId);
     }
 
-    /** Above this row count the profile skips the exact-distinct refinement to stay bounded. */
+    /** Above this row count the profile skips the broad exact-distinct refinement to stay bounded. */
     private static final long REFINE_ROW_LIMIT = 1_000_000L;
+    /**
+     * Above {@link #REFINE_ROW_LIMIT} only cheap low-cardinality columns are refined: one extra
+     * query counts DISTINCT for columns whose sketch estimate is at most this value. Higher
+     * cardinality keeps the sketch — an exact count over millions of unique values is the
+     * dominant cost of a large profile, and both /profile and report sections accept it.
+     */
+    private static final long REFINE_SMALL_DISTINCT = 10_000L;
 
     private static ProfileData readProfile(DuckDBConnection connection, String sql,
                                            List<ColumnSpec> columns) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             long rows = countWith(statement, sql);
             boolean approximate = rows > MAX_DISTINCT;
-            // Exact distinct is needed up to the refinement limit (and by report sections);
-            // above it the sketch is the documented behaviour for both /profile and reports.
+            // Exact distinct is computed in the main query up to the refinement limit;
+            // above it only columns with a small sketch estimate get a cheap exact pass.
             boolean exactDistinct = rows <= REFINE_ROW_LIMIT;
             String table = "(" + LazyPlan.stripSemicolon(sql) + ") AS dap_plan";
             StringBuilder aggregates = new StringBuilder("COUNT(*) AS dap_rows");
@@ -558,13 +565,19 @@ public final class DuckDbSession implements AutoCloseable {
                 for (int index = 0; index < columns.size(); index++) {
                     ColumnSpec column = columns.get(index);
                     present[index] = result.getLong("c" + index + "_present");
-                    exact[index] = exactDistinct
-                            ? result.getLong("c" + index + "_exact") : 0L;
-                    distinct[index] = approximate
-                            ? result.getLong("c" + index + "_approx") : exact[index];
-                    // Same refinement as before, but the exact value came from the scan above.
-                    if (approximate && exactDistinct && distinct[index] <= REFINE_DISTINCT) {
-                        distinct[index] = exact[index];
+                    if (exactDistinct) {
+                        exact[index] = result.getLong("c" + index + "_exact");
+                        distinct[index] = approximate
+                                ? result.getLong("c" + index + "_approx") : exact[index];
+                        // Same refinement as before, but the exact value came from the scan above.
+                        if (approximate && distinct[index] <= REFINE_DISTINCT) {
+                            distinct[index] = exact[index];
+                        }
+                    } else {
+                        distinct[index] = result.getLong("c" + index + "_approx");
+                        // High-cardinality columns stay approximate by design; the extra pass
+                        // below only replaces columns whose estimate is small.
+                        exact[index] = distinct[index];
                     }
                     if (column.numeric()) {
                         min[index] = asDouble(result.getObject("c" + index + "_min"));
@@ -574,12 +587,42 @@ public final class DuckDbSession implements AutoCloseable {
                     }
                 }
             }
+            if (approximate && !exactDistinct) {
+                // A sketch can say "9" for eight categories. One extra query counts DISTINCT
+                // only for the cheap low-cardinality columns; high-cardinality ones keep the
+                // sketch so a large profile stays bounded.
+                List<Integer> refine = new ArrayList<>();
+                for (int index = 0; index < columns.size(); index++) {
+                    if (distinct[index] <= REFINE_SMALL_DISTINCT) {
+                        refine.add(index);
+                    }
+                }
+                if (!refine.isEmpty()) {
+                    StringBuilder small = new StringBuilder();
+                    for (int position = 0; position < refine.size(); position++) {
+                        if (position > 0) {
+                            small.append(", ");
+                        }
+                        int index = refine.get(position);
+                        small.append("COUNT(DISTINCT ").append(quote(columns.get(index).name()))
+                                .append(") AS \"r").append(index).append('"');
+                    }
+                    try (ResultSet result = statement.executeQuery(
+                            "SELECT " + small + " FROM " + table)) {
+                        result.next();
+                        for (int index : refine) {
+                            exact[index] = result.getLong("r" + index);
+                            distinct[index] = exact[index];
+                        }
+                    }
+                }
+            }
             List<ProfileColumn> profile = new ArrayList<>(columns.size());
             for (int index = 0; index < columns.size(); index++) {
                 ColumnSpec column = columns.get(index);
                 profile.add(new ProfileColumn(column.name(), column.knimeType(), rows - present[index],
                         distinct[index], min[index], max[index], mean[index], stddev[index],
-                        exactDistinct ? exact[index] : distinct[index]));
+                        exact[index]));
             }
             return new ProfileData(rows, profile);
         }
