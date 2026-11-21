@@ -35,7 +35,7 @@ JobManager ──► Dag (уровни Кана, параллельные вет
                  ▼
               DuckDbSession (одна in-memory БД на сессию)
                  ├─ base connection; duplicate() видит тот же каталог
-                 ├─ csv_reader / excel_reader: Arrow → Appender → таблица
+                 ├─ csv_reader: read_csv (ленивое отношение); excel_reader: Arrow → Appender → таблица
                  ├─ parquet_reader / json_reader: read_parquet / read_json_auto
                  ├─ csv_writer / parquet_writer / json_writer: COPY ... TO
                  ├─ excel_writer: zip + XML (без POI), атомарное переименование
@@ -85,7 +85,7 @@ JobManager ──► Dag (уровни Кана, параллельные вет
 | `Dag` | Исполнение снимка графа уровнями Кана: узлы уровня параллельны, следующий уровень — после предыдущего; падение узла отменяет соседей |
 | `LazyPlan` | Ленивая таблица: текст SQL, схема и сессия; данные читаются только в `/table` и `/profile` |
 | `DuckDbSession` | In-memory БД сессии: базовое соединение, `duplicate()`, ресурсные настройки, ingestion, preview/profile, учёт активных чтений |
-| `ArrowTable`, `CsvParser`, `CsvTableReader`, `XlsxTableReader` | Граница данных на входе: разбор CSV/XLSX в Arrow, затем построчная вставка в DuckDB |
+| `ArrowTable`, `XlsxTableReader` | Граница данных на входе: разбор XLSX в Arrow, затем построчная вставка в DuckDB; CSV читается DuckDB через `read_csv` |
 | `IngestService` | Parquet-кэш `POST /v1/datasets`: конвертация CSV/Excel/JSON/Parquet, ключ SHA-256 (путь, размер, mtime, формат), ответ `path/rows/columns/cached` |
 | `CatalogHandlers`, `WorkflowHandlers`, `JobHandlers`, `DataHandlers`, `DatasetHandlers`, `OpsHandlers` | HTTP-слой: валидация запросов, коды ошибок, сериализация ответов |
 | MCP-адаптер (`adapters/mcp/dap_mcp.py`) | Отдельный Python-процесс: stdio JSON-RPC 2.0, 33 инструмента `dap_*`, при необходимости поднимает jar |
@@ -119,10 +119,10 @@ JobManager ──► Dag (уровни Кана, параллельные вет
    делает `COUNT(*)` и `LIMIT` (по умолчанию 50 строк, `port` по умолчанию 0),
    `/profile` — полный проход с агрегатами по колонкам.
 
-Исключения из ленивости: `csv_reader` и `excel_reader` читают файл и загружают
-таблицу уже на run, поэтому ошибки файла и схемы видны в run, а не в `/table`.
-`parquet_reader` и `json_reader` проверяют файл и выводят схему на run
-(`DESCRIBE`), но строки читают лениво; писатели (`csv_writer`, `parquet_writer`,
+Исключение из ленивости: `excel_reader` читает файл и загружает таблицу уже на run.
+`csv_reader`, `parquet_reader` и `json_reader` проверяют файл и выводят схему на run
+(`DESCRIBE` над `read_csv`/`read_parquet`/`read_json_auto`), но строки читают лениво;
+ошибки приведения типов видны в `/table`. Писатели (`csv_writer`, `parquet_writer`,
 `json_writer`) выполняют `COPY ... TO` на run и возвращают входной план без
 изменений (pass-through).
 
@@ -161,22 +161,22 @@ cached}`. Ключ кэша — SHA-256 от абсолютного пути, р
   каталог и не включают autoinstall, поэтому в рантайме сеть не нужна.
   `GET /v1/health` отдаёт `extensions.installed` — имена установленных
   расширений.
-- `csv_reader`/`excel_reader` грузят таблицу на job-соединении под стабильным именем
-  `csv_<wf>_<node>` / `excel_<wf>_<node>` через `CREATE OR REPLACE TABLE` и
-  `DuckDBAppender`. Ре-ран заменяет ту же таблицу, а не копит копии; закрытие
-  job-соединения прерывает ingestion. Вставки сериализованы на соединении: две
-  независимые ветви `csv_reader` в одном уровне DAG не интерливают результаты DuckDB.
+- `excel_reader` грузит таблицу на job-соединении под стабильным именем
+  `excel_<wf>_<node>` через `CREATE OR REPLACE TABLE` и `DuckDBAppender`. Ре-ран
+  заменяет ту же таблицу, а не копит копии; закрытие job-соединения прерывает
+  ingestion. `csv_reader`, `parquet_reader` и `json_reader` таблиц не создают: их
+  планы содержат `read_csv`/`read_parquet`/`read_json_auto`, и ре-ран просто
+  заменяет план.
 - Zero-copy Arrow → DuckDB нет: публичный `registerArrowStream` в `duckdb_jdbc`
   1.5.6.0 требует `arrow-c-data` (`ArrowArrayStream`), которого нет в зависимостях,
-  поэтому данные копируются построчно. Arrow остаётся границей ingestion, между
+  поэтому XLSX-данные копируются построчно. Arrow нужен только для Excel, между
   узлами Arrow не передаётся.
-- Arrow-таблицы CSV/Excel живут в JVM heap, а `DAP_DUCKDB_MEMORY_LIMIT` ограничивает
-  только буферы DuckDB. Замер на 10 млн строк: ingest требует ~4,65 ГБ heap при
-  `-Xmx6g` ([BENCH.md](BENCH.md)).
+- CSV читается DuckDB и в JVM heap не попадает; `DAP_DUCKDB_MEMORY_LIMIT`
+  ограничивает буферы DuckDB. Arrow-таблицы XLSX живут в heap.
 - Потолок памяти процесса — примерно `sessions × DAP_DUCKDB_MEMORY_LIMIT` плюс heap.
   Сессионные БД эвиктятся по `DAP_SESSION_TTL_SEC`/LRU-лимиту `DAP_MAX_SESSIONS`,
-  история завершённых jobs ограничена `DAP_MAX_RETAINED_JOBS`; таблицы исходников
-  занимают одну стабильную таблицу на узел и удаляются вместе с workflow.
+  история завершённых jobs ограничена `DAP_MAX_RETAINED_JOBS`; таблица `excel_reader`
+  удаляется вместе с workflow.
 - Parquet-кэш `POST /v1/datasets` лежит на диске, в heap не учитывается и не
   эвиктится; каталог общий для всех сессий и переживает перезапуск процесса.
   По умолчанию это `$DAP_HOME/build/cache` (когда `DAP_HOME` задан, например
@@ -209,9 +209,8 @@ cached}`. Ключ кэша — SHA-256 от абсолютного пути, р
   `start(port)`. Javalin начинает слушать первым, поэтому `GET /v1/health` отвечает
   сразу; затем демон-поток `dap-warm-up` прогревает движок: временная
   `DuckDbSession`, `SELECT 1`, CSV из трёх строк в `DAP_DUCKDB_TEMP_DIR` (иначе
-  `$TMPDIR`), разбор настоящим путём `csv_reader` (`CsvTableReader` → `ArrowTable`
-  → `DuckDBAppender`), `describe` и `preview`, затем сессия закрывается, а файл
-  удаляется. Так инициализация DuckDB JDBC (~1,5 с) и JIT уходят в фоновый поток,
+  `$TMPDIR`), разбор настоящим путём `csv_reader` (`read_csv` → `describe` →
+  `preview`), затем сессия закрывается, а файл удаляется. Так инициализация DuckDB JDBC (~1,5 с) и JIT уходят в фоновый поток,
   а не в старт/health; вызов, пришедший после прогрева, их уже не платит (замер —
   `tests/measure_warmup.py`). Прогрев идёт один раз на процесс, его ошибка
   только пишется в stderr и не мешает старту; стоимость фиксирует строка

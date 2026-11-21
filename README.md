@@ -231,10 +231,10 @@ Makefile         build-native, test-native, run-native, goldens, dist, check
   `~/.ssh`, `~/.dsh` и другие секреты). `DAP_DENY_ROOTS` расширяет запреты.
   Расширения DuckDB (sqlite/postgres/httpfs) ставятся один раз `make extensions`
   в `$DAP_HOME/build/duckdb-ext` и дальше работают офлайн.
-- Out-of-core по умолчанию: `parquet_reader` строит ленивый `read_parquet`, CSV
-  больше `DAP_INGEST_STREAM_MB` (64 МБ) идёт через DuckDB `read_csv` без Arrow в heap,
-  `DAP_DUCKDB_MEMORY_LIMIT=512MB` и spill в `$DAP_HOME/build/duckdb-tmp` включены по
-  умолчанию. Потолок теперь задаёт диск, а не `-Xmx`.
+- Out-of-core по умолчанию: `parquet_reader` и `csv_reader` строят ленивые
+  `read_parquet`/`read_csv`; `POST /v1/datasets` тоже конвертирует CSV через `read_csv`
+  без Arrow в heap. `DAP_DUCKDB_MEMORY_LIMIT=512MB` и spill в
+  `$DAP_HOME/build/duckdb-tmp` включены по умолчанию. Потолок теперь задаёт диск, а не `-Xmx`.
 
 ## Лицензия
 

@@ -147,26 +147,18 @@ class IngestServiceTest {
     }
 
     @Test
-    void streamingCsvPathProducesTheSameTableAsTheArrowPath() throws Exception {
-        Path source = write("stream.csv", "name,age\nann,34\nbob,28\n");
+    void quotedAndUnquotedEmptyFieldsBecomeNulls() throws Exception {
+        Path source = write("empty.csv", "txt,num\n,1\n\"\",2\n\"x\",3\n");
 
-        IngestService.Result arrow = new IngestService(dir.resolve("cache-arrow")).ingest(source, "csv");
-        IngestService.Result streamed = new IngestService(dir.resolve("cache-stream"), 0)
-                .ingest(source, "csv");
+        IngestService.Result result = service().ingest(source, "csv");
 
-        assertFalse(arrow.cached());
-        assertFalse(streamed.cached());
-        assertEquals(2, streamed.rows());
-        assertEquals(arrow.columns(), streamed.columns());
-        assertEquals(rows(arrow.path()), rows(streamed.path()));
-    }
-
-    @Test
-    void streamingThresholdIsMeasuredInMegabytes() {
-        assertFalse(IngestService.shouldStream(64L * 1024 * 1024, 64));
-        assertTrue(IngestService.shouldStream(64L * 1024 * 1024 + 1, 64));
-        assertTrue(IngestService.shouldStream(1, 0));
-        assertFalse(IngestService.shouldStream(0, 0));
+        assertEquals(List.of(
+                new IngestService.Column("txt", "Utf8"),
+                new IngestService.Column("num", "Int64")), result.columns());
+        assertEquals(List.of(
+                List.of("x", "3"),
+                java.util.Arrays.asList(null, "1"),
+                java.util.Arrays.asList(null, "2")), rows(result.path()));
     }
 
     @Test

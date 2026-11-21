@@ -1835,7 +1835,7 @@ EXPORT IMPORT CALL` и второй оператор (`;` вне кавычек)
 ## 52. dap.db_reader
 
 Читает одну таблицу или результат read-only запроса из внешней БД и копирует его в
-таблицу сессии: остальной граф видит обычную таблицу, как после `dap.csv_reader`.
+таблицу сессии: остальной граф видит обычную таблицу.
 DuckDB-файл подключается нативно; SQLite, PostgreSQL и MySQL — через расширения
 `sqlite_scanner`, `postgres_scanner`, `mysql_scanner` (ставятся один раз
 `make extensions`; без расширения — ошибка `extension_missing` с этим hint).

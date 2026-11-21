@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Startup warm-up: pays the first-run costs (JVM JIT, JDBC driver bootstrap, DuckDB
- * native init, CSV parsing, Arrow ingest and preview) on a throwaway session after
+ * native init, CSV parsing through read_csv and preview) on a throwaway session after
  * the HTTP server is already listening, so the first user call does not.
  *
  * <p>The switch is the system property {@code dap.warmup} or, when it is absent, the
@@ -72,7 +72,7 @@ final class WarmUp {
 
     /**
      * Run one warm-up on a throwaway session: tiny SQL, a few-row CSV parsed through
-     * the real csv_reader path, Arrow ingest, describe and preview, then close and
+     * the real csv_reader path, describe and preview, then close and
      * delete the temp file.
      */
     static Outcome run(NativeService.Settings settings) throws Exception {
