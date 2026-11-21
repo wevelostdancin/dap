@@ -57,6 +57,8 @@ public final class DuckDbSession implements AutoCloseable {
     private final AtomicLong tableIds = new AtomicLong();
     private final Object loadLock = new Object();
     private final ConcurrentHashMap<DuckDBConnection, Read> reads = new ConcurrentHashMap<>();
+    /** Shared by report sections and GET /profile within one run; see {@link ProfileCache}. */
+    private final ProfileCache profiles = new ProfileCache();
     /** Guards {@link #reads}: openRead, endRead, close and interruptReads all take it. */
     final Object readsLock = new Object();
     private boolean closed;
@@ -484,13 +486,24 @@ public final class DuckDbSession implements AutoCloseable {
     /** Bounded profile: 408 {@code query_timeout} when the scan exceeds {@code timeoutMillis}. */
     public ProfileData profile(String sql, List<ColumnSpec> columns, long timeoutMillis,
                                String workflowId, String nodeId) throws SQLException {
+        ProfileData cached = profiles.get(workflowId, nodeId, sql, columns);
+        if (cached != null) {
+            return cached;
+        }
         DuckDBConnection connection = openRead(workflowId, nodeId);
         try {
-            return bounded("profile", timeoutMillis, workflowId,
+            ProfileData data = bounded("profile", timeoutMillis, workflowId,
                     () -> readProfile(connection, sql, columns));
+            profiles.put(workflowId, nodeId, sql, columns, data);
+            return data;
         } finally {
             endRead(connection);
         }
+    }
+
+    /** Call at the start of a workflow run: profiles of the previous run are no longer valid. */
+    public void invalidateProfiles(String workflowId) {
+        profiles.invalidate(workflowId);
     }
 
     /** Above this row count the profile skips the exact-distinct refinement to stay bounded. */
@@ -500,20 +513,27 @@ public final class DuckDbSession implements AutoCloseable {
                                            List<ColumnSpec> columns) throws SQLException {
         try (Statement statement = connection.createStatement()) {
             long rows = countWith(statement, sql);
+            boolean approximate = rows > MAX_DISTINCT;
+            // Exact distinct is needed up to the refinement limit (and by report sections);
+            // above it the sketch is the documented behaviour for both /profile and reports.
+            boolean exactDistinct = rows <= REFINE_ROW_LIMIT;
             String table = "(" + LazyPlan.stripSemicolon(sql) + ") AS dap_plan";
             StringBuilder aggregates = new StringBuilder("COUNT(*) AS dap_rows");
             for (int index = 0; index < columns.size(); index++) {
                 ColumnSpec column = columns.get(index);
                 String quoted = quote(column.name());
-                // KNIME counts distinct exactly up to 100k distinct values per column; above
-                // that the approximate sketch is allowed to differ (docs/QUALITY.md).
-                String distinctSql = rows > MAX_DISTINCT
-                        ? "APPROX_COUNT_DISTINCT(" + quoted + ")"
-                        : "COUNT(DISTINCT " + quoted + ")";
+                // One scan yields the /profile statistics, the report's stddev, and (when
+                // bounded) the exact distinct used for refinement and report sections.
                 aggregates.append(", COUNT(").append(quoted).append(") AS \"c").append(index)
                         .append("_present\"");
-                aggregates.append(", ").append(distinctSql).append(" AS \"c").append(index)
-                        .append("_distinct\"");
+                if (exactDistinct) {
+                    aggregates.append(", COUNT(DISTINCT ").append(quoted).append(") AS \"c")
+                            .append(index).append("_exact\"");
+                }
+                if (approximate) {
+                    aggregates.append(", APPROX_COUNT_DISTINCT(").append(quoted)
+                            .append(") AS \"c").append(index).append("_approx\"");
+                }
                 if (column.numeric()) {
                     aggregates.append(", MIN(").append(quoted).append(") AS \"c").append(index)
                             .append("_min\"");
@@ -521,51 +541,36 @@ public final class DuckDbSession implements AutoCloseable {
                             .append("_max\"");
                     aggregates.append(", AVG(").append(quoted).append(") AS \"c").append(index)
                             .append("_mean\"");
+                    aggregates.append(", STDDEV_SAMP(").append(quoted).append(") AS \"c")
+                            .append(index).append("_stddev\"");
                 }
             }
             long[] present = new long[columns.size()];
             long[] distinct = new long[columns.size()];
+            long[] exact = new long[columns.size()];
             Double[] min = new Double[columns.size()];
             Double[] max = new Double[columns.size()];
             Double[] mean = new Double[columns.size()];
+            Double[] stddev = new Double[columns.size()];
             try (ResultSet result = statement.executeQuery(
                     "SELECT " + aggregates + " FROM " + table)) {
                 result.next();
                 for (int index = 0; index < columns.size(); index++) {
                     ColumnSpec column = columns.get(index);
                     present[index] = result.getLong("c" + index + "_present");
-                    distinct[index] = result.getLong("c" + index + "_distinct");
+                    exact[index] = exactDistinct
+                            ? result.getLong("c" + index + "_exact") : 0L;
+                    distinct[index] = approximate
+                            ? result.getLong("c" + index + "_approx") : exact[index];
+                    // Same refinement as before, but the exact value came from the scan above.
+                    if (approximate && exactDistinct && distinct[index] <= REFINE_DISTINCT) {
+                        distinct[index] = exact[index];
+                    }
                     if (column.numeric()) {
                         min[index] = asDouble(result.getObject("c" + index + "_min"));
                         max[index] = asDouble(result.getObject("c" + index + "_max"));
                         mean[index] = asDouble(result.getObject("c" + index + "_mean"));
-                    }
-                }
-            }
-            // Refine low-cardinality estimates in one extra scan, not one scan per column.
-            List<Integer> refine = new ArrayList<>();
-            if (rows > MAX_DISTINCT && rows <= REFINE_ROW_LIMIT) {
-                for (int index = 0; index < columns.size(); index++) {
-                    if (distinct[index] <= REFINE_DISTINCT) {
-                        refine.add(index);
-                    }
-                }
-            }
-            if (!refine.isEmpty()) {
-                StringBuilder exact = new StringBuilder();
-                for (int position = 0; position < refine.size(); position++) {
-                    if (position > 0) {
-                        exact.append(", ");
-                    }
-                    int index = refine.get(position);
-                    exact.append("COUNT(DISTINCT ").append(quote(columns.get(index).name()))
-                            .append(") AS \"r").append(index).append('"');
-                }
-                try (ResultSet result = statement.executeQuery(
-                        "SELECT " + exact + " FROM " + table)) {
-                    result.next();
-                    for (int index : refine) {
-                        distinct[index] = result.getLong("r" + index);
+                        stddev[index] = asDouble(result.getObject("c" + index + "_stddev"));
                     }
                 }
             }
@@ -573,7 +578,8 @@ public final class DuckDbSession implements AutoCloseable {
             for (int index = 0; index < columns.size(); index++) {
                 ColumnSpec column = columns.get(index);
                 profile.add(new ProfileColumn(column.name(), column.knimeType(), rows - present[index],
-                        distinct[index], min[index], max[index], mean[index]));
+                        distinct[index], min[index], max[index], mean[index], stddev[index],
+                        exactDistinct ? exact[index] : distinct[index]));
             }
             return new ProfileData(rows, profile);
         }

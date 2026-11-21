@@ -102,6 +102,19 @@ class MarkdownReportExecutorTest {
     }
 
     @Test
+    void repeatedProfileSectionsRenderIdenticalStatistics() throws Exception {
+        String markdown = document(dir.resolve("profiles.md"),
+                ",\"sections\":[{\"kind\":\"profile\",\"title\":\"First\",\"columns\":[\"score\"]},"
+                        + "{\"kind\":\"profile\",\"title\":\"Second\",\"columns\":[\"score\"]},"
+                        + "{\"kind\":\"profile\",\"title\":\"Names\",\"columns\":[\"name\"]}]");
+        String score = "| score | Number (Float) | 3 | 1 | 3 | 2.0 | 6.0 | 4.0 | 2.0 |";
+        assertEquals(2, markdown.split(java.util.regex.Pattern.quote(score), -1).length - 1,
+                "two profile sections with the same columns render the same statistics");
+        assertTrue(markdown.contains("| name | String | 3 | 1 | 3 |"),
+                "a different column selection still renders its own statistics");
+    }
+
+    @Test
     void metricsSectionReportsRowColumnAndColumnMetrics() throws Exception {
         String markdown = document(dir.resolve("metrics.md"),
                 ",\"sections\":[{\"kind\":\"metrics\",\"columns\":[\"score\"]}]");
