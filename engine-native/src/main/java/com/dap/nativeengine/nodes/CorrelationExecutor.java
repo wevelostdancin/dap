@@ -25,20 +25,23 @@ import java.util.StringJoiner;
  * dap.correlation: pairwise Pearson, Spearman or Kendall correlation in long or matrix
  * form, optionally partial on control columns.
  *
- * <p>Pearson/Spearman correlations and their counts come from DuckDB aggregates; the
- * p-value (t approximation, Kendall z approximation) and the confidence interval
- * (Fisher's z, Kendall asymptotic standard error) need the engine's own distributions,
- * so the pairs are materialised into a literal plan like {@code dap.hypothesis_test}
- * does. Partial correlations come from the inverse of the correlation matrix; Kendall
- * tau-b is computed in Java with a Fenwick tree over ranks (O(n log n)). The long
- * format also carries {@code p_adjusted} with the shared multiple-comparison
- * correction; the matrix format has no p-values and is therefore never adjusted.</p>
+ * <p>Pearson/Spearman correlations come from SQL sufficient statistics (count, sums,
+ * squares and cross products) computed by DuckDB in one scan; Spearman applies SQL
+ * window ranks first. Only the p-by-p moment matrix lives in Java, so the row count is
+ * unbounded. The p-value (t approximation, Kendall z approximation) and the confidence
+ * interval (Fisher's z, Kendall asymptotic standard error) need the engine's own
+ * distributions, so the pairs are materialised into a literal plan. Partial
+ * correlations come from the inverse of the moment-based correlation matrix; Kendall
+ * tau-b is computed in Java with a Fenwick tree over ranks (O(n log n)) and therefore
+ * keeps an explicit row cap. The long format also carries {@code p_adjusted} with the
+ * shared multiple-comparison correction; the matrix format has no p-values and is
+ * therefore never adjusted.</p>
  */
 public final class CorrelationExecutor implements NodeExecutor {
     private static final List<String> METHODS = List.of("pearson", "spearman", "kendall");
     private static final List<String> OUTPUTS = List.of("long", "matrix");
-    /** Kendall reads values into Java; the same cap as the other in-memory statistics. */
-    private static final int ROW_CAP = 100_000;
+    /** Kendall reads values into Java; Pearson and Spearman do not. */
+    static final int KENDALL_ROW_CAP = 100_000;
     private static final List<ColumnSpec> LONG = List.of(
             ColumnSpec.of("column_a", "Utf8"),
             ColumnSpec.of("column_b", "Utf8"),
@@ -74,23 +77,33 @@ public final class CorrelationExecutor implements NodeExecutor {
         boolean partial = !controls.isEmpty();
         List<ColumnSpec> all = new ArrayList<>(columns);
         all.addAll(controls);
-        if ("matrix".equals(output)) {
-            return matrix(context, input, columns, all, method, partial);
+        int sampleRows = config == null ? 0 : config.path("sample_rows").asInt(0);
+        if (sampleRows < 0) {
+            throw new IllegalArgumentException("correlation: 'sample_rows' must be 0 or positive");
         }
-        return longFormat(context, input, columns, all, method, alpha, partial, correction);
+        int seed = config == null ? 42 : config.path("seed").asInt(42);
+        if (seed < 0) {
+            throw new IllegalArgumentException("correlation: 'seed' must be 0 or positive");
+        }
+        if ("matrix".equals(output)) {
+            return matrix(context, input, columns, all, method, partial, sampleRows, seed);
+        }
+        return longFormat(context, input, columns, all, method, alpha, partial, correction,
+                sampleRows, seed);
     }
 
     // ------------------------------------------------------------------- long
 
     private static LazyPlan longFormat(NodeContext context, LazyPlan input, List<ColumnSpec> columns,
                                        List<ColumnSpec> all, String method, double alpha,
-                                       boolean partial, String correction) throws SQLException {
+                                       boolean partial, String correction, int sampleRows, int seed)
+            throws SQLException {
         int requested = columns.size();
         List<Pair> pairs = new ArrayList<>();
         if ("kendall".equals(method)) {
             // Kendall needs the values: complete cases when partial (for the matrix
             // inverse), otherwise every row so that nulls can be dropped per pair.
-            double[][] values = readValues(context, input, all, partial);
+            double[][] values = readValues(context, input, all, partial, sampleRows, seed);
             long commonN = values.length;
             double[][] matrix = kendallMatrix(values, all.size());
             for (int i = 0; i < requested; i++) {
@@ -103,7 +116,7 @@ public final class CorrelationExecutor implements NodeExecutor {
                 }
             }
         } else if (partial) {
-            List<PairResult> results = pairQuery(context, input, all, method, true);
+            List<PairResult> results = pairQuery(context, input, all, method, true, sampleRows, seed);
             double[][] matrix = matrixFrom(results, all.size());
             long n = results.isEmpty() ? 0 : results.get(0).n();
             for (int i = 0; i < requested; i++) {
@@ -114,7 +127,8 @@ public final class CorrelationExecutor implements NodeExecutor {
                 }
             }
         } else {
-            List<PairResult> results = pairQuery(context, input, columns, method, false);
+            List<PairResult> results = pairQuery(context, input, columns, method, false,
+                    sampleRows, seed);
             for (PairResult result : results) {
                 pairs.add(new Pair(result.first(), result.second(), result.correlation(), result.n(),
                         null));
@@ -210,18 +224,19 @@ public final class CorrelationExecutor implements NodeExecutor {
     // ----------------------------------------------------------------- matrix
 
     private static LazyPlan matrix(NodeContext context, LazyPlan input, List<ColumnSpec> columns,
-                                   List<ColumnSpec> all, String method,
-                                   boolean partial) throws SQLException {
+                                   List<ColumnSpec> all, String method, boolean partial,
+                                   int sampleRows, int seed) throws SQLException {
         double[][] matrix;
         long n;
         if ("kendall".equals(method)) {
-            double[][] values = readValues(context, input, all, true);
+            double[][] values = readValues(context, input, all, true, sampleRows, seed);
             n = values.length;
             matrix = kendallMatrix(values, all.size());
         } else {
-            List<PairResult> results = pairQuery(context, input, all, method, true);
+            List<PairResult> results = pairQuery(context, input, all, method, true, sampleRows, seed);
             matrix = matrixFrom(results, all.size());
-            n = results.isEmpty() ? countComplete(context, input, all) : results.get(0).n();
+            n = results.isEmpty()
+                    ? countComplete(context, input, all, sampleRows, seed) : results.get(0).n();
         }
         if (partial) {
             matrix = partialMatrix(matrix, columns.size(), all.size() - columns.size());
@@ -243,65 +258,94 @@ public final class CorrelationExecutor implements NodeExecutor {
 
     private static List<PairResult> pairQuery(NodeContext context, LazyPlan input,
                                               List<ColumnSpec> columns, String method,
-                                              boolean completeCase) throws SQLException {
-        List<int[]> pairs = new ArrayList<>();
-        StringJoiner union = new StringJoiner("\nUNION ALL\n");
-        int ordinal = 0;
+                                              boolean completeCase, int sampleRows, int seed)
+            throws SQLException {
+        List<PairResult> results = new ArrayList<>();
+        String source = sampledSource(input, sampleRows, seed);
+        if (!"spearman".equals(method)) {
+            // One scan yields every pair's n, sums, squares and cross product.
+            List<String> expressions = new ArrayList<>(columns.size());
+            for (ColumnSpec column : columns) {
+                expressions.add(MomentSupport.doubleColumn(column.name()));
+            }
+            String fromWhere = " FROM " + source + " WHERE "
+                    + (completeCase ? completeCaseWhere(columns) : "TRUE");
+            MomentSupport.Moments moments = MomentSupport.read(context, "", fromWhere,
+                    expressions, false, List.of()).values().iterator().next();
+            boolean pairwise = !moments.complete();
+            if (pairwise) {
+                // NULLs present: recompute the five sums per pair on pair-complete rows.
+                moments = MomentSupport.read(context, "", fromWhere, expressions, true, List.of())
+                        .values().iterator().next();
+            }
+            for (int i = 0; i < columns.size(); i++) {
+                for (int j = i + 1; j < columns.size(); j++) {
+                    results.add(new PairResult(i, j,
+                            pairwise ? moments.correlation(i, j) : moments.centeredCorrelation(i, j),
+                            pairwise ? moments.count(i, j) : moments.count()));
+                }
+            }
+            return results;
+        }
+        if (completeCase) {
+            // All pairs share one complete-case row set, so rank every column once.
+            String with = spearmanCte(columns, completeCaseWhere(columns), source);
+            List<String> ranks = new ArrayList<>(columns.size());
+            for (int i = 0; i < columns.size(); i++) {
+                ranks.add(NodeSql.quote("dap_v" + i));
+            }
+            MomentSupport.Moments moments = MomentSupport.read(context, with, " FROM dap_ranked",
+                    ranks, true, List.of()).values().iterator().next();
+            for (int i = 0; i < columns.size(); i++) {
+                for (int j = i + 1; j < columns.size(); j++) {
+                    results.add(new PairResult(i, j, moments.correlation(i, j), moments.count(i, j)));
+                }
+            }
+            return results;
+        }
+        // Pairwise deletion: ranks depend on the pair's complete rows, so rank per pair.
         for (int i = 0; i < columns.size(); i++) {
             for (int j = i + 1; j < columns.size(); j++) {
-                pairs.add(new int[]{i, j});
-                String where = completeCase
-                        ? completeCaseWhere(columns)
-                        : pairWhere(columns.get(i), columns.get(j));
-                union.add(pairSql(ordinal++, columns.get(i), columns.get(j), input.asTable(), where, method));
+                List<ColumnSpec> pair = List.of(columns.get(i), columns.get(j));
+                String with = spearmanCte(pair, pairWhere(pair.get(0), pair.get(1)), source);
+                MomentSupport.Moments moments = MomentSupport.read(context, with, " FROM dap_ranked",
+                        List.of(NodeSql.quote("dap_v0"), NodeSql.quote("dap_v1")), true, List.of())
+                        .values().iterator().next();
+                results.add(new PairResult(i, j, moments.correlation(0, 1), moments.count(0, 1)));
             }
         }
-        PairResult[] results = new PairResult[pairs.size()];
-        try (Connection connection = context.db().newConnection();
-             Statement statement = connection.createStatement();
-             ResultSet result = statement.executeQuery(union.toString())) {
-            while (result.next()) {
-                int read = result.getInt("dap_ordinal");
-                int[] pair = pairs.get(read);
-                results[read] = new PairResult(pair[0], pair[1], value(result, "r"),
-                        result.getLong("n"));
-            }
-        }
-        List<PairResult> ordered = new ArrayList<>(pairs.size());
-        for (PairResult result : results) {
-            if (result != null) {
-                ordered.add(result);
-            }
-        }
-        return ordered;
+        return results;
     }
 
-    private static String pairSql(int ordinal, ColumnSpec a, ColumnSpec b, String table,
-                                  String where, String method) {
-        String quotedA = NodeSql.quote(a.name());
-        String quotedB = NodeSql.quote(b.name());
-        if ("spearman".equals(method)) {
-            return "SELECT " + ordinal + " AS \"dap_ordinal\","
-                    + " CAST(CORR(\"dap_rank_a\", \"dap_rank_b\") AS DOUBLE) AS \"r\","
-                    + " COUNT(*) AS \"n\""
-                    + " FROM (SELECT " + quotedA + " AS " + quotedA + ", " + quotedB + " AS " + quotedB
-                    + ", RANK() OVER (ORDER BY " + quotedA + ") + (COUNT(*) OVER (PARTITION BY "
-                    + quotedA + ") - 1) / 2.0 AS \"dap_rank_a\""
-                    + ", RANK() OVER (ORDER BY " + quotedB + ") + (COUNT(*) OVER (PARTITION BY "
-                    + quotedB + ") - 1) / 2.0 AS \"dap_rank_b\""
-                    + " FROM " + table + " AS dap_input"
-                    + " WHERE " + where + ") AS dap_ranked";
+    /** Average rank per column: RANK() shares the minimum rank, the offset restores ties. */
+    private static String spearmanCte(List<ColumnSpec> columns, String where, String source) {
+        StringJoiner select = new StringJoiner(", ");
+        for (int i = 0; i < columns.size(); i++) {
+            String value = MomentSupport.doubleColumn(columns.get(i).name());
+            select.add(value + " AS " + NodeSql.quote("dap_raw" + i));
         }
-        return "SELECT " + ordinal + " AS \"dap_ordinal\","
-                + " CAST(CORR(" + quotedA + ", " + quotedB + ") AS DOUBLE) AS \"r\","
-                + " COUNT(*) AS \"n\""
-                + " FROM " + table + " AS dap_input"
-                + " WHERE " + where;
+        StringJoiner ranks = new StringJoiner(", ");
+        for (int i = 0; i < columns.size(); i++) {
+            String value = MomentSupport.doubleColumn(columns.get(i).name());
+            ranks.add("RANK() OVER (ORDER BY " + value + ") + (COUNT(*) OVER (PARTITION BY " + value
+                    + ") - 1) / 2.0 AS " + NodeSql.quote("dap_v" + i));
+        }
+        return "WITH dap_ranked AS (SELECT " + select + ", " + ranks + " FROM " + source
+                + " WHERE " + where + ") ";
     }
 
-    private static long countComplete(NodeContext context, LazyPlan input, List<ColumnSpec> columns)
-            throws SQLException {
-        String sql = "SELECT COUNT(*) AS \"n\" FROM " + input.asTable() + " AS dap_input"
+    /** Optional deterministic reservoir sample, applied before any null filtering. */
+    private static String sampledSource(LazyPlan input, int sampleRows, int seed) {
+        if (sampleRows <= 0) {
+            return input.asTable() + " AS dap_input";
+        }
+        return "(SELECT * FROM " + input.asTable() + " AS dap_src USING SAMPLE reservoir("
+                + sampleRows + " ROWS) REPEATABLE(" + seed + ")) AS dap_input";
+    }
+
+    private static long countComplete(NodeContext context, LazyPlan input, List<ColumnSpec> columns,
+                                      int sampleRows, int seed) throws SQLException {
+        String sql = "SELECT COUNT(*) AS \"n\" FROM " + sampledSource(input, sampleRows, seed)
                 + " WHERE " + completeCaseWhere(columns);
         try (Connection connection = context.db().newConnection();
              Statement statement = connection.createStatement();
@@ -594,14 +638,15 @@ public final class CorrelationExecutor implements NodeExecutor {
     }
 
     private static double[][] readValues(NodeContext context, LazyPlan input, List<ColumnSpec> columns,
-                                         boolean completeCase) throws SQLException {
+                                         boolean completeCase, int sampleRows, int seed)
+            throws SQLException {
         StringJoiner projection = new StringJoiner(", ");
         for (ColumnSpec column : columns) {
-            projection.add("CAST(" + NodeSql.quote(column.name()) + " AS DOUBLE)");
+            projection.add(MomentSupport.doubleColumn(column.name()));
         }
-        String sql = "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input"
+        String sql = "SELECT " + projection + " FROM " + sampledSource(input, sampleRows, seed)
                 + (completeCase ? " WHERE " + completeCaseWhere(columns) : "")
-                + " LIMIT " + (ROW_CAP + 1);
+                + " LIMIT " + (KENDALL_ROW_CAP + 1);
         List<double[]> rows = new ArrayList<>();
         try (Connection connection = context.db().newConnection();
              Statement statement = connection.createStatement();
@@ -615,9 +660,10 @@ public final class CorrelationExecutor implements NodeExecutor {
                 rows.add(row);
             }
         }
-        if (rows.size() > ROW_CAP) {
-            throw new IllegalArgumentException("correlation: kendall tau is computed in memory and needs at "
-                    + "most " + ROW_CAP + " rows, got more; use method=spearman or aggregate first");
+        if (rows.size() > KENDALL_ROW_CAP) {
+            throw new IllegalArgumentException("correlation: method=kendall supports at most "
+                    + KENDALL_ROW_CAP + " rows, got more; use pearson/spearman or sample_rows=N "
+                    + "(deterministic reservoir sample) instead");
         }
         return rows.toArray(new double[0][]);
     }
@@ -683,15 +729,6 @@ public final class CorrelationExecutor implements NodeExecutor {
 
     private static List<ColumnSpec> controlsOf(List<ColumnSpec> all, int requested) {
         return all.subList(requested, all.size());
-    }
-
-    private static Double value(ResultSet result, String column) throws SQLException {
-        Object value = result.getObject(column);
-        if (value == null) {
-            return Double.NaN;
-        }
-        double number = ((Number) value).doubleValue();
-        return Double.isFinite(number) ? number : Double.NaN;
     }
 
     private static double fisherZ(double correlation) {

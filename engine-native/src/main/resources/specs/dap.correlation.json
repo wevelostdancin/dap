@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Pairwise correlation of two or more numeric columns, in long format (one row per pair) or as a matrix. Methods: Pearson, Spearman (rank correlation, ties share a rank) and Kendall tau-b. Optional partial correlation on control columns via the inverse of the correlation matrix. Long output carries the sample size, the p-value (t approximation for Pearson/Spearman, normal z approximation for Kendall), a confidence interval (Fisher's z for Pearson/Spearman, asymptotic standard error for Kendall) and p_adjusted with the requested multiple-comparison correction across all pairs. The matrix format has no p-values, so correction is not applied there.",
+  "description": "Pairwise correlation of two or more numeric columns, in long format (one row per pair) or as a matrix. Pearson and Spearman use SQL sufficient statistics (count, sums, squares and cross products; Spearman ranks with SQL windows), so they handle any row count with O(columns^2) memory. Kendall tau-b is computed in Java and supports at most 100000 rows unless sample_rows draws a deterministic reservoir sample. Optional partial correlation on control columns via the inverse of the moment-based correlation matrix. Long output carries the sample size, the p-value (t approximation for Pearson/Spearman, normal z approximation for Kendall), a confidence interval (Fisher's z for Pearson/Spearman, asymptotic standard error for Kendall) and p_adjusted with the requested multiple-comparison correction across all pairs. The matrix format has no p-values, so correction is not applied there.",
   "inPorts": [
     {
       "index": 0,
@@ -73,6 +73,20 @@
         "default": 0.05,
         "minimum": 0,
         "maximum": 1
+      },
+      "sample_rows": {
+        "type": "integer",
+        "title": "Sample rows",
+        "description": "0 uses every eligible row (no cap for Pearson/Spearman); a positive N fits on a deterministic reservoir sample of N rows (DuckDB USING SAMPLE reservoir(N ROWS) REPEATABLE(seed)), which also lets Kendall stay within its in-memory limit.",
+        "default": 0,
+        "minimum": 0
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Sampling seed",
+        "description": "Seed for the repeatable reservoir sample; the same input and seed give the same result. Ignored when sample_rows is 0. Must be 0 or positive.",
+        "default": 42,
+        "minimum": 0
       },
       "correction": {
         "type": "string",

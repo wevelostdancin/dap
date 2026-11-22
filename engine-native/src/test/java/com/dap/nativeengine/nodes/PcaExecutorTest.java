@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -147,6 +148,61 @@ class PcaExecutorTest {
         }
     }
 
+    /** Distinct periodic columns so the covariance matrix is not degenerate at p=20. */
+    private static LazyPlan wideInput(DuckDbSession db, int rows, int columns, String name)
+            throws Exception {
+        StringJoiner select = new StringJoiner(", ");
+        List<ColumnSpec> schema = new ArrayList<>();
+        for (int j = 0; j < columns; j++) {
+            select.add("((i % " + (89 + j) + ") * 0.01) AS c" + j);
+            schema.add(ColumnSpec.of("c" + j, "Float64"));
+        }
+        return NodeTestSupport.sqlTable(db, name,
+                "SELECT " + select + " FROM range(" + rows + ") t(i)", schema);
+    }
+
+    @Test
+    void twoHundredThousandRowsMatchNumpyCovarianceEigenvalues() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = NodeTestSupport.sqlTable(db, "pca_big",
+                    "SELECT ((i % 1000) * 0.01 - 5.0) AS x, ((i % 997) * 0.01 - 4.0) AS y, "
+                            + "((i % 991) * 0.01 - 4.0) AS z FROM range(200000) t(i)",
+                    List.of(ColumnSpec.of("x", "Float64"), ColumnSpec.of("y", "Float64"),
+                            ColumnSpec.of("z", "Float64")));
+            LazyPlan plan = new PcaExecutor().execute(NodeTestSupport.context(db, """
+                    {"columns":["x","y","z"],"components":3,"standardize":false,"mode":"explained"}
+                    """), List.of(input));
+            TableData data = plan.preview(10);
+            assertEquals(3L, data.rows());
+            // numpy.linalg.eigvalsh(np.cov(matrix, rowvar=False)), sorted descending.
+            assertEquals(0.38071523465281315, number(data, 0, 2), 1e-9);
+            assertEquals(0.3160262284066235, number(data, 1, 2), 1e-9);
+            assertEquals(0.3032585369405633, number(data, 2, 2), 1e-9);
+        }
+    }
+
+    @Test
+    void twentyColumnsAtOneMillionRowsUseMomentsNotRows() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = wideInput(db, 1_000_000, 20, "pca_wide");
+            StringJoiner columns = new StringJoiner(",");
+            for (int j = 0; j < 20; j++) {
+                columns.add("\"c" + j + "\"");
+            }
+            LazyPlan plan = new PcaExecutor().execute(NodeTestSupport.context(db,
+                    "{\"columns\":[" + columns + "],\"components\":2,\"mode\":\"explained\"}"),
+                    List.of(input));
+            assertTrue(!plan.sql().contains("pca_wide"), plan.sql());
+            TableData data = plan.preview(10);
+            assertEquals(2L, data.rows());
+            assertTrue(number(data, 0, 2) > number(data, 1, 2));
+        }
+    }
+
+    private static double number(TableData data, int row, int column) {
+        return Double.parseDouble(data.data().get(row).get(column));
+    }
+
     @Test
     void invalidConfigIsRejected() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
@@ -194,14 +250,28 @@ class PcaExecutorTest {
     }
 
     @Test
-    void rowCapFailsWithAHint() throws Exception {
+    void moreThanTheOldRowCapIsFittedFromMoments() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
-            IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                    () -> pca(db, COLUMNS, correlated(10), """
-                            {"columns":["x","y"],"components":1,"max_rows":5}
-                            """));
-            assertTrue(error.getMessage().contains("max_rows"), error.getMessage());
-            assertTrue(error.getMessage().contains("pre-filter"), error.getMessage());
+            LazyPlan plan = pca(db, COLUMNS, correlated(120_000), """
+                    {"columns":["x","y"],"components":2,"standardize":true,"mode":"explained"}
+                    """);
+            TableData data = plan.preview(10);
+            assertEquals(2L, data.rows());
+            assertTrue(Double.parseDouble(data.data().get(0).get(2)) > 0.8);
+            assertEquals(1.0, Double.parseDouble(data.data().get(1).get(3)), 1e-9);
+        }
+    }
+
+    @Test
+    void sampleRowsIsADeterministicOptionalSample() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            String config = """
+                    {"columns":["x","y"],"components":2,"standardize":true,
+                     "mode":"explained","sample_rows":1000,"seed":42}
+                    """;
+            List<Object[]> rows = correlated(120_000);
+            assertEquals(pca(db, COLUMNS, rows, config).preview(10).data(),
+                    pca(db, COLUMNS, rows, config).preview(10).data());
         }
     }
 

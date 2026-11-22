@@ -41,6 +41,13 @@ final class NodeTestSupport {
         }
     }
 
+    /** Create a large table with DuckDB SQL, without materialising rows in Java. */
+    static LazyPlan sqlTable(DuckDbSession db, String name, String query,
+                             List<ColumnSpec> columns) throws Exception {
+        db.execute("CREATE TABLE " + DuckDbSession.quote(name) + " AS " + query);
+        return new LazyPlan(db, "SELECT * FROM " + DuckDbSession.quote(name), columns);
+    }
+
     /** JSON-escaped absolute path for hand-built config objects. */
     static String path(Path file) {
         return file.toAbsolutePath().toString().replace("\\", "\\\\").replace("\"", "\\\"");
