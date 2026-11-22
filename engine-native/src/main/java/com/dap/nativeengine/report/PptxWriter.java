@@ -61,7 +61,7 @@ public final class PptxWriter {
 
     /** One slide: exactly one of paragraphs, table cells or images is set. */
     private record Slide(String title, List<String> paragraphs, List<String> columns,
-                         List<List<String>> rows, List<Placed> images) {
+                         List<List<String>> rows, List<Placed> images, int maxRows, String note) {
     }
 
     private record Deck(List<Slide> slides, List<Media> media) {
@@ -109,11 +109,14 @@ public final class PptxWriter {
         for (Section section : document.sections()) {
             switch (section) {
                 case Section.Text text -> slides.add(new Slide(text.title(), lines(text.text()),
-                        null, null, List.of()));
-                case Section.Table table -> slides.add(new Slide(table.title(), null,
-                        table.columns(), table.rows(), List.of()));
+                        null, null, List.of(), 0, null));
+                case Section.Table table -> {
+                    int limit = table.maxRows() == null ? MAX_TABLE_ROWS : table.maxRows();
+                    slides.add(new Slide(table.title(), null, table.columns(), table.rows(), List.of(),
+                            limit, truncationNote(table.rows(), limit)));
+                }
                 case Section.Image image -> slides.add(new Slide(image.title(), null, null, null,
-                        List.of(new Placed(media(image, media), image.width()))));
+                        List.of(new Placed(media(image, media), image.width())), 0, null));
                 case Section.PageBreak ignored -> {
                     // a presentation is paginated by slides: an explicit break adds nothing
                 }
@@ -144,6 +147,11 @@ public final class PptxWriter {
     private static List<String> lines(String value) {
         String normalized = value.replace("\r\n", "\n").replace('\r', '\n');
         return List.of(normalized.split("\n", -1));
+    }
+
+    /** An explicit in-body note: a truncated table must say how much of it was shown. */
+    private static String truncationNote(List<List<String>> rows, int limit) {
+        return rows.size() > limit ? "shown " + limit + " of " + rows.size() + " rows" : null;
     }
 
     /** Widescreen by default; an explicit page size and orientation map to point dimensions. */
@@ -329,7 +337,13 @@ public final class PptxWriter {
                     size[1] - BODY_Y - SLIDE_MARGIN, slide.paragraphs(), 1400, 0));
         }
         if (slide.columns() != null) {
-            out.append(tableFrame(3, slide, SLIDE_MARGIN, BODY_Y, contentCx));
+            long rowHeight = tableRowHeight(slide, size);
+            out.append(tableFrame(3, slide, SLIDE_MARGIN, BODY_Y, contentCx, rowHeight));
+            if (slide.note() != null) {
+                long noteY = BODY_Y + tableRows(slide) * rowHeight + 80_000;
+                out.append(textShape(4, "Truncation", SLIDE_MARGIN, noteY, contentCx, 240_000,
+                        List.of(slide.note()), 1000, 0));
+            }
         }
         if (!slide.images().isEmpty()) {
             out.append(picture(3, slide.images().get(0), SLIDE_MARGIN, BODY_Y, contentCx,
@@ -375,13 +389,25 @@ public final class PptxWriter {
         return out.toString();
     }
 
-    private static String tableFrame(int id, Slide slide, long x, long y, long cx) {
+    /** Header, printed rows and the optional "more rows" summary row. */
+    private static long tableRows(Slide slide) {
+        return Math.min(slide.rows().size(), slide.maxRows()) + 1L
+                + (slide.rows().size() > slide.maxRows() ? 1 : 0);
+    }
+
+    /** Fit the table and its optional note inside the slide without changing normal decks. */
+    private static long tableRowHeight(Slide slide, long[] size) {
+        long noteSpace = slide.note() == null ? 0 : 320_000;
+        long available = size[1] - BODY_Y - SLIDE_MARGIN - noteSpace;
+        return Math.min(TABLE_ROW_HEIGHT, available / Math.max(1, tableRows(slide)));
+    }
+
+    private static String tableFrame(int id, Slide slide, long x, long y, long cx, long rowHeight) {
         List<String> columns = slide.columns();
         int count = Math.max(1, columns.size());
         long columnWidth = cx / count;
         List<List<String>> rows = slide.rows();
-        long rowsHeight = (Math.min(rows.size(), MAX_TABLE_ROWS) + 1L
-                + (rows.size() > MAX_TABLE_ROWS ? 1 : 0)) * TABLE_ROW_HEIGHT;
+        long rowsHeight = tableRows(slide) * rowHeight;
         StringBuilder out = new StringBuilder();
         out.append("<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id=\"").append(id)
                 .append("\" name=\"Table\"/><p:cNvGraphicFramePr>"
@@ -396,30 +422,31 @@ public final class PptxWriter {
             out.append("<a:gridCol w=\"").append(columnWidth).append("\"/>");
         }
         out.append("</a:tblGrid>");
-        out.append(tableRow(columns, columnWidth, true));
+        out.append(tableRow(columns, columnWidth, true, rowHeight));
         int printed = 0;
         for (List<String> dataRow : rows) {
-            if (printed >= MAX_TABLE_ROWS) {
+            if (printed >= slide.maxRows()) {
                 break;
             }
-            out.append(tableRow(dataRow, columnWidth, false));
+            out.append(tableRow(dataRow, columnWidth, false, rowHeight));
             printed++;
         }
-        if (rows.size() > MAX_TABLE_ROWS) {
+        if (rows.size() > slide.maxRows()) {
             List<String> summary = new ArrayList<>();
-            summary.add("\u2026 " + (rows.size() - MAX_TABLE_ROWS) + " more rows");
+            summary.add("\u2026 " + (rows.size() - slide.maxRows()) + " more rows");
             for (int index = 1; index < count; index++) {
                 summary.add("");
             }
-            out.append(tableRow(summary, columnWidth, false));
+            out.append(tableRow(summary, columnWidth, false, rowHeight));
         }
         out.append("</a:tbl></a:graphicData></a:graphic></p:graphicFrame>");
         return out.toString();
     }
 
-    private static String tableRow(List<String> cells, long columnWidth, boolean header) {
+    private static String tableRow(List<String> cells, long columnWidth, boolean header,
+                                   long rowHeight) {
         StringBuilder out = new StringBuilder();
-        out.append("<a:tr h=\"").append(TABLE_ROW_HEIGHT).append("\">");
+        out.append("<a:tr h=\"").append(rowHeight).append("\">");
         int count = cells.size();
         for (int index = 0; index < count; index++) {
             String value = cells.get(index);

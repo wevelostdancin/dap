@@ -8,6 +8,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -156,6 +157,51 @@ class PptxWriterTest {
                 ReportDocument.PageSize.LETTER, ReportDocument.Orientation.LANDSCAPE,
                 new ReportDocument.Section.Text(null, "x")))), "ppt/presentation.xml");
         assertTrue(letter.contains("<p:sldSz cx=\"10058400\" cy=\"7772400\"/>"), letter);
+    }
+
+    @Test
+    void truncationIsVisibleInTheSlideBodyAndConfigurable() throws Exception {
+        List<List<String>> rows = new ArrayList<>();
+        for (int index = 0; index < 30; index++) {
+            rows.add(List.of("row " + index));
+        }
+        ReportDocument.Section.Table section = new ReportDocument.Section.Table("Rows",
+                List.of("a"), rows);
+        String defaultSlide = text(entries(new PptxWriter().write(document(null, null, section))),
+                "ppt/slides/slide1.xml");
+        assertTrue(defaultSlide.contains("<a:t>shown 12 of 30 rows</a:t>"), defaultSlide);
+        assertTrue(defaultSlide.contains("<a:t>\u2026 18 more rows</a:t>"), defaultSlide);
+        assertEquals(12, count(defaultSlide, "<a:t>row "));
+
+        ReportDocument.Section.Table limited = new ReportDocument.Section.Table("Rows",
+                List.of("a"), rows, 5);
+        String limitedSlide = text(entries(new PptxWriter().write(document(null, null, limited))),
+                "ppt/slides/slide1.xml");
+        assertTrue(limitedSlide.contains("<a:t>shown 5 of 30 rows</a:t>"), limitedSlide);
+        assertEquals(5, count(limitedSlide, "<a:t>row "));
+    }
+
+    @Test
+    void aTableThatFitsHasNoTruncationNote() throws Exception {
+        List<List<String>> rows = new ArrayList<>();
+        for (int index = 0; index < 12; index++) {
+            rows.add(List.of("row " + index));
+        }
+        String slide = text(entries(new PptxWriter().write(document(null, null,
+                new ReportDocument.Section.Table("Rows", List.of("a"), rows)))),
+                "ppt/slides/slide1.xml");
+        assertEquals(12, count(slide, "<a:t>row "));
+        assertTrue(!slide.contains("shown "), slide);
+    }
+
+    private static int count(String value, String needle) {
+        int found = 0;
+        int index = value.indexOf(needle);
+        while (index >= 0) {
+            found++;
+            index = value.indexOf(needle, index + needle.length());
+        }
+        return found;
     }
 
     @Test

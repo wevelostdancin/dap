@@ -71,6 +71,14 @@ public final class ChartRenderer {
         List<Shape> shapes = new ArrayList<>();
         shapes.add(new Shape.Rect(0, 0, spec.width(), spec.height(), BACKGROUND));
         int top = header(shapes, spec.title(), spec.subtitle(), spec.width());
+        // The renderer only ever sees a preview. Say so on the canvas instead of implying
+        // that aggregates cover the whole input.
+        if (data.rows() > data.data().size()) {
+            shapes.add(new Shape.Label(spec.width() - MARGIN_RIGHT, top + 14,
+                    "first " + data.data().size() + " of " + data.rows() + " rows", "end",
+                    SUBTITLE_SIZE - 1, TEXT));
+            top += 18;
+        }
         Frame frame = new Frame(0, top, spec.width(), spec.height() - top);
         if (spec.faceted()) {
             shapes.addAll(facets(spec, columns, data.data(), frame));
@@ -121,7 +129,11 @@ public final class ChartRenderer {
         int facetIndex = indexOf(columns, spec.facet());
         Map<String, List<List<String>>> groups = new LinkedHashMap<>();
         for (List<String> row : rows) {
-            groups.computeIfAbsent(cell(row, facetIndex), key -> new ArrayList<>()).add(row);
+            String facet = cell(row, facetIndex);
+            if (facet == null) {
+                continue;
+            }
+            groups.computeIfAbsent(facet, key -> new ArrayList<>()).add(row);
         }
         List<String> values = categoryOrder(groups.keySet());
         int columnsCount = Math.max(1, Math.min(spec.facetColumns(), Math.max(1, values.size())));
@@ -439,12 +451,12 @@ public final class ChartRenderer {
         for (List<String> row : rows) {
             String category = cell(row, xIndex);
             Double value = number(cell(row, yIndex));
-            if (value == null) {
+            if (category == null || value == null) {
                 continue;
             }
             String group = seriesIndex < 0 ? "" : cell(row, seriesIndex);
             sums.computeIfAbsent(category, key -> new LinkedHashMap<>())
-                    .merge(group, value, Double::sum);
+                    .merge(group == null ? "" : group, value, Double::sum);
         }
         List<String> groups = new ArrayList<>(new LinkedHashSet<>(sums.values().stream()
                 .flatMap(values -> values.keySet().stream()).toList()));
@@ -536,10 +548,11 @@ public final class ChartRenderer {
             for (List<String> row : rows) {
                 Double x = number(cell(row, xIndex));
                 Double value = number(cell(row, yIndex));
-                if (x == null || value == null) {
+                String name = cell(row, seriesIndex);
+                if (x == null || value == null || name == null) {
                     continue;
                 }
-                series.computeIfAbsent(cell(row, seriesIndex), key -> new ArrayList<>())
+                series.computeIfAbsent(name, key -> new ArrayList<>())
                         .add(new double[]{x, value});
             }
             Map<String, List<double[]>> sorted = new LinkedHashMap<>();
@@ -675,7 +688,11 @@ public final class ChartRenderer {
                 throw new IllegalArgumentException("chart: pie requires non-negative values, column '"
                         + spec.y().get(0) + "' contains " + format(value));
             }
-            sums.merge(cell(row, xIndex), value, Double::sum);
+            String category = cell(row, xIndex);
+            if (category == null) {
+                continue;
+            }
+            sums.merge(category, value, Double::sum);
         }
         List<String> categories = order(spec, new ArrayList<>(sums.keySet()),
                 category -> sums.get(category));
@@ -741,10 +758,11 @@ public final class ChartRenderer {
         Map<String, List<Double>> groups = new LinkedHashMap<>();
         for (List<String> row : rows) {
             Double value = number(cell(row, yIndex));
-            if (value == null) {
+            String category = cell(row, xIndex);
+            if (value == null || category == null) {
                 continue;
             }
-            groups.computeIfAbsent(cell(row, xIndex), key -> new ArrayList<>()).add(value);
+            groups.computeIfAbsent(category, key -> new ArrayList<>()).add(value);
         }
         List<String> categories = order(spec, new ArrayList<>(groups.keySet()),
                 category -> median(groups.get(category)));
@@ -856,11 +874,13 @@ public final class ChartRenderer {
         Map<String, Map<String, double[]>> cells = new LinkedHashMap<>();
         for (List<String> row : rows) {
             Double value = number(cell(row, yIndex));
-            if (value == null) {
+            String category = cell(row, xIndex);
+            String series = cell(row, seriesIndex);
+            if (value == null || category == null || series == null) {
                 continue;
             }
-            double[] cell = cells.computeIfAbsent(cell(row, xIndex), key -> new LinkedHashMap<>())
-                    .computeIfAbsent(cell(row, seriesIndex), key -> new double[2]);
+            double[] cell = cells.computeIfAbsent(category, key -> new LinkedHashMap<>())
+                    .computeIfAbsent(series, key -> new double[2]);
             cell[0] += value;
             cell[1] += 1;
         }
@@ -1252,9 +1272,9 @@ public final class ChartRenderer {
         throw new IllegalArgumentException("chart: unknown column '" + name + "'");
     }
 
+    /** Raw cell value; NULL stays NULL so categorical axes can skip it. */
     private static String cell(List<String> row, int index) {
-        String value = index < row.size() ? row.get(index) : null;
-        return value == null ? "(null)" : value;
+        return index < row.size() ? row.get(index) : null;
     }
 
     private static Double number(String value) {
@@ -1309,10 +1329,16 @@ public final class ChartRenderer {
         return categories;
     }
 
-    /** Two decimals, trailing zeros trimmed: deterministic across platforms. */
+    /** Two decimals (or significant digits for tiny values): deterministic across platforms. */
     private static String format(double value) {
-        if (Math.abs(value) < 0.005) {
+        double magnitude = Math.abs(value);
+        if (magnitude == 0) {
             return "0";
+        }
+        if (magnitude < 0.01) {
+            // A log axis can span 1e-4…1e-2; rounding that range to "0" destroys every tick.
+            // Significant digits also keep 0.005 and 0.01 as two distinct labels.
+            return String.format(Locale.ROOT, "%.2g", value);
         }
         String text = String.format(Locale.ROOT, "%.2f", value);
         while (text.endsWith("0")) {

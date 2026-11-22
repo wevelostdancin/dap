@@ -109,6 +109,37 @@ class PdfWriterTest {
     }
 
     @Test
+    void splitsOneTallRowAcrossPagesWithoutLeavingTheMediaBox() throws Exception {
+        StringBuilder cell = new StringBuilder();
+        for (int index = 0; index < 100; index++) {
+            if (index > 0) {
+                cell.append(' ');
+            }
+            cell.append(String.format(java.util.Locale.ROOT, "line%03d", index))
+                    .append("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+        }
+        ReportDocument.Section table = new ReportDocument.Section.Table("Tall",
+                List.of("body"), List.of(List.of(cell.toString())));
+
+        String content = latin1(new PdfWriter().write(document(ReportDocument.PageSize.A4,
+                ReportDocument.Orientation.PORTRAIT, table)));
+
+        assertTrue(pageCount(content) >= 3, "a 100-line cell needs several pages: "
+                + pageCount(content));
+        assertTrue(content.contains("line000"), content);
+        assertTrue(content.contains("line099"), "the tail of the row must be kept");
+        assertTrue(content.indexOf("line099") > content.indexOf("line000"));
+        Matcher positions = Pattern.compile("1 0 0 1 [0-9.]+ ([0-9.\\-]+) Tm").matcher(content);
+        int drawn = 0;
+        while (positions.find()) {
+            double y = Double.parseDouble(positions.group(1));
+            assertTrue(y >= 0 && y <= 842, "text outside A4 MediaBox: y=" + y);
+            drawn++;
+        }
+        assertTrue(drawn >= 100, "drawn lines " + drawn);
+    }
+
+    @Test
     void explicitPageBreakStartsANewPage() throws Exception {
         String content = latin1(new PdfWriter().write(document(ReportDocument.PageSize.A4,
                 ReportDocument.Orientation.PORTRAIT,
