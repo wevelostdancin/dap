@@ -71,9 +71,16 @@ public record ReportDocument(Format format, String title, String subtitle, Strin
     public sealed interface Section permits Section.Table, Section.Text, Section.Image, Section.PageBreak {
         String title();
 
-        /** A table section: column headers plus already-selected, unescaped cells (null = NULL). */
-        record Table(String title, List<String> columns, List<List<String>> rows)
+        /**
+         * A table section: column headers plus already-selected, unescaped cells (null = NULL).
+         * {@code maxRows} is the format-specific row cap (PPTX only); null means the default.
+         */
+        record Table(String title, List<String> columns, List<List<String>> rows, Integer maxRows)
                 implements Section {
+            public Table(String title, List<String> columns, List<List<String>> rows) {
+                this(title, columns, rows, null);
+            }
+
             public Table {
                 columns = List.copyOf(columns);
                 rows = List.copyOf(rows);

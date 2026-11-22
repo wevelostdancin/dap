@@ -79,14 +79,22 @@ public final class ReportWriter {
         return "![" + alt + "](" + path + ")";
     }
 
-    /** A table cell: pipes and newlines cannot break the row, HTML cannot break the document. */
+    /**
+     * A table cell is literal text: HTML cannot break the document and markdown metacharacters
+     * cannot change the row or its formatting. Backslashes are escaped first, so an original
+     * {@code a\|b} becomes {@code a\\\|b} (literal backslash + literal pipe) instead of a stray
+     * {@code \\} followed by a column separator.
+     */
     static String escapeCell(String value) {
         if (value == null) {
             return "";
         }
         String escaped = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-        escaped = escaped.replace("|", "\\|");
-        return normalizeNewlines(escaped).replace("\n", "<br>");
+        escaped = normalizeNewlines(escaped).replace("\\", "\\\\");
+        for (char meta : new char[]{'*', '_', '`', '[', ']', '~', '#'}) {
+            escaped = escaped.replace(String.valueOf(meta), "\\" + meta);
+        }
+        return escaped.replace("|", "\\|").replace("\n", "<br>");
     }
 
     static String normalizeNewlines(String value) {

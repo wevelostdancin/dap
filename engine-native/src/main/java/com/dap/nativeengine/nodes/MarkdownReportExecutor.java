@@ -42,6 +42,7 @@ public final class MarkdownReportExecutor implements NodeExecutor {
     private static final int MAX_TABLE_LIMIT = 10_000;
     private static final int DEFAULT_PROFILE_LIMIT = 1_000;
     private static final int MAX_IMAGE_WIDTH = 10_000;
+    private static final int MAX_SLIDE_ROWS = 1_000;
     private static final Set<String> KINDS =
             Set.of("table", "profile", "text", "metrics", "image", "page_break");
     /** Per-column numeric metrics: SQL aggregate and its report label. */
@@ -71,11 +72,19 @@ public final class MarkdownReportExecutor implements NodeExecutor {
 
     /** One parsed section before its data is resolved from the selected input. */
     private record Spec(String kind, String title, List<String> columns, int limit, String text,
-                        int input, String path, String alt, int width) {
+                        int input, String path, String alt, int width, int maxRows) {
     }
 
     /** Profile sections sharing an input and column selection share one statistics scan. */
     private record ProfileKey(int input, List<String> columns) {
+    }
+
+    /** Cached statistics plus the plan they were computed from, so metrics can reuse them. */
+    private record ProfileResult(ProfileData data, String sql) {
+    }
+
+    /** One value of the metrics table: a column plus the aggregate to report for it. */
+    private record Metric(String column, String name, String arrowType) {
     }
 
     private static ReportDocument document(NodeContext context, List<LazyPlan> inputs, JsonNode config)
@@ -94,16 +103,21 @@ public final class MarkdownReportExecutor implements NodeExecutor {
                 ReportDocument.Orientation.class, null);
         List<Spec> specs = specs(config, inputs);
         Map<Integer, TableData> previews = previews(context, inputs, specs);
-        Map<ProfileKey, ProfileData> profiles = new HashMap<>();
-        Map<Integer, Long> totals = new HashMap<>();
+        Map<ProfileKey, ProfileResult> profiles = new HashMap<>();
+        // Statistics are order-independent: resolving profile sections up front lets an
+        // earlier metrics section reuse them instead of scanning the same input again.
+        for (Spec spec : specs) {
+            if (spec.kind().equals("profile")) {
+                profile(context, spec, inputs.get(spec.input()), profiles);
+            }
+        }
         List<ReportDocument.Section> sections = new ArrayList<>();
         for (Spec spec : specs) {
             LazyPlan input = inputs.get(spec.input());
             sections.add(switch (spec.kind()) {
                 case "table" -> table(spec, input, previews.get(spec.input()));
                 case "profile" -> profile(context, spec, input, profiles);
-                case "metrics" -> metrics(context, spec, input,
-                        totalRows(context, input, spec.input(), previews, totals));
+                case "metrics" -> metrics(context, spec, input, previews, profiles);
                 case "text" -> new ReportDocument.Section.Text(spec.title(), spec.text());
                 case "image" -> image(spec);
                 default -> new ReportDocument.Section.PageBreak(spec.title());
@@ -170,7 +184,8 @@ public final class MarkdownReportExecutor implements NodeExecutor {
                 alt = NodeSql.text(item, "alt", "");
                 width = width(item);
             }
-            specs.add(new Spec(kind, title, selected, limit, text, input, path, alt, width));
+            specs.add(new Spec(kind, title, selected, limit, text, input, path, alt, width,
+                    maxRows(item)));
         }
         return specs;
     }
@@ -253,6 +268,23 @@ public final class MarkdownReportExecutor implements NodeExecutor {
         return (int) width;
     }
 
+    /** PPTX rows per slide section; 0 leaves the writer's default in place. */
+    private static int maxRows(JsonNode section) {
+        JsonNode node = section.get("max_rows");
+        if (node == null || node.isNull()) {
+            return 0;
+        }
+        if (!node.isIntegralNumber()) {
+            throw new IllegalArgumentException(NODE + ": section 'max_rows' must be an integer");
+        }
+        long value = node.longValue();
+        if (value < 1 || value > MAX_SLIDE_ROWS) {
+            throw new IllegalArgumentException(NODE + ": section 'max_rows' must be between 1 and "
+                    + MAX_SLIDE_ROWS + ", got " + value);
+        }
+        return (int) value;
+    }
+
     /** One preview per input that has table sections; the widest limit bounds it. */
     private static Map<Integer, TableData> previews(NodeContext context, List<LazyPlan> inputs,
                                                     List<Spec> specs) throws Exception {
@@ -268,21 +300,6 @@ public final class MarkdownReportExecutor implements NodeExecutor {
                     .preview(entry.getValue(), context.workflowId(), context.nodeId()));
         }
         return previews;
-    }
-
-    private static long totalRows(NodeContext context, LazyPlan input, int index,
-                                  Map<Integer, TableData> previews, Map<Integer, Long> totals)
-            throws Exception {
-        Long cached = totals.get(index);
-        if (cached != null) {
-            return cached;
-        }
-        TableData preview = previews.get(index);
-        long rows = preview != null
-                ? preview.rows()
-                : input.preview(1, context.workflowId(), context.nodeId()).rows();
-        totals.put(index, rows);
-        return rows;
     }
 
     // ---------------------------------------------------------------- renderers
@@ -307,18 +324,18 @@ public final class MarkdownReportExecutor implements NodeExecutor {
             }
             data.add(cells);
         }
-        return new ReportDocument.Section.Table(spec.title(), selected, data);
+        return new ReportDocument.Section.Table(spec.title(), selected, data, spec.maxRows());
     }
 
     private static ReportDocument.Section.Table profile(NodeContext context, Spec spec, LazyPlan input,
-                                                        Map<ProfileKey, ProfileData> profiles)
+                                                        Map<ProfileKey, ProfileResult> profiles)
             throws Exception {
         List<ColumnSpec> columns = spec.columns().isEmpty()
                 ? input.columns()
                 : spec.columns().stream().map(name -> NodeSql.column(input.columns(), name)).toList();
         ProfileKey key = new ProfileKey(spec.input(), columns.stream().map(ColumnSpec::name).toList());
-        ProfileData data = profiles.get(key);
-        if (data == null) {
+        ProfileResult cached = profiles.get(key);
+        if (cached == null) {
             // The same key is used by GET /profile of the upstream node; DuckDbSession keeps
             // one statistics scan per workflow run and (node, plan, columns) combination.
             String nodeId = spec.input() < context.inputNodeIds().size()
@@ -326,9 +343,11 @@ public final class MarkdownReportExecutor implements NodeExecutor {
             LazyPlan plan = columns.equals(input.columns())
                     ? input
                     : new LazyPlan(input.session(), input.sql(), columns);
-            data = plan.profile(0L, context.workflowId(), nodeId, true);
-            profiles.put(key, data);
+            cached = new ProfileResult(plan.profile(0L, context.workflowId(), nodeId, true),
+                    plan.sql());
+            profiles.put(key, cached);
         }
+        ProfileData data = cached.data();
         List<List<String>> rows = new ArrayList<>();
         for (ProfileColumn column : data.columns()) {
             if (rows.size() >= spec.limit()) {
@@ -342,7 +361,7 @@ public final class MarkdownReportExecutor implements NodeExecutor {
                     number(column.min()), number(column.max()), number(column.mean()),
                     number(column.stddev())));
         }
-        return new ReportDocument.Section.Table(spec.title(), PROFILE_HEADERS, rows);
+        return new ReportDocument.Section.Table(spec.title(), PROFILE_HEADERS, rows, spec.maxRows());
     }
 
     private static final List<String> PROFILE_HEADERS = List.of(
@@ -353,41 +372,123 @@ public final class MarkdownReportExecutor implements NodeExecutor {
     }
 
     private static ReportDocument.Section.Table metrics(NodeContext context, Spec spec, LazyPlan input,
-                                                long totalRows) throws Exception {
-        List<ColumnSpec> metrics = new ArrayList<>();
-        StringJoiner sql = new StringJoiner(", ");
-        sql.add("CAST(COUNT(*) AS VARCHAR) AS \"m0\"");
-        metrics.add(ColumnSpec.of("m0", "Utf8"));
-        List<String> values = new ArrayList<>();
-        int ordinal = 1;
+                                                        Map<Integer, TableData> previews,
+                                                        Map<ProfileKey, ProfileResult> profiles)
+            throws Exception {
+        List<Metric> metrics = new ArrayList<>();
         for (String name : spec.columns()) {
             ColumnSpec column = NodeSql.column(input.columns(), name);
-            String quoted = NodeSql.quote(name);
-            values.add(name + ".count");
-            sql.add("CAST(COUNT(" + quoted + ") AS VARCHAR) AS \"m" + ordinal + "\"");
-            metrics.add(ColumnSpec.of("m" + ordinal++, "Utf8"));
-            values.add(name + ".missing");
-            sql.add("CAST(COUNT(*) - COUNT(" + quoted + ") AS VARCHAR) AS \"m" + ordinal + "\"");
-            metrics.add(ColumnSpec.of("m" + ordinal++, "Utf8"));
+            metrics.add(new Metric(name, "count", column.arrowType()));
+            metrics.add(new Metric(name, "missing", column.arrowType()));
             if (column.numeric()) {
                 for (String[] aggregate : NUMERIC_METRICS) {
-                    values.add(name + "." + aggregate[1]);
-                    sql.add("CAST(" + aggregate[0] + "(" + quoted + ") AS VARCHAR) AS \"m" + ordinal + "\"");
-                    metrics.add(ColumnSpec.of("m" + ordinal++, "Utf8"));
+                    metrics.add(new Metric(name, aggregate[1], column.arrowType()));
                 }
             }
         }
-        LazyPlan plan = new LazyPlan(context.db(),
-                "SELECT " + sql + " FROM " + input.asTable() + " AS dap_report", metrics);
-        TableData data = plan.preview(1, context.workflowId(), context.nodeId());
-        List<String> row = data.data().isEmpty() ? List.of() : data.data().get(0);
+        ProfileData profile = reusableProfile(profiles, spec.input(), input, metrics);
+        long totalRows;
+        List<String> row;
+        if (profile != null && metrics.stream().allMatch(MarkdownReportExecutor::profileBacked)) {
+            totalRows = profile.rows();
+            row = profileRow(profile, metrics);
+        } else if (metrics.isEmpty()) {
+            TableData preview = previews.get(spec.input());
+            totalRows = profile != null ? profile.rows()
+                    : preview != null ? preview.rows()
+                    : input.preview(1, context.workflowId(), context.nodeId()).rows();
+            row = List.of();
+        } else {
+            StringJoiner sql = new StringJoiner(", ");
+            sql.add("CAST(COUNT(*) AS VARCHAR) AS \"m0\"");
+            List<ColumnSpec> output = new ArrayList<>();
+            output.add(ColumnSpec.of("m0", "Utf8"));
+            int ordinal = 1;
+            for (Metric metric : metrics) {
+                String quoted = NodeSql.quote(metric.column());
+                String expression = switch (metric.name()) {
+                    case "count" -> "CAST(COUNT(" + quoted + ") AS VARCHAR)";
+                    case "missing" -> "CAST(COUNT(*) - COUNT(" + quoted + ") AS VARCHAR)";
+                    case "mean" -> "CAST(AVG(" + quoted + ") AS VARCHAR)";
+                    case "min" -> "CAST(MIN(" + quoted + ") AS VARCHAR)";
+                    case "max" -> "CAST(MAX(" + quoted + ") AS VARCHAR)";
+                    default -> throw new IllegalStateException("unknown metric " + metric.name());
+                };
+                sql.add(expression + " AS \"m" + ordinal + "\"");
+                output.add(ColumnSpec.of("m" + ordinal++, "Utf8"));
+            }
+            LazyPlan plan = new LazyPlan(context.db(),
+                    "SELECT " + sql + " FROM " + input.asTable() + " AS dap_report", output);
+            TableData data = plan.preview(1, context.workflowId(), context.nodeId());
+            row = data.data().isEmpty() ? List.of() : data.data().get(0);
+            totalRows = row.isEmpty() ? 0 : Long.parseLong(row.get(0));
+        }
         List<List<String>> table = new ArrayList<>();
         table.add(List.of("rows", Long.toString(totalRows)));
         table.add(List.of("columns", Integer.toString(input.columns().size())));
-        for (int index = 0; index < values.size(); index++) {
-            table.add(List.of(values.get(index), cell(row, index + 1)));
+        for (int index = 0; index < metrics.size(); index++) {
+            Metric metric = metrics.get(index);
+            table.add(List.of(metric.column() + "." + metric.name(), cell(row, index + 1)));
         }
-        return new ReportDocument.Section.Table(spec.title(), List.of("metric", "value"), table);
+        return new ReportDocument.Section.Table(spec.title(), List.of("metric", "value"), table,
+                spec.maxRows());
+    }
+
+    /** A profile for the very same plan whose columns cover every requested metric. */
+    private static ProfileData reusableProfile(Map<ProfileKey, ProfileResult> profiles, int input,
+                                               LazyPlan plan, List<Metric> metrics) {
+        List<String> needed = metrics.stream().map(Metric::column).distinct().toList();
+        for (Map.Entry<ProfileKey, ProfileResult> entry : profiles.entrySet()) {
+            ProfileResult candidate = entry.getValue();
+            if (entry.getKey().input() != input || !candidate.sql().equals(plan.sql())) {
+                continue;
+            }
+            if (candidate.data().columns().stream().map(ProfileColumn::name).toList()
+                    .containsAll(needed)) {
+                return candidate.data();
+            }
+        }
+        return null;
+    }
+
+    /** Decimal aggregates keep their SQL scale, so they still use the single-query path. */
+    private static boolean profileBacked(Metric metric) {
+        return "Int64".equals(metric.arrowType()) || "Float64".equals(metric.arrowType());
+    }
+
+    private static List<String> profileRow(ProfileData profile, List<Metric> metrics) {
+        Map<String, ProfileColumn> byName = new HashMap<>();
+        for (ProfileColumn column : profile.columns()) {
+            byName.put(column.name(), column);
+        }
+        List<String> row = new ArrayList<>();
+        row.add(Long.toString(profile.rows()));
+        for (Metric metric : metrics) {
+            row.add(profileMetric(profile.rows(), byName.get(metric.column()), metric));
+        }
+        return row;
+    }
+
+    private static String profileMetric(long rows, ProfileColumn column, Metric metric) {
+        if (column == null) {
+            return null;
+        }
+        return switch (metric.name()) {
+            case "count" -> Long.toString(rows - column.missing());
+            case "missing" -> Long.toString(column.missing());
+            case "mean" -> number(column.mean());
+            case "min" -> bound(column.min(), metric.arrowType());
+            case "max" -> bound(column.max(), metric.arrowType());
+            default -> null;
+        };
+    }
+
+    /** DuckDB casts an integer MIN/MAX to text without decimals; doubles keep ".0". */
+    private static String bound(Double value, String arrowType) {
+        if (value == null) {
+            return null;
+        }
+        return "Int64".equals(arrowType) ? Long.toString(value.longValue()) : number(value);
     }
 
     private static ReportDocument.Section.Image image(Spec spec) {

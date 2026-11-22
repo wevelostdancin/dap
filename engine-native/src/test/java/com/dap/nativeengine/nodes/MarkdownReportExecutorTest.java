@@ -10,12 +10,15 @@ import org.junit.jupiter.api.io.TempDir;
 import javax.imageio.ImageIO;
 
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -402,6 +405,65 @@ class MarkdownReportExecutorTest {
             String content = new String(Files.readAllBytes(file), StandardCharsets.ISO_8859_1);
             assertTrue(content.startsWith("%PDF-1.4"), content);
             assertTrue(content.contains("/MediaBox [0 0 792 612]"), content);
+        }
+    }
+
+    private static String metricsBlock(String markdown) {
+        int start = markdown.indexOf("| metric | value |");
+        assertTrue(start >= 0, markdown);
+        String rest = markdown.substring(start);
+        int next = rest.indexOf("\n\n| ");
+        return (next < 0 ? rest : rest.substring(0, next)).strip();
+    }
+
+    @Test
+    void metricsReuseProfileStatisticsInEitherSectionOrder() throws Exception {
+        String metrics = "{\"kind\":\"metrics\",\"columns\":[\"id\",\"score\"]}";
+        String profile = "{\"kind\":\"profile\",\"columns\":[\"id\",\"score\"]}";
+        String only = document(dir.resolve("metrics-only.md"),
+                ",\"sections\":[" + metrics + "]");
+        String after = document(dir.resolve("metrics-after.md"),
+                ",\"sections\":[" + profile + "," + metrics + "]");
+        String before = document(dir.resolve("metrics-before.md"),
+                ",\"sections\":[" + metrics + "," + profile + "]");
+
+        assertEquals(metricsBlock(only), metricsBlock(after));
+        assertEquals(metricsBlock(only), metricsBlock(before));
+        assertTrue(metricsBlock(after).contains("| id.count | 4 |"), metricsBlock(after));
+        assertTrue(metricsBlock(after).contains("| score.mean | 4.0 |"), metricsBlock(after));
+    }
+
+    @Test
+    void pptxMaxRowsIsConfigurableAndItsTruncationIsVisible() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            Path file = dir.resolve("capped.pptx");
+            execute(db, job, file,
+                    ",\"format\":\"pptx\",\"sections\":[{\"kind\":\"table\",\"title\":\"Rows\","
+                            + "\"columns\":[\"id\"],\"limit\":4,\"max_rows\":2}]",
+                    List.of(input(db)));
+            StringBuilder slide = new StringBuilder();
+            try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(
+                    Files.readAllBytes(file)))) {
+                ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    if (entry.getName().equals("ppt/slides/slide1.xml")) {
+                        slide.append(new String(zip.readAllBytes(), StandardCharsets.UTF_8));
+                    }
+                }
+            }
+            assertTrue(slide.toString().contains("<a:t>shown 2 of 4 rows</a:t>"), slide.toString());
+        }
+    }
+
+    @Test
+    void rejectsInvalidPptxMaxRows() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            LazyPlan input = input(db);
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> execute(db, job, dir.resolve("bad.pptx"),
+                            ",\"format\":\"pptx\",\"sections\":[{\"kind\":\"table\","
+                                    + "\"max_rows\":0}]", List.of(input)));
+            assertTrue(failure.getMessage().contains("max_rows"), failure.getMessage());
         }
     }
 

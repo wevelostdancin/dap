@@ -19,6 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -525,6 +526,76 @@ class ChartExecutorTest {
         BufferedImage image = ImageIO.read(file.toFile());
         assertEquals(320, image.getWidth());
         assertEquals(240, image.getHeight());
+    }
+
+    @Test
+    void nullCategoriesAreSkippedByEveryCategoricalChart() throws Exception {
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("category", "Utf8"),
+                ColumnSpec.of("score", "Float64"));
+        List<Object[]> rows = List.of(
+                new Object[]{"A", 2.0}, new Object[]{null, 100.0}, new Object[]{"B", 3.0});
+        for (String type : List.of("bar", "pie", "boxplot")) {
+            String document = svg(columns, rows, ",\"type\":\"" + type
+                    + "\",\"x\":\"category\",\"y\":[\"score\"]");
+            assertFalse(document.contains("(null)"), type + ": " + document);
+            if (type.equals("pie")) {
+                assertTrue(document.contains("A 40.0%") && document.contains("B 60.0%"),
+                        type + ": " + document);
+            } else {
+                assertTrue(xOf(document, "A") >= 0 && xOf(document, "B") >= 0,
+                        type + ": " + document);
+            }
+            for (Text text : texts(document, END_TEXT)) {
+                assertTrue(Double.parseDouble(text.label()) < 100,
+                        type + " used the NULL row: " + text.label());
+            }
+        }
+
+        List<ColumnSpec> heatColumns = List.of(
+                ColumnSpec.of("category", "Utf8"),
+                ColumnSpec.of("series", "Utf8"),
+                ColumnSpec.of("score", "Float64"));
+        List<Object[]> heatRows = List.of(
+                new Object[]{"A", "s1", 2.0}, new Object[]{null, "s1", 100.0},
+                new Object[]{"A", null, 100.0}, new Object[]{"B", "s1", 3.0});
+        String heatmap = svg(heatColumns, heatRows, ",\"type\":\"heatmap\",\"x\":\"category\","
+                + "\"series\":\"series\",\"y\":[\"score\"]");
+        assertFalse(heatmap.contains("(null)"), heatmap);
+        assertTrue(xOf(heatmap, "A") >= 0 && xOf(heatmap, "B") >= 0, heatmap);
+        assertFalse(heatmap.contains(">100<"), heatmap);
+    }
+
+    @Test
+    void logAxisKeepsSignificantDigitsForTinyTicks() throws Exception {
+        List<ColumnSpec> columns = List.of(
+                ColumnSpec.of("x", "Int64"),
+                ColumnSpec.of("value", "Float64"));
+        List<Object[]> rows = List.of(
+                new Object[]{1L, 0.0001}, new Object[]{2L, 0.001},
+                new Object[]{3L, 0.01}, new Object[]{4L, 0.002});
+        String document = svg(columns, rows,
+                ",\"type\":\"scatter\",\"x\":\"x\",\"y\":[\"value\"],\"log_y\":true");
+
+        List<String> yLabels = new ArrayList<>();
+        for (Text text : texts(document, END_TEXT)) {
+            yLabels.add(text.label());
+        }
+        assertTrue(yLabels.contains("0.00010") || yLabels.contains("1e-04"), document);
+        assertTrue(yLabels.contains("0.01"), document);
+        assertTrue(yLabels.contains("0.0050") || yLabels.contains("0.005"), document);
+        assertFalse(yLabels.contains("0"), "every tick collapsed to zero: " + yLabels);
+        assertEquals(yLabels.size(), new java.util.HashSet<>(yLabels).size(),
+                "distinct ticks need distinct labels: " + yLabels);
+    }
+
+    @Test
+    void chartSaysWhenItOnlyAggregatedThePreview() throws Exception {
+        String limited = svg(",\"type\":\"bar\",\"x\":\"category\",\"y\":[\"score\"],\"limit\":2");
+        assertTrue(limited.contains("first 2 of 5 rows"), limited);
+
+        String full = svg(",\"type\":\"bar\",\"x\":\"category\",\"y\":[\"score\"]");
+        assertFalse(full.contains("first "), full);
     }
 
     @Test

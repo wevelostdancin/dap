@@ -8,7 +8,7 @@
 
 | Уровень | Команда | Что покрывает |
 |---|---|---|
-| JUnit | `make test-native` | 859 тестов в 115 классах: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
+| JUnit | `make test-native` | 915 тестов в 120 классах: исполнители, IO-кэш, Dag/JobManager, DuckDB-сессии, каталог, HTTP-интеграция |
 | Goldens | `make goldens` | 35 workflow на чистом экземпляре `:7811`; сравнение с `expected.json` или литеральными ожиданиями |
 | Coverage | `make coverage` | 69 задач таксономии через `/v1`; сейчас 68/69 (F6 — не-цель) |
 | Структура goldens | `python3 tests/goldens-native/runner.py --validate` | проверка фикстур без движка |
@@ -24,7 +24,7 @@
 ## 2. Unit-тесты
 
 JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java.base/java.nio`).
-859 тестов в 115 классах:
+915 тестов в 120 классах:
 
 - **Исполнители** — по классу на узел (`CsvReaderExecutorTest`, `ExcelReaderExecutorTest`,
   `ParquetReaderExecutorTest`, `JsonReaderExecutorTest`, `CsvWriterExecutorTest`,
@@ -227,6 +227,10 @@ A/B, time_series. Фикстуры данных:
 
 ## 7. Воспроизводимость
 
+- Отчёты (`md`/`html`/`pdf`/`pptx`) и SVG-графики побайтово детерминированы:
+  `ReportWriterTest`, `HtmlWriterTest`, `PdfWriterTest`, `PptxWriterTest` и
+  `ChartExecutorTest` сравнивают два прогона. Известное ограничение PDF — стандартные
+  шрифты Helvetica без встраивания: символы вне WinAnsi заменяются на `?`.
 - JDK 21 через `DAP_JDK`; зависимости пиннятся `engine-native/pom.xml` и `./mvnw`.
 - Goldens не ходят в сеть и не требуют внешней БД: вход — файлы в `data/`, движок
   запускается на свободном порту со своим временным каталогом.

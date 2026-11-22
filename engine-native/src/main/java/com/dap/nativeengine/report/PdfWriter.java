@@ -149,16 +149,61 @@ public final class PdfWriter {
             }
             double[] widths = widths(table);
             ensure(rowHeight(table.columns(), HEADER_FONT, widths) + layout.lineHeight(CELL_FONT));
-            y = row(table.columns(), HEADER_FONT, widths, y);
-            rule(y, MARGIN, MARGIN + total(widths));
+            headerRow(table.columns(), widths);
             for (List<String> dataRow : table.rows()) {
-                double height = rowHeight(dataRow, CELL_FONT, widths);
-                if (y + height > pageHeight - MARGIN) {
-                    newPage();
-                    y = row(table.columns(), HEADER_FONT, widths, y);
-                    rule(y, MARGIN, MARGIN + total(widths));
+                // A single wrapped row can be taller than a page. Draw it in slices, repeating
+                // the header on every continuation page, so no text is written outside MediaBox.
+                List<List<String>> lines = wrappedCells(dataRow, widths);
+                int totalLines = 0;
+                for (List<String> columnLines : lines) {
+                    totalLines = Math.max(totalLines, columnLines.size());
                 }
-                y = row(dataRow, CELL_FONT, widths, y);
+                int firstLine = 0;
+                while (firstLine < totalLines) {
+                    int fits = (int) Math.floor(
+                            (pageHeight - MARGIN - y - 2 * PADDING) / layout.lineHeight(CELL_FONT));
+                    if (fits < 1) {
+                        newPage();
+                        headerRow(table.columns(), widths);
+                        continue;
+                    }
+                    int count = Math.min(fits, totalLines - firstLine);
+                    rowSlice(lines, firstLine, count, widths);
+                    y += count * layout.lineHeight(CELL_FONT) + 2 * PADDING;
+                    firstLine += count;
+                    if (firstLine < totalLines) {
+                        newPage();
+                        headerRow(table.columns(), widths);
+                    }
+                }
+            }
+        }
+
+        private void headerRow(List<String> columns, double[] widths) {
+            y = row(columns, HEADER_FONT, widths, y);
+            rule(y, MARGIN, MARGIN + total(widths));
+        }
+
+        private List<List<String>> wrappedCells(List<String> cells, double[] widths) {
+            List<List<String>> lines = new ArrayList<>();
+            for (int index = 0; index < widths.length; index++) {
+                String cell = index < cells.size() ? cells.get(index) : null;
+                lines.add(layout.wrap(cell == null ? "" : cell, CELL_FONT,
+                        Math.max(8, widths[index] - 2 * PADDING)));
+            }
+            return lines;
+        }
+
+        private void rowSlice(List<List<String>> lines, int from, int count, double[] widths) {
+            double x = MARGIN;
+            for (int index = 0; index < widths.length; index++) {
+                double lineY = y + PADDING;
+                List<String> columnLines = lines.get(index);
+                for (int line = from; line < Math.min(from + count, columnLines.size()); line++) {
+                    text(columnLines.get(line), CELL_FONT, x + PADDING, lineY, BLACK);
+                    lineY += layout.lineHeight(CELL_FONT);
+                }
+                x += widths[index];
             }
         }
 
