@@ -6,10 +6,13 @@ import com.dap.nativeengine.engine.TypeMap;
 import com.dap.nativeengine.xlsx.XlsxTableReader;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
@@ -22,17 +25,33 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
  * One-time conversion of a source file into the Parquet cache, so repeated
  * analysis reads Parquet instead of re-parsing CSV/Excel/JSON.
  *
- * <p>The cache is keyed by the source's absolute path, size, modification time
- * and format: editing the file (or passing another format) produces a new entry,
- * while an unchanged source returns the existing Parquet file untouched.
+ * <p>The cache key is SHA-256 of the absolute path, size, modification time,
+ * format, reader options and a content fingerprint (first and last 64 KiB):
+ * editing the file (or changing how it is read) produces a new entry, while an
+ * unchanged source returns the existing Parquet file untouched. An unreadable
+ * cache entry is quarantined and rebuilt once under a per-key lock, so parallel
+ * ingests converge on a single Parquet file.
  */
 public final class IngestService {
+    private static final int FINGERPRINT_BYTES = 64 * 1024;
+
+    /** Ingest currently reads every workbook with one fixed option set; keep it in the key. */
+    private static final XlsxTableReader.Options EXCEL_OPTIONS =
+            new XlsxTableReader.Options(null, true, List.of(), false);
+    private static final String EXCEL_READER = "excel:" + EXCEL_OPTIONS.sheet() + "\n"
+            + EXCEL_OPTIONS.header() + "\n" + EXCEL_OPTIONS.columns() + "\n"
+            + EXCEL_OPTIONS.emptyStringIsNull();
+
+    /** Static so several IngestService instances sharing a cache directory cannot race. */
+    private static final ConcurrentHashMap<String, Object> LOCKS = new ConcurrentHashMap<>();
+
     private final Path cacheDir;
 
     /** Production service: {@code DAP_CACHE_DIR} or {@code ~/.dap/cache}. */
@@ -102,32 +121,68 @@ public final class IngestService {
             throw new IllegalArgumentException("file not found: " + file);
         }
 
-        Path target;
+        String key;
         try {
-            target = cacheDir.resolve(key(source, parsed, options) + ".parquet");
+            key = key(source, parsed, options);
         } catch (IOException failure) {
             throw new IllegalStateException("cannot read " + file + ": " + failure.getMessage(), failure);
         }
-        if (Files.isRegularFile(target)) {
-            return describe(target, true);
-        }
-
-        Path temporary = cacheDir.resolve("." + target.getFileName() + "." + UUID.randomUUID() + ".tmp");
-        try {
-            Files.createDirectories(cacheDir);
-            try (DuckDbSession db = new DuckDbSession()) {
-                write(db, source, parsed, temporary, options);
-                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
-                return describe(db, target, false);
+        Path target = cacheDir.resolve(key + ".parquet");
+        Object lock = LOCKS.computeIfAbsent(
+                target.toAbsolutePath().normalize().toString(), ignored -> new Object());
+        synchronized (lock) {
+            try {
+                Files.createDirectories(cacheDir);
+                if (Files.isRegularFile(target)) {
+                    try {
+                        return describe(target, true);
+                    } catch (SQLException unreadable) {
+                        quarantine(target);
+                    }
+                }
+                return rebuild(file, source, parsed, options, target);
+            } catch (IOException | SQLException failure) {
+                throw new IllegalStateException("ingest failed for " + file + ": " + failure.getMessage(), failure);
             }
-        } catch (SQLException | IOException failure) {
-            throw new IllegalStateException("ingest failed for " + file + ": " + failure.getMessage(), failure);
+        }
+    }
+
+    /** Write a fresh entry and describe it; the caller holds the per-key lock. */
+    private Result rebuild(Path file, Path source, Format parsed, CsvOptions options, Path target)
+            throws IOException, SQLException {
+        Path temporary = cacheDir.resolve("." + target.getFileName() + "." + UUID.randomUUID() + ".tmp");
+        try (DuckDbSession db = new DuckDbSession()) {
+            try {
+                write(db, source, parsed, temporary, options);
+            } catch (SQLException failure) {
+                throw new IllegalStateException("ingest failed for " + file + ": " + failure.getMessage(), failure);
+            }
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
+            try {
+                return describe(db, target, false);
+            } catch (SQLException unreadable) {
+                quarantine(target);
+                throw new IllegalStateException("cannot read ingested file " + target
+                        + " even after regenerating it from " + source + ": " + unreadable.getMessage()
+                        + ". Remove the cache file and retry, or use a fresh DAP_CACHE_DIR", unreadable);
+            }
         } finally {
             try {
                 Files.deleteIfExists(temporary);
             } catch (IOException ignored) {
-                // best effort: a leftover temp file is inert and gets overwritten by a new UUID
+                // best effort: a leftover temp file is inert and gets a new UUID next time
             }
+        }
+    }
+
+    /** Keep a damaged entry for inspection; fall back to deletion if it cannot be renamed. */
+    private static void quarantine(Path target) throws IOException {
+        Path damaged = target.resolveSibling(target.getFileName() + ".corrupt-" + UUID.randomUUID());
+        try {
+            Files.move(target, damaged);
+        } catch (IOException moveFailure) {
+            Files.deleteIfExists(target);
         }
     }
 
@@ -174,7 +229,7 @@ public final class IngestService {
 
     private static ArrowTable excel(Path source) {
         try {
-            return XlsxTableReader.read(source, new XlsxTableReader.Options(null, true, List.of(), false));
+            return XlsxTableReader.read(source, EXCEL_OPTIONS);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("ingest interrupted", interrupted);
@@ -213,12 +268,9 @@ public final class IngestService {
         }
     }
 
-    private static Result describe(Path parquet, boolean cached) {
+    private static Result describe(Path parquet, boolean cached) throws SQLException {
         try (DuckDbSession db = new DuckDbSession()) {
             return describe(db, parquet, cached);
-        } catch (SQLException failure) {
-            throw new IllegalStateException("cannot read ingested file " + parquet + ": "
-                    + failure.getMessage(), failure);
         }
     }
 
@@ -253,16 +305,48 @@ public final class IngestService {
     }
 
     private static String key(Path source, Format format, CsvOptions options) throws IOException {
-        String descriptor = source + "\n" + Files.size(source) + "\n"
+        long size = Files.size(source);
+        String descriptor = source + "\n" + size + "\n"
                 + Files.getLastModifiedTime(source).to(TimeUnit.NANOSECONDS) + "\n"
-                + format.name().toLowerCase(Locale.ROOT) + "\n"
+                + format.name().toLowerCase(Locale.ROOT) + "\n" + EXCEL_READER + "\n"
                 + options.header() + "\n" + options.delimiter() + "\n" + options.quote() + "\n"
                 + options.escape() + "\n" + options.ignoreErrors() + "\n"
                 + options.nullPadding() + "\n" + options.strictMode() + "\n"
-                + String.join("\u0001", options.nullStrings());
+                + String.join("\u0001", options.nullStrings()) + "\n";
+        MessageDigest digest = sha256();
+        digest.update(descriptor.getBytes(StandardCharsets.UTF_8));
+        // Full hashing is O(file size) on every ingest; head+tail (64 KiB each) catches
+        // rewrites, truncation and ZIP/Parquet footers for ~128 KiB of I/O. mtime and
+        // size above cover most changes in the middle of a large file as well.
+        try (FileChannel channel = FileChannel.open(source, StandardOpenOption.READ)) {
+            if (channel.size() != size) {
+                throw new IOException("source changed while fingerprinting " + source);
+            }
+            digestRange(channel, digest, 0, (int) Math.min(size, FINGERPRINT_BYTES));
+            if (size > FINGERPRINT_BYTES) {
+                digestRange(channel, digest, size - FINGERPRINT_BYTES, FINGERPRINT_BYTES);
+            }
+        }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static void digestRange(FileChannel channel, MessageDigest digest, long start, int length)
+            throws IOException {
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        long position = start;
+        while (buffer.hasRemaining()) {
+            int read = channel.read(buffer, position);
+            if (read < 0) {
+                throw new IOException("source changed while fingerprinting");
+            }
+            position += read;
+        }
+        digest.update(buffer.array(), 0, length);
+    }
+
+    private static MessageDigest sha256() {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(descriptor.getBytes(StandardCharsets.UTF_8)));
+            return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is unavailable", impossible);
         }

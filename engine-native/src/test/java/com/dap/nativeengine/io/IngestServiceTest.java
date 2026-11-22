@@ -5,17 +5,26 @@ import com.dap.nativeengine.engine.DuckDbSession;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileTime;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -225,6 +234,108 @@ class IngestServiceTest {
             assertTrue(rows.next());
             assertEquals(5, rows.getInt(1));
         }
+    }
+
+    @Test
+    void sameSizeAndMtimeWithDifferentContentProducesNewParquet() throws Exception {
+        Path source = write("same.csv", "id\n1\n2\n");
+        IngestService service = service();
+        IngestService.Result first = service.ingest(source, "csv");
+        long size = Files.size(source);
+        FileTime mtime = Files.getLastModifiedTime(source);
+
+        Files.writeString(source, "id\n3\n4\n", StandardCharsets.UTF_8);
+        assertEquals(size, Files.size(source));
+        Files.setLastModifiedTime(source, mtime);
+
+        IngestService.Result second = service.ingest(source, "csv");
+
+        assertNotEquals(first.path(), second.path(), "rewritten content must not reuse the old entry");
+        assertFalse(second.cached());
+        assertEquals(List.of(List.of("3"), List.of("4")), rows(second.path()));
+        assertEquals(List.of(List.of("1"), List.of("2")), rows(first.path()));
+    }
+
+    @Test
+    void changeInTailOfLargeFileInvalidatesCache() throws Exception {
+        StringBuilder content = new StringBuilder("id,name\n");
+        for (int row = 0; row < 10_000; row++) {
+            content.append(row % 10).append(",value\n");
+        }
+        Path source = write("large.csv", content.toString());
+        assertTrue(Files.size(source) > 64 * 1024);
+        IngestService service = service();
+        IngestService.Result first = service.ingest(source, "csv");
+        long size = Files.size(source);
+        FileTime mtime = Files.getLastModifiedTime(source);
+
+        String changed = content.substring(0, content.length() - 8) + "0,value\n";
+        Files.writeString(source, changed, StandardCharsets.UTF_8);
+        assertEquals(size, Files.size(source));
+        Files.setLastModifiedTime(source, mtime);
+
+        IngestService.Result second = service.ingest(source, "csv");
+
+        assertNotEquals(first.path(), second.path(), "tail bytes must be part of the fingerprint");
+        assertFalse(second.cached());
+        assertEquals(10_000, second.rows());
+    }
+
+    @Test
+    void truncatedCachedParquetIsRegenerated() throws Exception {
+        Path source = write("truncate.csv", "id\n7\n8\n");
+        IngestService service = service();
+        IngestService.Result first = service.ingest(source, "csv");
+        try (FileChannel channel = FileChannel.open(first.path(), StandardOpenOption.WRITE)) {
+            channel.truncate(100);
+        }
+
+        IngestService.Result recovered = service.ingest(source, "csv");
+
+        assertFalse(recovered.cached(), "corrupt cache entry must be rebuilt");
+        assertEquals(first.path(), recovered.path());
+        assertEquals(List.of(List.of("7"), List.of("8")), rows(recovered.path()));
+    }
+
+    @Test
+    void parallelIngestSharesOneCacheEntry() throws Exception {
+        Path source = write("parallel.csv", "id\n1\n2\n");
+        IngestService service = service();
+        ExecutorService pool = Executors.newFixedThreadPool(4);
+        try {
+            List<Future<IngestService.Result>> futures = new ArrayList<>();
+            for (int attempt = 0; attempt < 4; attempt++) {
+                futures.add(pool.submit(() -> service.ingest(source, "csv")));
+            }
+            List<IngestService.Result> results = new ArrayList<>();
+            for (Future<IngestService.Result> future : futures) {
+                results.add(future.get(30, TimeUnit.SECONDS));
+            }
+
+            assertEquals(1, results.stream().map(IngestService.Result::path).distinct().count());
+            assertEquals(1, results.stream().filter(result -> !result.cached()).count(),
+                    "exactly one call writes the cache entry");
+            try (Stream<Path> cached = Files.list(dir.resolve("cache"))) {
+                assertEquals(1, cached.filter(path -> path.getFileName().toString().endsWith(".parquet"))
+                        .count(), "one Parquet file per key");
+            }
+            assertEquals(List.of(List.of("1"), List.of("2")), rows(results.get(0).path()));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void unchangedFileIsServedFromCacheWithSamePath() throws Exception {
+        Path source = write("stable.csv", "id\n1\n2\n");
+        IngestService service = service();
+
+        IngestService.Result first = service.ingest(source, "csv");
+        IngestService.Result second = service.ingest(source, "csv");
+
+        assertTrue(second.cached());
+        assertEquals(first.path(), second.path());
+        assertEquals(first.rows(), second.rows());
     }
 
     @Test

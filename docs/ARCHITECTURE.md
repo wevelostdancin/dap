@@ -88,7 +88,7 @@ JobManager ──► Dag (уровни Кана, параллельные вет
 | `LazyPlan` | Ленивая таблица: текст SQL, схема и сессия; данные читаются только в `/table` и `/profile` |
 | `DuckDbSession` | In-memory БД сессии: базовое соединение, `duplicate()`, ресурсные настройки, ingestion, preview/profile, учёт активных чтений |
 | `ArrowTable`, `XlsxTableReader` | Граница данных на входе: разбор XLSX в Arrow, затем построчная вставка в DuckDB; CSV читается DuckDB через `read_csv` |
-| `IngestService` | Parquet-кэш `POST /v1/datasets`: конвертация CSV/Excel/JSON/Parquet, ключ SHA-256 (путь, размер, mtime, формат), ответ `path/rows/columns/cached` |
+| `IngestService` | Parquet-кэш `POST /v1/datasets`: конвертация CSV/Excel/JSON/Parquet, ключ SHA-256 (путь, размер, mtime, формат, параметры чтения, отпечаток содержимого), ответ `path/rows/columns/cached` |
 | `CatalogHandlers`, `WorkflowHandlers`, `JobHandlers`, `DataHandlers`, `DatasetHandlers`, `OpsHandlers` | HTTP-слой: валидация запросов, коды ошибок, сериализация ответов |
 | MCP-адаптер (`adapters/mcp/dap_mcp.py`) | Отдельный Python-процесс: stdio JSON-RPC 2.0, 33 инструмента `dap_*`, при необходимости поднимает jar |
 
@@ -143,10 +143,28 @@ JobManager ──► Dag (уровни Кана, параллельные вет
 
 `POST /v1/datasets` идёт вне workflow: `IngestService` конвертирует
 CSV/Excel/JSON/Parquet в Parquet-файл в кэше и отвечает `{path, rows, columns,
-cached}`. Ключ кэша — SHA-256 от абсолютного пути, размера, mtime и формата:
-неизменённый файл отдаёт существующий Parquet с `cached: true`. Конвертация
-выполняется в отдельной in-memory `DuckDbSession`, которая закрывается после
-записи; кэш переживает перезапуск движка.
+cached}`. Ключ кэша — SHA-256 от абсолютного пути, размера, mtime, формата,
+параметров чтения (CSV `header/delimiter/quote/escape/ignoreErrors/nullPadding/
+strictMode/nullStrings`; для XLSX сейчас используется фиксированный набор
+`sheet=null, header=true, columns=[]`, он тоже входит в ключ) и отпечатка
+содержимого: SHA-256 первых и последних 64 КиБ (для файлов меньше 128 КиБ —
+всего файла). Полный хеш больших файлов требует чтения всего файла при каждом
+`dap_ingest`; head+tail дешевле (~128 КиБ) и ловит перезапись, обрезку и
+изменение футера Parquet/ZIP, а размер с mtime прикрывают изменения в середине.
+Поэтому `cp -p` с новым содержимым того же размера даёт новую запись, а
+неизменённый файл отдаёт существующий Parquet с `cached: true` — `dap_ingest`
+идемпотентен по содержимому.
+
+Если кэшированный Parquet не читается (обрезан, испорчен), запись
+переименовывается в `<key>.parquet.corrupt-<uuid>` и файл переингестируется
+один раз; при повторной неудаче запрос получает понятную ошибку с путём кэша и
+подсказкой удалить запись или использовать другой `DAP_CACHE_DIR`. Запись и
+перезапись идут под per-key lock (общим для всех `IngestService` в JVM) с
+`ATOMIC_MOVE + REPLACE_EXISTING`, поэтому параллельные ingest одного файла
+производят один Parquet. Конвертация выполняется в отдельной in-memory
+`DuckDbSession`, которая закрывается после записи; кэш переживает перезапуск
+движка. Старые записи, созданные до появления отпечатка, имеют другие ключи и
+переингестируются при первом обращении.
 
 ## 4. Память и ресурсы DuckDB
 
