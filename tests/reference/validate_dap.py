@@ -472,6 +472,152 @@ def case_edge_infinite(engine: Engine, data: Path):
     return [check_true("json_is_valid", True, str(rows[0]))]
 
 
+def _explore(engine: Engine, path: Path, sample_rows: int = 1000):
+    return engine.call("POST", "/v1/explore", {"file": str(path), "sampleRows": sample_rows})
+
+
+def case_real_adult_profile(engine: Engine, data: Path):
+    source = ROOT / "tests" / "goldens-native" / "data" / "adult.csv"
+    csv = data / "adult.csv"
+    shutil.copyfile(source, csv)
+    workflow = engine.call("POST", "/v1/workflows", {"name": "adult"})["id"]
+    try:
+        reader = engine.call("POST", f"/v1/workflows/{workflow}/nodes",
+                             {"factory": "dap.csv_reader", "settings": {"file": str(csv)}})["node"]
+        engine.call("POST", f"/v1/workflows/{workflow}/run", {"timeoutSec": 120})
+        profile = engine.call("GET", f"/v1/workflows/{workflow}/nodes/{reader}/profile")
+    finally:
+        engine.call("DELETE", f"/v1/workflows/{workflow}")
+    import csv as csv_module
+    with open(source, newline="", encoding="utf-8") as handle:
+        rows = list(csv_module.DictReader(handle))
+    checks = [check("rows", profile["rows"], len(rows))]
+    for column in profile["columns"]:
+        name = column["name"]
+        values = [row[name] for row in rows if row[name] not in ("", None)]
+        if column["type"] in ("Number (Integer)", "Number (Float)"):
+            numbers = np.array([float(value) for value in values])
+            checks.append(check(f"{name}.missing", column["missing"], len(rows) - len(numbers)))
+            checks.append(check(f"{name}.mean", number(column["mean"]), float(numbers.mean())))
+            checks.append(check(f"{name}.distinct", column["distinct"], len(set(numbers.tolist()))))
+        else:
+            checks.append(check(f"{name}.missing", column["missing"], len(rows) - len(values)))
+            checks.append(check(f"{name}.distinct", column["distinct"], len(set(values))))
+    return checks
+
+
+def case_real_adult_explore(engine: Engine, data: Path):
+    source = ROOT / "tests" / "goldens-native" / "data" / "adult.csv"
+    csv = data / "adult_explore.csv"
+    shutil.copyfile(source, csv)
+    result = _explore(engine, csv)
+    import csv as csv_module
+    with open(source, newline="", encoding="utf-8") as handle:
+        rows = list(csv_module.DictReader(handle))
+    age = [row["age"] for row in rows]
+    age_column = next(column for column in result["columns"] if column["name"] == "age")
+    checks = [
+        check("rows", result["rows"], len(rows)),
+        check_true("not_sampled", result["quality_sampled"] is False,
+                   f"quality_sampled={result['quality_sampled']}"),
+        check("scanned", result["quality_scanned_rows"], len(rows)),
+        check_true("distinct_exact", age_column["distinct_exact"] is True, "age distinct should be exact"),
+        check("age.mean", number(age_column["mean"]), float(np.mean([float(v) for v in age]))),
+        check_true("score_range", 0 <= result["quality"]["score"] <= 100, str(result["quality"]["score"])),
+        check_true("issues_present", len(result["quality"]["issues"]) > 0, "adult has duplicates/outliers"),
+    ]
+    for difference in result["group_differences"]:
+        checks.append(check_true("p_adjusted_present", "p_adjusted" in difference, str(difference)))
+    return checks
+
+
+def case_explore_sampled_outliers(engine: Engine, data: Path):
+    rng = np.random.default_rng(41)
+    values = rng.normal(0, 1, 1_000_000)
+    values[:1_500] = 1_000_000.0
+    rows = [[index, round(float(value), 6)] for index, value in enumerate(values)]
+    csv = write_csv(data / "sampled.csv", ["id", "x"], rows)
+    result = _explore(engine, csv, sample_rows=1000)
+    issues = [issue for issue in result["quality"]["issues"] if issue["kind"] == "outliers"]
+    ratio = None
+    if issues:
+        detail = issues[0]["detail"]
+        for token in detail.replace("(", " ").replace("%", " ").split():
+            try:
+                candidate = float(token)
+            except ValueError:
+                continue
+            if 0 < candidate <= 100 and "." in token:
+                ratio = candidate / 100.0
+    return [
+        check_true("quality_sampled", result["quality_sampled"] is True,
+                   f"quality_sampled={result['quality_sampled']}"),
+        check("scanned", result["quality_scanned_rows"], 100_000),
+        check_true("outlier_issue", len(issues) > 0, "20% outliers must be reported"),
+        check_true("outlier_ratio", ratio is not None and 0.010 <= ratio <= 0.050,
+                   f"ratio parsed {ratio} from {issues[0]['detail'] if issues else None}"),
+    ]
+
+
+def case_explore_small_n(engine: Engine, data: Path):
+    rows = [[1.0, 2.0], [3.0, 9.0], [5.0, 1.0]]
+    csv = write_csv(data / "small.csv", ["x", "y"], rows)
+    result = _explore(engine, csv, sample_rows=3)
+    high = [hypothesis for hypothesis in result["hypotheses"] if hypothesis["priority"] == "high"]
+    modelling = [text for text in result["recommendations"] if "Model " in text]
+    return [
+        check_true("no_high_hypothesis", not high, str(high)),
+        check_true("no_modelling_recommendation", not modelling, str(modelling)),
+    ]
+
+
+def case_pathguard_excel(engine: Engine, data: Path):
+    forbidden = ROOT / "engine-native" / "pom.xml"  # outside DAP_ALLOWED_ROOTS
+    workflow = engine.call("POST", "/v1/workflows", {"name": "guard"})["id"]
+    try:
+        engine.call("POST", f"/v1/workflows/{workflow}/nodes",
+                    {"factory": "dap.excel_reader", "settings": {"file": str(forbidden)}})
+        try:
+            engine.call("POST", f"/v1/workflows/{workflow}/run", {"timeoutSec": 60})
+        except urllib.error.HTTPError as failure:
+            body = failure.read().decode()
+            return [check("status", failure.code, 500),
+                    check_true("path_not_allowed", "path_not_allowed" in body, body[:200])]
+        raise CaseFailure("excel_reader read a path outside the allowlist")
+    finally:
+        engine.call("DELETE", f"/v1/workflows/{workflow}")
+
+
+def case_pathguard_save(engine: Engine, data: Path):
+    workflow = engine.call("POST", "/v1/workflows", {"name": "guard-save"})["id"]
+    try:
+        target = Path.home() / ".ssh" / "dap-should-not-write"
+        try:
+            engine.call("POST", f"/v1/workflows/{workflow}/save", {"dir": str(target)})
+        except urllib.error.HTTPError as failure:
+            body = json.loads(failure.read().decode())
+            return [check("status", failure.code, 400),
+                    check_true("code", body.get("code") == "path_not_allowed", str(body)),
+                    check_true("not_created", not target.exists(), str(target))]
+        raise CaseFailure("save accepted a denied directory")
+    finally:
+        engine.call("DELETE", f"/v1/workflows/{workflow}")
+
+
+def case_cache_selfheal(engine: Engine, data: Path):
+    csv = write_csv(data / "cache.csv", ["x"], [[index] for index in range(1000)])
+    first = engine.call("POST", "/v1/datasets", {"file": str(csv), "format": "csv"})
+    cached = Path(first["path"])
+    os.truncate(cached, 100)
+    second = engine.call("POST", "/v1/datasets", {"file": str(csv), "format": "csv"})
+    return [
+        check("rows_after_heal", second["rows"], 1000),
+        check_true("rebuilt", second["cached"] is False, f"cached={second['cached']}"),
+        check_true("quarantine", any("corrupt" in name for name in os.listdir(cached.parent)),
+                   str(os.listdir(cached.parent))),
+    ]
+
+
 CASES = {
     "describe": case_describe,
     "correlation": case_correlation,
@@ -491,6 +637,13 @@ CASES = {
     "edge_constant": case_edge_constant,
     "edge_all_null": case_edge_all_null,
     "edge_infinite": case_edge_infinite,
+    "real_adult_profile": case_real_adult_profile,
+    "real_adult_explore": case_real_adult_explore,
+    "explore_sampled_outliers": case_explore_sampled_outliers,
+    "explore_small_n": case_explore_small_n,
+    "pathguard_excel": case_pathguard_excel,
+    "pathguard_save": case_pathguard_save,
+    "cache_selfheal": case_cache_selfheal,
 }
 
 
