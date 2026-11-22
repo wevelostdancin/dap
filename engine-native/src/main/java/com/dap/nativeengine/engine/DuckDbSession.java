@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,18 @@ public final class DuckDbSession implements AutoCloseable {
     /** Virtual threads for bounded reads: cheap, daemon, and one per materialization. */
     private static final ExecutorService READS = Executors.newVirtualThreadPerTaskExecutor();
 
+    /** DAP_TABLE_MATERIALIZE_MAX_ROWS: above it /table re-reads the plan with ORDER BY ALL. */
+    private static final long DEFAULT_MATERIALIZE_MAX_ROWS = 2_000_000L;
+    private static final String MATERIALIZE_MAX_ROWS_ENV = "DAP_TABLE_MATERIALIZE_MAX_ROWS";
+    /** Test seam for the env setting, the same pattern as NativeService's dap.port. */
+    private static final String MATERIALIZE_MAX_ROWS_PROPERTY = "dap.table.materialize.maxRows";
+    /** DAP_TABLE_MATERIALIZE_BUDGET_ROWS: total rows kept in all /table tables of one session. */
+    private static final long DEFAULT_PAGE_BUDGET_ROWS = 4_000_000L;
+    private static final String PAGE_BUDGET_ROWS_ENV = "DAP_TABLE_MATERIALIZE_BUDGET_ROWS";
+    private static final String PAGE_BUDGET_ROWS_PROPERTY = "dap.table.materialize.budgetRows";
+    private static final String PAGE_TABLE_PREFIX = "dap_page_";
+    private static final String RID_COLUMN = "__dap_rid";
+
     /** Effective database settings, read back from DuckDB (normalized, e.g. 1GB -> 953.6 MiB). */
     public record Resources(String memoryLimit, Integer threads, String tempDirectory) {
     }
@@ -59,6 +72,15 @@ public final class DuckDbSession implements AutoCloseable {
     private final ConcurrentHashMap<DuckDBConnection, Read> reads = new ConcurrentHashMap<>();
     /** Shared by report sections and GET /profile within one run; see {@link ProfileCache}. */
     private final ProfileCache profiles = new ProfileCache();
+    /** One materialized table per (workflow, node, page SQL, generation) of GET /table. */
+    private final Map<PageKey, PageTable> pageTables = new LinkedHashMap<>();
+    private final ConcurrentHashMap<String, AtomicLong> pageGenerations = new ConcurrentHashMap<>();
+    private final AtomicLong pageTableIds = new AtomicLong();
+    /** Guards pageTables, pageTableRows and the CREATE/DROP of the tables they name. */
+    private final Object pagesLock = new Object();
+    private final long materializeMaxRows;
+    private final long pageBudgetRows;
+    private long pageTableRows;
     /** Guards {@link #reads}: openRead, endRead, close and interruptReads all take it. */
     final Object readsLock = new Object();
     private boolean closed;
@@ -74,6 +96,8 @@ public final class DuckDbSession implements AutoCloseable {
         if (threads != null && threads <= 0) {
             throw new IllegalArgumentException("DuckDB threads must be positive, got " + threads);
         }
+        this.materializeMaxRows = materializeMaxRows();
+        this.pageBudgetRows = pageBudgetRows();
         this.base = (DuckDBConnection) DriverManager.getConnection("jdbc:duckdb:");
         try {
             apply(memoryLimit, threads, tempDirectory, extensionDirectory);
@@ -365,30 +389,165 @@ public final class DuckDbSession implements AutoCloseable {
         DuckDBConnection connection = openRead(workflowId, nodeId);
         try {
             return bounded("table", timeoutMillis, workflowId,
-                    () -> readPage(connection, sql, columns, safeLimit, safeOffset));
+                    () -> readPage(connection, sql, columns, safeLimit, safeOffset, workflowId, nodeId));
         } finally {
             endRead(connection);
         }
     }
 
-    private static TableData readPage(DuckDBConnection connection, String sql,
-                                      List<ColumnSpec> columns, int limit, int offset)
+    private record PageKey(String workflowId, String nodeId, String sql, long generation) {
+    }
+
+    /** name is null when the plan exceeded a cap: rows still carries its count for the fallback. */
+    private record PageTable(String name, long rows) {
+    }
+
+    private TableData readPage(DuckDBConnection connection, String sql, List<ColumnSpec> columns,
+                               int limit, int offset, String workflowId, String nodeId)
             throws SQLException {
-        try (Statement statement = connection.createStatement()) {
-            long rows = countWith(statement, sql);
-            List<List<String>> data = new ArrayList<>();
-            try (ResultSet result = statement.executeQuery("SELECT * FROM ("
-                    + LazyPlan.stripSemicolon(sql) + ") AS dap_page LIMIT " + limit
-                    + " OFFSET " + offset)) {
-                while (result.next()) {
-                    List<String> row = new ArrayList<>(columns.size());
-                    for (int column = 1; column <= columns.size(); column++) {
-                        row.add(format(result.getObject(column)));
-                    }
-                    data.add(row);
+        String plan = LazyPlan.stripSemicolon(sql);
+        if (workflowId == null || nodeId == null) {
+            // No run to scope a cache entry to: the deterministic fallback still applies.
+            return readFallback(connection, plan, columns, limit, offset, countWith(connection, sql));
+        }
+        PageKey key = new PageKey(workflowId, nodeId, sql, pageGeneration(workflowId));
+        PageTable cached = getPageTable(key);
+        if (cached == null) {
+            synchronized (pagesLock) {
+                cached = pageTables.get(key);
+                if (cached == null) {
+                    cached = materializePage(connection, key, plan);
+                }
+                if (cached.name() != null) {
+                    // Refresh access order: the oldest entry is evicted once the budget is full.
+                    pageTables.remove(key);
+                    pageTables.put(key, cached);
                 }
             }
+        }
+        if (cached.name() == null) {
+            return readFallback(connection, plan, columns, limit, offset, cached.rows());
+        }
+        return readMaterialized(connection, cached, columns, limit, offset);
+    }
+
+    private PageTable getPageTable(PageKey key) {
+        synchronized (pagesLock) {
+            PageTable entry = pageTables.get(key);
+            if (entry != null) {
+                pageTables.remove(key);
+                pageTables.put(key, entry);
+            }
+            return entry;
+        }
+    }
+
+    /** Called with {@link #pagesLock} held so concurrent first pages share one table. */
+    private PageTable materializePage(DuckDBConnection connection, PageKey key, String plan)
+            throws SQLException {
+        String name = PAGE_TABLE_PREFIX + sanitize(key.workflowId()) + "_"
+                + sanitize(key.nodeId()) + "_" + pageTableIds.incrementAndGet();
+        // DuckDB TEMP tables are connection-local, so the scratch table lives in main under a
+        // reserved prefix that dropTablesForWorkflow and the budget eviction both know.
+        // The stable key is DuckDB's rowid (measured: window row_number() costs ~130 ms extra
+        // on 2M rows); __dap_rid is only an alias in the page query, never stored or returned.
+        String ddl = "CREATE TABLE " + quote(name) + " AS SELECT * FROM (" + plan + ") AS p";
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(ddl);
+        } catch (SQLException failure) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("DROP TABLE IF EXISTS " + quote(name));
+            } catch (SQLException ignored) {
+                // Best effort: a half-created table must not survive a failed request.
+            }
+            throw failure;
+        }
+        // COUNT(*) over the materialized table reads its cardinality instead of re-running
+        // the plan: one scan per first page, and no count on any later page.
+        long rows;
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT COUNT(*) FROM " + quote(name))) {
+            result.next();
+            rows = result.getLong(1);
+        }
+        if (rows > materializeMaxRows || rows > pageBudgetRows) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("DROP TABLE IF EXISTS " + quote(name));
+            } catch (SQLException ignored) {
+                // Best effort: an oversized table must not stay in the catalog.
+            }
+            return new PageTable(null, rows);
+        }
+        PageTable entry = new PageTable(name, rows);
+        pageTables.put(key, entry);
+        pageTableRows += rows;
+        // ponytail: one session-wide LRU; per-workflow budgets only if /table concurrency matters.
+        while (pageTableRows > pageBudgetRows) {
+            Map.Entry<PageKey, PageTable> oldest = pageTables.entrySet().iterator().next();
+            pageTables.remove(oldest.getKey());
+            pageTableRows -= oldest.getValue().rows();
+            dropTables(List.of(oldest.getValue().name()));
+        }
+        return entry;
+    }
+
+    private static TableData readMaterialized(DuckDBConnection connection, PageTable table,
+                                              List<ColumnSpec> columns, int limit, int offset)
+            throws SQLException {
+        return readRows(connection, "SELECT * EXCLUDE (" + quote(RID_COLUMN) + ") FROM "
+                + "(SELECT rowid AS " + quote(RID_COLUMN) + ", * FROM " + quote(table.name())
+                + ") AS dap_rids ORDER BY " + quote(RID_COLUMN)
+                + " LIMIT " + limit + " OFFSET " + offset, columns, table.rows());
+    }
+
+    /** Correct but expensive: compare every column so a large plan still has one stable order. */
+    private static TableData readFallback(DuckDBConnection connection, String plan,
+                                          List<ColumnSpec> columns, int limit, int offset, long rows)
+            throws SQLException {
+        return readRows(connection, "SELECT * FROM (" + plan + ") AS dap_page ORDER BY ALL"
+                + " LIMIT " + limit + " OFFSET " + offset, columns, rows);
+    }
+
+    private static TableData readRows(DuckDBConnection connection, String sql,
+                                      List<ColumnSpec> columns, long rows) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(sql)) {
+            List<List<String>> data = new ArrayList<>();
+            while (result.next()) {
+                List<String> row = new ArrayList<>(columns.size());
+                for (int column = 1; column <= columns.size(); column++) {
+                    row.add(format(result.getObject(column)));
+                }
+                data.add(row);
+            }
             return new TableData(rows, columns, data);
+        }
+    }
+
+    private static long materializeMaxRows() {
+        return configuredRows(MATERIALIZE_MAX_ROWS_PROPERTY, MATERIALIZE_MAX_ROWS_ENV,
+                DEFAULT_MATERIALIZE_MAX_ROWS);
+    }
+
+    private static long pageBudgetRows() {
+        return configuredRows(PAGE_BUDGET_ROWS_PROPERTY, PAGE_BUDGET_ROWS_ENV,
+                DEFAULT_PAGE_BUDGET_ROWS);
+    }
+
+    private static long configuredRows(String property, String env, long fallback) {
+        String configured = System.getProperty(property, System.getenv(env));
+        if (configured == null || configured.isBlank()) {
+            return fallback;
+        }
+        try {
+            long value = Long.parseLong(configured.strip());
+            if (value < 0) {
+                throw new NumberFormatException(configured);
+            }
+            return value;
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException(env + " must be a non-negative integer, got "
+                    + configured);
         }
     }
 
@@ -473,6 +632,12 @@ public final class DuckDbSession implements AutoCloseable {
         }
     }
 
+    private static long countWith(DuckDBConnection connection, String sql) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            return countWith(statement, sql);
+        }
+    }
+
     public ProfileData profile(String sql, List<ColumnSpec> columns) throws SQLException {
         return profile(sql, columns, null, null);
     }
@@ -520,6 +685,35 @@ public final class DuckDbSession implements AutoCloseable {
     /** Call at the start of a workflow run: profiles of the previous run are no longer valid. */
     public void invalidateProfiles(String workflowId) {
         profiles.invalidate(workflowId);
+    }
+
+    private long pageGeneration(String workflowId) {
+        AtomicLong generation = pageGenerations.get(workflowId);
+        return generation == null ? 0L : generation.get();
+    }
+
+    /** Call at the start of a workflow run: /table tables of the previous run are stale. */
+    public void invalidateTables(String workflowId) {
+        if (workflowId == null) {
+            return;
+        }
+        pageGenerations.computeIfAbsent(workflowId, ignored -> new AtomicLong()).incrementAndGet();
+        dropPageTables(workflowId);
+    }
+
+    private void dropPageTables(String workflowId) {
+        synchronized (pagesLock) {
+            List<String> drop = new ArrayList<>();
+            pageTables.entrySet().removeIf(entry -> {
+                if (!workflowId.equals(entry.getKey().workflowId())) {
+                    return false;
+                }
+                drop.add(entry.getValue().name());
+                pageTableRows -= entry.getValue().rows();
+                return true;
+            });
+            dropTables(drop);
+        }
     }
 
     /** Above this row count the profile skips the broad exact-distinct refinement to stay bounded. */
@@ -742,6 +936,7 @@ public final class DuckDbSession implements AutoCloseable {
         if (workflowId == null || workflowId.isEmpty()) {
             return;
         }
+        dropPageTables(workflowId);
         Set<String> prefixes = new LinkedHashSet<>();
         prefixes.add("csv_" + workflowId + "_");
         prefixes.add("excel_" + workflowId + "_");
