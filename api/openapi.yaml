@@ -853,8 +853,15 @@ paths:
         modification time and format. An unchanged source returns the existing
         file with cached=true instead of converting again. The cache directory is
         DAP_CACHE_DIR, or ~/.dap/cache. CSV uses the csv_reader rules (comma,
-        header row, type inference); Excel uses the first worksheet; JSON uses
-        DuckDB read_json_auto; Parquet is copied through read_parquet.
+        header row, type inference); Excel has no request options and uses the
+        first worksheet with a header row, inferred types, empty strings kept as
+        empty strings (emptyStringIsNull=false) and hard errors on error cells or
+        uncached formulas (errorsAsNull=false) — CSV options are ignored for it.
+        Excel sheets stream into DuckDB in bounded chunks before the Parquet copy,
+        so heap does not grow with the row count; a sharedStrings.xml above 8 MiB
+        is spooled to temp files and above 5 million strings or 512 MiB fails with
+        a hint to split the workbook or convert it to CSV. JSON uses DuckDB
+        read_json_auto; Parquet is copied through read_parquet.
       parameters:
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'

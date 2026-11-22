@@ -13,8 +13,12 @@ import javax.xml.stream.XMLStreamReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -38,7 +42,9 @@ import java.util.zip.ZipFile;
  * libraries. The node path streams worksheet rows in bounded chunks straight
  * into DuckDB via {@link DuckDBAppender}: neither the sheet nor a list of all
  * its rows is ever held in the JVM heap. {@link #read} stays as a materializing
- * helper for callers that need an {@link ArrowTable}.
+ * helper for callers that need an {@link ArrowTable}. The shared-string table is
+ * kept in heap only while small and otherwise spooled to temp files, so neither
+ * path scales its heap with the worksheet size.
  *
  * <p>NULL semantics match csv_reader: a missing cell and an empty string are
  * NULL by default. Cell errors and formulas without a cached value are hard
@@ -51,6 +57,23 @@ public final class XlsxTableReader {
 
     /** Default number of parsed rows buffered before an appender flush. */
     public static final int DEFAULT_CHUNK_ROWS = 50_000;
+
+    /** sharedStrings.xml below this uncompressed size stays in heap; larger is spooled to disk. */
+    private static final long DEFAULT_SST_HEAP_BYTES = 8L * 1024 * 1024;
+    /** Hard caps: a pathological SST fails with a hint instead of exhausting heap or disk. */
+    private static final int DEFAULT_SST_MAX_STRINGS = 5_000_000;
+    private static final long SST_MAX_BYTES = 512L * 1024 * 1024;
+    /** Test seams for the SST bounds, following the DAP_* system-property pattern. */
+    private static final String SST_HEAP_PROPERTY = "dap.xlsx.sst.heapBytes";
+    private static final String SST_MAX_STRINGS_PROPERTY = "dap.xlsx.sst.maxStrings";
+
+    private static long sstHeapBytes() {
+        return Long.getLong(SST_HEAP_PROPERTY, DEFAULT_SST_HEAP_BYTES);
+    }
+
+    private static int sstMaxStrings() {
+        return Integer.getInteger(SST_MAX_STRINGS_PROPERTY, DEFAULT_SST_MAX_STRINGS);
+    }
 
     /** Parsed node configuration. */
     public record Options(String sheet, boolean header, List<ColumnSpec> columns,
@@ -87,8 +110,8 @@ public final class XlsxTableReader {
         if (!Files.isRegularFile(file)) {
             throw new IllegalArgumentException("cannot read Excel workbook " + file + ": file does not exist");
         }
-        try (ZipFile zip = new ZipFile(file.toFile())) {
-            WorkbookContext context = open(zip, file, options);
+        try (ZipFile zip = new ZipFile(file.toFile());
+             WorkbookContext context = open(zip, file, options)) {
             SchemaProbe probe = probe(context, options, file);
             Schema schema = resolve(probe, options, context.sheet().name(), file);
             if (schema == null) {
@@ -146,8 +169,8 @@ public final class XlsxTableReader {
         // Parallel readers share one job connection and DuckDB cannot interleave
         // pending query results; the same serialization as loadInto applies.
         synchronized (connection) {
-            try (ZipFile zip = new ZipFile(file.toFile())) {
-                WorkbookContext context = open(zip, file, options);
+            try (ZipFile zip = new ZipFile(file.toFile());
+                 WorkbookContext context = open(zip, file, options)) {
                 SchemaProbe probe = probe(context, options, file);
                 Schema schema = resolve(probe, options, context.sheet().name(), file);
                 try {
@@ -239,7 +262,12 @@ public final class XlsxTableReader {
     }
 
     private record WorkbookContext(ZipFile zip, Sheet sheet, ZipEntry sheetEntry,
-                                   List<String> sharedStrings, Styles styles, boolean date1904) {
+                                   SharedStrings strings, Styles styles, boolean date1904)
+            implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            strings.close();
+        }
     }
 
     private static WorkbookContext open(ZipFile zip, Path file, Options options)
@@ -262,7 +290,10 @@ public final class XlsxTableReader {
             throw new IllegalArgumentException("excel_reader: worksheet part '" + target
                     + "' is missing in " + file);
         }
-        return new WorkbookContext(zip, sheet, sheetEntry, readSharedStrings(zip), readStyles(zip),
+        // Read styles first: readSharedStrings cleans up its own spool if parsing fails,
+        // so it must be the last allocating step before the context owns it.
+        Styles styles = readStyles(zip);
+        return new WorkbookContext(zip, sheet, sheetEntry, readSharedStrings(zip), styles,
                 workbook.date1904());
     }
 
@@ -364,13 +395,20 @@ public final class XlsxTableReader {
 
     // ------------------------------------------------------------ shared strings
 
-    private static List<String> readSharedStrings(ZipFile zip)
+    /**
+     * Read the shared-string table once. Small tables stay in heap; larger ones are
+     * spooled to two temp files (offsets plus UTF-8 payloads) so a workbook with many
+     * unique strings cannot exhaust the heap. Both modes enforce a hard cap.
+     */
+    private static SharedStrings readSharedStrings(ZipFile zip)
             throws IOException, XMLStreamException, InterruptedException {
         ZipEntry entry = zip.getEntry("xl/sharedStrings.xml");
         if (entry == null) {
-            return List.of();
+            return new SharedStrings(false);
         }
-        List<String> strings = new ArrayList<>();
+        long declared = entry.getSize();
+        SharedStrings strings = new SharedStrings(declared < 0 || declared >= sstHeapBytes());
+        boolean complete = false;
         try (InputStream in = zip.getInputStream(entry)) {
             XMLStreamReader xml = reader(in);
             while (xml.hasNext()) {
@@ -380,8 +418,163 @@ public final class XlsxTableReader {
                     strings.add(readTextContainer(xml, "si"));
                 }
             }
+            complete = true;
+            return strings;
+        } finally {
+            if (!complete) {
+                try {
+                    strings.close();
+                } catch (IOException ignored) {
+                    // the parse failure is more informative than a cleanup failure
+                }
+            }
         }
-        return strings;
+    }
+
+    /** Random access to shared strings: heap for a small SST, two temp files for a large one. */
+    private static final class SharedStrings implements AutoCloseable {
+        private final boolean spooled;
+        private final List<String> heap;
+        private final Path dataPath;
+        private final Path indexPath;
+        private final FileChannel data;
+        private final FileChannel index;
+        private int count;
+        private long bytes;
+
+        private SharedStrings(boolean spooled) throws IOException {
+            this.spooled = spooled;
+            if (spooled) {
+                heap = null;
+                dataPath = Files.createTempFile("dap-sst-", ".dat");
+                indexPath = Files.createTempFile("dap-sst-", ".idx");
+                data = FileChannel.open(dataPath, StandardOpenOption.READ, StandardOpenOption.WRITE);
+                index = FileChannel.open(indexPath, StandardOpenOption.READ, StandardOpenOption.WRITE);
+            } else {
+                heap = new ArrayList<>();
+                dataPath = null;
+                indexPath = null;
+                data = null;
+                index = null;
+            }
+        }
+
+        int size() {
+            return count;
+        }
+
+        String get(int position) throws IOException {
+            if (position < 0 || position >= count) {
+                throw new IndexOutOfBoundsException("shared string " + position);
+            }
+            if (!spooled) {
+                return heap.get(position);
+            }
+            ByteBuffer offsetBuffer = ByteBuffer.allocate(Long.BYTES);
+            readFully(index, offsetBuffer, (long) position * Long.BYTES);
+            long offset = offsetBuffer.flip().getLong();
+            ByteBuffer lengthBuffer = ByteBuffer.allocate(Integer.BYTES);
+            readFully(data, lengthBuffer, offset);
+            int length = lengthBuffer.flip().getInt();
+            if (length < 0 || length > SST_MAX_BYTES) {
+                throw new IOException("invalid shared string length " + length + " at offset " + offset);
+            }
+            ByteBuffer text = ByteBuffer.allocate(length);
+            readFully(data, text, offset + Integer.BYTES);
+            return new String(text.array(), StandardCharsets.UTF_8);
+        }
+
+        void add(String value) throws IOException {
+            if (count >= sstMaxStrings()) {
+                throw sharedStringLimit(count + 1, bytes);
+            }
+            count++;
+            if (!spooled) {
+                bytes += value.length();
+                if (bytes > SST_MAX_BYTES) {
+                    throw sharedStringLimit(count, bytes);
+                }
+                heap.add(value);
+                return;
+            }
+            byte[] encoded = value.getBytes(StandardCharsets.UTF_8);
+            long offset = bytes;
+            bytes += Integer.BYTES + (long) encoded.length;
+            if (bytes > SST_MAX_BYTES) {
+                throw sharedStringLimit(count, bytes);
+            }
+            writeFully(index, ByteBuffer.allocate(Long.BYTES).putLong(offset).flip(),
+                    (long) (count - 1) * Long.BYTES);
+            writeFully(data, ByteBuffer.allocate(Integer.BYTES).putInt(encoded.length).flip(), offset);
+            writeFully(data, ByteBuffer.wrap(encoded), offset + Integer.BYTES);
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (!spooled) {
+                return;
+            }
+            IOException failure = null;
+            failure = closeQuietly(data, failure);
+            failure = closeQuietly(index, failure);
+            failure = deleteQuietly(dataPath, failure);
+            failure = deleteQuietly(indexPath, failure);
+            if (failure != null) {
+                throw failure;
+            }
+        }
+
+        private static IOException closeQuietly(FileChannel channel, IOException failure) {
+            try {
+                channel.close();
+            } catch (IOException close) {
+                if (failure == null) {
+                    return close;
+                }
+                failure.addSuppressed(close);
+            }
+            return failure;
+        }
+
+        private static IOException deleteQuietly(Path path, IOException failure) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException delete) {
+                if (failure == null) {
+                    return delete;
+                }
+                failure.addSuppressed(delete);
+            }
+            return failure;
+        }
+
+        private static void writeFully(FileChannel channel, ByteBuffer buffer, long position)
+                throws IOException {
+            while (buffer.hasRemaining()) {
+                int written = channel.write(buffer, position);
+                if (written <= 0) {
+                    throw new IOException("short write to shared-string spool");
+                }
+                position += written;
+            }
+        }
+
+        private static void readFully(FileChannel channel, ByteBuffer buffer, long position)
+                throws IOException {
+            while (buffer.hasRemaining()) {
+                int read = channel.read(buffer, position);
+                if (read < 0) {
+                    throw new IOException("truncated shared-string spool");
+                }
+                position += read;
+            }
+        }
+    }
+
+    private static IllegalArgumentException sharedStringLimit(int strings, long bytes) {
+        return new IllegalArgumentException("excel_reader: workbook has " + strings
+                + " shared strings (" + bytes / (1024 * 1024) + " MiB in xl/sharedStrings.xml); "
+                + "split the file or convert it to CSV");
     }
 
     // ------------------------------------------------------------------ styles
@@ -613,7 +806,7 @@ public final class XlsxTableReader {
                     if ("c".equals(local)) {
                         if (row != null && cellColumn >= 0) {
                             Cell cell = toCell(cellType, value, inline, formula, styleIndex,
-                                    context.sharedStrings(), context.styles(), file, options, cellRef);
+                                    context.strings(), context.styles(), file, options, cellRef);
                             if (cell != null) {
                                 row.put(cellColumn, cell);
                             }
@@ -657,8 +850,8 @@ public final class XlsxTableReader {
     }
 
     private static Cell toCell(String type, String value, String inline, boolean formula, int styleIndex,
-                               List<String> sharedStrings, Styles styles, Path file, Options options,
-                               String ref) {
+                               SharedStrings sharedStrings, Styles styles, Path file, Options options,
+                               String ref) throws IOException {
         String kind = type == null || type.isBlank() ? "n" : type;
         if (formula && (value == null || value.isBlank())) {
             if (options.errorsAsNull()) {
