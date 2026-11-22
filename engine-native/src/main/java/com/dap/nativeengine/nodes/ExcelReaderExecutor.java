@@ -1,6 +1,5 @@
 package com.dap.nativeengine.nodes;
 
-import com.dap.nativeengine.engine.ArrowTable;
 import com.dap.nativeengine.engine.ColumnSpec;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
@@ -15,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-/** dap.excel_reader: reads one worksheet of an .xlsx workbook into an Arrow table. */
+/** dap.excel_reader: streams one worksheet of an .xlsx workbook into DuckDB. */
 public final class ExcelReaderExecutor implements NodeExecutor {
     private static final String NODE = "excel_reader";
     private static final Set<String> SUPPORTED =
@@ -33,15 +32,14 @@ public final class ExcelReaderExecutor implements NodeExecutor {
         Path file = IoNodeSupport.sourceFile(config, NODE);
         XlsxTableReader.Options options = options(config);
 
-        ArrowTable table = XlsxTableReader.read(file, options);
+        String name = tableName(context);
         try {
-            String name = context.db().loadInto(context.jobConnection(), table, tableName(context));
-            return new LazyPlan(context.db(), "SELECT * FROM " + DuckDbSession.quote(name), table.columns());
+            XlsxTableReader.LoadResult loaded =
+                    XlsxTableReader.streamInto(context.jobConnection(), name, file, options);
+            return new LazyPlan(context.db(), "SELECT * FROM " + DuckDbSession.quote(name), loaded.columns());
         } catch (java.sql.SQLException failure) {
-            throw new IllegalStateException("excel_reader: cannot load parsed workbook into DuckDB: "
+            throw new IllegalStateException("excel_reader: cannot load workbook into DuckDB: "
                     + failure.getMessage(), failure);
-        } finally {
-            table.close();
         }
     }
 
@@ -72,7 +70,10 @@ public final class ExcelReaderExecutor implements NodeExecutor {
             }
         }
         boolean header = NodeSql.bool(config, "header", true);
-        boolean emptyStringIsNull = NodeSql.bool(config, "emptyStringIsNull", false);
+        // Empty cells are NULL by default, same as csv_reader; false keeps the
+        // legacy empty-string value. Cell errors are loud unless explicitly relaxed.
+        boolean emptyStringIsNull = NodeSql.bool(config, "emptyStringIsNull", true);
+        boolean errorsAsNull = NodeSql.bool(config, "errorsAsNull", false);
 
         List<ColumnSpec> columns = new ArrayList<>();
         JsonNode columnsNode = config.get("columns");
@@ -90,6 +91,6 @@ public final class ExcelReaderExecutor implements NodeExecutor {
                 columns.add(ColumnSpec.of(name, type));
             }
         }
-        return new XlsxTableReader.Options(sheet, header, columns, emptyStringIsNull);
+        return new XlsxTableReader.Options(sheet, header, columns, emptyStringIsNull, errorsAsNull);
     }
 }

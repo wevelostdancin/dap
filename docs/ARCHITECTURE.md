@@ -35,7 +35,7 @@ JobManager ──► Dag (уровни Кана, параллельные вет
                  ▼
               DuckDbSession (одна in-memory БД на сессию)
                  ├─ base connection; duplicate() видит тот же каталог
-                 ├─ csv_reader: read_csv (ленивое отношение); excel_reader: Arrow → Appender → таблица
+                 ├─ csv_reader: read_csv (ленивое отношение); excel_reader: StAX → чанки → Appender → таблица
                  ├─ parquet_reader / json_reader: read_parquet / read_json_auto
                  ├─ csv_writer / parquet_writer / json_writer: COPY ... TO
                  ├─ excel_writer: zip + XML (без POI), страницы по 10k строк прямо в
@@ -88,7 +88,7 @@ JobManager ──► Dag (уровни Кана, параллельные вет
 | `Dag` | Исполнение снимка графа уровнями Кана: узлы уровня параллельны, следующий уровень — после предыдущего; падение узла отменяет соседей |
 | `LazyPlan` | Ленивая таблица: текст SQL, схема и сессия; данные читаются только в `/table` и `/profile` |
 | `DuckDbSession` | In-memory БД сессии: базовое соединение, `duplicate()`, ресурсные настройки, ingestion, preview/profile, учёт активных чтений |
-| `ArrowTable`, `XlsxTableReader` | Граница данных на входе: разбор XLSX в Arrow, затем построчная вставка в DuckDB; CSV читается DuckDB через `read_csv` |
+| `ArrowTable`, `XlsxTableReader` | Граница данных на входе: XLSX разбирается StAX-ом и загружается в DuckDB чанками по 50k строк через `DuckDBAppender` (heap ограничен чанком, не листом); CSV читается DuckDB через `read_csv`. `ArrowTable` остаётся материализующим помощником для ingest/тестов |
 | `IngestService` | Parquet-кэш `POST /v1/datasets`: конвертация CSV/Excel/JSON/Parquet, ключ SHA-256 (путь, размер, mtime, формат, параметры чтения, отпечаток содержимого), ответ `path/rows/columns/cached` |
 | `CatalogHandlers`, `WorkflowHandlers`, `JobHandlers`, `DataHandlers`, `DatasetHandlers`, `OpsHandlers` | HTTP-слой: валидация запросов, коды ошибок, сериализация ответов |
 | MCP-адаптер (`adapters/mcp/dap_mcp.py`) | Отдельный Python-процесс: stdio JSON-RPC 2.0, 33 инструмента `dap_*`, при необходимости поднимает jar |
@@ -203,14 +203,18 @@ strictMode/nullStrings`; для XLSX сейчас используется фи�
   заменяет план.
 - Zero-copy Arrow → DuckDB нет: публичный `registerArrowStream` в `duckdb_jdbc`
   1.5.6.0 требует `arrow-c-data` (`ArrowArrayStream`), которого нет в зависимостях,
-  поэтому XLSX-данные копируются построчно. Arrow нужен только для Excel, между
-  узлами Arrow не передаётся.
+  поэтому XLSX-строки копируются в `DuckDBAppender` построчно (буфер чанка).
+  Между узлами Arrow не передаётся.
+- `excel_reader` делает два прохода по `sheetN.xml`: первый выводит заголовок и
+  типы, второй пишет данные. Память JVM ограничена одним чанком (по умолчанию
+  50k строк) и одной строкой разбора; `read()` материализует Arrow только для
+  small-file путей (ingest, тесты).
 - CSV читается DuckDB и в JVM heap не попадает; `DAP_DUCKDB_MEMORY_LIMIT`
-  ограничивает буферы DuckDB. Arrow-таблицы XLSX живут в heap.
+  ограничивает буферы DuckDB. Heap XLSX-пути ограничен размером чанка, а не
+  числом строк листа.
 - `excel_writer` не материализует таблицу в heap: читает план страницами по 10 000
   строк и пишет XML листа в `ZipOutputStream` через буфер 8 KiB. В heap живут
   текущая страница `TableData` и одна XML-строка; shared strings не используются.
-  Ограничение памяти на чтение XLSX (`XlsxTableReader`) это не снимает.
 - Потолок памяти процесса — примерно `sessions × DAP_DUCKDB_MEMORY_LIMIT` плюс heap.
   Сессионные БД эвиктятся по `DAP_SESSION_TTL_SEC`/LRU-лимиту `DAP_MAX_SESSIONS`,
   история завершённых jobs ограничена `DAP_MAX_RETAINED_JOBS`; таблица `excel_reader`

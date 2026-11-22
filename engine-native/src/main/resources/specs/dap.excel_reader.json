@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Reads a worksheet from an Excel workbook into a data table. Cells become typed columns from the header or the explicit column schema; blank header names get columnN placeholders and duplicate header names are rejected. Time-only cells (formats without a date part) are read as Timestamp on the workbook epoch date, because Time is not offered yet.",
+  "description": "Streams a worksheet from an Excel workbook into DuckDB in bounded row chunks. Cells become typed columns from the header or the explicit column schema; blank header names get columnN placeholders and duplicate header names are rejected. Empty cells are NULL by default (as in csv_reader). Error cells and formulas without a cached value fail unless errorsAsNull is set. Time-only cells (formats without a date part) are read as Timestamp on the workbook epoch date, because Time is not offered yet.",
   "inPorts": [],
   "outPorts": [
     {
@@ -74,7 +74,13 @@
       "emptyStringIsNull": {
         "type": "boolean",
         "title": "Empty string is null",
-        "description": "Treat empty cells as NULL instead of empty strings.",
+        "description": "Treat empty cells as NULL instead of empty strings. Defaults to true, matching csv_reader; set false to keep the legacy empty-string value.",
+        "default": true
+      },
+      "errorsAsNull": {
+        "type": "boolean",
+        "title": "Errors as null",
+        "description": "Read error cells (#N/A, #DIV/0!, ...) and formulas without a cached value as NULL instead of failing with the cell reference.",
         "default": false
       }
     },
