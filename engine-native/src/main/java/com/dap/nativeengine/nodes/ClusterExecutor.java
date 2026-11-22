@@ -327,7 +327,7 @@ public final class ClusterExecutor implements NodeExecutor {
 
     // -------------------------------------------------------------- silhouette
 
-    /** Per-row silhouette; NULL for noise and when fewer than two clusters are present. */
+    /** Per-row silhouette; NULL for noise and when fewer than two clusters are present, 0 for singletons. */
     private static Double[] silhouette(double[][] points, int[] labels) {
         int n = points.length;
         Double[] result = new Double[n];
@@ -362,7 +362,12 @@ public final class ClusterExecutor implements NodeExecutor {
                 counts[labels[other]]++;
             }
             int own = labels[point];
-            double ownMean = counts[own] == 0 ? 0.0 : sums[own] / counts[own];
+            if (counts[own] == 0) {
+                // Singleton cluster: a is undefined; set s = 0 (Rousseeuw, sklearn).
+                result[point] = 0.0;
+                continue;
+            }
+            double ownMean = sums[own] / counts[own];
             double nearestOther = Double.POSITIVE_INFINITY;
             for (int cluster = 0; cluster <= maxLabel; cluster++) {
                 if (cluster != own && counts[cluster] > 0) {
