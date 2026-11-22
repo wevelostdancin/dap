@@ -59,7 +59,7 @@ JUnit 5.11.4, запуск через `./mvnw test` (surefire, `--add-opens java
   idle-timeout, `POST /v1/datasets` → `dap.parquet_reader`).
 
 Kendall tau-b и p-value сверяются с эталоном `tests/reference/kendall_pvalue.py`
-(scipy, двусторонняя нормальная аппроксимация): запуск —
+(scipy, tie-corrected асимптотика, двусторонний хвост): запуск —
 `/Users/vitalypesnev/Projects/dap/build/refvenv/bin/python tests/reference/kendall_pvalue.py`,
 ожидания `CorrelationExecutorTest` совпадают с эталоном до `1e-9`.
 

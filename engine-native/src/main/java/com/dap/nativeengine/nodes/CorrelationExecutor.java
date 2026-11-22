@@ -13,9 +13,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 
@@ -92,7 +94,7 @@ public final class CorrelationExecutor implements NodeExecutor {
                             ? partialCorrelation(matrix, i, j, requested, all.size() - requested)
                             : kendallFromValues(values, i, j);
                     long n = partial ? commonN : finitePairs(values, i, j);
-                    pairs.add(new Pair(i, j, correlation, n));
+                    pairs.add(new Pair(i, j, correlation, n, kendallTieStats(values, i, j)));
                 }
             }
         } else if (partial) {
@@ -102,13 +104,15 @@ public final class CorrelationExecutor implements NodeExecutor {
             for (int i = 0; i < requested; i++) {
                 for (int j = i + 1; j < requested; j++) {
                     pairs.add(new Pair(i, j,
-                            partialCorrelation(matrix, i, j, requested, all.size() - requested), n));
+                            partialCorrelation(matrix, i, j, requested, all.size() - requested), n,
+                            null));
                 }
             }
         } else {
             List<PairResult> results = pairQuery(context, input, columns, method, false);
             for (PairResult result : results) {
-                pairs.add(new Pair(result.first(), result.second(), result.correlation(), result.n()));
+                pairs.add(new Pair(result.first(), result.second(), result.correlation(), result.n(),
+                        null));
             }
         }
         List<String> rows = new ArrayList<>(pairs.size());
@@ -116,13 +120,13 @@ public final class CorrelationExecutor implements NodeExecutor {
         for (Pair pair : pairs) {
             rows.add(longRow(columns.get(pair.first()), columns.get(pair.second()), method,
                     stats(method, pair.correlation(), pair.n(), partial ? all.size() - requested : 0,
-                            alpha),
+                            alpha, pair.ties()),
                     partialValue));
         }
         return literalPlan(context, rows, LONG);
     }
 
-    private record Pair(int first, int second, double correlation, long n) {
+    private record Pair(int first, int second, double correlation, long n, KendallTieStats ties) {
     }
 
     private record Stats(double correlation, long n, Double pValue, Double ciLow, Double ciHigh) {
@@ -130,11 +134,13 @@ public final class CorrelationExecutor implements NodeExecutor {
 
     /**
      * p-value and confidence interval for one correlation: the t approximation for
-     * Pearson/Spearman (df = n - 2 - controls), the normal z approximation for Kendall;
-     * Fisher's z for the Pearson/Spearman interval and the asymptotic standard error for
-     * Kendall. Degenerate samples leave the p-value and interval NULL.
+     * Pearson/Spearman (df = n - 2 - controls), the tie-corrected normal z approximation
+     * for Kendall; Fisher's z for the Pearson/Spearman interval and the tie-corrected
+     * asymptotic standard error for Kendall. Degenerate samples leave the p-value and
+     * interval NULL. Kendall never computes an exact permutation p-value.
      */
-    private static Stats stats(String method, double rawCorrelation, long n, int controls, double alpha) {
+    private static Stats stats(String method, double rawCorrelation, long n, int controls,
+                               double alpha, KendallTieStats ties) {
         double correlation = rawCorrelation;
         if (Double.isNaN(correlation)) {
             return new Stats(Double.NaN, n, null, null, null);
@@ -145,12 +151,24 @@ public final class CorrelationExecutor implements NodeExecutor {
         Double ciHigh = null;
         double critical = Distributions.normalQuantile(1.0 - alpha / 2.0);
         if ("kendall".equals(method)) {
-            if (n >= 3) {
-                double z = 3.0 * correlation * Math.sqrt(n * (n - 1.0)) / Math.sqrt(2.0 * (2.0 * n + 5.0));
-                pValue = clamp(2.0 * (1.0 - Distributions.normalCdf(Math.abs(z))));
-                double standardError = Math.sqrt(2.0 * (2.0 * n + 5.0) / (9.0 * n * (n - 1.0)));
-                ciLow = clip(correlation - critical * standardError);
-                ciHigh = clip(correlation + critical * standardError);
+            if (n >= 3 && ties != null) {
+                double pairs = n * (n - 1.0) / 2.0;
+                double m = n * (n - 1.0);
+                // scipy.stats._stats_py::_kendalltau, method='asymptotic' (v0/vt ->
+                // v1/v2 -> var in count_rank_tie): var of concordant minus discordant
+                // pairs; xtie/x0/x1 and ytie/y0/y1 are the two columns' tie sums.
+                double variance = (m * (2.0 * n + 5.0) - ties.x1() - ties.y1()) / 18.0
+                        + 2.0 * ties.xtie() * ties.ytie() / m
+                        + ties.x0() * ties.y0() / (9.0 * m * (n - 2.0));
+                double denominator = (pairs - ties.xtie()) * (pairs - ties.ytie());
+                if (variance > 0.0 && denominator > 0.0) {
+                    // tau-b scale: z = tau / se, with se = sqrt(var / denominator).
+                    double standardError = Math.sqrt(variance / denominator);
+                    double z = correlation / standardError;
+                    pValue = clamp(2.0 * (1.0 - Distributions.normalCdf(Math.abs(z))));
+                    ciLow = clip(correlation - critical * standardError);
+                    ciHigh = clip(correlation + critical * standardError);
+                }
             }
         } else {
             double df = n - 2.0 - controls;
@@ -359,6 +377,44 @@ public final class CorrelationExecutor implements NodeExecutor {
     }
 
     // --------------------------------------------------------------- Kendall
+
+    /** Tie sums for one column: xtie, x0, x1 in scipy's count_rank_tie notation. */
+    private record KendallTieStats(double xtie, double ytie, double x0, double y0,
+                                   double x1, double y1) {
+    }
+
+    /** Tie sums of both columns over the pair's complete rows. */
+    private static KendallTieStats kendallTieStats(double[][] values, int first, int second) {
+        List<Double> xs = new ArrayList<>();
+        List<Double> ys = new ArrayList<>();
+        for (double[] row : values) {
+            if (!Double.isNaN(row[first]) && !Double.isNaN(row[second])) {
+                xs.add(row[first]);
+                ys.add(row[second]);
+            }
+        }
+        double[] x = tieMoments(xs);
+        double[] y = tieMoments(ys);
+        return new KendallTieStats(x[0], y[0], x[1], y[1], x[2], y[2]);
+    }
+
+    private static double[] tieMoments(List<Double> column) {
+        Map<Double, Long> counts = new HashMap<>();
+        for (double value : column) {
+            counts.merge(value, 1L, Long::sum);
+        }
+        double pairs = 0.0;
+        double v0 = 0.0;
+        double v1 = 0.0;
+        for (long size : counts.values()) {
+            if (size > 1) {
+                pairs += size * (size - 1) / 2.0;
+                v0 += size * (size - 1) * (size - 2);
+                v1 += size * (size - 1) * (2 * size + 5);
+            }
+        }
+        return new double[]{pairs, v0, v1};
+    }
 
     /**
      * Kendall tau-b between two columns; NaN when fewer than three complete pairs or a

@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
-"""Independent reference for Kendall tau-b p-values (normal approximation).
+"""Independent reference for Kendall tau-b p-values (scipy asymptotic method).
 
 Run from the repository root:
 
     /Users/vitalypesnev/Projects/dap/build/refvenv/bin/python tests/reference/kendall_pvalue.py
 
-Deterministic and offline. ``tau`` comes from scipy.stats.kendalltau (tau-b with
-the usual tie correction); ``p_value`` is the two-sided normal tail of
-z = 3*tau*sqrt(n(n-1)) / sqrt(2(2n+5)), i.e. p = 2*(1 - Phi(|z|)), evaluated
-with the numerically equivalent survival function. These are the numbers the
-JUnit tests in CorrelationExecutorTest assert, with tolerance 1e-9.
+Deterministic and offline. ``tau`` and ``p_value`` come from
+``scipy.stats.kendalltau(x, y, method='asymptotic')``: tau-b with the usual tie
+correlation and the tie-corrected asymptotic variance of concordant minus
+discordant pairs (scipy/stats/_stats_py.py, ``_kendalltau``: v0/vt/vu/v1/v2 ->
+``var`` -> ``z``). The printed ``z``/``standard_error`` are the equivalent
+tau-b scale values used by DAP: se = sqrt(var / ((tot-xtie)*(tot-ytie))),
+z = tau/se, p = 2*(1 - Phi(|z|)). ``ci_low``/``ci_high`` use alpha=0.05 and are
+clipped to [-1, 1]. These are the numbers asserted by CorrelationExecutorTest
+(tolerance 1e-9). DAP never computes the exact permutation p-value.
 
-Data provenance: the n=100 series is x=1..100 and y=round(x+U(-120,120), 6)
-from random.Random(42); the resulting y values are frozen below so the script
-and the Java test consume bit-identical inputs. Other vectors are literal.
+Data provenance: n=100 y is round(x+U(-120,120), 6) from random.Random(42);
+n=50 y is a 3-label series from random.Random(1) with score = i+U(-40,40) and
+cutoffs 20/35. Both are frozen below as literals shared with the Java test.
 """
 
 import json
 import math
+from collections import Counter
 
 from scipy.stats import kendalltau, norm
 
@@ -25,7 +30,12 @@ from scipy.stats import kendalltau, norm
 X4 = [1.0, 2.0, 3.0, 4.0]
 Y4 = [1.0, 2.0, 2.0, 3.0]
 
-# (b) n=100, tau ~= 0.3, frozen deterministic noise.
+# (a2) n=4 without ties: scipy's default 'auto' would use the exact p-value;
+# the reference deliberately requests the asymptotic method DAP implements.
+X4_NO_TIES = [1.0, 2.0, 3.0, 4.0]
+Y4_NO_TIES = [1.0, 2.0, 4.0, 3.0]
+
+# (b) n=100, tau ~= 0.3, frozen deterministic noise, no ties.
 X100 = [float(i) for i in range(1, 101)]
 Y100 = [
     34.462432, -111.997419, -50.992964, -62.429423, 61.753091,
@@ -50,22 +60,56 @@ Y100 = [
     67.588629, 216.069131, 104.987443, 212.058811, 186.587129,
 ]
 
-# (c) n=10 with ties in both x and y.
+# (c) n=10 with ties in both columns.
 X10_TIES = [1.0, 1.0, 2.0, 2.0, 3.0, 4.0, 4.0, 5.0, 6.0, 6.0]
 Y10_TIES = [2.0, 3.0, 1.0, 3.0, 5.0, 4.0, 4.0, 2.0, 6.0, 5.0]
+
+# (d) n=50, y has only three distinct values (strong ties).
+X50 = [float(i) for i in range(1, 51)]
+Y50 = [
+    0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+    2.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 2.0, 2.0, 0.0,
+    0.0, 1.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0,
+    0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 2.0, 2.0, 0.0,
+    2.0, 2.0, 0.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0,
+]
+
+
+def tie_stats(values):
+    """(sum t(t-1)/2, sum t(t-1)(t-2), sum t(t-1)(2t+5)) over tie groups."""
+    counts = Counter(values)
+    return (
+        sum(c * (c - 1) // 2 for c in counts.values()),
+        sum(c * (c - 1) * (c - 2) for c in counts.values()),
+        sum(c * (c - 1) * (2 * c + 5) for c in counts.values()),
+    )
 
 
 def reference(x, y):
     n = len(x)
-    tau = float(kendalltau(x, y).statistic)
-    z = 3.0 * tau * math.sqrt(n * (n - 1.0)) / math.sqrt(2.0 * (2.0 * n + 5.0))
-    se = math.sqrt(2.0 * (2.0 * n + 5.0) / (9.0 * n * (n - 1.0)))
+    result = kendalltau(x, y, method="asymptotic")
+    tau = float(result.statistic)
+    p = float(result.pvalue)
+    m = n * (n - 1.0)
+    tot = m / 2.0
+    xtie, x0, x1 = tie_stats(x)
+    ytie, y0, y1 = tie_stats(y)
+    # scipy/stats/_stats_py.py::_kendalltau (v0, vt, vu -> v1, v2 -> var).
+    var = ((m * (2 * n + 5) - x1 - y1) / 18.0
+           + (2.0 * xtie * ytie) / m
+           + x0 * y0 / (9.0 * m * (n - 2)))
+    se = math.sqrt(var / ((tot - xtie) * (tot - ytie)))
+    z = tau / se
+    crit = float(norm.ppf(0.975))
     return {
         "n": n,
         "tau": tau,
+        "p_value": p,
         "z": z,
+        "z_from_scipy_p": float(norm.isf(p / 2.0)),
         "standard_error": se,
-        "p_value": 2.0 * norm.sf(abs(z)),
+        "ci_low": max(-1.0, tau - crit * se),
+        "ci_high": min(1.0, tau + crit * se),
         "abs_z_minus_abs_tau_over_se": abs(abs(z) - abs(tau) / se),
     }
 
@@ -73,8 +117,10 @@ def reference(x, y):
 def main():
     cases = {
         "n4": reference(X4, Y4),
+        "n4_no_ties": reference(X4_NO_TIES, Y4_NO_TIES),
         "n100": reference(X100, Y100),
         "n10_ties": reference(X10_TIES, Y10_TIES),
+        "n50_three_labels": reference(X50, Y50),
     }
     print(json.dumps(cases, indent=2, sort_keys=True))
 

@@ -18,8 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * dap.correlation. Reference values are R/independent double-precision computations:
  * Pearson p-values use the t approximation, Kendall the normal z approximation, the CI
- * Fisher's z transform (Kendall: the asymptotic normal standard error). Kendall tau and
- * p-values are cross-checked against tests/reference/kendall_pvalue.py (scipy).
+ * Fisher's z transform (Kendall: the tie-corrected asymptotic standard error). Kendall
+ * tau and asymptotic p-values are cross-checked against
+ * tests/reference/kendall_pvalue.py (scipy); DAP never computes exact permutation p.
  */
 class CorrelationExecutorTest {
     private static final List<ColumnSpec> OUTPUT = List.of(
@@ -48,6 +49,7 @@ class CorrelationExecutorTest {
     // Kendall vectors shared with tests/reference/kendall_pvalue.py (identical literals).
     private static final double[] KENDALL_X4 = {1.0, 2.0, 3.0, 4.0};
     private static final double[] KENDALL_Y4 = {1.0, 2.0, 2.0, 3.0};
+    private static final double[] KENDALL_Y4_NO_TIES = {1.0, 2.0, 4.0, 3.0};
     private static final double[] KENDALL_X10 = {
             1.0, 1.0, 2.0, 2.0, 3.0, 4.0, 4.0, 5.0, 6.0, 6.0};
     private static final double[] KENDALL_Y10 = {
@@ -74,6 +76,20 @@ class CorrelationExecutorTest {
             18.636982, 206.409026, 90.28631, -9.181741, -18.69207,
             -2.684209, 122.58705, 163.099047, 75.318392, -9.753351,
             67.588629, 216.069131, 104.987443, 212.058811, 186.587129};
+    // x = 1..50; y = 3 labels from random.Random(1), score = i+U(-40,40), cutoffs 20/35.
+    private static final double[] KENDALL_X50 = new double[50];
+    private static final double[] KENDALL_Y50 = {
+            0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+            2.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 2.0, 2.0, 0.0,
+            0.0, 1.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0,
+            0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 2.0, 2.0, 0.0,
+            2.0, 2.0, 0.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0};
+
+    static {
+        for (int i = 0; i < KENDALL_X50.length; i++) {
+            KENDALL_X50[i] = i + 1.0;
+        }
+    }
 
     private static LazyPlan kendallInput(DuckDbSession db, double[] x, double[] y) throws Exception {
         List<Object[]> rows = new ArrayList<>();
@@ -208,12 +224,28 @@ class CorrelationExecutorTest {
 
             TableData data = run(db, input, "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
             assertEquals("kendall", data.data().get(0).get(2));
-            // scipy reference: tau_b = 5 / sqrt(6 * 5) = 0.9128709291752769,
-            // z = 1.860521018838127, p = 0.06281184751609867.
+            // scipy method='asymptotic': tau_b = 0.9128709291752769, z = 1.805787796286538,
+            // p = 0.07095149242730564 with the tie-corrected SE (ytie = 1). scipy cannot
+            // compute an exact p-value when ties are present; DAP only does asymptotic.
             assertEquals(0.9128709291752769, number(data, 0, 4), 1e-12);
-            assertEquals(0.06281184751609867, number(data, 0, 5), 1e-9);
-            assertEquals(-0.048792027384325198, number(data, 0, 6), 1e-9);
+            assertEquals(0.07095149242730564, number(data, 0, 5), 1e-9);
+            assertEquals(-0.07793992213100365, number(data, 0, 6), 1e-9);
             assertEquals(1.0, number(data, 0, 7), 1e-9);
+        }
+    }
+
+    @Test
+    void kendallWithoutTiesUsesAsymptoticNotExactPValue() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            TableData data = run(db, kendallInput(db, KENDALL_X4, KENDALL_Y4_NO_TIES),
+                    "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
+
+            // scipy asymptotic: tau = 0.6666666666666669, p = 0.1742313882480251.
+            // The exact permutation p-value would be 0.3333333333333333; DAP does not
+            // compute it even for this tiny sample.
+            assertEquals(0.6666666666666669, number(data, 0, 4), 1e-12);
+            assertEquals(0.1742313882480251, number(data, 0, 5), 1e-9);
+            assertEquals(-0.2949962898929357, number(data, 0, 6), 1e-9);
         }
     }
 
@@ -228,9 +260,11 @@ class CorrelationExecutorTest {
                     "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
 
             assertEquals("100", data.data().get(0).get(3));
-            // scipy reference: tau = 0.30020202020202025, z = 4.425481546448939.
+            // scipy asymptotic: tau = 0.30020202020202025, z = 4.425481546448939 (no ties).
             assertEquals(0.30020202020202025, number(data, 0, 4), 1e-9);
             assertEquals(9.622738296844866e-06, number(data, 0, 5), 1e-9);
+            assertEquals(0.16724809383117076, number(data, 0, 6), 1e-9);
+            assertEquals(0.4331559465728697, number(data, 0, 7), 1e-9);
         }
     }
 
@@ -240,31 +274,57 @@ class CorrelationExecutorTest {
             TableData data = run(db, kendallInput(db, KENDALL_X10, KENDALL_Y10),
                     "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
 
-            // scipy reference: tau_b = 0.48780487804878053, z = 1.9633767607315227.
+            // scipy asymptotic: tau_b = 0.48780487804878053, z = 1.8461975436542644.
             assertEquals(0.48780487804878053, number(data, 0, 4), 1e-9);
-            assertEquals(0.04960241208655068, number(data, 0, 5), 1e-9);
+            assertEquals(0.06486352749968662, number(data, 0, 5), 1e-9);
+            assertEquals(-0.03005952695207853, number(data, 0, 6), 1e-9);
+            assertEquals(1.0, number(data, 0, 7), 1e-9);
         }
     }
 
     @Test
-    void kendallZEqualsTauOverStandardError() throws Exception {
+    void kendallPValueMatchesScipyReferenceWithStrongTies() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            TableData data = run(db, kendallInput(db, KENDALL_X50, KENDALL_Y50),
+                    "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
+
+            // y has only three distinct values: scipy asymptotic tau = 0.3397105998335,
+            // z = 3.0310897778010712 with the tie-corrected variance.
+            assertEquals(0.3397105998335, number(data, 0, 4), 1e-9);
+            assertEquals(0.0024367278316132506, number(data, 0, 5), 1e-9);
+            assertEquals(0.12004685192459333, number(data, 0, 6), 1e-9);
+            assertEquals(0.5593743477424067, number(data, 0, 7), 1e-9);
+        }
+    }
+
+    @Test
+    void kendallAsymptoticZMatchesScipy() throws Exception {
         double[] x100 = new double[KENDALL_Y100.length];
         for (int i = 0; i < x100.length; i++) {
             x100[i] = i + 1.0;
         }
         try (DuckDbSession db = new DuckDbSession()) {
-            for (double[][] vectors : List.of(
-                    new double[][]{KENDALL_X4, KENDALL_Y4},
-                    new double[][]{KENDALL_X10, KENDALL_Y10},
-                    new double[][]{x100, KENDALL_Y100})) {
-                TableData data = run(db, kendallInput(db, vectors[0], vectors[1]),
+            // {x, y, scipy z, scipy tie-corrected SE} from tests/reference/kendall_pvalue.py.
+            for (Object[] referenceCase : List.of(
+                    new Object[]{KENDALL_X4, KENDALL_Y4, 1.805787796286538, 0.5055250296034367},
+                    new Object[]{KENDALL_X4, KENDALL_Y4_NO_TIES, 1.3587324409735153,
+                            0.49065338146265813},
+                    new Object[]{KENDALL_X10, KENDALL_Y10, 1.8461975436542644,
+                            0.26422138829371733},
+                    new Object[]{KENDALL_X50, KENDALL_Y50, 3.0310897778010712,
+                            0.112075400181629},
+                    new Object[]{x100, KENDALL_Y100, 4.425481546448939, 0.06783488238537703})) {
+                double[] x = (double[]) referenceCase[0];
+                double[] y = (double[]) referenceCase[1];
+                double expectedZ = (double) referenceCase[2];
+                double expectedSe = (double) referenceCase[3];
+                TableData data = run(db, kendallInput(db, x, y),
                         "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
-                long n = Long.parseLong(data.data().get(0).get(3));
                 double tau = number(data, 0, 4);
                 double p = number(data, 0, 5);
-                double se = Math.sqrt(2.0 * (2.0 * n + 5.0) / (9.0 * n * (n - 1.0)));
                 double zFromP = Distributions.normalQuantile(1.0 - p / 2.0);
-                assertEquals(Math.abs(tau) / se, zFromP, 1e-12);
+                assertEquals(expectedZ, zFromP, 1e-12);
+                assertEquals(expectedZ, Math.abs(tau) / expectedSe, 1e-12);
             }
         }
     }

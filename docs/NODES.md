@@ -1117,13 +1117,19 @@ NULL в любой выбранной колонке делает `sum`, `mean`,
 Правила:
 
 - p-value: для Pearson/Spearman `t = r·sqrt(df/(1−r²))`, `df = n−2−k` (`k` —
-  число контрольных колонок), двусторонний хвост t; для Kendall
-  `z = 3τ·sqrt(n(n−1))/sqrt(2(2n+5)) = τ/se` (без поправки на связи),
-  `p = 2(1−Φ(|z|))`, двусторонний нормальный хвост. Эталонные значения tau и
-  p-value: `tests/reference/kendall_pvalue.py` (scipy, запуск через
-  `build/refvenv/bin/python`).
+  число контрольных колонок), двусторонний хвост t; для Kendall асимптотический
+  `z = τ/se = C/sqrt(var)`, где `C` — разность конкордантных и дискордантных пар,
+  `m = n(n−1)`, `var = (m(2n+5)−x1−y1)/18 + 2·xtie·ytie/m + x0·y0/(9m(n−2))`;
+  суммы по связям `xtie = Σt(t−1)/2`, `x0 = Σt(t−1)(t−2)`, `x1 = Σt(t−1)(2t+5)`
+  (то же для y) — как в scipy `kendalltau(method='asymptotic')`. `p = 2(1−Φ(|z|))`,
+  двусторонний нормальный хвост. Эталон: `tests/reference/kendall_pvalue.py`
+  (scipy, запуск через `build/refvenv/bin/python`).
 - Интервал: Fisher `atanh` с `se = 1/sqrt(n−3−k)` для Pearson/Spearman; для Kendall
-  асимптотическая `se = sqrt(2(2n+5)/(9n(n−1)))`; значения обрезаны в `[−1, 1]`.
+  `se = sqrt(var/((tot−xtie)(tot−ytie)))`, `tot = n(n−1)/2`; значения обрезаны
+  в `[−1, 1]`.
+- Ограничение: DAP всегда считает нормальную асимптотику; точный пермутационный
+  p-value для малых n (и данных со связями) не вычисляется, даже если scipy
+  `method='auto'` выбрал бы exact.
 - `n < 3` (для Pearson/Spearman `df ≤ 0` или `n−3−k ≤ 0`) оставляет `p_value`
   и/или `ci_low`/`ci_high` NULL; `|r| = 1` даёт `p_value = 0` и вырожденный
   интервал.
