@@ -21,10 +21,12 @@ import org.apache.arrow.vector.types.pojo.Schema;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -129,8 +131,10 @@ public final class ArrowTable implements AutoCloseable {
         } else if (vector instanceof TimeMicroVector typed) {
             typed.setSafe(row, ((LocalTime) value).toNanoOfDay() / 1_000L);
         } else if (vector instanceof TimeStampMicroVector typed) {
-            typed.setSafe(row, ((LocalDateTime) value).toInstant(ZoneOffset.UTC).toEpochMilli() * 1_000L);
+            typed.setSafe(row, ChronoUnit.MICROS.between(Instant.EPOCH,
+                    ((LocalDateTime) value).toInstant(ZoneOffset.UTC)));
         } else if (vector instanceof DecimalVector typed) {
+            // Exact BigDecimal at the Arrow boundary; profile/statistics widen to double by design.
             typed.setSafe(row, (BigDecimal) value);
         } else {
             throw new IllegalArgumentException("unsupported vector: " + vector.getClass().getName());

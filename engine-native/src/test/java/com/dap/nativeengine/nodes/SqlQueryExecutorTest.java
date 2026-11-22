@@ -98,6 +98,33 @@ class SqlQueryExecutorTest {
     }
 
     @Test
+    void sumOfIntegersReportsExactDecimalInsteadOfInt64() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            LazyPlan input = NodeTestSupport.table(db, List.of(ColumnSpec.of("x", "Int64")),
+                    List.<Object[]>of(new Object[]{Long.MAX_VALUE}, new Object[]{1L}));
+            LazyPlan plan = plan(db, connection, List.of(input), config("SELECT SUM(x) AS total FROM src", "src"));
+
+            assertEquals(List.of(ColumnSpec.of("total", "Decimal128(38,0)")), plan.columns());
+            assertEquals("Number (Decimal)", plan.columns().get(0).knimeType());
+            assertEquals(List.of(List.of("9223372036854775808")), plan.preview(10).data());
+        }
+    }
+
+    @Test
+    void decimal38OverflowSurfacesDuckDbConversionError() throws Exception {
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            java.sql.SQLException failure = assertThrows(java.sql.SQLException.class, () -> {
+                LazyPlan plan = plan(db, connection, List.of(), config(
+                        "SELECT CAST(170141183460469231731687303715884105727 AS DECIMAL(38,0)) AS total"));
+                plan.preview(10);
+            });
+            assertTrue(failure.getMessage().contains("Conversion Error"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("170141183460469231731687303715884105727"),
+                    failure.getMessage());
+        }
+    }
+
+    @Test
     void withoutInputsUsesSourceNodeIdAliases() throws Exception {
         try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
             LazyPlan input = NodeTestSupport.table(db, PEOPLE, PEOPLE_ROWS);
