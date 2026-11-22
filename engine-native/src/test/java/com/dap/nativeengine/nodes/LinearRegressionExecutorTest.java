@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -371,13 +372,18 @@ class LinearRegressionExecutorTest {
                     ColumnSpec.of("prediction", "Float64"),
                     ColumnSpec.of("residual", "Float64"),
                     ColumnSpec.of("prediction_lower", "Float64"),
-                    ColumnSpec.of("prediction_upper", "Float64")), plan.columns());
+                    ColumnSpec.of("prediction_upper", "Float64"),
+                    ColumnSpec.of("sampled_rows", "Int64"),
+                    ColumnSpec.of("total_rows", "Int64")), plan.columns());
 
             TableData data = plan.preview(10);
             assertEquals(3, data.rows());
-            assertEquals(List.of("1.0", "3.0", "3.0", "0.0", "3.0", "3.0"), data.data().get(0));
-            assertEquals(List.of("2.0", "5.0", "5.0", "0.0", "5.0", "5.0"), data.data().get(1));
-            assertEquals(List.of("3.0", "7.0", "7.0", "0.0", "7.0", "7.0"), data.data().get(2));
+            assertEquals(List.of("1.0", "3.0", "3.0", "0.0", "3.0", "3.0", "3", "3"),
+                    data.data().get(0));
+            assertEquals(List.of("2.0", "5.0", "5.0", "0.0", "5.0", "5.0", "3", "3"),
+                    data.data().get(1));
+            assertEquals(List.of("3.0", "7.0", "7.0", "0.0", "7.0", "7.0", "3", "3"),
+                    data.data().get(2));
         }
     }
 
@@ -393,7 +399,9 @@ class LinearRegressionExecutorTest {
                     ColumnSpec.of("prediction", "Float64"),
                     ColumnSpec.of("residual", "Float64"),
                     ColumnSpec.of("prediction_lower", "Float64"),
-                    ColumnSpec.of("prediction_upper", "Float64")), plan.columns());
+                    ColumnSpec.of("prediction_upper", "Float64"),
+                    ColumnSpec.of("sampled_rows", "Int64"),
+                    ColumnSpec.of("total_rows", "Int64")), plan.columns());
 
             TableData data = plan.preview(20);
             assertEquals(10, data.rows());
@@ -431,7 +439,9 @@ class LinearRegressionExecutorTest {
                     ColumnSpec.of("fitted", "Float64"),
                     ColumnSpec.of("residual", "Float64"),
                     ColumnSpec.of("prediction_lower", "Float64"),
-                    ColumnSpec.of("prediction_upper", "Float64")), plan.columns());
+                    ColumnSpec.of("prediction_upper", "Float64"),
+                    ColumnSpec.of("sampled_rows", "Int64"),
+                    ColumnSpec.of("total_rows", "Int64")), plan.columns());
 
             TableData data = plan.preview(10);
             assertEquals(6, data.rows());
@@ -532,6 +542,12 @@ class LinearRegressionExecutorTest {
                             """));
             assertTrue(badRobust.getMessage().contains("hc3"), badRobust.getMessage());
 
+            IllegalArgumentException badSeed = assertThrows(IllegalArgumentException.class,
+                    () -> run(db, input, """
+                            {"x":["x"],"y":"y","seed":-1}
+                            """));
+            assertTrue(badSeed.getMessage().contains("seed"), badSeed.getMessage());
+
             IllegalArgumentException unknownGroup = assertThrows(IllegalArgumentException.class,
                     () -> run(db, input, """
                             {"x":["x"],"y":"y","group_by":["nope"]}
@@ -571,7 +587,7 @@ class LinearRegressionExecutorTest {
     }
 
     @Test
-    void sampleRowsFitsOnTheFirstNwRowsInsteadOfFailing() throws Exception {
+    void sampleRowsFitsAReservoirSampleInsteadOfFailing() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             int n = 150_000;
             List<ColumnSpec> columns = List.of(ColumnSpec.of("x", "Float64"),
@@ -591,6 +607,78 @@ class LinearRegressionExecutorTest {
             List<String> slope = termRow(data, 0, "x");
             assertEquals(2.0, number(slope, 1), 1e-9);
             assertEquals(1000, Integer.parseInt(slope.get(6)));
+        }
+    }
+
+    /**
+     * Insertion order is a permutation of x and y has two regimes (y = x below 20,
+     * y = 10x otherwise), so the fitted coefficients depend on which rows are sampled.
+     */
+    private static LazyPlan scrambled(DuckDbSession db) throws Exception {
+        int n = 100;
+        List<Object[]> rows = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            double x = (i * 37) % n;
+            rows.add(new Object[]{x, x < 20 ? x : 10.0 * x});
+        }
+        return NodeTestSupport.table(db,
+                List.of(ColumnSpec.of("x", "Float64"), ColumnSpec.of("y", "Float64")), rows);
+    }
+
+    @Test
+    void reservoirSampleIsRepeatableAcrossRuns() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = scrambled(db);
+            String config = """
+                    {"x":["x"],"y":"y","sample_rows":20,"seed":42}
+                    """;
+
+            TableData first = run(db, input, config);
+            TableData second = run(db, input, config);
+            TableData otherSeed = run(db, input, """
+                    {"x":["x"],"y":"y","sample_rows":20,"seed":43}
+                    """);
+            assertEquals(first.data(), second.data());
+            assertEquals("20", termRow(first, 0, "x").get(6));
+            assertNotEquals(first.data(), otherSeed.data(), "seed must change the sample");
+        }
+    }
+
+    @Test
+    void sampleRowsAtLeastTotalFitsEveryRow() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = scrambled(db);
+            TableData full = run(db, input, """
+                    {"x":["x"],"y":"y"}
+                    """);
+            TableData sampled = run(db, input, """
+                    {"x":["x"],"y":"y","sample_rows":200,"seed":42}
+                    """);
+            assertEquals(full.data(), sampled.data());
+            assertEquals("100", termRow(sampled, 0, "x").get(6));
+
+            LazyPlan small = line(db, new double[]{1, 2, 3, 4, 5},
+                    new double[]{3, 5, 7, 9, 11});
+            TableData predictions = run(db, small, """
+                    {"x":["x"],"y":"y","mode":"predict","sample_rows":50,"seed":42}
+                    """);
+            assertEquals("5", predictions.data().get(0).get(6));
+            assertEquals("5", predictions.data().get(0).get(7));
+        }
+    }
+
+    @Test
+    void predictReportsSampledAndTotalRows() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = scrambled(db);
+            TableData data = run(db, input, """
+                    {"x":["x"],"y":"y","mode":"predict","sample_rows":20}
+                    """);
+            assertEquals(100, data.rows());
+            for (List<String> row : data.data()) {
+                assertEquals("20", row.get(6), row.toString());
+                assertEquals("100", row.get(7), row.toString());
+            }
         }
     }
 }

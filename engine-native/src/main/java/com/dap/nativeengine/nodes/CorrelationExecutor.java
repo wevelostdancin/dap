@@ -30,7 +30,9 @@ import java.util.StringJoiner;
  * (Fisher's z, Kendall asymptotic standard error) need the engine's own distributions,
  * so the pairs are materialised into a literal plan like {@code dap.hypothesis_test}
  * does. Partial correlations come from the inverse of the correlation matrix; Kendall
- * tau-b is computed in Java with a Fenwick tree over ranks (O(n log n)).</p>
+ * tau-b is computed in Java with a Fenwick tree over ranks (O(n log n)). The long
+ * format also carries {@code p_adjusted} with the shared multiple-comparison
+ * correction; the matrix format has no p-values and is therefore never adjusted.</p>
  */
 public final class CorrelationExecutor implements NodeExecutor {
     private static final List<String> METHODS = List.of("pearson", "spearman", "kendall");
@@ -46,7 +48,8 @@ public final class CorrelationExecutor implements NodeExecutor {
             ColumnSpec.of("p_value", "Float64"),
             ColumnSpec.of("ci_low", "Float64"),
             ColumnSpec.of("ci_high", "Float64"),
-            ColumnSpec.of("partial", "Utf8"));
+            ColumnSpec.of("partial", "Utf8"),
+            ColumnSpec.of("p_adjusted", "Float64"));
 
     @Override
     public String nodeId() {
@@ -65,6 +68,8 @@ public final class CorrelationExecutor implements NodeExecutor {
             throw new IllegalArgumentException("correlation: unknown output '" + output
                     + "' (expected long or matrix)");
         }
+        String correction = MultipleTestingCorrection.validate(
+                NodeSql.text(config, "correction", "none"), "correlation");
         double alpha = alpha(config);
         boolean partial = !controls.isEmpty();
         List<ColumnSpec> all = new ArrayList<>(columns);
@@ -72,14 +77,14 @@ public final class CorrelationExecutor implements NodeExecutor {
         if ("matrix".equals(output)) {
             return matrix(context, input, columns, all, method, partial);
         }
-        return longFormat(context, input, columns, all, method, alpha, partial);
+        return longFormat(context, input, columns, all, method, alpha, partial, correction);
     }
 
     // ------------------------------------------------------------------- long
 
     private static LazyPlan longFormat(NodeContext context, LazyPlan input, List<ColumnSpec> columns,
                                        List<ColumnSpec> all, String method, double alpha,
-                                       boolean partial) throws SQLException {
+                                       boolean partial, String correction) throws SQLException {
         int requested = columns.size();
         List<Pair> pairs = new ArrayList<>();
         if ("kendall".equals(method)) {
@@ -115,13 +120,21 @@ public final class CorrelationExecutor implements NodeExecutor {
                         null));
             }
         }
+        List<Stats> statistics = new ArrayList<>(pairs.size());
+        List<Double> pValues = new ArrayList<>(pairs.size());
+        for (Pair pair : pairs) {
+            Stats value = stats(method, pair.correlation(), pair.n(),
+                    partial ? all.size() - requested : 0, alpha, pair.ties());
+            statistics.add(value);
+            pValues.add(value.pValue());
+        }
+        Double[] adjusted = MultipleTestingCorrection.adjust(pValues, correction);
         List<String> rows = new ArrayList<>(pairs.size());
         String partialValue = partial ? joinNames(controlsOf(all, requested)) : null;
-        for (Pair pair : pairs) {
+        for (int i = 0; i < pairs.size(); i++) {
+            Pair pair = pairs.get(i);
             rows.add(longRow(columns.get(pair.first()), columns.get(pair.second()), method,
-                    stats(method, pair.correlation(), pair.n(), partial ? all.size() - requested : 0,
-                            alpha, pair.ties()),
-                    partialValue));
+                    statistics.get(i), adjusted[i], partialValue));
         }
         return literalPlan(context, rows, LONG);
     }
@@ -612,7 +625,7 @@ public final class CorrelationExecutor implements NodeExecutor {
     // --------------------------------------------------------------- output
 
     private static String longRow(ColumnSpec a, ColumnSpec b, String method, Stats stats,
-                                  String partialValue) {
+                                  Double pAdjusted, String partialValue) {
         StringJoiner select = new StringJoiner(", ");
         select.add(NodeSql.literal(a.name()) + " AS " + NodeSql.quote("column_a"));
         select.add(NodeSql.literal(b.name()) + " AS " + NodeSql.quote("column_b"));
@@ -625,6 +638,7 @@ public final class CorrelationExecutor implements NodeExecutor {
         select.add(partialValue == null
                 ? "CAST(NULL AS VARCHAR) AS " + NodeSql.quote("partial")
                 : NodeSql.literal(partialValue) + " AS " + NodeSql.quote("partial"));
+        select.add(doubleLiteral(pAdjusted) + " AS " + NodeSql.quote("p_adjusted"));
         return "SELECT " + select;
     }
 

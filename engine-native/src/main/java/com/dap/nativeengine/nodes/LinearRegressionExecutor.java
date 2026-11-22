@@ -42,6 +42,8 @@ public final class LinearRegressionExecutor implements NodeExecutor {
     private static final String RESIDUAL = "residual";
     private static final String LOWER = "prediction_lower";
     private static final String UPPER = "prediction_upper";
+    private static final String SAMPLED_ROWS = "sampled_rows";
+    private static final String TOTAL_ROWS = "total_rows";
     private static final List<ColumnSpec> COEFFICIENTS = List.of(
             ColumnSpec.of("term", "Utf8"),
             ColumnSpec.of("coefficient", "Float64"),
@@ -98,8 +100,13 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         if (sampleRows < 0) {
             throw new IllegalArgumentException("linear_regression: 'sample_rows' must be 0 or positive");
         }
+        int seed = config == null ? 42 : config.path("seed").asInt(42);
+        if (seed < 0) {
+            throw new IllegalArgumentException("linear_regression: 'seed' must be 0 or positive");
+        }
         String prediction = "predict".equals(mode) ? predictionName(input, config) : null;
-        List<SampleRow> rows = readRows(context, input, groups, predictors, response, sampleRows);
+        Sample sample = readRows(context, input, groups, predictors, response, sampleRows, seed);
+        List<SampleRow> rows = sample.rows();
         LinkedHashMap<List<Object>, List<SampleRow>> grouped = group(rows, groups.size());
         LinkedHashMap<List<Object>, Model> models = new LinkedHashMap<>();
         if (rows.isEmpty()) {
@@ -110,7 +117,8 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                     alpha, entry.getKey()));
         }
         if ("predict".equals(mode)) {
-            return predict(context, input, prediction, predictors, response, groups, models, intercept);
+            return predict(context, input, prediction, predictors, response, groups, models, intercept,
+                    rows.size(), sample.totalRows());
         }
         if ("diagnostics".equals(mode)) {
             return diagnostics(context, groups, models);
@@ -121,6 +129,10 @@ public final class LinearRegressionExecutor implements NodeExecutor {
     // -------------------------------------------------------------- data
 
     private record SampleRow(List<Object> groupValues, double[] x, double y) {
+    }
+
+    /** Rows actually fitted, plus the number of eligible rows before sampling. */
+    private record Sample(List<SampleRow> rows, long totalRows) {
     }
 
     /**
@@ -136,31 +148,46 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                          double[] residuals, Double durbinWatson, Double aic, Double bic) {
     }
 
-    private static List<SampleRow> readRows(NodeContext context, LazyPlan input,
-                                            List<ColumnSpec> groups, List<ColumnSpec> predictors,
-                                            ColumnSpec response, int sampleRows) throws SQLException {
+    /**
+     * Deterministic reservoir sample via DuckDB {@code USING SAMPLE reservoir(N ROWS)
+     * REPEATABLE(seed)}: same input and seed give the same fit without sorting the whole
+     * table. A separate COUNT reports the unsampled total; leaving the window function
+     * out of the sampled query keeps its scan cheap. Without sampling the 100k-row cap
+     * is enforced with LIMIT and the window count comes back in the same result.
+     */
+    private static Sample readRows(NodeContext context, LazyPlan input,
+                                   List<ColumnSpec> groups, List<ColumnSpec> predictors,
+                                   ColumnSpec response, int sampleRows, int seed) throws SQLException {
         StringJoiner projection = new StringJoiner(", ");
         for (ColumnSpec group : groups) {
             projection.add(NodeSql.quote(group.name()));
         }
         for (ColumnSpec predictor : predictors) {
-            projection.add("CAST(" + NodeSql.quote(predictor.name()) + " AS DOUBLE)");
+            projection.add("CAST(" + NodeSql.quote(predictor.name()) + " AS DOUBLE) AS "
+                    + NodeSql.quote(predictor.name()));
         }
-        projection.add("CAST(" + NodeSql.quote(response.name()) + " AS DOUBLE)");
-        StringJoiner where = new StringJoiner(" AND ");
-        for (ColumnSpec predictor : predictors) {
-            where.add(NodeSql.quote(predictor.name()) + " IS NOT NULL");
+        projection.add("CAST(" + NodeSql.quote(response.name()) + " AS DOUBLE) AS "
+                + NodeSql.quote(response.name()));
+        String where = sampleWhere(predictors, response);
+        String sql;
+        if (sampleRows > 0) {
+            sql = "SELECT * FROM (SELECT " + projection + " FROM " + input.asTable()
+                    + " AS dap_input WHERE " + where + ") USING SAMPLE reservoir(" + sampleRows
+                    + " ROWS) REPEATABLE (" + seed + ")";
+        } else {
+            sql = "SELECT * FROM (SELECT " + projection + ", COUNT(*) OVER () AS "
+                    + NodeSql.quote("dap_total") + " FROM " + input.asTable()
+                    + " AS dap_input WHERE " + where + ") LIMIT " + (ROW_CAP + 1);
         }
-        where.add(NodeSql.quote(response.name()) + " IS NOT NULL");
-        String sql = "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input"
-                + " WHERE " + where
-                + (groups.isEmpty() ? "" : " ORDER BY " + groupProjection(groups))
-                + " LIMIT " + (sampleRows > 0 ? sampleRows : ROW_CAP + 1);
         List<SampleRow> rows = new ArrayList<>();
+        long total = 0;
         try (Connection connection = context.db().newConnection();
              Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(sql)) {
             while (result.next()) {
+                if (sampleRows == 0) {
+                    total = result.getLong("dap_total");
+                }
                 List<Object> groupValues = new ArrayList<>(groups.size());
                 for (int i = 0; i < groups.size(); i++) {
                     groupValues.add(result.getObject(i + 1));
@@ -173,12 +200,33 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                         x, result.getDouble(groups.size() + predictors.size() + 1)));
             }
         }
-        if (sampleRows == 0 && rows.size() > ROW_CAP) {
+        if (sampleRows > 0) {
+            total = countRows(context, input, where);
+        } else if (total > ROW_CAP) {
             throw new IllegalArgumentException("linear_regression: the fit is computed in memory and needs "
                     + "at most " + ROW_CAP + " rows, got more; set sample_rows=N to fit on a "
-                    + "deterministic first-N sample, or pre-filter the input");
+                    + "deterministic reservoir sample, or pre-filter the input");
         }
-        return rows;
+        return new Sample(rows, total);
+    }
+
+    private static long countRows(NodeContext context, LazyPlan input, String where) throws SQLException {
+        String sql = "SELECT COUNT(*) AS " + NodeSql.quote("dap_total") + " FROM " + input.asTable()
+                + " AS dap_input WHERE " + where;
+        try (Connection connection = context.db().newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(sql)) {
+            return result.next() ? result.getLong("dap_total") : 0;
+        }
+    }
+
+    private static String sampleWhere(List<ColumnSpec> predictors, ColumnSpec response) {
+        StringJoiner where = new StringJoiner(" AND ");
+        for (ColumnSpec predictor : predictors) {
+            where.add(NodeSql.quote(predictor.name()) + " IS NOT NULL");
+        }
+        where.add(NodeSql.quote(response.name()) + " IS NOT NULL");
+        return where.toString();
     }
 
     private static LinkedHashMap<List<Object>, List<SampleRow>> group(List<SampleRow> rows, int groupCount) {
@@ -525,7 +573,7 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         if (prediction.isBlank()) {
             throw new IllegalArgumentException("linear_regression: 'output' must not be blank");
         }
-        Set<String> reserved = Set.of(RESIDUAL, LOWER, UPPER);
+        Set<String> reserved = Set.of(RESIDUAL, LOWER, UPPER, SAMPLED_ROWS, TOTAL_ROWS);
         for (ColumnSpec column : input.columns()) {
             if (column.name().equals(prediction) || reserved.contains(column.name())) {
                 throw new IllegalArgumentException("linear_regression: output column '" + column.name()
@@ -542,12 +590,15 @@ public final class LinearRegressionExecutor implements NodeExecutor {
     private static LazyPlan predict(NodeContext context, LazyPlan input, String prediction,
                                     List<ColumnSpec> predictors, ColumnSpec response,
                                     List<ColumnSpec> groups,
-                                    LinkedHashMap<List<Object>, Model> models, boolean intercept) {
+                                    LinkedHashMap<List<Object>, Model> models, boolean intercept,
+                                    long sampledRows, long totalRows) {
         List<ColumnSpec> output = new ArrayList<>(input.columns());
         output.add(ColumnSpec.of(prediction, "Float64"));
         output.add(ColumnSpec.of(RESIDUAL, "Float64"));
         output.add(ColumnSpec.of(LOWER, "Float64"));
         output.add(ColumnSpec.of(UPPER, "Float64"));
+        output.add(ColumnSpec.of(SAMPLED_ROWS, "Int64"));
+        output.add(ColumnSpec.of(TOTAL_ROWS, "Int64"));
 
         String[] xExpressions = new String[predictors.size()];
         for (int j = 0; j < predictors.size(); j++) {
@@ -577,10 +628,11 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             } else {
                 addNullPredictions(projection, prediction);
             }
+            addSampleCounts(projection, sampledRows, totalRows);
             sql = "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input";
         } else {
             sql = groupedPredictSql(input, groups, models, projection, prediction, response.name(),
-                    xExpressions, intercept);
+                    xExpressions, intercept, sampledRows, totalRows);
         }
         return new LazyPlan(context.db(), sql, output);
     }
@@ -589,7 +641,7 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                                             LinkedHashMap<List<Object>, Model> models,
                                             StringJoiner projection, String prediction,
                                             String response, String[] xExpressions,
-                                            boolean intercept) {
+                                            boolean intercept, long sampledRows, long totalRows) {
         StringJoiner coefficientColumns = new StringJoiner(", ");
         for (int g = 0; g < groups.size(); g++) {
             coefficientColumns.add("CAST(NULL AS " + groups.get(g).duckDbType() + ") AS "
@@ -646,6 +698,7 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         addPredictionColumns(projection, prediction, response, xExpressions, intercept,
                 coefficientSql, covarianceSql, "dap_coefs." + NodeSql.quote("dap_mse"),
                 "dap_coefs." + NodeSql.quote("dap_tcrit"));
+        addSampleCounts(projection, sampledRows, totalRows);
         StringJoiner join = new StringJoiner(" AND ");
         for (int g = 0; g < groups.size(); g++) {
             join.add("dap_input." + NodeSql.quote(groups.get(g).name()) + " IS NOT DISTINCT FROM "
@@ -670,6 +723,11 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                 + NodeSql.quote(LOWER));
         projection.add("(" + fitted + " + " + criticalSql + " * sqrt(" + variance + ")) AS "
                 + NodeSql.quote(UPPER));
+    }
+
+    private static void addSampleCounts(StringJoiner projection, long sampledRows, long totalRows) {
+        projection.add(sampledRows + " AS " + NodeSql.quote(SAMPLED_ROWS));
+        projection.add(totalRows + " AS " + NodeSql.quote(TOTAL_ROWS));
     }
 
     private static void addNullPredictions(StringJoiner projection, String prediction) {
@@ -721,6 +779,8 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             output.add(ColumnSpec.of(RESIDUAL, "Float64"));
             output.add(ColumnSpec.of(LOWER, "Float64"));
             output.add(ColumnSpec.of(UPPER, "Float64"));
+            output.add(ColumnSpec.of(SAMPLED_ROWS, "Int64"));
+            output.add(ColumnSpec.of(TOTAL_ROWS, "Int64"));
         } else {
             output.addAll(groups);
             output.addAll("diagnostics".equals(mode) ? DIAGNOSTICS : COEFFICIENTS);
@@ -754,14 +814,6 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             return Boolean.TRUE.equals(value) ? "TRUE" : "FALSE";
         }
         return "CAST(" + NodeSql.literal(value.toString()) + " AS " + column.duckDbType() + ")";
-    }
-
-    private static String groupProjection(List<ColumnSpec> groups) {
-        StringJoiner joiner = new StringJoiner(", ");
-        for (ColumnSpec group : groups) {
-            joiner.add(NodeSql.quote(group.name()));
-        }
-        return joiner.toString();
     }
 
     private static String doubleLiteral(Double value) {

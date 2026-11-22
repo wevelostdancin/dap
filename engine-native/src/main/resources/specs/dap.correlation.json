@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Pairwise correlation of two or more numeric columns, in long format (one row per pair) or as a matrix. Methods: Pearson, Spearman (rank correlation, ties share a rank) and Kendall tau-b. Optional partial correlation on control columns via the inverse of the correlation matrix. Long output carries the sample size, the p-value (t approximation for Pearson/Spearman, normal z approximation for Kendall) and a confidence interval (Fisher's z for Pearson/Spearman, asymptotic standard error for Kendall).",
+  "description": "Pairwise correlation of two or more numeric columns, in long format (one row per pair) or as a matrix. Methods: Pearson, Spearman (rank correlation, ties share a rank) and Kendall tau-b. Optional partial correlation on control columns via the inverse of the correlation matrix. Long output carries the sample size, the p-value (t approximation for Pearson/Spearman, normal z approximation for Kendall), a confidence interval (Fisher's z for Pearson/Spearman, asymptotic standard error for Kendall) and p_adjusted with the requested multiple-comparison correction across all pairs. The matrix format has no p-values, so correction is not applied there.",
   "inPorts": [
     {
       "index": 0,
@@ -73,6 +73,18 @@
         "default": 0.05,
         "minimum": 0,
         "maximum": 1
+      },
+      "correction": {
+        "type": "string",
+        "title": "Multiple comparison correction",
+        "description": "Adjustment applied to the p_values of all emitted pairs in long format: none copies p_value, bonferroni and holm use the same step-down methods as dap.hypothesis_test, bh is the Benjamini-Hochberg FDR method. The matrix format carries no p-values and is never adjusted.",
+        "enum": [
+          "none",
+          "bonferroni",
+          "holm",
+          "bh"
+        ],
+        "default": "none"
       }
     },
     "required": [
