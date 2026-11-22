@@ -113,7 +113,8 @@ public final class LogisticRegressionExecutor implements NodeExecutor {
         projection.add(responseExpression(response));
         StringJoiner where = new StringJoiner(" AND ");
         for (ColumnSpec predictor : predictors) {
-            where.add(NodeSql.quote(predictor.name()) + " IS NOT NULL");
+            String quoted = NodeSql.quote(predictor.name());
+            where.add(quoted + " IS NOT NULL AND isfinite(CAST(" + quoted + " AS DOUBLE))");
         }
         where.add(NodeSql.quote(response.name()) + " IS NOT NULL");
         String sql = "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input"

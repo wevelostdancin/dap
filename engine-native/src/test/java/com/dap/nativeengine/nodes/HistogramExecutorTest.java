@@ -49,18 +49,16 @@ class HistogramExecutorTest {
     }
 
     @Test
-    void constantColumnPutsEveryValueIntoTheFirstBin() throws Exception {
+    void constantColumnEmitsASingleDegenerateIntervalWithEveryObservation() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             LazyPlan input = doubles(db, 7.0, 7.0, 7.0);
 
             TableData data = new HistogramExecutor().execute(
                     NodeTestSupport.context(db, "{\"column\":\"v\",\"bins\":3}"), List.of(input)).preview(10);
-            assertEquals(3, data.rows());
-            for (List<String> row : data.data()) {
-                assertEquals(7.0, Double.parseDouble(row.get(0)), 1e-9);
-                assertEquals(7.0, Double.parseDouble(row.get(1)), 1e-9);
-            }
-            assertEquals(List.of("3", "0", "0"), counts(data));
+            assertEquals(1, data.rows(), "a constant column has one [v, v] interval, not three");
+            assertEquals(7.0, Double.parseDouble(data.data().get(0).get(0)), 1e-9);
+            assertEquals(7.0, Double.parseDouble(data.data().get(0).get(1)), 1e-9);
+            assertEquals(List.of("3"), counts(data));
         }
     }
 

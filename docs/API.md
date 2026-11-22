@@ -522,15 +522,16 @@ read-only SELECT — 400 `invalid_sql`.
               "count": 3, "detail": "3 of 150 rows are exact duplicates"}]},
  "relationships": [{"left": "petal_length", "right": "petal_width",
                     "method": "pearson", "value": 0.9629, "p_value": 0.0,
+                    "p_adjusted": 0.0,
                     "n": 150, "strength": "very strong"}],
  "group_differences": [{"value": "petal_length", "group": "species", "test": "anova",
                         "statistic": 1180.16, "p_value": 0.0, "p_adjusted": 0.0,
                         "effect_size": 0.941}],
  "hypotheses": [{"id": "h1", "question": "Do petal_length and petal_width move together?",
                  "test": "pearson", "columns": ["petal_length", "petal_width"],
-                 "rationale": "Very strong correlation (pearson=0.963, p<0.001, n=150).",
+                 "rationale": "Very strong correlation (pearson=0.963, p<0.001, p_adjusted<0.001, n=150).",
                  "priority": "high"}],
- "recommendations": ["Model petal_width with petal_length (pearson=0.963, p<0.001)."]}
+ "recommendations": ["Model petal_width with petal_length (pearson=0.963, p<0.001, p_adjusted<0.001)."]}
 ```
 
 `columns` — до `maxColumns` первых колонок (по умолчанию 50); `missing` точен.
@@ -549,19 +550,20 @@ low 1), в диапазоне 0..100; `kind` — одно из `missing`, `empty
 
 `relationships` — до 20 пар по убыванию |value|, затем по именам: Pearson для
 числовых пар (p-value по t с n−2 степенями свободы), Cramér's V и p хи-квадрат
-для категориальных (Utf8/Boolean, от 2 до 20 категорий). `group_differences` —
-до 10 пар «числовая × категориальная» по возрастанию `p_adjusted`: ANOVA, если в
+для категориальных (Utf8/Boolean, от 2 до 20 категорий); `p_adjusted` есть и у связей.
+`group_differences` — до 10 пар «числовая × категориальная» по возрастанию
+`p_adjusted`: ANOVA, если в
 каждой группе не меньше 5 значений, иначе Kruskal-Wallis; `effect_size` — η²
-или ε². `p_adjusted` — поправка Бенджамини–Хохберга (FDR) по всем протестированным
-парам, а не только по возвращённым 10; порог 0.05 и приоритет гипотез используют
-именно `p_adjusted`. `p_value` может отдаваться как `0.0`, если истинное значение
-меньше точности double. `time` — первый столбец даты/времени: диапазон и оценка
+или ε². `p_adjusted` в обоих разделах — поправка Бенджамини–Хохберга (FDR) по всем
+протестированным парам своего семейства, а не только по возвращённым 20/10; порог 0.05,
+приоритет гипотез и рекомендация «Model …» используют именно `p_adjusted`.
+`p_value` может отдаваться как `0.0`, если истинное значение меньше точности double. `time` — первый столбец даты/времени: диапазон и оценка
 гранулярности (`day`/`week`/`month`/`year`); без такого столбца поле отсутствует.
 `hypotheses` — от 3 до 5 шаблонных вопросов по самым сильным находкам, порядок:
 priority (`high`/`medium`/`low`), затем `id`; `high` для связи ставится только
-при `n ≥ 20` и `p < 0.05`, иначе `medium`/`low`; на пустом источнике — пустой
+при `n ≥ 20` и `p_adjusted < 0.05`, иначе `medium`/`low`; на пустом источнике — пустой
 список. `recommendations` — до 8 конкретных шагов; «Model …» выдаётся только при
-`n ≥ 20` и `p < 0.05`. Агрегаты профиля считаются по всему источнику, связи,
+`n ≥ 20` и `p_adjusted < 0.05`. Агрегаты профиля считаются по всему источнику, связи,
 различия и гипотезы — по первым `sampleRows` строкам (по умолчанию 1000,
 детерминированно, без случайной выборки).
 

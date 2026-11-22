@@ -120,6 +120,32 @@ class LogisticRegressionExecutorTest {
     }
 
     @Test
+    void nonFinitePredictorRowsAreExcludedInsteadOfPoisoningCoefficients() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            String config = "{\"x\":[\"x1\"],\"y\":\"y\"}";
+            TableData clean = run(db, sample(db), config);
+
+            List<Object[]> rows = new ArrayList<>();
+            for (int i = 0; i < X1.length; i++) {
+                rows.add(new Object[]{X1[i], Y[i]});
+            }
+            rows.add(new Object[]{Double.POSITIVE_INFINITY, 0});
+            LazyPlan dirty = NodeTestSupport.table(db, List.of(ColumnSpec.of("x1", "Float64"),
+                    ColumnSpec.of("y", "Float64")), rows);
+            TableData filtered = run(db, dirty, config);
+
+            assertEquals("40", termRow(filtered, "intercept").get(8),
+                    "the Infinity row must be dropped before the fit");
+            assertEquals(termRow(clean, "intercept").get(1), termRow(filtered, "intercept").get(1));
+            for (List<String> row : filtered.data()) {
+                for (int column = 1; column <= 10; column++) {
+                    assertTrue(Double.isFinite(number(row, column)), "non-finite coefficient: " + row);
+                }
+            }
+        }
+    }
+
+    @Test
     void robustHc1UsesTheSandwichEstimator() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             TableData data = run(db, sample(db), """

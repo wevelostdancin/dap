@@ -116,6 +116,14 @@
         {
           "name": "resamples",
           "type": "Number (Integer)"
+        },
+        {
+          "name": "valid_resamples",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "warning",
+          "type": "String"
         }
       ],
       "data": [
@@ -127,7 +135,9 @@
           7.3025,
           0.039499999999994984,
           10,
-          200
+          200,
+          200,
+          null
         ]
       ],
       "order": "ordered"
@@ -168,6 +178,14 @@
         {
           "name": "resamples",
           "type": "Number (Integer)"
+        },
+        {
+          "name": "valid_resamples",
+          "type": "Number (Integer)"
+        },
+        {
+          "name": "warning",
+          "type": "String"
         }
       ],
       "data": [
@@ -179,7 +197,9 @@
           1.0,
           0.0,
           10,
-          100
+          100,
+          100,
+          null
         ]
       ],
       "order": "ordered"

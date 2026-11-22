@@ -11,6 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,7 +31,9 @@ class ResampleTestExecutorTest {
             ColumnSpec.of("ci_high", "Float64"),
             ColumnSpec.of("bias", "Float64"),
             ColumnSpec.of("n", "Int64"),
-            ColumnSpec.of("resamples", "Int64"));
+            ColumnSpec.of("resamples", "Int64"),
+            ColumnSpec.of("valid_resamples", "Int64"),
+            ColumnSpec.of("warning", "Utf8"));
 
     private static final List<ColumnSpec> PERMUTATION = List.of(
             ColumnSpec.of("statistic", "Utf8"),
@@ -97,6 +100,34 @@ class ResampleTestExecutorTest {
     }
 
     @Test
+    void degenerateResamplesAreReportedSeparatelyFromTheConfiguredCount() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            // x is constant except for one row: a resample that never draws that row
+            // has zero variance and cannot define a slope. The true slope of y on x is 3.
+            List<Object[]> rows = new ArrayList<>();
+            for (int i = 1; i <= 5; i++) {
+                rows.add(new Object[]{1.0, (double) i});
+            }
+            rows.add(new Object[]{2.0, 6.0});
+            LazyPlan input = NodeTestSupport.table(db, List.of(ColumnSpec.of("x", "Float64"),
+                    ColumnSpec.of("y", "Float64")), rows);
+
+            List<String> row = run(db, input, """
+                    {"mode":"bootstrap","statistic":"slope","columns":["x","y"],
+                     "resamples":200,"seed":42}
+                    """).data().get(0);
+
+            assertEquals("200", row.get(7), "resamples stays the configured count");
+            int valid = Integer.parseInt(row.get(8));
+            assertTrue(valid > 0 && valid < 200, "some draws are degenerate: " + row);
+            assertNotNull(row.get(9), "a large skip rate must warn in the result: " + row);
+            assertTrue(row.get(9).contains("valid"), row.get(9));
+            assertEquals(3.0, number(row, 1), 1e-9);
+            assertTrue(Double.isFinite(number(row, 2)), row.toString());
+        }
+    }
+
+    @Test
     void bootstrapMedianAndSdMatchTheSampleStatistics() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             TableData median = run(db, values(db), """
@@ -120,6 +151,8 @@ class ResampleTestExecutorTest {
                     """);
             assertEquals("correlation", correlation.data().get(0).get(0));
             assertEquals(1.0, number(correlation.data().get(0), 1), 1e-12);
+            assertEquals("100", correlation.data().get(0).get(8),
+                    "a perfect line has no degenerate resamples (golden fixture)");
 
             TableData slope = run(db, values(db), """
                     {"mode":"bootstrap","statistic":"slope","columns":["x","y"],"resamples":100}
@@ -146,6 +179,45 @@ class ResampleTestExecutorTest {
                     """);
             assertNotEquals(first.data().get(0).get(2), other.data().get(0).get(2),
                     "a different seed should give a different standard error");
+        }
+    }
+
+    @Test
+    void nonFiniteRowsAreExcludedFromBootstrapAndPermutation() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            List<Object[]> rows = new ArrayList<>();
+            for (int i = 1; i <= 10; i++) {
+                rows.add(new Object[]{(double) i, 2.0 * i + 1.0});
+            }
+            rows.add(new Object[]{Double.POSITIVE_INFINITY, 100.0});
+            LazyPlan dirty = NodeTestSupport.table(db, List.of(ColumnSpec.of("x", "Float64"),
+                    ColumnSpec.of("y", "Float64")), rows);
+
+            List<String> slope = run(db, dirty, """
+                    {"mode":"bootstrap","statistic":"slope","columns":["x","y"],"resamples":100}
+                    """).data().get(0);
+            assertEquals("10", slope.get(6), "the Infinity row must be dropped");
+            assertEquals(2.0, number(slope, 1), 1e-9);
+            assertTrue(Double.isFinite(number(slope, 1)), slope.toString());
+            assertEquals("100", slope.get(8), "no degenerate resamples when the row is excluded");
+
+            List<Object[]> groupedRows = new ArrayList<>();
+            for (int i = 1; i <= 5; i++) {
+                groupedRows.add(new Object[]{(double) i, "a"});
+            }
+            for (int i = 10; i <= 14; i++) {
+                groupedRows.add(new Object[]{(double) i, "b"});
+            }
+            groupedRows.add(new Object[]{Double.NEGATIVE_INFINITY, "a"});
+            LazyPlan dirtyGroups = NodeTestSupport.table(db, List.of(ColumnSpec.of("v", "Float64"),
+                    ColumnSpec.of("g", "Utf8")), groupedRows);
+            List<String> permutation = run(db, dirtyGroups, """
+                    {"mode":"permutation","statistic":"difference_mean","value":"v","group":"g",
+                     "permutations":100,"seed":42}
+                    """).data().get(0);
+            assertEquals("10", permutation.get(3));
+            assertEquals(-9.0, number(permutation, 1), 1e-9);
+            assertTrue(Double.isFinite(number(permutation, 2)), permutation.toString());
         }
     }
 

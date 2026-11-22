@@ -10,7 +10,8 @@ import java.util.List;
 
 /**
  * dap.histogram: equal-width bins over the observed min/max. Every configured bin is
- * emitted, empty ones included, via a generated series LEFT JOINed with the counts.
+ * emitted, empty ones included, via a generated series LEFT JOINed with the counts;
+ * a constant column has a single degenerate interval [v, v] instead.
  */
 public final class HistogramExecutor implements NodeExecutor {
     private static final List<ColumnSpec> OUTPUT = List.of(
@@ -48,7 +49,7 @@ public final class HistogramExecutor implements NodeExecutor {
                 + "b.lo + (b.hi - b.lo) * t.i / " + bins + " AS \"bin_start\", "
                 + "b.lo + (b.hi - b.lo) * (t.i + 1) / " + bins + " AS \"bin_end\""
                 + " FROM dap_bounds AS b, generate_series(0, " + (bins - 1) + ") AS t(i)"
-                + " WHERE b.lo IS NOT NULL), "
+                + " WHERE b.lo IS NOT NULL AND (b.hi <> b.lo OR t.i = 0)), "
                 + "dap_counts AS ("
                 + "SELECT CASE WHEN b.hi = b.lo THEN CAST(0 AS BIGINT) "
                 + "ELSE LEAST(CAST(FLOOR((d." + quoted + " - b.lo) / ((b.hi - b.lo) / " + bins + ")) AS BIGINT), "

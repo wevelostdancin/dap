@@ -46,6 +46,8 @@ public final class ResampleTestExecutor implements NodeExecutor {
     private static final int DEFAULT_MAX_ROWS = 100_000;
     private static final int MAX_REPLICATES = 1_000_000;
     private static final int MAX_ROWS_LIMIT = 10_000_000;
+    /** Warn when more than 10% of the configured resamples had to be discarded. */
+    private static final double WARNING_SKIP_FRACTION = 0.10;
 
     private static final List<ColumnSpec> BOOTSTRAP_COLUMNS = List.of(
             ColumnSpec.of("statistic", "Utf8"),
@@ -55,7 +57,9 @@ public final class ResampleTestExecutor implements NodeExecutor {
             ColumnSpec.of("ci_high", "Float64"),
             ColumnSpec.of("bias", "Float64"),
             ColumnSpec.of("n", "Int64"),
-            ColumnSpec.of("resamples", "Int64"));
+            ColumnSpec.of("resamples", "Int64"),
+            ColumnSpec.of("valid_resamples", "Int64"),
+            ColumnSpec.of("warning", "Utf8"));
 
     private static final List<ColumnSpec> PERMUTATION_COLUMNS = List.of(
             ColumnSpec.of("statistic", "Utf8"),
@@ -147,7 +151,20 @@ public final class ResampleTestExecutor implements NodeExecutor {
         select.add(doubleLiteral(bias) + " AS " + NodeSql.quote("bias"));
         select.add(n + " AS " + NodeSql.quote("n"));
         select.add(resamples + " AS " + NodeSql.quote("resamples"));
+        select.add(valid + " AS " + NodeSql.quote("valid_resamples"));
+        select.add(warning(valid, resamples, statistic));
         return new LazyPlan(context.db(), "SELECT " + select, BOOTSTRAP_COLUMNS);
+    }
+
+    /** NULL unless too many draws were degenerate; then the reason is part of the result. */
+    private static String warning(int valid, int resamples, String statistic) {
+        if (valid >= resamples * (1.0 - WARNING_SKIP_FRACTION)) {
+            return "CAST(NULL AS VARCHAR) AS " + NodeSql.quote("warning");
+        }
+        String text = String.format(Locale.ROOT,
+                "only %d of %d bootstrap resamples gave a defined %s; intervals use %d valid resamples "
+                        + "(the column may be nearly constant)", valid, resamples, statistic, valid);
+        return NodeSql.literal(text) + " AS " + NodeSql.quote("warning");
     }
 
     private static List<ColumnSpec> columns(JsonNode config, LazyPlan input, String statistic) {
@@ -321,15 +338,17 @@ public final class ResampleTestExecutor implements NodeExecutor {
 
     // ------------------------------------------------------------------ data
 
-    /** One numeric row per observation; rows with a NULL in any selected column are dropped. */
+    /** One numeric row per observation; NULL and non-finite values in any selected column are dropped. */
     private static List<double[]> readNumeric(NodeContext context, LazyPlan input,
                                               List<ColumnSpec> columns, int maxRows)
             throws SQLException {
         StringJoiner projection = new StringJoiner(", ");
         StringJoiner where = new StringJoiner(" AND ");
         for (ColumnSpec column : columns) {
-            projection.add("CAST(" + NodeSql.quote(column.name()) + " AS DOUBLE)");
-            where.add(NodeSql.quote(column.name()) + " IS NOT NULL");
+            String quoted = NodeSql.quote(column.name());
+            String cast = "CAST(" + quoted + " AS DOUBLE)";
+            projection.add(cast);
+            where.add(quoted + " IS NOT NULL AND isfinite(" + cast + ")");
         }
         String sql = "SELECT " + projection + " FROM " + input.asTable() + " AS dap_input"
                 + " WHERE " + where + " LIMIT " + (maxRows + 1);
@@ -353,12 +372,14 @@ public final class ResampleTestExecutor implements NodeExecutor {
         return rows;
     }
 
-    /** value/group text pairs; rows with a NULL in either column are dropped. */
+    /** value/group text pairs; NULL and non-finite values in either column are dropped. */
     private static List<String[]> readGroups(NodeContext context, LazyPlan input, ColumnSpec value,
                                              ColumnSpec group, int maxRows) throws SQLException {
-        String sql = "SELECT CAST(" + NodeSql.quote(value.name()) + " AS DOUBLE), CAST("
+        String quotedValue = NodeSql.quote(value.name());
+        String sql = "SELECT CAST(" + quotedValue + " AS DOUBLE), CAST("
                 + NodeSql.quote(group.name()) + " AS VARCHAR) FROM " + input.asTable()
-                + " AS dap_input WHERE " + NodeSql.quote(value.name()) + " IS NOT NULL AND "
+                + " AS dap_input WHERE " + quotedValue + " IS NOT NULL AND "
+                + "isfinite(CAST(" + quotedValue + " AS DOUBLE)) AND "
                 + NodeSql.quote(group.name()) + " IS NOT NULL LIMIT " + (maxRows + 1);
         List<String[]> rows = new ArrayList<>();
         try (Connection connection = context.db().newConnection();

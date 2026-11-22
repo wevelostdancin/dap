@@ -365,7 +365,7 @@ public final class OutlierDetectExecutor implements NodeExecutor {
                 throw new IllegalArgumentException(
                         "outlier_detect: 'columns' must contain non-empty column names");
             }
-            ColumnSpec column = TimeSeriesSupport.column(input.columns(), item.textValue(), "value",
+            ColumnSpec column = TimeSeriesSupport.column(input.columns(), item.textValue(), "columns",
                     "outlier_detect");
             if (!column.numeric()) {
                 throw new IllegalArgumentException("outlier_detect: column '" + column.name() + "' is "

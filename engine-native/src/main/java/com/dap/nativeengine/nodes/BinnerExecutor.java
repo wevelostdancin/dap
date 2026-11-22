@@ -32,17 +32,57 @@ public final class BinnerExecutor implements NodeExecutor {
         String method = NodeSql.requiredText(config, "method").toLowerCase(Locale.ROOT);
         String quoted = NodeSql.quote(column.name());
 
+        if ("frequency".equals(method)) {
+            return frequency(input, quoted, bins(config), output);
+        }
         String expression = switch (method) {
             case "width" -> width(quoted, input.asTable(), bins(config));
             case "custom" -> custom(quoted, config);
-            case "frequency" -> "CASE WHEN " + quoted + " IS NULL THEN NULL ELSE CAST(NTILE("
-                    + bins(config) + ") OVER (ORDER BY " + quoted + ") AS BIGINT) END";
             default -> throw new IllegalArgumentException("binner: unknown method '" + method
                     + "' (expected width, custom, frequency)");
         };
         return TransformSupport.append(input,
                 List.of(expression + " AS " + NodeSql.quote(output)),
                 List.of(ColumnSpec.of(output, "Int64")));
+    }
+
+    /**
+     * Frequency bins over the non-NULL values only. Ranking every row would let the
+     * trailing NULLs occupy tiles and shift the boundaries of the observed values.
+     */
+    private static LazyPlan frequency(LazyPlan input, String quoted, int bins, String output) {
+        String row = internalName("dap_bin_row", input);
+        String bin = internalName("dap_bin", input);
+        String sql = "WITH dap_frequency AS ("
+                + "SELECT " + NodeSql.projection(input.columns()) + ", ROW_NUMBER() OVER () AS "
+                + NodeSql.quote(row) + " FROM " + input.asTable() + " AS dap_source), "
+                + "dap_ranked AS ("
+                + "SELECT " + NodeSql.quote(row) + ", NTILE(" + bins + ") OVER (ORDER BY " + quoted
+                + ") AS " + NodeSql.quote(bin)
+                + " FROM dap_frequency WHERE " + quoted + " IS NOT NULL) "
+                + "SELECT " + NodeSql.projection(input.columns()) + ", CAST(r." + NodeSql.quote(bin)
+                + " AS BIGINT) AS " + NodeSql.quote(output)
+                + " FROM dap_frequency AS f LEFT JOIN dap_ranked AS r USING (" + NodeSql.quote(row) + ")"
+                + " ORDER BY f." + NodeSql.quote(row);
+        List<ColumnSpec> columns = new ArrayList<>(input.columns());
+        columns.add(ColumnSpec.of(output, "Int64"));
+        return new LazyPlan(input.session(), sql, columns);
+    }
+
+    /** Internal column name that cannot shadow an input column. */
+    private static String internalName(String base, LazyPlan input) {
+        String name = base;
+        int suffix = 1;
+        outer:
+        while (true) {
+            for (ColumnSpec column : input.columns()) {
+                if (column.name().equals(name)) {
+                    name = base + "_" + suffix++;
+                    continue outer;
+                }
+            }
+            return name;
+        }
     }
 
     /** Equal-width bins over the observed min/max; the maximum value lands in the last bin. */
