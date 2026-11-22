@@ -650,7 +650,7 @@ paths:
           required: false
           description: >-
             Rows per page; negative values yield an empty page. Values above
-            DAP_TABLE_MAX_LIMIT (default 10000) are rejected with 400 limit_too_large; pages
+            DAP_TABLE_MAX_LIMIT (default 100000) are rejected with 400 limit_too_large; pages
             are never silently truncated.
           schema:
             type: integer

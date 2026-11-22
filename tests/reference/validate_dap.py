@@ -649,7 +649,7 @@ def case_pathguard_excel(engine: Engine, data: Path):
             engine.call("POST", f"/v1/workflows/{workflow}/run", {"timeoutSec": 60})
         except urllib.error.HTTPError as failure:
             body = failure.read().decode()
-            return [check("status", failure.code, 500),
+            return [check("status", failure.code, 400),
                     check_true("path_not_allowed", "path_not_allowed" in body, body[:200])]
         raise CaseFailure("excel_reader read a path outside the allowlist")
     finally:
@@ -686,6 +686,34 @@ def case_cache_selfheal(engine: Engine, data: Path):
     ]
 
 
+def case_api_limit(engine: Engine, data: Path):
+    csv = write_csv(data / "limit.csv", ["x"], [[index] for index in range(5)])
+    workflow, node = engine.run_raw(csv, "sorter", {"keys": [{"column": "x"}]})
+    try:
+        try:
+            engine.call("GET", f"/v1/workflows/{workflow}/nodes/{node}/table?limit=100001")
+        except urllib.error.HTTPError as failure:
+            body = json.loads(failure.read().decode())
+            return [check("status", failure.code, 400),
+                    check_true("code", body.get("code") == "limit_too_large", str(body))]
+        raise CaseFailure("limit above DAP_TABLE_MAX_LIMIT was accepted")
+    finally:
+        engine.call("DELETE", f"/v1/workflows/{workflow}")
+
+
+def case_api_where(engine: Engine, data: Path):
+    csv = write_csv(data / "where.csv", ["from_date", "status"],
+                    [[1, "selected"], [2, "other"], [3, "selected"]])
+    workflow, node = engine.run_raw(csv, "sorter", {"keys": [{"column": "from_date"}]})
+    try:
+        page = engine.call("GET", f"/v1/workflows/{workflow}/nodes/{node}/table"
+                                  "?where=from_date%20%3E%201%20AND%20status%20%3D%20'selected'")
+        return [check("rows", page["rows"], 1),
+                check_true("first", page["data"][0][0] == "3", str(page["data"][:2]))]
+    finally:
+        engine.call("DELETE", f"/v1/workflows/{workflow}")
+
+
 CASES = {
     "describe": case_describe,
     "correlation": case_correlation,
@@ -712,6 +740,8 @@ CASES = {
     "pathguard_excel": case_pathguard_excel,
     "pathguard_save": case_pathguard_save,
     "cache_selfheal": case_cache_selfheal,
+    "api_limit": case_api_limit,
+    "api_where": case_api_where,
 }
 
 

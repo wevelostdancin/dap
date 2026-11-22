@@ -114,7 +114,7 @@ public final class NativeService implements AutoCloseable {
                            int idleTimeoutSec, int queryTimeoutSec, int maxSessions,
                            int sessionTtlSec, int maxRetainedJobs, String duckdbExtensionDirectory,
                            int maxTableLimit) {
-        public static final int DEFAULT_TABLE_MAX_LIMIT = 10_000;
+        public static final int DEFAULT_TABLE_MAX_LIMIT = 100_000;
         private static final int DEFAULT_IDLE_TIMEOUT_SEC = 900;
         private static final int DEFAULT_QUERY_TIMEOUT_SEC = 60;
         private static final int DEFAULT_MAX_SESSIONS = 64;

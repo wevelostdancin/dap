@@ -136,8 +136,8 @@ class NativeServiceSettingsTest {
     }
 
     @Test
-    void tableLimitDefaultsTo10000AndIsConfigurable() {
-        assertEquals(10_000, NativeService.Settings.fromEnv(Map.of()).maxTableLimit());
+    void tableLimitDefaultsTo100000AndIsConfigurable() {
+        assertEquals(100_000, NativeService.Settings.fromEnv(Map.of()).maxTableLimit());
         assertEquals(17, NativeService.Settings.fromEnv(
                 Map.of("DAP_TABLE_MAX_LIMIT", " 17 ")).maxTableLimit());
 

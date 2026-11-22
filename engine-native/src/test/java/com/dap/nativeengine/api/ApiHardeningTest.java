@@ -74,19 +74,19 @@ class ApiHardeningTest {
     void tableLimitAboveMaxIsRejectedWithCodeAndHint() throws Exception {
         String table = materializedTable();
 
-        Resp rejected = get(table + "/table?limit=10001");
+        Resp rejected = get(table + "/table?limit=100001");
 
         assertEquals(400, rejected.status(), rejected.raw().body());
         assertEquals("limit_too_large", rejected.body().path("code").asText(), rejected.raw().body());
         assertFalse(rejected.body().path("hint").asText().isBlank(), rejected.raw().body());
-        assertEquals(10_000, rejected.body().path("limit").asInt(), rejected.raw().body());
+        assertEquals(100_000, rejected.body().path("limit").asInt(), rejected.raw().body());
     }
 
     @Test
     void tableLimitAtMaxIsAccepted() throws Exception {
         String table = materializedTable();
 
-        Resp accepted = get(table + "/table?limit=10000");
+        Resp accepted = get(table + "/table?limit=100000");
 
         assertEquals(200, accepted.status(), accepted.raw().body());
         assertEquals(2, accepted.body().path("rows").asInt(), accepted.raw().body());

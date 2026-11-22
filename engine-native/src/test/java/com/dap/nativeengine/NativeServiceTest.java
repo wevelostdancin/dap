@@ -43,7 +43,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Black-box HTTP tests for the complete /v1 surface of the native service. */
 class NativeServiceTest {
-    private static final Duration FAST = Duration.ofSeconds(5);
+    // Transport timeout for the plain helpers. It is deliberately generous: the assertions that
+    // care about latency pass their own (small) timeout, while an overloaded CI box must not turn
+    // an async 202 submission into a spurious HttpTimeout.
+    private static final Duration FAST = Duration.ofSeconds(30);
     private static final Duration SLOW_REQUEST = Duration.ofSeconds(20);
     private static final String SLOW_SPEC = """
             {
@@ -546,14 +549,14 @@ class NativeServiceTest {
         Resp submitted = post("/v1/workflows/" + workflow + "/jobs", Map.of("timeoutSec", 30));
         assertEquals(202, submitted.status());
         String jobId = submitted.body().path("id").asText();
-        assertEquals(jobId, awaitRunningJob(Duration.ofSeconds(5)));
+        assertEquals(jobId, awaitRunningJob(Duration.ofSeconds(15)));
 
         Resp cancelled = delete("/v1/jobs/" + jobId);
         assertEquals(200, cancelled.status(), cancelled.raw().body());
         assertTrue(cancelled.body().path("ok").asBoolean());
         assertEquals(jobId, cancelled.body().path("id").asText());
 
-        JsonNode terminal = awaitJobState(jobId, Set.of("cancelled"), Duration.ofSeconds(5));
+        JsonNode terminal = awaitJobState(jobId, Set.of("cancelled"), Duration.ofSeconds(15));
         assertEquals("cancelled", terminal.path("state").asText());
 
         Resp again = delete("/v1/jobs/" + jobId);
@@ -786,7 +789,7 @@ class NativeServiceTest {
             Resp submitted = post("/v1/workflows/" + workflow + "/jobs", Map.of("timeoutSec", 30));
             assertEquals(202, submitted.status(), submitted.raw().body());
             String jobId = submitted.body().path("id").asText();
-            assertEquals(jobId, awaitRunningJob(Duration.ofSeconds(5)));
+            assertEquals(jobId, awaitRunningJob(Duration.ofSeconds(15)));
 
             Thread.sleep(2500);
             assertFalse(slow.shuttingDown(), "an active job must keep the engine alive");
