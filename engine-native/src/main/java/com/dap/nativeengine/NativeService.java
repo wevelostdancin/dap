@@ -342,6 +342,11 @@ public final class NativeService implements AutoCloseable {
     private final CountDownLatch stopped = new CountDownLatch(1);
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean shuttingDown = new AtomicBoolean();
+    /**
+     * Admission and the idle-shutdown commit are mutually exclusive: a request either cancels a
+     * pending shutdown or is rejected once the engine has committed to stopping, never both.
+     */
+    private final Object shutdownGate = new Object();
     /** Boot id: a new value per process start, so clients can notice an engine restart. */
     private final String generation = java.util.UUID.randomUUID().toString();
     private final AtomicLong lastActivity = new AtomicLong(System.currentTimeMillis());
@@ -378,9 +383,17 @@ public final class NativeService implements AutoCloseable {
         // Every request, matched route or not, postpones the idle shutdown and counts as
         // in-flight work: a long /table, /profile or /v1/datasets call must not be cut off.
         app.before(context -> {
-            lastActivity.set(System.currentTimeMillis());
-            inFlight.incrementAndGet();
-            context.attribute(IN_FLIGHT_ATTRIBUTE, Boolean.TRUE);
+            synchronized (shutdownGate) {
+                if (closed.get()) {
+                    throw new io.javalin.http.HttpResponseException(503,
+                            "{\"error\":\"service is shutting down\",\"code\":\"shutting_down\"}");
+                }
+                // A request inside the idle grace window keeps the engine alive.
+                shuttingDown.set(false);
+                lastActivity.set(System.currentTimeMillis());
+                inFlight.incrementAndGet();
+                context.attribute(IN_FLIGHT_ATTRIBUTE, Boolean.TRUE);
+            }
         });
         app.after(this::releaseInFlight);
         this.idleWatchdog = settings.idleTimeoutSec() > 0 || settings.sessionTtlSec() > 0
@@ -626,13 +639,19 @@ public final class NativeService implements AutoCloseable {
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             }
-            long idleMs = System.currentTimeMillis() - lastActivity.get();
-            if (inFlight.get() > 0 || state.jobs().activeCount() > 0
-                    || idleMs < settings.idleTimeoutSec() * 1000L) {
-                shuttingDown.set(false);
-                return;
+            synchronized (shutdownGate) {
+                long idleMs = System.currentTimeMillis() - lastActivity.get();
+                if (inFlight.get() > 0 || state.jobs().activeCount() > 0
+                        || idleMs < settings.idleTimeoutSec() * 1000L) {
+                    shuttingDown.set(false);
+                    return;
+                }
+                // Commit while holding the gate: admissions after this point get 503.
+                if (!closed.compareAndSet(false, true)) {
+                    return;
+                }
             }
-            close();
+            stopServer();
         }, "dap-idle-shutdown");
         thread.setDaemon(true);
         thread.start();
@@ -688,6 +707,11 @@ public final class NativeService implements AutoCloseable {
             stopped.countDown();
             return;
         }
+        stopServer();
+    }
+
+    /** Stops the HTTP server and closes the state; the caller already claimed {@code closed}. */
+    private void stopServer() {
         try {
             if (idleWatchdog != null) {
                 idleWatchdog.shutdownNow();
