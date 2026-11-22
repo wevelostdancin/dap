@@ -218,6 +218,8 @@ Makefile         build-native, test-native, run-native, goldens, dist, check
 - [docs/MCP.md](docs/MCP.md) — подключение одной командой, локальные Postgres/MySQL,
   сценарий «два вызова», инструменты и lifecycle;
   [api/openapi.yaml](api/openapi.yaml) — машинный.
+- [docs/BENCH-P7.md](docs/BENCH-P7.md) — эффект правок A–E: чтение, пейджинг,
+  отчёты, статистика на больших данных, MCP;
 - [docs/ACCURACY.md](docs/ACCURACY.md) — эталонная проверка статистики (scipy,
   statsmodels, sklearn, lifelines) и границы приближений;
 - [docs/BENCH.md](docs/BENCH.md) — замеры ingest, cold start, памяти;
