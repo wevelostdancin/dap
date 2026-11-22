@@ -333,8 +333,8 @@ public final class SurvivalExecutor implements NodeExecutor {
                 for (int other = index + 1; other < groups; other++) {
                     double covariance = -factor * proportion
                             * ((double) groupAtRisk[other] / atRisk);
-                    variance[index][other] = covariance;
-                    variance[other][index] = covariance;
+                    variance[index][other] += covariance;
+                    variance[other][index] += covariance;
                 }
             }
         }

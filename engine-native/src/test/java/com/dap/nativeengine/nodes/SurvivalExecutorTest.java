@@ -20,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * log-rank statistic are re-derived from the definitions inside the test: the survival is
  * the product of (1 - d/n) over the event times, the interval is exp(log S -/+ z * se)
  * with se = sqrt(sum d/(n(n-d))), and the log-rank statistic is the Mantel-Haenszel
- * (O-E)'V^-1(O-E) for the first k-1 groups.
+ * (O-E)'V^-1(O-E) for the first k-1 groups. The statistic/p-value assertions also pin
+ * lifelines 0.30.3 values frozen in tests/reference/logrank.py (tolerance 1e-9).
  */
 class SurvivalExecutorTest {
     /** Same tested primitive the executor uses; pinned by DistributionsTest. */
@@ -183,6 +184,63 @@ class SurvivalExecutorTest {
             assertEquals(pValue, number(row, 3), 1e-9);
             assertEquals("2", row.get(4));
             assertTrue(number(row, 3) > 0.5, "the groups do not differ: " + row);
+        }
+    }
+
+    @Test
+    void logRankTwoGroupsMatchesTheLifelinesReference() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            // a: events at 1..5; b: events at 2..6. No censoring.
+            LazyPlan plan = plan(db, grouped(db,
+                    new double[]{1, 2, 3, 4, 5, 2, 3, 4, 5, 6},
+                    new int[]{1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                    new String[]{"a", "a", "a", "a", "a", "b", "b", "b", "b", "b"}), """
+                    {"time":"time","event":"event","group":"group","mode":"logrank"}
+                    """);
+            List<String> row = plan.preview(10).data().get(0);
+            assertEquals(0.9908286871675439, number(row, 1), 1e-9);
+            assertEquals("1", row.get(2));
+            assertEquals(0.3195399204298757, number(row, 3), 1e-9);
+            assertEquals("2", row.get(4));
+        }
+    }
+
+    @Test
+    void logRankCensoringMatchesTheLifelinesReference() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            // b is censored at 4, so it stays in the risk set at the event times 1 and 2.
+            LazyPlan plan = plan(db, grouped(db,
+                    new double[]{1, 2, 3, 1, 2, 4}, new int[]{1, 1, 1, 1, 1, 0},
+                    new String[]{"a", "a", "a", "b", "b", "b"}), """
+                    {"time":"time","event":"event","group":"group","mode":"logrank"}
+                    """);
+            List<String> row = plan.preview(10).data().get(0);
+            assertEquals(0.25423728813559315, number(row, 1), 1e-9);
+            assertEquals("1", row.get(2));
+            assertEquals(0.6141071500553654, number(row, 3), 1e-9);
+            assertEquals("2", row.get(4));
+        }
+    }
+
+    @Test
+    void logRankThreeGroupsAccumulateTheOffDiagonalCovariance() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            // Group c is censored at 1,2,3,5,7 and never fails; a and b share the
+            // event times 1,2,4 so the off-diagonal covariance accumulates over
+            // four event times. lifelines and the numpy Mantel-Haenszel oracle both
+            // give statistic=4.1432119205298, p=0.125983294989954, df=2.
+            LazyPlan plan = plan(db, grouped(db,
+                    new double[]{1, 2, 3, 4, 5, 1, 2, 3, 4, 6, 1, 2, 3, 5, 7},
+                    new int[]{1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0},
+                    new String[]{"a", "a", "a", "a", "a", "b", "b", "b", "b", "b",
+                            "c", "c", "c", "c", "c"}), """
+                    {"time":"time","event":"event","group":"group","mode":"logrank"}
+                    """);
+            List<String> row = plan.preview(10).data().get(0);
+            assertEquals(4.1432119205298, number(row, 1), 1e-9);
+            assertEquals("2", row.get(2));
+            assertEquals(0.12598329498995398, number(row, 3), 1e-9);
+            assertEquals("3", row.get(4));
         }
     }
 
