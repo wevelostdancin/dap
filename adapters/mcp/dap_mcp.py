@@ -24,6 +24,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -91,15 +92,42 @@ class DapError(Exception):
 # --------------------------------------------------------------------- сервис
 
 def probe() -> dict | None:
-    """GET /v1/health: the parsed body, or None when the engine does not answer."""
+    """GET /v1/health: parsed body, or None only when nothing answers on the port.
+
+    A peer that answers with a non-200 status or an unparsable body is a broken
+    engine, not an absent one: raise DapError(data.status) so ensure_service
+    never launches a second jar on an occupied port.
+    """
     try:
         with urllib.request.urlopen(f"{BASE}/v1/health", timeout=2) as r:
-            if r.status != 200:
-                return None
-            raw = r.read()
-            return json.loads(raw.decode("utf-8")) if raw else {}
-    except Exception:
+            status, raw = r.status, r.read()
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:400]
+        raise DapError(
+            f"DAP health отвечает HTTP {e.code}: {detail}",
+            data={"status": e.code, "body": detail, "base": BASE},
+        ) from e
+    except (urllib.error.URLError, TimeoutError, OSError):
         return None
+    if status != 200:
+        detail = raw.decode("utf-8", errors="replace")[:400]
+        raise DapError(f"DAP health отвечает HTTP {status}: {detail}",
+                       data={"status": status, "body": detail, "base": BASE})
+    try:
+        return json.loads(raw.decode("utf-8")) if raw else {}
+    except ValueError as e:
+        detail = raw.decode("utf-8", errors="replace")[:400]
+        raise DapError(
+            f"DAP health вернул битый JSON (HTTP {status}): {detail!r}",
+            data={"status": status, "body": detail, "base": BASE},
+        ) from e
+
+
+def _port_busy() -> bool:
+    """True when something already listens on DAP_PORT, even if /health fails."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.5)
+        return sock.connect_ex((HOST, PORT)) == 0
 
 
 def health() -> bool:
@@ -342,6 +370,12 @@ def ensure_service() -> None:
             )
         _stop_stale_engine(body, reason)
         _REPLACED = True
+    if _port_busy():
+        raise DapError(
+            f"порт {HOST}:{PORT} занят, но /v1/health не отвечает; проверьте процесс "
+            "на этом порту или задайте другой DAP_PORT",
+            code=-32001, data={"base": BASE, "port": PORT},
+        )
     _reap_child()
     env = dict(os.environ)
     env.update({"DAP_HOME": DAP_HOME, "DAP_PORT": str(PORT), "DAP_BIND": BIND})
@@ -451,6 +485,30 @@ _TABLE_FORMATS = ("json", "objects", "csv", "markdown")
 _DATASET_ACTIONS = ("list", "add", "show", "refresh", "remove")
 # Catalog dataset names: [A-Za-z0-9._-]{1,64} (the engine enforces the same rule).
 _CATALOG_NAME = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+
+# Compact-table arguments shared by every tool that returns a table. Cells are
+# capped by default (200 chars) so a single huge value cannot flood the context.
+_COMPACT_TABLE_PROPS = {
+    "tableFormat": {
+        "type": "string", "enum": list(_TABLE_FORMATS), "default": "json",
+        "description": (
+            "формат таблицы: json (по умолчанию), objects, csv или markdown; "
+            "не путать с форматом входа/отчёта в аргументе format"
+        ),
+    },
+    "columns": {
+        "type": ["array", "string"], "items": {"type": "string"},
+        "description": (
+            "проекция: имена колонок массивом или строкой через запятую; "
+            "применяется ко всем возвращаемым таблицам"
+        ),
+    },
+    "maxCellChars": _int("обрезать значение ячейки до N символов с многоточием", 200),
+    "includeColumns": {
+        "type": "boolean", "default": True,
+        "description": "false — не возвращать список колонок (только данные)",
+    },
+}
 
 
 TOOLS = [
@@ -765,6 +823,7 @@ TOOLS = [
                 ),
                 "params": _obj_prop("переопределения настроек: имя параметра -> значение"),
                 "limit": _int("сколько строк таблицы вернуть", 20),
+                **_COMPACT_TABLE_PROPS,
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
             },
             ["name"],
@@ -803,6 +862,7 @@ TOOLS = [
                     "default": False,
                 },
                 "limit": _int("сколько строк таблицы вернуть", 20),
+                **_COMPACT_TABLE_PROPS,
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
             },
             ["workflow"],
@@ -851,6 +911,7 @@ TOOLS = [
                     "items": {"type": "string"},
                 },
                 "limit": _int("строк на таблицу выхода", 20),
+                **_COMPACT_TABLE_PROPS,
             },
             ["nodes"],
         ),
@@ -873,6 +934,7 @@ TOOLS = [
                 "profile": {"type": "boolean", "description": "вернуть профиль источника", "default": True},
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
                 "limit": _int("строк таблицы", 20),
+                **_COMPACT_TABLE_PROPS,
             },
         ),
     },
@@ -968,6 +1030,7 @@ TOOLS = [
                     "default": True,
                 },
                 "limit": _int("строк таблицы и отчёта", 20),
+                **_COMPACT_TABLE_PROPS,
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
             },
             ["report"],
@@ -986,7 +1049,6 @@ TOOLS = [
                 "dataset": _str(
                     "путь к готовому Parquet-датасету (из dap_ingest) или имя из "
                     "каталога датасетов (dap_dataset action=list)"),
-                "limit": _int("предел строк value counts", 10),
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
             },
         ),
@@ -1309,7 +1371,7 @@ def _page_meta(table: dict, offset: int, limit: int) -> tuple[int, int | None]:
 
 
 def _format_table(table: dict, fmt: str, offset: int, limit: int,
-                  max_chars: int, include_columns: bool) -> dict:
+                  max_chars: int, include_columns: bool, meta: bool = True) -> dict:
     if not isinstance(table, dict):
         table = {"data": table if isinstance(table, list) else []}
     names = _column_names(table)
@@ -1325,25 +1387,65 @@ def _format_table(table: dict, fmt: str, offset: int, limit: int,
     current, following = _page_meta(table, offset, limit)
     total = table.get("rows")
     total = total if isinstance(total, int) and not isinstance(total, bool) else current + len(rows)
-    meta = {"offset": current, "nextOffset": following, "truncated": following is not None}
+    paging = {"offset": current, "nextOffset": following, "truncated": following is not None} if meta else {}
     if fmt == "csv":
-        return dict({"format": "csv", "text": _csv_text(names, rows), "rows": total}, **meta)
+        return dict({"format": "csv", "text": _csv_text(names, rows), "rows": total}, **paging)
     if fmt == "markdown":
         return dict({"format": "markdown", "text": _markdown_text(names, rows), "rows": total},
-                    **meta)
+                    **paging)
     if fmt == "objects":
         result = {"rows": total,
                   "data": [dict(zip(names, row)) for row in rows]}
         if include_columns:
             result["columns"] = table.get("columns")
-        return dict(result, **meta)
+        return dict(result, **paging)
     result = dict(table)
     result["rows"] = total
     result["data"] = rows
-    result.update(meta)
+    result.update(paging)
     if not include_columns:
         result.pop("columns", None)
     return result
+
+
+def _project_columns(table: dict, names: list[str]) -> dict:
+    """Project a raw table onto named columns, preserving the requested order."""
+    columns = table.get("columns") if isinstance(table, dict) else None
+    if not isinstance(columns, list):
+        return table
+    positions = {}
+    for index, column in enumerate(columns):
+        name = column.get("name") if isinstance(column, dict) else column
+        positions.setdefault(str(name), index)
+    order = [positions[name] for name in names if name in positions]
+    if not order:
+        return table
+    result = dict(table)
+    result["columns"] = [columns[index] for index in order]
+    data = table.get("data")
+    if isinstance(data, list):
+        result["data"] = [
+            [row[index] if index < len(row) else None for index in order]
+            if isinstance(row, (list, tuple)) else row for row in data
+        ]
+    return result
+
+
+def _tool_table(table, args) -> dict:
+    """Cap cells in any tabular tool response; optional compact format/projection.
+
+    Unlike dap_get_table, one-call tools are not paged: keep the original response
+    shape (no offset/nextOffset/truncated) while still applying the same caps.
+    """
+    fmt = str(args.get("tableFormat") or "json").strip().lower()
+    if fmt not in _TABLE_FORMATS:
+        raise DapError(
+            "'tableFormat' должен быть один из: " + ", ".join(_TABLE_FORMATS), code=-32602)
+    columns = _columns_arg(args)
+    if columns:
+        table = _project_columns(table, columns)
+    return _format_table(table, fmt, 0, _table_limit(args), _max_cell_chars(args),
+                         args.get("includeColumns") is not False, meta=False)
 
 
 def tool_get_table(args: dict):
@@ -1536,7 +1638,7 @@ def tool_recipe_run(args: dict):
         "recipe": name,
         "workflow": workflow,
         "node": node,
-        "table": table,
+        "table": _tool_table(table, args),
         "applied": applied,
     }
 
@@ -1651,12 +1753,13 @@ def tool_sql(args: dict):
     if single:
         limit = plans[0]["limit"] or default_limit
         return {"workflow": workflow, "node": nodes[0],
-                "table": _sql_table(workflow, nodes[0], limit)}
+                "table": _tool_table(_sql_table(workflow, nodes[0], limit), args)}
     return {
         "workflow": workflow,
         "tables": [
             {"index": index, "node": node,
-             "table": _sql_table(workflow, node, plan["limit"] or default_limit)}
+             "table": _tool_table(
+                 _sql_table(workflow, node, plan["limit"] or default_limit), args)}
             for index, (plan, node) in enumerate(zip(plans, nodes))
         ],
     }
@@ -1730,8 +1833,9 @@ def tool_workflow_build(args: dict):
         if outputs:
             tables = {}
             for key in outputs:
-                tables[str(key)] = call(
+                raw = call(
                     "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(mapping[str(key)])}/table?limit={limit}")
+                tables[str(key)] = _tool_table(raw, args)
             result["tables"] = tables
         return result
     except Exception:
@@ -1800,7 +1904,7 @@ def tool_analyze(args: dict):
                      f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(node_id)}/table?limit={limit}")
         _emit_progress(3, stages, "table")
         result = {"workflow": workflow, "node": node_id, "source": source,
-                  "cached": ingest_cached, "run": run, "table": table}
+                  "cached": ingest_cached, "run": run, "table": _tool_table(table, args)}
         if with_profile:
             result["profile"] = call(
                 "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(reader_id)}/profile")
@@ -2147,10 +2251,12 @@ def tool_report(args: dict):
                   "report": report}
         if queries is None:
             result["node"] = table_nodes[0]
-            result["table"] = tables[0]["table"]
+            result["table"] = _tool_table(tables[0]["table"], args)
         else:
             result["nodes"] = table_nodes
-            result["tables"] = tables
+            result["tables"] = [
+                dict(entry, table=_tool_table(entry["table"], args)) for entry in tables
+            ]
         if with_profile:
             result["profile"] = call(
                 "GET",
@@ -2173,7 +2279,6 @@ def tool_report(args: dict):
 
 def tool_profile(args: dict):
     has_file, _ = _source_args(args)
-    limit = _table_limit(args, 10)
     ensure_service()
     source, cached = _source(args, has_file)
     _emit_progress(1, 3, "ingest")
@@ -2182,10 +2287,8 @@ def tool_profile(args: dict):
         reader = _add_node(workflow, "dap.parquet_reader", {"file": source})
         call("POST", f"/v1/workflows/{_seg(workflow)}/run", _timeout_body(args))
         _emit_progress(2, 3, "run")
-        # limit is reserved for value-count rows; /profile does not return them yet,
-        # so the engine ignores the parameter until the profile grows them.
         profile = call(
-            "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(reader)}/profile?limit={limit}")
+            "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(reader)}/profile")
         _emit_progress(3, 3, "profile")
         result = {"source": source, "cached": cached, "profile": profile}
         if isinstance(profile, dict):
@@ -2246,7 +2349,12 @@ def tool_shutdown(_args: dict):
         _reap_child()
         return {"ok": True, "alreadyStopped": True}
     try:
-        return call("POST", "/v1/shutdown")
+        return call("POST", "/v1/shutdown", timeout=10)
+    except TimeoutError as exc:
+        raise DapError(
+            f"движок не ответил на /v1/shutdown за 10 с: {exc}",
+            code=-32001, data={"base": BASE, "timeout": 10},
+        ) from exc
     finally:
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline and health():

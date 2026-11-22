@@ -164,7 +164,7 @@ printf '%s\n' \
 | `dap_estimate` | один вызов: rows/operators/plan до запуска (`/estimate`) | `file`?/`dataset`?, `format`?, `sql`?, `limit`? |
 | `dap_analyze` | один вызов: файл/датасет → таблица + профиль, опционально SQL по `src` | `file`?/`dataset`?, `format`?, `sql`?, `profile` (true), `limit` (20), `timeoutSec`? |
 | `dap_report` | один вызов: файл/датасет → таблицы + отчёт md/html/pdf/pptx + график | `file`?/`dataset`?, `format`? (md/html/pdf/pptx), `sql`?/`queries`[]?, `report`, `chart`?, `chartType`? (bar), `x`?, `y`[]?, `title`?, `profile` (true), `limit` (20), `timeoutSec`? |
-| `dap_profile` | один вызов: компактный профиль файла/датасета без таблицы | `file`?/`dataset`?, `format`?, `limit` (10), `timeoutSec`? |
+| `dap_profile` | один вызов: компактный профиль файла/датасета без таблицы | `file`?/`dataset`?, `format`?, `timeoutSec`? |
 | `dap_workflow_build` | один вызов: узлы + связи + запуск + таблицы выходов | `nodes`, `edges`?, `run` (false), `outputs`?, `limit` (20), `timeoutSec`? |
 | `dap_sql` | read-only SQL по таблице узла или по входу `src`; батч `queries`[] и `explain` | `workflow`, `sql`?/`queries`[]?, `node`?, `explain`? (false), `limit` |
 | `dap_recipe_list` | рецепты библиотеки | — |
@@ -173,6 +173,12 @@ printf '%s\n' \
 | `dap_save_workflow` | сохранить workflow в каталог (`workflow.json`) | `workflow`, `dir` |
 | `dap_load_workflow` | создать workflow из сохранённого каталога | `dir`, `name`? |
 | `dap_shutdown` | остановить движок; следующий вызов поднимет его заново | — |
+
+Все таблицы (в том числе в ответах `dap_analyze`, `dap_report`, `dap_sql`,
+`dap_recipe_run` и `dap_workflow_build`) обрезают ячейки до 200 символов; у этих
+инструментов есть `tableFormat` (json/objects/csv/markdown), `columns`,
+`maxCellChars` и `includeColumns`. Постраничные поля остаются только у
+`dap_get_table`.
 
 `settings` — плоский объект по `configKey` из `dap_node_dialog_schema`, например
 `{"dataset": "IRIS"}`.

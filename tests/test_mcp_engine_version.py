@@ -94,6 +94,7 @@ class EngineBuildGuardTest(unittest.TestCase):
         with mock.patch.object(self.mod, "probe", side_effect=fake_probe), \
              mock.patch.object(self.mod, "health", return_value=True), \
              mock.patch.object(self.mod, "_wait_for_warmup"), \
+             mock.patch.object(self.mod, "_port_busy", return_value=False), \
              mock.patch.object(self.mod, "_launch_blocker", return_value=blocker), \
              mock.patch.object(self.mod, "_launch_native",
                                return_value=FakeChild()) as launch, \
@@ -133,6 +134,7 @@ class EngineBuildGuardTest(unittest.TestCase):
         with mock.patch.object(self.mod, "probe", side_effect=fake_probe), \
              mock.patch.object(self.mod, "health", return_value=True), \
              mock.patch.object(self.mod, "_wait_for_warmup"), \
+             mock.patch.object(self.mod, "_port_busy", return_value=False), \
              mock.patch.object(self.mod, "_launch_blocker", return_value=None), \
              mock.patch.object(self.mod, "_launch_native", return_value=FakeChild()), \
              mock.patch.object(self.mod, "call",
@@ -196,6 +198,7 @@ class EngineBuildGuardTest(unittest.TestCase):
 
         with mock.patch.object(self.mod, "probe", return_value={"version": "1.1.0"}), \
              mock.patch.object(self.mod, "_launch_blocker", return_value=None), \
+             mock.patch.object(self.mod, "_port_busy", return_value=False), \
              mock.patch.object(self.mod, "STOP_WAIT", 0.0), \
              mock.patch.object(self.mod, "_wait_for_warmup"), \
              mock.patch.object(self.mod, "call",

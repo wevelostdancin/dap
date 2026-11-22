@@ -167,8 +167,8 @@ def scenario(client, source, home, report_path):
     shared.check(messages and messages[0].get("role") == "user",
                  "prompts/get returned no user message: %r" % (prompt,))
     text = messages[0]["content"]["text"]
-    shared.check(str(source) in text and "dap_ingest" in text,
-                 "analyze_csv prompt does not mention the path and pipeline")
+    shared.check(str(source) in text and "dap_analyze" in text,
+                 "analyze_csv prompt does not mention the path and one-call pipeline")
 
     tool_calls = 0
     step("tool call 1/3: dap_ingest")

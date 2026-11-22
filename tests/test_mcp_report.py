@@ -515,24 +515,26 @@ class ProfileTest(unittest.TestCase):
         self.assertNotIn("table", result)
         self.assertEqual(engine.factories(), ["dap.parquet_reader"])
         profile_urls = [path for method, path in engine.paths()
-                        if method == "GET" and path.endswith("/profile?limit=10")]
+                        if method == "GET" and path.endswith("/profile")]
         self.assertEqual(len(profile_urls), 1)
         self.assertIn(("DELETE", "/v1/workflows/wf-1"), engine.paths())
 
-    def test_profile_for_file_ingests_and_forwards_limit(self):
-        result, engine = self.run_tool({"file": "/data/sales.csv", "limit": 5})
+    def test_profile_schema_has_no_limit_argument(self):
+        tools = {tool["name"]: tool for tool in self.module.TOOLS}
+        self.assertNotIn("limit", tools["dap_profile"]["inputSchema"]["properties"])
+
+    def test_profile_for_file_ingests_and_reads_profile(self):
+        result, engine = self.run_tool({"file": "/data/sales.csv"})
         self.assertEqual(result["source"], "/cache/sales.parquet")
         self.assertIn(("POST", "/v1/datasets"), engine.paths())
         profile_urls = [path for method, path in engine.paths()
-                        if method == "GET" and path.endswith("/profile?limit=5")]
+                        if method == "GET" and path.endswith("/profile")]
         self.assertEqual(len(profile_urls), 1)
 
     def test_validation_fails_before_http(self):
         for arguments, expected in (
             ({}, "file"),
             ({"file": "/a.csv", "dataset": "/b.parquet"}, "оба"),
-            ({"dataset": "/cache/x.parquet", "limit": 0}, "limit"),
-            ({"dataset": "/cache/x.parquet", "limit": 1001}, "limit"),
         ):
             with self.subTest(arguments=arguments):
                 with mock.patch.object(self.module, "ensure_service"), \
