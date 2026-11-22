@@ -14,6 +14,8 @@ import java.util.Map;
 public record ExploreResult(
         String source,
         long rows,
+        boolean qualitySampled,
+        long qualityScannedRows,
         List<Column> columns,
         Quality quality,
         List<Relationship> relationships,
@@ -32,7 +34,7 @@ public record ExploreResult(
 
     /** One profiled column. Numeric statistics are null for non-numeric columns. */
     public record Column(String name, String type, long missing, long distinct,
-                         Double min, Double max, Double mean, Double stddev,
+                         boolean distinctExact, Double min, Double max, Double mean, Double stddev,
                          Long zeros, Long negatives, Long outliers) {
     }
 
@@ -54,7 +56,7 @@ public record ExploreResult(
 
     /** Numeric value that differs across the groups of a categorical column. */
     public record GroupDifference(String value, String group, String test, double statistic,
-                                  double pValue, Double effectSize) {
+                                  double pValue, double pAdjusted, Double effectSize) {
     }
 
     /** Inferred time span of the first temporal column. */
@@ -74,6 +76,8 @@ public record ExploreResult(
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("source", source);
         body.put("rows", rows);
+        body.put("quality_sampled", qualitySampled);
+        body.put("quality_scanned_rows", qualityScannedRows);
         body.put("columns", columns.stream().map(ExploreResult::columnMap).toList());
         Map<String, Object> qualityBody = new LinkedHashMap<>();
         qualityBody.put("score", quality.score());
@@ -100,6 +104,7 @@ public record ExploreResult(
         view.put("type", column.type());
         view.put("missing", column.missing());
         view.put("distinct", column.distinct());
+        view.put("distinct_exact", column.distinctExact());
         putIfNotNull(view, "min", column.min());
         putIfNotNull(view, "max", column.max());
         putIfNotNull(view, "mean", column.mean());
@@ -139,6 +144,7 @@ public record ExploreResult(
         view.put("test", difference.test());
         view.put("statistic", difference.statistic());
         view.put("p_value", difference.pValue());
+        view.put("p_adjusted", difference.pAdjusted());
         putIfNotNull(view, "effect_size", difference.effectSize());
         return view;
     }
