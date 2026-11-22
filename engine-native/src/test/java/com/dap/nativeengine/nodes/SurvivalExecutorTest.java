@@ -296,6 +296,60 @@ class SurvivalExecutorTest {
     }
 
     @Test
+    void kaplanMeierAcceptsNegativeNumericTimes() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            TableData data = run(db, series(db, new double[]{-3, -2, -1}, new int[]{1, 1, 1}),
+                    "{\"time\":\"time\",\"event\":\"event\"}");
+
+            assertEquals(3, data.rows());
+            assertEquals(-3.0, number(data.data().get(0), 0), 1e-12);
+            assertEquals(2.0 / 3.0, number(data.data().get(0), 4), 1e-12);
+            assertEquals(-2.0, number(data.data().get(1), 0), 1e-12);
+            assertEquals(1.0 / 3.0, number(data.data().get(1), 4), 1e-12);
+            assertEquals(-1.0, number(data.data().get(2), 0), 1e-12);
+            assertEquals(0.0, number(data.data().get(2), 4), 1e-12);
+        }
+    }
+
+    @Test
+    void datesBefore1970GetNegativeEpochDaysAndTheSameCurve() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            List<Object[]> rows = new ArrayList<>();
+            rows.add(new Object[]{LocalDate.of(1960, 1, 1), 1L});
+            rows.add(new Object[]{LocalDate.of(1960, 1, 2), 1L});
+            rows.add(new Object[]{LocalDate.of(1960, 1, 3), 1L});
+            LazyPlan input = NodeTestSupport.table(db, List.of(ColumnSpec.of("day", "Date32"),
+                    ColumnSpec.of("event", "Int64")), rows);
+
+            LazyPlan plan = plan(db, input, "{\"time\":\"day\",\"event\":\"event\"}");
+            assertEquals("Date32", plan.columns().get(0).arrowType());
+            TableData data = plan.preview(10);
+
+            assertEquals(3, data.rows());
+            assertEquals("1960-01-01", data.data().get(0).get(0));
+            assertEquals(2.0 / 3.0, number(data.data().get(0), 4), 1e-12);
+            assertEquals("1960-01-02", data.data().get(1).get(0));
+            assertEquals(1.0 / 3.0, number(data.data().get(1), 4), 1e-12);
+            assertEquals("1960-01-03", data.data().get(2).get(0));
+            assertEquals(0.0, number(data.data().get(2), 4), 1e-12);
+        }
+    }
+
+    @Test
+    void nonFiniteTimesAreRejected() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = NodeTestSupport.table(db, List.of(ColumnSpec.of("time", "Float64"),
+                    ColumnSpec.of("event", "Int64")),
+                    List.<Object[]>of(new Object[]{Double.NaN, 1L}, new Object[]{2.0, 0L}));
+
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> run(db, input, "{\"time\":\"time\",\"event\":\"event\"}"));
+            assertTrue(failure.getMessage().contains("finite"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("time"), failure.getMessage());
+        }
+    }
+
+    @Test
     void invalidConfigurationIsRejectedWithTheProblemNamed() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             LazyPlan input = series(db, new double[]{1, 2}, new int[]{1, 0});
@@ -317,11 +371,6 @@ class SurvivalExecutorTest {
                                     ColumnSpec.of("time", "Utf8"), ColumnSpec.of("event", "Int64")),
                             List.<Object[]>of(new Object[]{"a", 1L})), "{\"time\":\"time\",\"event\":\"event\"}"));
             assertTrue(nonNumericTime.getMessage().contains("numeric"), nonNumericTime.getMessage());
-
-            IllegalArgumentException negativeTime = assertThrows(IllegalArgumentException.class,
-                    () -> run(db, series(db, new double[]{-1, 2}, new int[]{1, 0}),
-                            "{\"time\":\"time\",\"event\":\"event\"}"));
-            assertTrue(negativeTime.getMessage().contains("time"), negativeTime.getMessage());
 
             IllegalArgumentException badEvent = assertThrows(IllegalArgumentException.class,
                     () -> run(db, series(db, new double[]{1, 2}, new int[]{1, 2}),

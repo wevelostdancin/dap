@@ -30,7 +30,7 @@
       "time": {
         "type": "string",
         "title": "Time column",
-        "description": "Numeric or date column with the non-negative follow-up time."
+        "description": "Numeric or date column with finite follow-up time; negative values, including dates before 1970, are allowed."
       },
       "event": {
         "type": "string",

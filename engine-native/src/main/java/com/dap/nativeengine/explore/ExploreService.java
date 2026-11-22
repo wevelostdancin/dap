@@ -569,11 +569,20 @@ public final class ExploreService {
                 }
             }
         }
-        found.sort(Comparator.comparingDouble((ExploreResult.Relationship pair) -> -Math.abs(pair.value()))
+        // Correction spans every tested pair, not just the twenty returned to the caller.
+        List<Double> adjusted = benjaminiHochberg(found.stream()
+                .map(ExploreResult.Relationship::pValue).toList());
+        List<ExploreResult.Relationship> corrected = new ArrayList<>(found.size());
+        for (int index = 0; index < found.size(); index++) {
+            ExploreResult.Relationship raw = found.get(index);
+            corrected.add(new ExploreResult.Relationship(raw.left(), raw.right(), raw.method(),
+                    raw.value(), raw.pValue(), adjusted.get(index), raw.n(), raw.strength()));
+        }
+        corrected.sort(Comparator.comparingDouble((ExploreResult.Relationship pair) -> -Math.abs(pair.value()))
                 .thenComparing(ExploreResult.Relationship::left)
                 .thenComparing(ExploreResult.Relationship::right)
                 .thenComparing(ExploreResult.Relationship::method));
-        return List.copyOf(found.subList(0, Math.min(MAX_RELATIONSHIPS, found.size())));
+        return List.copyOf(corrected.subList(0, Math.min(MAX_RELATIONSHIPS, corrected.size())));
     }
 
     private static ExploreResult.Relationship pearson(ColumnSpec left, ColumnSpec right,
@@ -617,7 +626,7 @@ public final class ExploreService {
         }
         double r = Math.max(-1.0, Math.min(1.0, covariance / Math.sqrt(varianceLeft * varianceRight)));
         return new ExploreResult.Relationship(left.name(), right.name(), "pearson", r,
-                pearsonPValue(r, n), n, strength(r));
+                pearsonPValue(r, n), null, n, strength(r));
     }
 
     /** Two-sided p-value of a Pearson correlation: t with n-2 degrees of freedom. */
@@ -677,7 +686,7 @@ public final class ExploreService {
         double v = Math.sqrt(chiSquare / (n * (double) Math.min(leftCounts.size() - 1,
                 rightCounts.size() - 1)));
         v = Math.min(1.0, v);
-        return new ExploreResult.Relationship(left.name(), right.name(), "cramers_v", v, p, n,
+        return new ExploreResult.Relationship(left.name(), right.name(), "cramers_v", v, p, null, n,
                 strength(v));
     }
 
@@ -908,7 +917,8 @@ public final class ExploreService {
                     pair.method(), List.of(pair.left(), pair.right()),
                     capitalised(pair.strength()) + " " + association + " ("
                             + pair.method() + "=" + decimal(pair.value()) + ", "
-                            + pText(pair.pValue()) + ", n=" + pair.n() + ").",
+                            + pText(pair.pValue()) + ", p_adjusted=" + pText(adjustedP(pair))
+                            + ", n=" + pair.n() + ").",
                     priority));
             relationshipCandidates++;
         }
@@ -1078,7 +1088,8 @@ public final class ExploreService {
                 break;
             }
             result.add("Model " + pair.right() + " with " + pair.left() + " (" + pair.method()
-                    + "=" + decimal(pair.value()) + ", " + pText(pair.pValue()) + ").");
+                    + "=" + decimal(pair.value()) + ", " + pText(pair.pValue())
+                    + ", p_adjusted=" + pText(adjustedP(pair)) + ").");
             relationshipAdded++;
         }
         int differenceAdded = 0;
@@ -1134,10 +1145,14 @@ public final class ExploreService {
         };
     }
 
-    /** A correlation is actionable only with enough observations and a significant p-value. */
+    /** A correlation is actionable only with enough observations and a significant FDR-adjusted p. */
     private static boolean reliable(ExploreResult.Relationship pair) {
-        return pair.n() >= MIN_RELIABLE_N
-                && pair.pValue() != null && pair.pValue() < SIGNIFICANCE;
+        Double p = adjustedP(pair);
+        return pair.n() >= MIN_RELIABLE_N && p != null && p < SIGNIFICANCE;
+    }
+
+    private static Double adjustedP(ExploreResult.Relationship pair) {
+        return pair.pAdjusted() != null ? pair.pAdjusted() : pair.pValue();
     }
 
     private static String relationshipPriority(ExploreResult.Relationship pair) {

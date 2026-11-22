@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Bootstrap confidence intervals and two-sample permutation tests computed in Java over at most max_rows rows. Bootstrap (mode bootstrap) resamples the observations with replacement and reports statistic, estimate, se, ci_low/ci_high (percentile, confidence), bias, n and resamples for mean, median, sd, correlation (two columns) or slope (OLS of the second column on the first). Permutation (mode permutation) shuffles the labels of group between the two levels of value and reports statistic, observed (difference of means or medians, first group minus second in sorted order), p_value (add-one estimator; alternative two-sided, less, greater), n and permutations. A seed makes every draw reproducible.",
+  "description": "Bootstrap confidence intervals and two-sample permutation tests computed in Java over at most max_rows rows. Bootstrap (mode bootstrap) resamples the observations with replacement and reports statistic, estimate, se, ci_low/ci_high (percentile, confidence), bias, n, resamples (configured), valid_resamples (draws with a defined statistic) and warning (NULL unless more than 10% of draws were degenerate) for mean, median, sd, correlation (two columns) or slope (OLS of the second column on the first). Permutation (mode permutation) shuffles the labels of group between the two levels of value and reports statistic, observed (difference of means or medians, first group minus second in sorted order), p_value (add-one estimator; alternative two-sided, less, greater), n and permutations. A seed makes every draw reproducible.",
   "inPorts": [
     {
       "index": 0,

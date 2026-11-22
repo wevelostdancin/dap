@@ -165,6 +165,8 @@ class OutlierDetectExecutorTest {
                             {"columns":["nope"],"method":"iqr"}
                             """));
             assertTrue(unknown.getMessage().contains("nope"), unknown.getMessage());
+            assertTrue(unknown.getMessage().contains("unknown columns column"),
+                    "the error must name the 'columns' config field: " + unknown.getMessage());
 
             IllegalArgumentException notNumeric = assertThrows(IllegalArgumentException.class,
                     () -> detect(db, List.of(ColumnSpec.of("s", "Utf8")), List.<Object[]>of(new Object[]{"x"}), """

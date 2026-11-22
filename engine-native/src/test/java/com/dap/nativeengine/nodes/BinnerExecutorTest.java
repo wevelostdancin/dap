@@ -75,6 +75,24 @@ class BinnerExecutorTest {
     }
 
     @Test
+    void frequencyBinsIgnoreNullsSoTheyDoNotShiftTheTiles() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            // Non-NULL values 10, 20, 30 split into [10,20] and [30] (numpy.array_split).
+            // NULLs are returned as NULL and must not occupy a tile.
+            LazyPlan input = NodeTestSupport.table(db, List.of(ColumnSpec.of("v", "Int64")),
+                    List.<Object[]>of(new Object[]{10L}, new Object[]{null}, new Object[]{30L},
+                            new Object[]{20L}, new Object[]{null}));
+            LazyPlan plan = new BinnerExecutor().execute(NodeTestSupport.context(db, """
+                    {"column":"v","output":"bin","method":"frequency","bins":2}
+                    """), List.of(input));
+
+            assertEquals(List.of(ColumnSpec.of("v", "Int64"), ColumnSpec.of("bin", "Int64")),
+                    plan.columns());
+            assertEquals(java.util.Arrays.asList("1", null, "2", "1", null), bins(plan, 1));
+        }
+    }
+
+    @Test
     void invalidBinsEdgesAndColumnsAreRejected() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             LazyPlan input = ints(db, 1, 2, 3);

@@ -51,7 +51,7 @@ public record ExploreResult(
 
     /** Pairwise association: Pearson for numeric pairs, Cramer's V for categorical pairs. */
     public record Relationship(String left, String right, String method, double value,
-                               Double pValue, long n, String strength) {
+                               Double pValue, Double pAdjusted, long n, String strength) {
     }
 
     /** Numeric value that differs across the groups of a categorical column. */
@@ -132,6 +132,7 @@ public record ExploreResult(
         view.put("method", relationship.method());
         view.put("value", relationship.value());
         putIfNotNull(view, "p_value", relationship.pValue());
+        putIfNotNull(view, "p_adjusted", relationship.pAdjusted());
         view.put("n", relationship.n());
         view.put("strength", relationship.strength());
         return view;

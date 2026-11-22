@@ -1085,11 +1085,12 @@ paths:
         at most 10000, which get one exact recount (distinct_exact=true).
         Relationships, group differences and hypotheses read at most sampleRows
         rows (default 1000, deterministic first rows in scan order) and are
-        capped at 20, 10 and 5 entries. Group-difference p_adjusted is a
-        Benjamini-Hochberg FDR correction over every tested pair, not just the
-        ten returned, and drives ordering, thresholds and hypothesis priority.
-        A relationship hypothesis is high only with n>=20 and p<0.05; the same
-        gate applies to the modelling recommendation. Ordering is deterministic:
+        capped at 20, 10 and 5 entries. p_adjusted on both relationships and
+        group differences is a Benjamini-Hochberg FDR correction over every
+        tested pair of that family, not just the 20/10 returned, and drives
+        significance thresholds, hypothesis priority and recommendations.
+        A relationship hypothesis is high only with n>=20 and p_adjusted<0.05;
+        the same gate applies to the modelling recommendation. Ordering is deterministic:
         relationships by descending |value| then names, group differences by
         adjusted p then names, hypotheses by priority then id.
       parameters:
@@ -2222,6 +2223,9 @@ components:
         p_value:
           type: number
           description: May be 0.0 when the true p-value underflows a double
+        p_adjusted:
+          type: number
+          description: Benjamini-Hochberg FDR adjustment over all tested relationship pairs
         n:
           type: integer
         strength:

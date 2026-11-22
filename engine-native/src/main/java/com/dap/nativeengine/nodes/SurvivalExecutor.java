@@ -161,9 +161,9 @@ public final class SurvivalExecutor implements NodeExecutor {
                 double value = time.date()
                         ? LocalDate.parse(result.getString(1)).toEpochDay()
                         : result.getDouble(1);
-                if (!(value >= 0.0)) {
+                if (!Double.isFinite(value)) {
                     throw new IllegalArgumentException(NODE + ": 'time' column '"
-                            + time.column().name() + "' must be non-negative, got " + value);
+                            + time.column().name() + "' must be finite, got " + value);
                 }
                 double eventValue = result.getDouble(2);
                 if (eventValue != 0.0 && eventValue != 1.0) {

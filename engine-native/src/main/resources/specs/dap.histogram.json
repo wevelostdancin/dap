@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Equal-width histogram of one numeric column between its minimum and maximum. Every bin is emitted, including empty ones; a constant column puts all values into the first bin.",
+  "description": "Equal-width histogram of one numeric column between its minimum and maximum. Every bin is emitted, including empty ones; a constant column emits a single interval [v, v] holding all observations.",
   "inPorts": [
     {
       "index": 0,
