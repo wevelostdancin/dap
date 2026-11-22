@@ -7,8 +7,11 @@ import com.dap.nativeengine.exec.NodeContext;
 import com.dap.nativeengine.exec.NodeExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -27,9 +30,17 @@ import java.util.zip.ZipOutputStream;
  * NULL is an empty cell.
  */
 public final class ExcelWriterExecutor implements NodeExecutor {
+    /** One bounded page of the input plan; {@code rows} is the total row count. */
+    @FunctionalInterface
+    interface PageSource {
+        TableData page(int limit, int offset) throws Exception;
+    }
+
     private static final String NODE = "excel_writer";
     private static final String DEFAULT_SHEET = "Sheet1";
-    private static final int MAX_ROWS = 1_048_575;
+    static final int MAX_ROWS = 1_048_575;
+    /** Rows fetched per page: keeps both the JDBC result buffer and the XML row buffer small. */
+    static final int PAGE_ROWS = 10_000;
     private static final int MAX_COLUMNS = 16_384;
     private static final int MAX_CELL_CHARS = 32_767;
     /** Characters Excel forbids in a worksheet name. */
@@ -60,17 +71,12 @@ public final class ExcelWriterExecutor implements NodeExecutor {
             throw new IllegalArgumentException("excel_writer: " + input.columns().size()
                     + " columns exceed the xlsx limit of " + MAX_COLUMNS);
         }
-        TableData data = input.preview(MAX_ROWS + 1, context.workflowId(), context.nodeId());
-        if (data.data().size() > MAX_ROWS) {
-            throw new IllegalArgumentException("excel_writer: more than " + MAX_ROWS
-                    + " data rows cannot be written to one xlsx sheet");
-        }
-
         // Write next to the target and rename, so a failed write never leaves a truncated
         // workbook under the user's path (same pattern as the CSV/Parquet writers).
         Path temporary = target.resolveSibling(target.getFileName() + ".tmp-" + UUID.randomUUID());
         try {
-            write(temporary, sheet, data);
+            write(temporary, sheet, (limit, offset) -> input.page(limit, offset, 0L,
+                    context.workflowId(), context.nodeId()));
             Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,
                     StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException failure) {
@@ -116,14 +122,20 @@ public final class ExcelWriterExecutor implements NodeExecutor {
         return sheet;
     }
 
-    private static void write(Path file, String sheet, TableData data) throws IOException {
+    private static void write(Path file, String sheet, PageSource pages) throws Exception {
         try (OutputStream stream = Files.newOutputStream(file);
              ZipOutputStream zip = new ZipOutputStream(stream, StandardCharsets.UTF_8)) {
             entry(zip, "[Content_Types].xml", contentTypes());
             entry(zip, "_rels/.rels", packageRelationships());
             entry(zip, "xl/workbook.xml", workbook(sheet));
             entry(zip, "xl/_rels/workbook.xml.rels", workbookRelationships());
-            entry(zip, "xl/worksheets/sheet1.xml", worksheet(data));
+            zip.putNextEntry(new ZipEntry("xl/worksheets/sheet1.xml"));
+            // The writer streams into the zip entry through a small buffer: neither the sheet
+            // XML nor a full byte[] copy of it is ever materialized in heap.
+            Writer xml = new BufferedWriter(new OutputStreamWriter(zip, StandardCharsets.UTF_8), 8192);
+            writeSheet(xml, pages);
+            xml.flush();
+            zip.closeEntry();
         }
     }
 
@@ -169,29 +181,59 @@ public final class ExcelWriterExecutor implements NodeExecutor {
                 + "</Relationships>";
     }
 
-    private static String worksheet(TableData data) {
-        List<ColumnSpec> columns = data.columns();
-        StringBuilder xml = new StringBuilder(1024);
+    /**
+     * Writes one worksheet to {@code xml} one page at a time. Only the current page and the
+     * current XML row are buffered; the number of data rows written is returned.
+     */
+    static long writeSheet(Appendable xml, PageSource pages) throws Exception {
+        TableData first = pages.page(PAGE_ROWS, 0);
+        List<ColumnSpec> columns = first.columns();
+        long total = first.rows();
+        if (total > MAX_ROWS) {
+            throw new IllegalArgumentException("excel_writer: more than " + MAX_ROWS
+                    + " data rows cannot be written to one xlsx sheet");
+        }
         xml.append(XML_DECLARATION)
                 .append("<worksheet xmlns=\"").append(SPREADSHEET).append("\"><sheetData>");
         if (!columns.isEmpty()) {
-            xml.append("<row r=\"1\">");
+            StringBuilder header = new StringBuilder(64 * columns.size());
+            header.append("<row r=\"1\">");
             for (int column = 0; column < columns.size(); column++) {
-                inlineString(xml, reference(column + 1, 1), columns.get(column).name());
+                inlineString(header, reference(column + 1, 1), columns.get(column).name());
             }
-            xml.append("</row>");
+            header.append("</row>");
+            xml.append(header);
         }
-        for (int row = 0; row < data.data().size(); row++) {
-            List<String> values = data.data().get(row);
-            int number = row + 2;
-            xml.append("<row r=\"").append(number).append("\">");
-            for (int column = 0; column < columns.size(); column++) {
-                String value = column < values.size() ? values.get(column) : null;
-                cell(xml, reference(column + 1, number), columns.get(column), value);
+        long written = 0;
+        TableData page = first;
+        int offset = 0;
+        while (offset < total) {
+            if (page.data().isEmpty()) {
+                break;
             }
-            xml.append("</row>");
+            for (List<String> values : page.data()) {
+                if (written >= MAX_ROWS) {
+                    throw new IllegalArgumentException("excel_writer: more than " + MAX_ROWS
+                            + " data rows cannot be written to one xlsx sheet");
+                }
+                StringBuilder row = new StringBuilder(64 * columns.size());
+                int number = (int) written + 2;
+                row.append("<row r=\"").append(number).append("\">");
+                for (int column = 0; column < columns.size(); column++) {
+                    String value = column < values.size() ? values.get(column) : null;
+                    cell(row, reference(column + 1, number), columns.get(column), value);
+                }
+                row.append("</row>");
+                xml.append(row);
+                written++;
+            }
+            offset += page.data().size();
+            if (offset < total) {
+                page = pages.page(PAGE_ROWS, offset);
+            }
         }
-        return xml.append("</sheetData></worksheet>").toString();
+        xml.append("</sheetData></worksheet>");
+        return written;
     }
 
     private static void cell(StringBuilder xml, String reference, ColumnSpec column, String value) {
