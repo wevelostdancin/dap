@@ -155,9 +155,11 @@ class MathFormulaExecutorTest {
                             """));
             assertTrue(syntax.getMessage().contains("oops"), syntax.getMessage());
 
+            // AVG keeps this a projection-validation case: SUM(id) is DuckDB HUGEINT,
+            // which TypeMap rejects earlier as out of the Int64 range.
             IllegalArgumentException aggregate = assertThrows(IllegalArgumentException.class,
                     () -> execute(db, input(db), """
-                            {"outputs":[{"name":"total","expression":"SUM(id)"}]}
+                            {"outputs":[{"name":"total","expression":"AVG(id)"}]}
                             """));
             assertTrue(aggregate.getMessage().contains("projection"), aggregate.getMessage());
 

@@ -96,8 +96,14 @@ public final class TypeMap {
             return "Decimal128(" + decimal.group(1) + "," + decimal.group(2) + ")";
         }
         return switch (value) {
-            case "BIGINT", "INTEGER", "INT", "SMALLINT", "TINYINT", "HUGEINT",
-                 "UBIGINT", "UINTEGER", "USMALLINT", "UTINYINT" -> "Int64";
+            // Narrow unsigned types max out below 2^63 and always fit in a signed Int64.
+            case "BIGINT", "INTEGER", "INT", "SMALLINT", "TINYINT",
+                 "UINTEGER", "USMALLINT", "UTINYINT" -> "Int64";
+            // HUGEINT is 128-bit and UBIGINT reaches 2^64-1: both exceed Int64, so a
+            // silent Int64 mapping would truncate values and break downstream BIGINT casts.
+            case "HUGEINT", "UBIGINT" -> throw new IllegalArgumentException(
+                    "DuckDB " + value + " value out of Int64 range; cast the column explicitly "
+                            + "(BIGINT for in-range values, DECIMAL or VARCHAR for the full range)");
             case "DOUBLE", "REAL", "FLOAT" -> "Float64";
             case "VARCHAR", "TEXT", "STRING", "CHAR" -> "Utf8";
             case "BOOLEAN", "BOOL" -> "Boolean";
