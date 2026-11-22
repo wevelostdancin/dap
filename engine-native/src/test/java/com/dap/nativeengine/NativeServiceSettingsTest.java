@@ -136,6 +136,18 @@ class NativeServiceSettingsTest {
     }
 
     @Test
+    void tableLimitDefaultsTo10000AndIsConfigurable() {
+        assertEquals(10_000, NativeService.Settings.fromEnv(Map.of()).maxTableLimit());
+        assertEquals(17, NativeService.Settings.fromEnv(
+                Map.of("DAP_TABLE_MAX_LIMIT", " 17 ")).maxTableLimit());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_TABLE_MAX_LIMIT", "0")));
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeService.Settings.fromEnv(Map.of("DAP_TABLE_MAX_LIMIT", "many")));
+    }
+
+    @Test
     void extensionDirectoryDefaultsToDapHomeThenUserHome() {
         assertEquals("/tmp/dap/build/duckdb-ext", NativeService.Settings.fromEnv(
                 Map.of("DAP_HOME", "/tmp/dap")).duckdbExtensionDirectory());

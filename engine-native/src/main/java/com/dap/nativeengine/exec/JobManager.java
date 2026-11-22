@@ -1,5 +1,7 @@
 package com.dap.nativeengine.exec;
 
+import com.dap.nativeengine.api.ApiException;
+import com.dap.nativeengine.api.Http;
 import com.dap.nativeengine.engine.DuckDbSession;
 
 import java.io.InterruptedIOException;
@@ -26,6 +28,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class JobManager implements AutoCloseable {
     private static final int DEFAULT_TIMEOUT_SEC = 600;
+    private static final String TIMEOUT_HINT =
+            "split the workflow or raise DAP_JOB_TIMEOUT / the run's timeoutSec";
     /** DAP_MAX_RETAINED_JOBS default; terminal history per session is capped here. */
     private static final int DEFAULT_MAX_RETAINED = 200;
     private static final AtomicInteger IDS = new AtomicInteger();
@@ -161,13 +165,47 @@ public final class JobManager implements AutoCloseable {
     }
 
     /**
-     * Forget the run lock of a deleted workflow: the lock map must not grow with every
-     * workflow the session ever ran.
+     * Forget everything a deleted workflow owns: cancel its jobs, drop their futures,
+     * timeouts and connections, and release its run lock. The maps must not grow with every
+     * workflow a session ever ran.
      */
     public void forgetWorkflow(String workflowId) {
-        if (workflowId != null) {
-            workflowLocks.remove(workflowId);
+        if (workflowId == null) {
+            return;
         }
+        for (Job job : new ArrayList<>(jobs.values())) {
+            if (workflowId.equals(job.workflowId())) {
+                cancel(job);
+                forgetJob(job);
+            }
+        }
+        workflowLocks.remove(workflowId);
+    }
+
+    /**
+     * Forget everything a closed session owns: jobs (including terminal ones still in the
+     * retained history), their futures/timeouts/connections, every workflow lock and the
+     * session's key in the workflow store.
+     */
+    public void forgetSession(String sessionId) {
+        for (Job job : new ArrayList<>(jobs.values())) {
+            if (Objects.equals(sessionId, job.sessionId())) {
+                cancel(job);
+                forgetJob(job);
+            }
+        }
+        for (Workflow workflow : workflows.list(sessionId)) {
+            workflowLocks.remove(workflow.id());
+        }
+        workflows.removeSession(sessionId);
+    }
+
+    /** Remove one job from every tracking map; cancel() has already stopped its execution. */
+    private void forgetJob(Job job) {
+        jobs.remove(job.id(), job);
+        futures.remove(job.id());
+        timeouts.remove(job.id());
+        closeJobConnection(job);
     }
 
     /** Test and diagnostics seam: whether a run lock is registered for the workflow. */
@@ -315,13 +353,17 @@ public final class JobManager implements AutoCloseable {
             future.cancel(true);
         }
         closeJobConnection(job);
-        job.complete(JobState.timeout, null, "timeout");
+        completeTimeout(job);
         retain(job);
+    }
+
+    private static void completeTimeout(Job job) {
+        job.complete(JobState.timeout, null, "timeout", 408, "query_timeout", TIMEOUT_HINT);
     }
 
     private static void completeSuccess(Job job, Workflow workflow) {
         if (job.timeoutRequested()) {
-            job.complete(JobState.timeout, null, "timeout");
+            completeTimeout(job);
             return;
         }
         if (job.cancelRequested()) {
@@ -334,7 +376,7 @@ public final class JobManager implements AutoCloseable {
 
     private static void completeInterrupted(Job job) {
         if (job.timeoutRequested()) {
-            job.complete(JobState.timeout, null, "timeout");
+            completeTimeout(job);
         } else if (job.cancelRequested()) {
             job.complete(JobState.cancelled, null, "cancelled");
         } else {
@@ -344,12 +386,34 @@ public final class JobManager implements AutoCloseable {
 
     private static void completeFailure(Job job, Throwable failure) {
         if (job.timeoutRequested()) {
-            job.complete(JobState.timeout, null, "timeout");
+            completeTimeout(job);
         } else if (job.cancelRequested()) {
             job.complete(JobState.cancelled, null, "cancelled");
         } else {
-            job.complete(JobState.failed, null, message(failure));
+            // A node may reject the request with an ApiException (for example path_not_allowed).
+            // Keep its status/code/hint so the sync-run handler can answer 4xx instead of 500.
+            ApiException rejection = apiException(failure);
+            if (rejection != null && rejection.status() < 500) {
+                String code = rejection.code() == null
+                        ? Http.codeForStatus(rejection.status()) : rejection.code();
+                job.complete(JobState.failed, null, message(failure),
+                        rejection.status(), code, rejection.hint());
+            } else {
+                job.complete(JobState.failed, null, message(failure));
+            }
         }
+    }
+
+    /** Unwrap executor wrappers to the ApiException a node actually threw, if any. */
+    private static ApiException apiException(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof ApiException api) {
+                return api;
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     private static List<NodeStateView> nodeStates(Workflow workflow) {

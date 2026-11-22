@@ -78,6 +78,35 @@ class WorkflowLockCleanupTest {
     }
 
     @Test
+    void closingASessionClearsItsLocksJobsAndStoreKey() throws Exception {
+        try (DuckDbSession planDb = new DuckDbSession()) {
+            ServiceState state = new ServiceState(new NativeService.Settings(100, 600, "127.0.0.1", 0),
+                    new NodeRegistry(), new Executors().register(
+                            ExecTestSupport.fake("dap.one", (context, inputs) ->
+                                    ExecTestSupport.plan(planDb, "SELECT 1 AS x", "x"))));
+            try {
+                Workflow workflow = state.workflows().create("s1", "wf");
+                workflow.addNode("dap.one", "one", null);
+                DuckDbSession db = state.session("s1");
+                Job job = state.jobs().submit(workflow, db, 5);
+                assertTrue(job.await(10_000), "job did not finish");
+                assertTrue(state.jobs().hasWorkflowLock(workflow.id()));
+
+                assertTrue(state.closeSession("s1"));
+
+                assertNull(state.sessionIfPresent("s1"), "the database must be closed");
+                assertEquals(0, state.sessionCount());
+                assertEquals(0, state.workflows().sessionCount(), "the store key must be gone");
+                assertFalse(state.jobs().hasWorkflowLock(workflow.id()), "the lock must be gone");
+                assertEquals(0, state.jobs().totalCount(), "the job history must be gone");
+                assertNull(state.jobs().find("s1", job.id()));
+            } finally {
+                state.close();
+            }
+        }
+    }
+
+    @Test
     void deletingAWorkflowInterruptsItsInFlightRead() throws Exception {
         ServiceState state = new ServiceState(new NativeService.Settings(100, 600, "127.0.0.1", 0),
                 new NodeRegistry(), new Executors());

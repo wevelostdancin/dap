@@ -112,7 +112,9 @@ public final class NativeService implements AutoCloseable {
     public record Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
                            String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
                            int idleTimeoutSec, int queryTimeoutSec, int maxSessions,
-                           int sessionTtlSec, int maxRetainedJobs, String duckdbExtensionDirectory) {
+                           int sessionTtlSec, int maxRetainedJobs, String duckdbExtensionDirectory,
+                           int maxTableLimit) {
+        public static final int DEFAULT_TABLE_MAX_LIMIT = 10_000;
         private static final int DEFAULT_IDLE_TIMEOUT_SEC = 900;
         private static final int DEFAULT_QUERY_TIMEOUT_SEC = 60;
         private static final int DEFAULT_MAX_SESSIONS = 64;
@@ -147,6 +149,20 @@ public final class NativeService implements AutoCloseable {
                 throw new IllegalArgumentException(
                         "DAP_MAX_RETAINED_JOBS must be a positive integer, got " + maxRetainedJobs);
             }
+            if (maxTableLimit <= 0) {
+                throw new IllegalArgumentException(
+                        "DAP_TABLE_MAX_LIMIT must be a positive integer, got " + maxTableLimit);
+            }
+        }
+
+        /** Settings without an explicit table limit keep the 10 000 rows default. */
+        public Settings(int maxWorkflows, int defaultJobTimeoutSec, String bindHost, int port,
+                        String duckdbMemoryLimit, Integer duckdbThreads, String duckdbTempDirectory,
+                        int idleTimeoutSec, int queryTimeoutSec, int maxSessions,
+                        int sessionTtlSec, int maxRetainedJobs, String duckdbExtensionDirectory) {
+            this(maxWorkflows, defaultJobTimeoutSec, bindHost, port, duckdbMemoryLimit, duckdbThreads,
+                    duckdbTempDirectory, idleTimeoutSec, queryTimeoutSec, maxSessions, sessionTtlSec,
+                    maxRetainedJobs, duckdbExtensionDirectory, DEFAULT_TABLE_MAX_LIMIT);
         }
 
         /** Phase-1/2 tests build the HTTP settings only; DuckDB resources stay at their defaults. */
@@ -211,7 +227,8 @@ public final class NativeService implements AutoCloseable {
                     positiveIntEnv(env, "DAP_MAX_SESSIONS", DEFAULT_MAX_SESSIONS),
                     nonNegativeIntEnv(env, "DAP_SESSION_TTL_SEC", DEFAULT_SESSION_TTL_SEC),
                     positiveIntEnv(env, "DAP_MAX_RETAINED_JOBS", DEFAULT_MAX_RETAINED_JOBS),
-                    extensionDirectory(env));
+                    extensionDirectory(env),
+                    positiveIntEnv(env, "DAP_TABLE_MAX_LIMIT", DEFAULT_TABLE_MAX_LIMIT));
         }
 
         private static int intEnv(Map<String, String> env, String name, int fallback) {
@@ -820,7 +837,7 @@ public final class NativeService implements AutoCloseable {
                 defaults.duckdbMemoryLimit(), defaults.duckdbThreads(), defaults.duckdbTempDirectory(),
                 defaults.idleTimeoutSec(), defaults.queryTimeoutSec(), defaults.maxSessions(),
                 defaults.sessionTtlSec(), defaults.maxRetainedJobs(),
-                defaults.duckdbExtensionDirectory());
+                defaults.duckdbExtensionDirectory(), defaults.maxTableLimit());
         NativeService service = new NativeService(settings, new NodeRegistry(), defaultExecutors());
         Runtime.getRuntime().addShutdownHook(new Thread(service::close, "dap-shutdown-hook"));
         service.start(port);

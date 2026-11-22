@@ -87,6 +87,11 @@ public final class WorkflowStore {
         }
     }
 
+    /** Forget the session key itself; called when its session is closed. */
+    public void removeSession(String session) {
+        sessions.remove(session);
+    }
+
     public int count() {
         int total = 0;
         for (LinkedHashMap<String, Workflow> workflows : sessions.values()) {

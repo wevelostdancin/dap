@@ -16,6 +16,10 @@ public final class Job {
     private volatile long startedAt;
     private volatile long finishedAt;
     private volatile String error;
+    /** Client-error status/code/hint preserved from an ApiException raised by a node. */
+    private volatile Integer errorStatus;
+    private volatile String errorCode;
+    private volatile String errorHint;
     private volatile RunResult result;
     private volatile int nodesTotal;
     private volatile int nodesDone;
@@ -64,6 +68,19 @@ public final class Job {
 
     public String error() {
         return error;
+    }
+
+    /** HTTP status of a client error raised by the run, or null for an internal failure. */
+    public Integer errorStatus() {
+        return errorStatus;
+    }
+
+    public String errorCode() {
+        return errorCode;
+    }
+
+    public String errorHint() {
+        return errorHint;
     }
 
     public RunResult result() {
@@ -124,13 +141,22 @@ public final class Job {
         return true;
     }
 
-    public synchronized boolean complete(JobState terminal, RunResult result, String error) {
+    public boolean complete(JobState terminal, RunResult result, String error) {
+        return complete(terminal, result, error, null, null, null);
+    }
+
+    /** Complete with the error metadata that the sync-run handler maps back to HTTP. */
+    public synchronized boolean complete(JobState terminal, RunResult result, String error,
+                                         Integer status, String code, String hint) {
         if (state.terminal()) {
             return false;
         }
         this.state = terminal;
         this.result = result;
         this.error = error;
+        this.errorStatus = status;
+        this.errorCode = code;
+        this.errorHint = hint;
         this.finishedAt = System.currentTimeMillis();
         // A finished run is fully done even if the last progress callback was lost.
         if (nodesTotal > 0) {
