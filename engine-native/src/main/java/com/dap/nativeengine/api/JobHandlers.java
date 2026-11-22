@@ -83,10 +83,11 @@ public final class JobHandlers {
         boolean cancelled = state.jobs().cancel(job);
         if (cancelled && wasRunning) {
             // A /table or /profile read runs on its own connection, so the job-connection
-            // close above cannot reach it; close the reads registered for this workflow.
+            // close above cannot reach it; close only the reads this job started. Other
+            // clients of the same workflow keep their (unowned) reads.
             DuckDbSession db = state.sessionIfPresent(job.sessionId());
             if (db != null) {
-                db.interruptReads(job.workflowId());
+                db.interruptReads(job.workflowId(), job.id());
             }
         }
         Map<String, Object> body = new LinkedHashMap<>();

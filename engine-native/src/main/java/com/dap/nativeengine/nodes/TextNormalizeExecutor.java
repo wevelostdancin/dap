@@ -176,7 +176,7 @@ public final class TextNormalizeExecutor implements NodeExecutor {
                 projection.add("i." + NodeSql.quote(column.name()));
                 output.add(column);
             }
-            String mappingTable = mappingTable(context, input, column.name(), options);
+            String mappingTable = mappingTable(context, input, column.name(), options, alias);
             String joinAlias = "m" + alias++;
             joins.add(" LEFT JOIN " + DuckDbSession.quote(mappingTable) + " AS " + joinAlias
                     + " ON i." + NodeSql.quote(column.name()) + " = " + joinAlias + ".src");
@@ -194,7 +194,7 @@ public final class TextNormalizeExecutor implements NodeExecutor {
      * (src, dst) pairs into a session table. Only the distinct values, never the rows.
      */
     private static String mappingTable(NodeContext context, LazyPlan input, String column,
-                                       Options options) throws SQLException {
+                                       Options options, int columnIndex) throws SQLException {
         DuckDbSession db = context.db();
         List<Object[]> pairs = new ArrayList<>();
         String quoted = NodeSql.quote(column);
@@ -216,7 +216,9 @@ public final class TextNormalizeExecutor implements NodeExecutor {
         }
         try (ArrowTable table = ArrowTable.of(
                 List.of(ColumnSpec.of("src", "Utf8"), ColumnSpec.of("dst", "Utf8")), pairs)) {
-            return db.load(table, "textnorm");
+            // Index, not column name: two columns can sanitize to the same identifier.
+            return db.load(table, "textnorm", context.workflowId(), context.nodeId(),
+                    String.valueOf(columnIndex));
         } catch (SQLException failure) {
             throw new SQLException("text_normalize: cannot load the normalization mapping: "
                     + failure.getMessage(), failure);

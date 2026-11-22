@@ -813,7 +813,7 @@ public final class TimeSeriesExecutor implements NodeExecutor {
     private static LazyPlan loadPlan(NodeContext context, List<ColumnSpec> columns,
                                      List<Object[]> rows) throws SQLException {
         try (ArrowTable table = ArrowTable.of(columns, rows)) {
-            String name = context.db().load(table, "timeseries");
+            String name = context.db().load(table, "timeseries", context.workflowId(), context.nodeId());
             return new LazyPlan(context.db(), "SELECT * FROM " + NodeSql.quote(name), columns);
         }
     }
