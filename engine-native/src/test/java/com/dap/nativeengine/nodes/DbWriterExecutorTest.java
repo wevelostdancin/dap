@@ -9,11 +9,13 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -143,6 +145,23 @@ class DbWriterExecutorTest {
                     () -> write(db, input, "{\"driver\":\"duckdb\",\"connection\":\"/etc/out.duckdb\","
                             + "\"table\":\"t\",\"mode\":\"create\"}"));
             assertEquals("path_not_allowed", failure.code(), failure.getMessage());
+        }
+    }
+
+    @Test
+    void rejectedTargetDoesNotCreateItsParentDirectory() throws Exception {
+        Path parent = Path.of(System.getProperty("user.home"), ".ssh",
+                "dap-dbwriter-" + UUID.randomUUID());
+        Path database = parent.resolve("out.duckdb");
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = NodeTestSupport.table(db, COLUMNS, ROWS);
+            ApiException failure = assertThrows(ApiException.class,
+                    () -> write(db, input, config(database, "create")));
+            assertEquals("path_not_allowed", failure.code(), failure.getMessage());
+            assertTrue(!Files.exists(parent), "a rejected target must not create directories: " + parent);
+        } finally {
+            Files.deleteIfExists(database);
+            Files.deleteIfExists(parent);
         }
     }
 

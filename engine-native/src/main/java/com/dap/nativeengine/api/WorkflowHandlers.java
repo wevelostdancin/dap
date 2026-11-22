@@ -4,6 +4,7 @@ import com.dap.nativeengine.catalog.NodeSpec;
 import com.dap.nativeengine.exec.Connection;
 import com.dap.nativeengine.exec.Workflow;
 import com.dap.nativeengine.exec.WorkflowNode;
+import com.dap.nativeengine.io.PathGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.javalin.http.Context;
@@ -59,6 +60,8 @@ public final class WorkflowHandlers {
         Path file;
         try {
             file = Path.of(dirNode.asText()).resolve("workflow.json");
+            // Guard before reading, including the not-found branch, so a denied dir cannot be probed.
+            PathGuard.shared().checkRead(file.toAbsolutePath().normalize().toString());
         } catch (InvalidPathException failure) {
             throw ApiException.badRequest("invalid dir: " + failure.getMessage());
         }

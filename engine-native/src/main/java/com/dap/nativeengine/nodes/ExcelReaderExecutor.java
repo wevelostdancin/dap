@@ -17,6 +17,7 @@ import java.util.Set;
 
 /** dap.excel_reader: reads one worksheet of an .xlsx workbook into an Arrow table. */
 public final class ExcelReaderExecutor implements NodeExecutor {
+    private static final String NODE = "excel_reader";
     private static final Set<String> SUPPORTED =
             Set.of("Int64", "Float64", "Utf8", "Boolean", "Date32", "Timestamp");
 
@@ -28,10 +29,11 @@ public final class ExcelReaderExecutor implements NodeExecutor {
     @Override
     public LazyPlan execute(NodeContext context, List<LazyPlan> inputs) throws InterruptedException {
         JsonNode config = context.config();
-        String file = NodeSql.requiredText(config, "file");
+        // PathGuard + existence check, exactly like the other file readers.
+        Path file = IoNodeSupport.sourceFile(config, NODE);
         XlsxTableReader.Options options = options(config);
 
-        ArrowTable table = XlsxTableReader.read(Path.of(file), options);
+        ArrowTable table = XlsxTableReader.read(file, options);
         try {
             String name = context.db().loadInto(context.jobConnection(), table, tableName(context));
             return new LazyPlan(context.db(), "SELECT * FROM " + DuckDbSession.quote(name), table.columns());

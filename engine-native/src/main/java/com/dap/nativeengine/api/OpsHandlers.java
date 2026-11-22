@@ -2,6 +2,7 @@ package com.dap.nativeengine.api;
 
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Workflow;
+import com.dap.nativeengine.io.PathGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.javalin.http.Context;
 
@@ -33,6 +34,8 @@ public final class OpsHandlers {
         String dir = dirNode.asText();
         try {
             Path target = Path.of(dir);
+            // Guard before touching the filesystem: a rejected save must not create the directory.
+            PathGuard.shared().checkWrite(target.resolve("workflow.json").toString());
             Files.createDirectories(target);
             Files.writeString(target.resolve("workflow.json"), Json.write(workflow.toJson()),
                     StandardCharsets.UTF_8);
