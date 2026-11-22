@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Least-squares regression of one numeric response on one or more numeric predictors, optionally per group. coefficients mode returns one row per term (intercept and each predictor) with std_error, t_statistic, p_value, ci_low, ci_high and vif plus the model fit (r2, adj_r2, f_statistic, f_p_value, rmse, df_residual); diagnostics mode returns one row per fit with the model-level statistics including Durbin-Watson, AIC and BIC; predict mode keeps every input row and adds the prediction, residual and prediction interval. Standard errors are classical or HC1 heteroskedasticity-consistent. Categorical predictors are not supported (encode them first); n must exceed the number of parameters.",
+  "description": "Least-squares regression of one numeric response on one or more numeric predictors, optionally per group. coefficients mode returns one row per term (intercept and each predictor) with std_error, t_statistic, p_value, ci_low, ci_high and vif plus the model fit (r2, adj_r2, f_statistic, f_p_value, rmse, df_residual); diagnostics mode returns one row per fit with the model-level statistics including Durbin-Watson, AIC and BIC; predict mode keeps every input row and adds the prediction, residual, prediction interval, sampled_rows and total_rows (so a fit on a sample is visible). Standard errors are classical or HC1 heteroskedasticity-consistent. Categorical predictors are not supported (encode them first); n must exceed the number of parameters.",
   "inPorts": [
     {
       "index": 0,
@@ -86,7 +86,7 @@
       "sample_rows": {
         "type": "integer",
         "title": "Sample rows",
-        "description": "0 keeps the 100k-row cap and fails above it; a positive N fits on the first N rows instead, so a large table can be modelled without pre-filtering.",
+        "description": "0 keeps the 100k-row cap and fails above it; a positive N fits on the first N rows in a deterministic order (sorted by every group, predictor and response column), so a large table can be modelled reproducibly without pre-filtering. predict mode reports sampled_rows and total_rows.",
         "default": 0,
         "minimum": 0
       },

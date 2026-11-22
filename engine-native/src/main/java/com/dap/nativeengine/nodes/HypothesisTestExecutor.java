@@ -36,7 +36,6 @@ public final class HypothesisTestExecutor implements NodeExecutor {
             "t_test_two_sample", "t_test_paired", "t_test_one_sample", "chi_square", "anova",
             "mann_whitney", "kruskal_wallis", "wilcoxon_signed_rank", "tukey_hsd");
     private static final List<String> ALTERNATIVES = List.of("two-sided", "less", "greater");
-    private static final List<String> CORRECTIONS = List.of("none", "bonferroni", "holm", "bh");
     /** Rank tests and Tukey read values into Java; same cap as the other in-memory statistics. */
     private static final int ROW_CAP = 100_000;
     private static final List<ColumnSpec> OUTPUT = List.of(
@@ -72,11 +71,8 @@ public final class HypothesisTestExecutor implements NodeExecutor {
                     + "' (expected two-sided, less, greater)");
         }
         double alpha = alpha(config);
-        String correction = NodeSql.text(config, "correction", "none").trim().toLowerCase(Locale.ROOT);
-        if (!CORRECTIONS.contains(correction)) {
-            throw new IllegalArgumentException("hypothesis_test: unknown correction '" + correction
-                    + "' (expected none, bonferroni, holm or bh)");
-        }
+        String correction = MultipleTestingCorrection.validate(
+                NodeSql.text(config, "correction", "none"), "hypothesis_test");
         List<Row> rows = switch (test) {
             case "t_test_one_sample" -> List.of(oneSample(context, input, config, alternative, alpha));
             case "t_test_two_sample" -> List.of(twoSample(context, input, config, alternative, alpha));
@@ -88,7 +84,11 @@ public final class HypothesisTestExecutor implements NodeExecutor {
             case "wilcoxon_signed_rank" -> List.of(wilcoxon(context, input, config, alternative));
             default -> tukey(context, input, config, alpha);
         };
-        Double[] adjusted = adjusted(rows, correction);
+        List<Double> pValues = new ArrayList<>();
+        for (Row row : rows) {
+            pValues.add(row.pValue());
+        }
+        Double[] adjusted = MultipleTestingCorrection.adjust(pValues, correction);
         return new LazyPlan(context.db(), sql(rows, adjusted), OUTPUT);
     }
 
@@ -533,54 +533,6 @@ public final class HypothesisTestExecutor implements NodeExecutor {
             }
         }
         return rows;
-    }
-
-    // ---------------------------------------------------------- corrections
-
-    /** p-values adjusted for multiple comparisons; the row order is preserved. */
-    private static Double[] adjusted(List<Row> rows, String correction) {
-        Double[] result = new Double[rows.size()];
-        List<Integer> valid = new ArrayList<>();
-        for (int i = 0; i < rows.size(); i++) {
-            if (rows.get(i).pValue() != null) {
-                valid.add(i);
-            }
-        }
-        int m = valid.size();
-        if ("none".equals(correction) || m == 0) {
-            for (int i = 0; i < rows.size(); i++) {
-                result[i] = rows.get(i).pValue();
-            }
-            return result;
-        }
-        valid.sort(Comparator.comparingDouble(index -> rows.get(index).pValue()));
-        if ("bonferroni".equals(correction)) {
-            for (int index : valid) {
-                result[index] = Math.min(1.0, rows.get(index).pValue() * m);
-            }
-            return result;
-        }
-        if ("holm".equals(correction)) {
-            double previous = 0.0;
-            for (int rank = 0; rank < m; rank++) {
-                int index = valid.get(rank);
-                double adjusted = Math.min(1.0, rows.get(index).pValue() * (m - rank));
-                adjusted = Math.max(adjusted, previous);
-                previous = adjusted;
-                result[index] = adjusted;
-            }
-            return result;
-        }
-        // Benjamini-Hochberg: step up, enforcing monotonicity from the largest p-value.
-        double next = 1.0;
-        for (int rank = m - 1; rank >= 0; rank--) {
-            int index = valid.get(rank);
-            double adjusted = Math.min(1.0, rows.get(index).pValue() * m / (rank + 1.0));
-            adjusted = Math.min(adjusted, next);
-            next = adjusted;
-            result[index] = adjusted;
-        }
-        return result;
     }
 
     // ------------------------------------------------------------------ SQL

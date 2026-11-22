@@ -1103,11 +1103,13 @@ NULL в любой выбранной колонке делает `sum`, `mean`,
 | `partial` | array<string> | — | необязательные числовые контрольные колонки; не должны пересекаться с `columns` |
 | `output` | `long` \| `matrix` | `long` | `matrix` — строка на переменную, колонка на переменную |
 | `alpha` | number | `0.05` | уровень значимости для интервала: `1 − alpha`; в `(0, 1)` |
+| `correction` | `none` \| `bonferroni` \| `holm` \| `bh` | `none` | поправка на множественные сравнения для `p_adjusted` по всем парам; в `matrix` не применяется |
 
 Схема выхода `long`: `column_a`, `column_b`, `method`, `partial` (`String`),
-`n` (`Number (Integer)`), `correlation`, `p_value`, `ci_low`, `ci_high`
+`n` (`Number (Integer)`), `correlation`, `p_value`, `ci_low`, `ci_high`, `p_adjusted`
 (`Number (Float)`). `partial` — контрольные колонки через запятую (NULL, если
-частичной корреляции нет). Число строк — `n·(n−1)/2`.
+частичной корреляции нет). `p_adjusted` — `p_value` с поправкой на число пар; при
+`correction = none` равен `p_value`, NULL остаётся NULL. Число строк — `n·(n−1)/2`.
 
 Схема выхода `matrix`: `column` (`String`) и по одной `Number (Float)` колонке на
 каждую переменную `columns`, имя колонки — имя переменной; строк столько же, сколько
@@ -1124,6 +1126,12 @@ NULL в любой выбранной колонке делает `sum`, `mean`,
   (то же для y) — как в scipy `kendalltau(method='asymptotic')`. `p = 2(1−Φ(|z|))`,
   двусторонний нормальный хвост. Эталон: `tests/reference/kendall_pvalue.py`
   (scipy, запуск через `build/refvenv/bin/python`).
+- Поправка: `p_adjusted` считается общим с `dap.hypothesis_test` хелпером по всем
+  валидным p-value выхода: `bonferroni` — `min(1, p·m)`, `holm` — step-down с
+  накоплением максимума, `bh` — Benjamini–Hochberg step-up (`fdr_bh`). Порядок строк
+  сохраняется, NULL-значения не участвуют и остаются NULL. Эталон —
+  `tests/reference/correction.py` (statsmodels `multipletests`, 1e-9 в JUnit).
+  В матричном формате p-value нет, поэтому `correction` на выход не влияет.
 - Интервал: Fisher `atanh` с `se = 1/sqrt(n−3−k)` для Pearson/Spearman; для Kendall
   `se = sqrt(var/((tot−xtie)(tot−ytie)))`, `tot = n(n−1)/2`; значения обрезаны
   в `[−1, 1]`.
@@ -1134,8 +1142,8 @@ NULL в любой выбранной колонке делает `sum`, `mean`,
   и/или `ci_low`/`ci_high` NULL; `|r| = 1` даёт `p_value = 0` и вырожденный
   интервал.
 - Меньше двух колонок, дубль, неизвестная или нечисловая колонка, пересечение
-  `columns` и `partial`, неизвестный `method`/`output`, `alpha` вне `(0, 1)` —
-  ошибка run.
+  `columns` и `partial`, неизвестный `method`/`output`/`correction`, `alpha` вне
+  `(0, 1)` — ошибка run.
 - Kendall читает значения в память: не более 100 000 строк, иначе ошибка с подсказкой
   использовать `spearman`.
 - На вырожденной паре (нулевой разброс) корреляция NULL; если корреляционная матрица
@@ -1149,7 +1157,8 @@ NULL в любой выбранной колонке делает `sum`, `mean`,
     "method": "spearman",
     "partial": ["petal_width"],
     "output": "long",
-    "alpha": 0.05
+    "alpha": 0.05,
+    "correction": "bh"
   }
 }
 ```
@@ -1755,6 +1764,7 @@ Tukey — SQL-агрегаты, ранговые тесты считаются �
 | `intercept` | boolean | `true` | `false` — модель без свободного члена |
 | `robust` | `none` \| `hc1` | `none` | `hc1` — гетероскедастичность-устойчивая ковариация `(X'X)⁻¹·meat·(X'X)⁻¹·n/(n−p)` |
 | `alpha` | number | `0.05` | уровень значимости интервалов: `1 − alpha`; в `(0, 1)` |
+| `sample_rows` | integer | `0` | `0` — лимит 100 000 строк; положительное N — детерминированная выборка первых N строк |
 | `output` | string | `prediction` | имя колонки предсказания в режиме `predict` |
 
 Выход `coefficients`: `[group_by…]`, `term`, `coefficient`, `std_error`,
@@ -1772,7 +1782,10 @@ Tukey — SQL-агрегаты, ранговые тесты считаются �
 
 Выход `predict`: входные колонки, затем `output`, `residual` (`y − prediction`),
 `prediction_lower` и `prediction_upper` — интервал предсказания для нового
-наблюдения: `prediction ± t(1−α/2, df)·sqrt(MSE + x₀'·Cov(β)·x₀)`. При
+наблюдения: `prediction ± t(1−α/2, df)·sqrt(MSE + x₀'·Cov(β)·x₀)`, затем
+`sampled_rows` и `total_rows` (`Number (Integer)`) — сколько строк реально вошло в
+подгонку и сколько было доступно до `LIMIT`; по ним видно, что модель обучена на
+выборке (`sampled_rows < total_rows`). При
 `group_by` коэффициенты подставляются через литеральную таблицу, соединённую по
 колонкам группировки (`IS NOT DISTINCT FROM`), поэтому порядок входных строк
 сохраняется. `prediction` и интервалы NULL, если NULL предиктор.
@@ -1784,6 +1797,12 @@ Tukey — SQL-агрегаты, ранговые тесты считаются �
 для модели без свободного члена считается по несцентрированному SST и может быть
 отрицательным. Категориальные предикторы не поддерживаются — сначала `dap.encoder`.
 Подгонка читает значения в память: не более 100 000 строк.
+`sample_rows > 0` берёт первые N строк в каноническом порядке — `ORDER BY` по всем
+колонкам группировки, предикторам и отклику (строки, равные по всем этим ключам,
+взаимозаменяемы для МНК). Благодаря этому один и тот же вход даёт одни и те же
+коэффициенты; `COUNT(*) OVER ()` в том же запросе считает `total_rows` до `LIMIT`.
+Ограничение: сортировка перед `LIMIT` читает весь вход, поэтому выборка экономит
+память подгонки, но не полный scan.
 
 ```json
 {

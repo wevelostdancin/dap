@@ -1,7 +1,7 @@
 {
   "id": "wf-p6-correlation",
   "title": "Correlation: Pearson p-value and Fisher confidence interval",
-  "rationale": "Pins the P6 long-format correlation contract: method, n, p_value, ci_low, ci_high and partial on iris.",
+  "rationale": "Pins the P6 long-format correlation contract: method, n, p_value, ci_low, ci_high, partial and p_adjusted (correction=none) on iris.",
   "kind": "native",
   "nodes": [
     {
@@ -71,6 +71,10 @@
         {
           "name": "partial",
           "type": "String"
+        },
+        {
+          "name": "p_adjusted",
+          "type": "Number (Float)"
         }
       ],
       "data": [
@@ -83,7 +87,8 @@
           0,
           0.9489048767247285,
           0.972906098710965,
-          null
+          null,
+          0
         ]
       ],
       "order": "unordered"

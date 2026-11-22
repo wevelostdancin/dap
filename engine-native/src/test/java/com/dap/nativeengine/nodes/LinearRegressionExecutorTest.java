@@ -371,13 +371,18 @@ class LinearRegressionExecutorTest {
                     ColumnSpec.of("prediction", "Float64"),
                     ColumnSpec.of("residual", "Float64"),
                     ColumnSpec.of("prediction_lower", "Float64"),
-                    ColumnSpec.of("prediction_upper", "Float64")), plan.columns());
+                    ColumnSpec.of("prediction_upper", "Float64"),
+                    ColumnSpec.of("sampled_rows", "Int64"),
+                    ColumnSpec.of("total_rows", "Int64")), plan.columns());
 
             TableData data = plan.preview(10);
             assertEquals(3, data.rows());
-            assertEquals(List.of("1.0", "3.0", "3.0", "0.0", "3.0", "3.0"), data.data().get(0));
-            assertEquals(List.of("2.0", "5.0", "5.0", "0.0", "5.0", "5.0"), data.data().get(1));
-            assertEquals(List.of("3.0", "7.0", "7.0", "0.0", "7.0", "7.0"), data.data().get(2));
+            assertEquals(List.of("1.0", "3.0", "3.0", "0.0", "3.0", "3.0", "3", "3"),
+                    data.data().get(0));
+            assertEquals(List.of("2.0", "5.0", "5.0", "0.0", "5.0", "5.0", "3", "3"),
+                    data.data().get(1));
+            assertEquals(List.of("3.0", "7.0", "7.0", "0.0", "7.0", "7.0", "3", "3"),
+                    data.data().get(2));
         }
     }
 
@@ -393,7 +398,9 @@ class LinearRegressionExecutorTest {
                     ColumnSpec.of("prediction", "Float64"),
                     ColumnSpec.of("residual", "Float64"),
                     ColumnSpec.of("prediction_lower", "Float64"),
-                    ColumnSpec.of("prediction_upper", "Float64")), plan.columns());
+                    ColumnSpec.of("prediction_upper", "Float64"),
+                    ColumnSpec.of("sampled_rows", "Int64"),
+                    ColumnSpec.of("total_rows", "Int64")), plan.columns());
 
             TableData data = plan.preview(20);
             assertEquals(10, data.rows());
@@ -431,7 +438,9 @@ class LinearRegressionExecutorTest {
                     ColumnSpec.of("fitted", "Float64"),
                     ColumnSpec.of("residual", "Float64"),
                     ColumnSpec.of("prediction_lower", "Float64"),
-                    ColumnSpec.of("prediction_upper", "Float64")), plan.columns());
+                    ColumnSpec.of("prediction_upper", "Float64"),
+                    ColumnSpec.of("sampled_rows", "Int64"),
+                    ColumnSpec.of("total_rows", "Int64")), plan.columns());
 
             TableData data = plan.preview(10);
             assertEquals(6, data.rows());
@@ -591,6 +600,56 @@ class LinearRegressionExecutorTest {
             List<String> slope = termRow(data, 0, "x");
             assertEquals(2.0, number(slope, 1), 1e-9);
             assertEquals(1000, Integer.parseInt(slope.get(6)));
+        }
+    }
+
+    /**
+     * Insertion order is a permutation of x, and the first 20 rows by x follow y = x
+     * while the rest follow y = 10x. A bare LIMIT 20 would fit slope 10; the canonical
+     * order-by-every-column sample must fit slope 1.
+     */
+    private static LazyPlan scrambled(DuckDbSession db) throws Exception {
+        int n = 100;
+        List<Object[]> rows = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            double x = (i * 37) % n;
+            rows.add(new Object[]{x, x < 20 ? x : 10.0 * x});
+        }
+        return NodeTestSupport.table(db,
+                List.of(ColumnSpec.of("x", "Float64"), ColumnSpec.of("y", "Float64")), rows);
+    }
+
+    @Test
+    void sampleRowsIsDeterministicAcrossRuns() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = scrambled(db);
+            String config = """
+                    {"x":["x"],"y":"y","sample_rows":20}
+                    """;
+
+            TableData first = run(db, input, config);
+            TableData second = run(db, input, config);
+            assertEquals(first.data(), second.data());
+
+            List<String> slope = termRow(first, 0, "x");
+            assertEquals(1.0, number(slope, 1), 1e-9);
+            assertEquals(0.0, number(termRow(first, 0, "intercept"), 1), 1e-9);
+            assertEquals("20", slope.get(6));
+        }
+    }
+
+    @Test
+    void predictReportsSampledAndTotalRows() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = scrambled(db);
+            TableData data = run(db, input, """
+                    {"x":["x"],"y":"y","mode":"predict","sample_rows":20}
+                    """);
+            assertEquals(100, data.rows());
+            for (List<String> row : data.data()) {
+                assertEquals("20", row.get(6), row.toString());
+                assertEquals("100", row.get(7), row.toString());
+            }
         }
     }
 }
