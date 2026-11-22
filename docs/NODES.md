@@ -1118,7 +1118,10 @@ NULL в любой выбранной колонке делает `sum`, `mean`,
 
 - p-value: для Pearson/Spearman `t = r·sqrt(df/(1−r²))`, `df = n−2−k` (`k` —
   число контрольных колонок), двусторонний хвост t; для Kendall
-  `z = 3τ·sqrt(n(n−1))/(2·sqrt(2n+5))`, двусторонний нормальный хвост.
+  `z = 3τ·sqrt(n(n−1))/sqrt(2(2n+5)) = τ/se` (без поправки на связи),
+  `p = 2(1−Φ(|z|))`, двусторонний нормальный хвост. Эталонные значения tau и
+  p-value: `tests/reference/kendall_pvalue.py` (scipy, запуск через
+  `build/refvenv/bin/python`).
 - Интервал: Fisher `atanh` с `se = 1/sqrt(n−3−k)` для Pearson/Spearman; для Kendall
   асимптотическая `se = sqrt(2(2n+5)/(9n(n−1)))`; значения обрезаны в `[−1, 1]`.
 - `n < 3` (для Pearson/Spearman `df ≤ 0` или `n−3−k ≤ 0`) оставляет `p_value`

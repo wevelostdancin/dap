@@ -1,6 +1,7 @@
 package com.dap.nativeengine.nodes;
 
 import com.dap.nativeengine.engine.ColumnSpec;
+import com.dap.nativeengine.engine.Distributions;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
 import com.dap.nativeengine.engine.TableData;
@@ -17,7 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * dap.correlation. Reference values are R/independent double-precision computations:
  * Pearson p-values use the t approximation, Kendall the normal z approximation, the CI
- * Fisher's z transform (Kendall: the asymptotic normal standard error).
+ * Fisher's z transform (Kendall: the asymptotic normal standard error). Kendall tau and
+ * p-values are cross-checked against tests/reference/kendall_pvalue.py (scipy).
  */
 class CorrelationExecutorTest {
     private static final List<ColumnSpec> OUTPUT = List.of(
@@ -42,6 +44,45 @@ class CorrelationExecutorTest {
             new Object[]{2.0, 4.0, 8.0, "b"},
             new Object[]{3.0, 6.0, 27.0, "c"},
             new Object[]{4.0, 8.0, 64.0, "d"});
+
+    // Kendall vectors shared with tests/reference/kendall_pvalue.py (identical literals).
+    private static final double[] KENDALL_X4 = {1.0, 2.0, 3.0, 4.0};
+    private static final double[] KENDALL_Y4 = {1.0, 2.0, 2.0, 3.0};
+    private static final double[] KENDALL_X10 = {
+            1.0, 1.0, 2.0, 2.0, 3.0, 4.0, 4.0, 5.0, 6.0, 6.0};
+    private static final double[] KENDALL_Y10 = {
+            2.0, 3.0, 1.0, 3.0, 5.0, 4.0, 4.0, 2.0, 6.0, 5.0};
+    // x = 1..100; y = round(x + U(-120, 120), 6) with random.Random(42), frozen.
+    private static final double[] KENDALL_Y100 = {
+            34.462432, -111.997419, -50.992964, -62.429423, 61.753091,
+            48.407877, 101.123096, -91.13468, -9.738763, -102.848667,
+            -56.526886, 13.285269, -100.631367, -58.278964, 50.972265,
+            26.785955, -50.094251, 39.423764, 93.26331, -98.440298,
+            94.39662, 69.553455, -15.339876, -58.68492, 134.731137,
+            -13.217309, -70.740998, -68.78807, 112.398648, 54.894248,
+            104.710786, 87.135629, 41.694742, 147.547783, 5.848251,
+            48.489752, 116.057119, 66.444741, 125.809656, 58.564515,
+            90.097241, -67.002148, -22.304414, -6.546889, -55.849926,
+            -18.130187, -48.759657, -5.286335, 81.564267, 17.559723,
+            19.843432, -17.718313, -2.925323, 158.797101, 90.528492,
+            82.191441, -21.926724, 112.990432, -21.783401, 31.069306,
+            178.485604, 95.599942, 76.667939, 108.30742, 147.284461,
+            132.239979, 1.971537, -44.295941, 24.708732, 14.25781,
+            1.635882, 178.298331, 163.32823, 29.522691, 112.30528,
+            50.951656, 176.491422, 68.124445, 22.57124, 19.190602,
+            95.728352, 25.057986, 103.300638, 179.477492, 60.856121,
+            18.636982, 206.409026, 90.28631, -9.181741, -18.69207,
+            -2.684209, 122.58705, 163.099047, 75.318392, -9.753351,
+            67.588629, 216.069131, 104.987443, 212.058811, 186.587129};
+
+    private static LazyPlan kendallInput(DuckDbSession db, double[] x, double[] y) throws Exception {
+        List<Object[]> rows = new ArrayList<>();
+        for (int i = 0; i < x.length; i++) {
+            rows.add(new Object[]{x[i], y[i]});
+        }
+        return NodeTestSupport.table(db,
+                List.of(ColumnSpec.of("x", "Float64"), ColumnSpec.of("y", "Float64")), rows);
+    }
 
     private static TableData run(DuckDbSession db, LazyPlan input, String configJson) throws Exception {
         LazyPlan plan = new CorrelationExecutor().execute(
@@ -163,21 +204,68 @@ class CorrelationExecutorTest {
     @Test
     void kendallTauBHandlesTies() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
-            LazyPlan input = NodeTestSupport.table(db,
-                    List.of(ColumnSpec.of("x", "Float64"), ColumnSpec.of("y", "Float64")),
-                    List.of(
-                            new Object[]{1.0, 1.0},
-                            new Object[]{2.0, 2.0},
-                            new Object[]{3.0, 2.0},
-                            new Object[]{4.0, 3.0}));
+            LazyPlan input = kendallInput(db, KENDALL_X4, KENDALL_Y4);
 
             TableData data = run(db, input, "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
             assertEquals("kendall", data.data().get(0).get(2));
-            // tau_b = 5 / sqrt(6 * 5) = 0.9128709291752769; z = 1.3155870289605438.
+            // scipy reference: tau_b = 5 / sqrt(6 * 5) = 0.9128709291752769,
+            // z = 1.860521018838127, p = 0.06281184751609867.
             assertEquals(0.9128709291752769, number(data, 0, 4), 1e-12);
-            assertEquals(0.18831268948891644, number(data, 0, 5), 1e-9);
+            assertEquals(0.06281184751609867, number(data, 0, 5), 1e-9);
             assertEquals(-0.048792027384325198, number(data, 0, 6), 1e-9);
             assertEquals(1.0, number(data, 0, 7), 1e-9);
+        }
+    }
+
+    @Test
+    void kendallPValueMatchesScipyReferenceForHundredObservations() throws Exception {
+        double[] x = new double[KENDALL_Y100.length];
+        for (int i = 0; i < x.length; i++) {
+            x[i] = i + 1.0;
+        }
+        try (DuckDbSession db = new DuckDbSession()) {
+            TableData data = run(db, kendallInput(db, x, KENDALL_Y100),
+                    "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
+
+            assertEquals("100", data.data().get(0).get(3));
+            // scipy reference: tau = 0.30020202020202025, z = 4.425481546448939.
+            assertEquals(0.30020202020202025, number(data, 0, 4), 1e-9);
+            assertEquals(9.622738296844866e-06, number(data, 0, 5), 1e-9);
+        }
+    }
+
+    @Test
+    void kendallPValueMatchesScipyReferenceWithTies() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            TableData data = run(db, kendallInput(db, KENDALL_X10, KENDALL_Y10),
+                    "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
+
+            // scipy reference: tau_b = 0.48780487804878053, z = 1.9633767607315227.
+            assertEquals(0.48780487804878053, number(data, 0, 4), 1e-9);
+            assertEquals(0.04960241208655068, number(data, 0, 5), 1e-9);
+        }
+    }
+
+    @Test
+    void kendallZEqualsTauOverStandardError() throws Exception {
+        double[] x100 = new double[KENDALL_Y100.length];
+        for (int i = 0; i < x100.length; i++) {
+            x100[i] = i + 1.0;
+        }
+        try (DuckDbSession db = new DuckDbSession()) {
+            for (double[][] vectors : List.of(
+                    new double[][]{KENDALL_X4, KENDALL_Y4},
+                    new double[][]{KENDALL_X10, KENDALL_Y10},
+                    new double[][]{x100, KENDALL_Y100})) {
+                TableData data = run(db, kendallInput(db, vectors[0], vectors[1]),
+                        "{\"columns\":[\"x\",\"y\"],\"method\":\"kendall\"}");
+                long n = Long.parseLong(data.data().get(0).get(3));
+                double tau = number(data, 0, 4);
+                double p = number(data, 0, 5);
+                double se = Math.sqrt(2.0 * (2.0 * n + 5.0) / (9.0 * n * (n - 1.0)));
+                double zFromP = Distributions.normalQuantile(1.0 - p / 2.0);
+                assertEquals(Math.abs(tau) / se, zFromP, 1e-12);
+            }
         }
     }
 

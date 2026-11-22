@@ -146,7 +146,7 @@ public final class CorrelationExecutor implements NodeExecutor {
         double critical = Distributions.normalQuantile(1.0 - alpha / 2.0);
         if ("kendall".equals(method)) {
             if (n >= 3) {
-                double z = 3.0 * correlation * Math.sqrt(n * (n - 1.0)) / (2.0 * Math.sqrt(2.0 * n + 5.0));
+                double z = 3.0 * correlation * Math.sqrt(n * (n - 1.0)) / Math.sqrt(2.0 * (2.0 * n + 5.0));
                 pValue = clamp(2.0 * (1.0 - Distributions.normalCdf(Math.abs(z))));
                 double standardError = Math.sqrt(2.0 * (2.0 * n + 5.0) / (9.0 * n * (n - 1.0)));
                 ciLow = clip(correlation - critical * standardError);
@@ -442,6 +442,8 @@ public final class CorrelationExecutor implements NodeExecutor {
                 unique[uniqueCount++] = sortedY[i];
             }
         }
+        // lowerBound needs ascending values, but unique was collected in x order.
+        java.util.Arrays.sort(unique, 0, uniqueCount);
         int[] rank = new int[n];
         for (int i = 0; i < n; i++) {
             rank[i] = lowerBound(unique, uniqueCount, sortedY[i]) + 1;
@@ -481,15 +483,14 @@ public final class CorrelationExecutor implements NodeExecutor {
             tiesX += group * (group - 1) / 2.0;
             at = end;
         }
+        // Equal y values are not adjacent in x order, so count them by dense rank.
+        int[] yCounts = new int[uniqueCount + 1];
+        for (int r : rank) {
+            yCounts[r]++;
+        }
         double tiesY = 0.0;
-        int run = 1;
-        for (int i = 1; i <= n; i++) {
-            if (i < n && sortedY[i] == sortedY[i - 1]) {
-                run++;
-            } else {
-                tiesY += (double) run * (run - 1) / 2.0;
-                run = 1;
-            }
+        for (int count : yCounts) {
+            tiesY += (double) count * (count - 1) / 2.0;
         }
         double denominator = Math.sqrt((pairs - tiesX) * (pairs - tiesY));
         return denominator == 0.0 ? Double.NaN : (concordant - discordant) / denominator;
