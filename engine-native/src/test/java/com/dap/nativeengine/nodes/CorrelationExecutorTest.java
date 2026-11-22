@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -490,6 +491,58 @@ class CorrelationExecutorTest {
             TableData ninetyNine = run(db, line(db), "{\"columns\":[\"x\",\"y\"],\"alpha\":0.01}");
             assertTrue(number(ninety, 0, 6) > number(ninetyNine, 0, 6));
             assertTrue(number(ninety, 0, 7) < number(ninetyNine, 0, 7));
+        }
+    }
+
+    /** x repeats 1000 values over 200k rows; y adds a small deterministic wobble. */
+    private static LazyPlan bigCorrelationInput(DuckDbSession db, int rows, int columns)
+            throws Exception {
+        StringJoiner select = new StringJoiner(", ");
+        for (int j = 0; j < columns; j++) {
+            select.add("x AS c" + j);
+        }
+        String query = "SELECT x, (CAST(0.6 AS DOUBLE) * x + CAST(0.01 AS DOUBLE) * (i % 7)) AS y "
+                + "FROM (SELECT ((i % 1000) * CAST(0.01 AS DOUBLE) - 5.0) AS x, i "
+                + "FROM range(" + rows + ") t(i))";
+        List<ColumnSpec> schema = new ArrayList<>();
+        for (int j = 0; j < columns; j++) {
+            schema.add(ColumnSpec.of("c" + j, "Float64"));
+        }
+        schema.add(ColumnSpec.of("y", "Float64"));
+        return NodeTestSupport.sqlTable(db, "corr_big", "SELECT " + select + ", y FROM (" + query
+                + ")", schema);
+    }
+
+    @Test
+    void twoHundredThousandRowsMatchScipyMoments() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = bigCorrelationInput(db, 200_000, 1);
+            TableData pearson = run(db, input, "{\"columns\":[\"c0\",\"y\"]}");
+            assertEquals("200000", pearson.data().get(0).get(3));
+            // scipy pearsonr/spearmanr on the same deterministic 200k values.
+            assertEquals(0.9999333397526557, number(pearson, 0, 4), 1e-9);
+
+            TableData spearman = run(db, input,
+                    "{\"columns\":[\"c0\",\"y\"],\"method\":\"spearman\"}");
+            assertEquals(0.9999327242759083, number(spearman, 0, 4), 1e-9);
+        }
+    }
+
+    @Test
+    void twentyColumnsAtOneMillionRowsFitInMomentsNotRows() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = bigCorrelationInput(db, 1_000_000, 20);
+            StringJoiner pairs = new StringJoiner(",");
+            for (int j = 0; j < 20; j++) {
+                pairs.add("\"c" + j + "\"");
+            }
+            LazyPlan plan = new CorrelationExecutor().execute(
+                    NodeTestSupport.context(db, "{\"columns\":[" + pairs + "]}"), List.of(input));
+            // Only the 190 pair rows are materialised: the plan no longer scans the input.
+            assertTrue(!plan.sql().contains("corr_big"), plan.sql());
+            TableData data = plan.preview(300);
+            assertEquals(190, data.rows());
+            assertEquals("1000000", data.data().get(0).get(3));
         }
     }
 

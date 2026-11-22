@@ -225,6 +225,25 @@ def case_correlation(engine: Engine, data: Path):
         row = result[0]
         checks.append(check(f"{method}.correlation", number(row["correlation"]), float(reference.statistic)))
         checks.append(check(f"{method}.p_value", number(row["p_value"]), float(reference.pvalue)))
+
+    # 200k rows: the moment-based path must agree with scipy without a row cap.
+    n = 200_000
+    big_x = rng.normal(0, 1, n)
+    big_y = 0.6 * big_x + rng.normal(0, 0.8, n)
+    big_x = np.round(big_x, 9)
+    big_y = np.round(big_y, 9)
+    big_csv = write_csv(data / "corr200k.csv", ["x", "y"],
+                        [[float(a), float(b)] for a, b in zip(big_x, big_y)])
+    for method, reference in (("pearson", stats.pearsonr(big_x, big_y)),
+                              ("spearman", stats.spearmanr(big_x, big_y))):
+        _, result = engine.run_node(big_csv, "correlation",
+                                    {"columns": ["x", "y"], "method": method})
+        row = result[0]
+        checks.append(check(f"200k.{method}.n", int(row["n"]), n))
+        checks.append(check(f"200k.{method}.correlation", number(row["correlation"]),
+                            float(reference.statistic)))
+        checks.append(check(f"200k.{method}.p_value", number(row["p_value"]),
+                            float(reference.pvalue)))
     return checks
 
 
@@ -264,6 +283,33 @@ def case_linear_regression(engine: Engine, data: Path):
         checks.append(check(f"{term}.t", number(row["t_statistic"]), float(model.tvalues[index])))
         checks.append(check(f"{term}.p", number(row["p_value"]), float(model.pvalues[index])))
     checks.append(check("r2", number(terms["intercept"]["r2"]), float(model.rsquared)))
+
+    # 200k rows: X'X/X'y from SQL moments must match statsmodels' OLS.
+    n = 200_000
+    big_x1 = np.round(rng.normal(0, 1, n), 9)
+    big_x2 = np.round(rng.normal(0, 1, n), 9)
+    big_y = np.round(2.5 + 1.7 * big_x1 - 0.9 * big_x2 + rng.normal(0, 0.5, n), 9)
+    big_csv = write_csv(data / "reg200k.csv", ["x1", "x2", "y"],
+                        [[float(a), float(b), float(c)]
+                         for a, b, c in zip(big_x1, big_x2, big_y)])
+    _, result = engine.run_node(big_csv, "linear_regression", {"x": ["x1", "x2"], "y": "y"})
+    big_model = sm.OLS(big_y, sm.add_constant(np.column_stack([big_x1, big_x2]))).fit()
+    terms = {row["term"]: row for row in result}
+    for index, term in enumerate(["intercept", "x1", "x2"]):
+        row = terms.get(term)
+        if row is None:
+            raise CaseFailure(f"missing term {term} in 200k result")
+        checks.append(check(f"200k.{term}.coefficient", number(row["coefficient"]),
+                            float(big_model.params[index])))
+        checks.append(check(f"200k.{term}.std_error", number(row["std_error"]),
+                            float(big_model.bse[index])))
+        checks.append(check(f"200k.{term}.t", number(row["t_statistic"]),
+                            float(big_model.tvalues[index])))
+        checks.append(check(f"200k.{term}.p", number(row["p_value"]),
+                            float(big_model.pvalues[index])))
+    checks.append(check("200k.n", int(terms["intercept"]["n"]), n))
+    checks.append(check("200k.r2", number(terms["intercept"]["r2"]),
+                        float(big_model.rsquared)))
     return checks
 
 
@@ -364,7 +410,29 @@ def case_pca(engine: Engine, data: Path):
     got = [number(row["explained_variance"]) for row in result]
     if len(got) < len(expected):
         raise CaseFailure(f"expected {len(expected)} components, got {len(got)}")
-    return [check(f"pc{index + 1}", got[index], float(value)) for index, value in enumerate(expected)]
+    checks = [check(f"pc{index + 1}", got[index], float(value))
+              for index, value in enumerate(expected)]
+
+    # 200k rows: covariance from SQL cross products must match numpy.
+    n = 200_000
+    big_x = np.round(rng.normal(0, 1, n), 9)
+    big_y = np.round(0.8 * big_x + rng.normal(0, 0.6, n), 9)
+    big_z = np.round(rng.normal(0, 1, n), 9)
+    big_csv = write_csv(data / "pca200k.csv", ["x", "y", "z"],
+                        [[float(a), float(b), float(c)]
+                         for a, b, c in zip(big_x, big_y, big_z)])
+    _, result = engine.run_node(big_csv, "pca",
+                                {"columns": ["x", "y", "z"], "components": 3,
+                                 "standardize": False, "mode": "explained"})
+    matrix = np.column_stack([big_x, big_y, big_z])
+    eigenvalues = np.sort(np.linalg.eigvalsh(np.cov(matrix, rowvar=False)))[::-1]
+    expected = eigenvalues / eigenvalues.sum()
+    got = [number(row["explained_variance"]) for row in result]
+    if len(got) < len(expected):
+        raise CaseFailure(f"expected {len(expected)} 200k components, got {len(got)}")
+    checks.extend(check(f"200k.pc{index + 1}", got[index], float(value))
+                  for index, value in enumerate(expected))
+    return checks
 
 
 def case_quantile(engine: Engine, data: Path):

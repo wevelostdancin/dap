@@ -30,15 +30,14 @@ import java.util.StringJoiner;
  * returns one row per fit with the model-level statistics (including Durbin-Watson,
  * AIC and BIC); predict mode returns the input rows plus the prediction, residual and
  * prediction interval. Standard errors are classical (none) or heteroskedasticity
- * consistent (hc1). The fit is computed in Java from X'X, the inverse and the residuals;
- * predict stays a lazy plan over the input with the coefficients as literals (or as a
- * literal coefficient table joined on the group columns).</p>
+ * consistent (hc1). X'X, X'y, y'y and the residual moments come from DuckDB aggregates,
+ * so only p-by-p matrices live in Java and the row count is unbounded; predict stays a
+ * lazy plan over the input with the coefficients as literals (or as a literal
+ * coefficient table joined on the group columns).</p>
  */
 public final class LinearRegressionExecutor implements NodeExecutor {
     private static final List<String> MODES = List.of("coefficients", "predict", "diagnostics");
     private static final List<String> ROBUST = List.of("none", "hc1");
-    /** The fit reads values into Java; same cap as the other in-memory statistics. */
-    private static final int ROW_CAP = 100_000;
     private static final String RESIDUAL = "residual";
     private static final String LOWER = "prediction_lower";
     private static final String UPPER = "prediction_upper";
@@ -105,20 +104,35 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             throw new IllegalArgumentException("linear_regression: 'seed' must be 0 or positive");
         }
         String prediction = "predict".equals(mode) ? predictionName(input, config) : null;
-        Sample sample = readRows(context, input, groups, predictors, response, sampleRows, seed);
-        List<SampleRow> rows = sample.rows();
-        LinkedHashMap<List<Object>, List<SampleRow>> grouped = group(rows, groups.size());
-        LinkedHashMap<List<Object>, Model> models = new LinkedHashMap<>();
-        if (rows.isEmpty()) {
+        String where = sampleWhere(predictors, response);
+        String baseTable = sampledSource(input, sampleRows, seed, where);
+        List<String> expressions = new ArrayList<>(predictors.size() + 1);
+        for (ColumnSpec predictor : predictors) {
+            expressions.add(MomentSupport.doubleColumn(predictor.name()));
+        }
+        expressions.add(MomentSupport.doubleColumn(response.name()));
+        List<String> groupExpressions = new ArrayList<>(groups.size());
+        for (ColumnSpec group : groups) {
+            groupExpressions.add(NodeSql.quote(group.name()));
+        }
+        LinkedHashMap<List<Object>, MomentSupport.Moments> moments = MomentSupport.read(context, "",
+                " FROM " + baseTable, expressions, false, groupExpressions);
+        if (moments.isEmpty()) {
             return emptyPlan(context, input, predictors, groups, mode, config);
         }
-        for (Map.Entry<List<Object>, List<SampleRow>> entry : grouped.entrySet()) {
-            models.put(entry.getKey(), fit(entry.getValue(), predictors, intercept, robust,
-                    alpha, entry.getKey()));
+        LinkedHashMap<List<Object>, Model> models = new LinkedHashMap<>();
+        long sampled = 0;
+        for (Map.Entry<List<Object>, MomentSupport.Moments> entry : moments.entrySet()) {
+            Model model = fit(context, baseTable, groups, entry.getKey(), entry.getValue(),
+                    predictors, response.name(), intercept, robust, alpha,
+                    "diagnostics".equals(mode));
+            models.put(entry.getKey(), model);
+            sampled += model.n();
         }
+        long total = sampleRows == 0 ? sampled : countRows(context, input, where);
         if ("predict".equals(mode)) {
             return predict(context, input, prediction, predictors, response, groups, models, intercept,
-                    rows.size(), sample.totalRows());
+                    sampled, total);
         }
         if ("diagnostics".equals(mode)) {
             return diagnostics(context, groups, models);
@@ -127,13 +141,6 @@ public final class LinearRegressionExecutor implements NodeExecutor {
     }
 
     // -------------------------------------------------------------- data
-
-    private record SampleRow(List<Object> groupValues, double[] x, double y) {
-    }
-
-    /** Rows actually fitted, plus the number of eligible rows before sampling. */
-    private record Sample(List<SampleRow> rows, long totalRows) {
-    }
 
     /**
      * One fitted model. {@code defined} is false when the design matrix is singular (a
@@ -149,65 +156,17 @@ public final class LinearRegressionExecutor implements NodeExecutor {
     }
 
     /**
-     * Deterministic reservoir sample via DuckDB {@code USING SAMPLE reservoir(N ROWS)
-     * REPEATABLE(seed)}: same input and seed give the same fit without sorting the whole
-     * table. A separate COUNT reports the unsampled total; leaving the window function
-     * out of the sampled query keeps its scan cheap. Without sampling the 100k-row cap
-     * is enforced with LIMIT and the window count comes back in the same result.
+     * Table expression over the eligible rows. With {@code sample_rows > 0} DuckDB draws
+     * a deterministic reservoir sample before any moment is computed; the same seed and
+     * input give the same fit. With 0 every eligible row is used, at any row count.
      */
-    private static Sample readRows(NodeContext context, LazyPlan input,
-                                   List<ColumnSpec> groups, List<ColumnSpec> predictors,
-                                   ColumnSpec response, int sampleRows, int seed) throws SQLException {
-        StringJoiner projection = new StringJoiner(", ");
-        for (ColumnSpec group : groups) {
-            projection.add(NodeSql.quote(group.name()));
+    private static String sampledSource(LazyPlan input, int sampleRows, int seed, String where) {
+        if (sampleRows <= 0) {
+            return input.asTable() + " AS dap_input WHERE " + where;
         }
-        for (ColumnSpec predictor : predictors) {
-            projection.add("CAST(" + NodeSql.quote(predictor.name()) + " AS DOUBLE) AS "
-                    + NodeSql.quote(predictor.name()));
-        }
-        projection.add("CAST(" + NodeSql.quote(response.name()) + " AS DOUBLE) AS "
-                + NodeSql.quote(response.name()));
-        String where = sampleWhere(predictors, response);
-        String sql;
-        if (sampleRows > 0) {
-            sql = "SELECT * FROM (SELECT " + projection + " FROM " + input.asTable()
-                    + " AS dap_input WHERE " + where + ") USING SAMPLE reservoir(" + sampleRows
-                    + " ROWS) REPEATABLE (" + seed + ")";
-        } else {
-            sql = "SELECT * FROM (SELECT " + projection + ", COUNT(*) OVER () AS "
-                    + NodeSql.quote("dap_total") + " FROM " + input.asTable()
-                    + " AS dap_input WHERE " + where + ") LIMIT " + (ROW_CAP + 1);
-        }
-        List<SampleRow> rows = new ArrayList<>();
-        long total = 0;
-        try (Connection connection = context.db().newConnection();
-             Statement statement = connection.createStatement();
-             ResultSet result = statement.executeQuery(sql)) {
-            while (result.next()) {
-                if (sampleRows == 0) {
-                    total = result.getLong("dap_total");
-                }
-                List<Object> groupValues = new ArrayList<>(groups.size());
-                for (int i = 0; i < groups.size(); i++) {
-                    groupValues.add(result.getObject(i + 1));
-                }
-                double[] x = new double[predictors.size()];
-                for (int i = 0; i < predictors.size(); i++) {
-                    x[i] = result.getDouble(groups.size() + i + 1);
-                }
-                rows.add(new SampleRow(groupValues,
-                        x, result.getDouble(groups.size() + predictors.size() + 1)));
-            }
-        }
-        if (sampleRows > 0) {
-            total = countRows(context, input, where);
-        } else if (total > ROW_CAP) {
-            throw new IllegalArgumentException("linear_regression: the fit is computed in memory and needs "
-                    + "at most " + ROW_CAP + " rows, got more; set sample_rows=N to fit on a "
-                    + "deterministic reservoir sample, or pre-filter the input");
-        }
-        return new Sample(rows, total);
+        return "(SELECT * FROM " + input.asTable() + " AS dap_src WHERE " + where
+                + " USING SAMPLE reservoir(" + sampleRows + " ROWS) REPEATABLE(" + seed
+                + ")) AS dap_input WHERE TRUE";
     }
 
     private static long countRows(NodeContext context, LazyPlan input, String where) throws SQLException {
@@ -229,26 +188,51 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         return where.toString();
     }
 
-    private static LinkedHashMap<List<Object>, List<SampleRow>> group(List<SampleRow> rows, int groupCount) {
-        LinkedHashMap<List<Object>, List<SampleRow>> grouped = new LinkedHashMap<>();
-        if (groupCount == 0) {
-            grouped.put(List.of(), rows);
-            return grouped;
+    private static String groupWhere(List<ColumnSpec> groups, List<Object> values) {
+        if (groups.isEmpty()) {
+            return "TRUE";
         }
-        for (SampleRow row : rows) {
-            grouped.computeIfAbsent(row.groupValues(), ignored -> new ArrayList<>()).add(row);
+        StringJoiner where = new StringJoiner(" AND ");
+        for (int i = 0; i < groups.size(); i++) {
+            where.add("dap_input." + NodeSql.quote(groups.get(i).name()) + " IS NOT DISTINCT FROM "
+                    + literal(groups.get(i), values.get(i)));
         }
-        return grouped;
+        return where.toString();
     }
 
     // --------------------------------------------------------------- fit
 
-    private static Model fit(List<SampleRow> rows, List<ColumnSpec> predictorColumns,
-                             boolean intercept, String robust, double alpha,
-                             List<Object> groupValues) {
+    /**
+     * Residuals are evaluated by DuckDB with the fitted coefficients as literal
+     * DOUBLEs: the residual sum of squares is exact even for a perfect fit (where
+     * y'y − β'X'y would cancel), and the HC1 meat needs no rows in the heap.
+     */
+    private record ResidualStats(double sse, double[][] meat) {
+    }
+
+    /** X'X and X'y from the SQL moments; the design's intercept is the constant column. */
+    private static double cross(MomentSupport.Moments moments, int first, int second) {
+        if (first < 0 && second < 0) {
+            return moments.count();
+        }
+        if (first < 0) {
+            return moments.sum(second);
+        }
+        if (second < 0) {
+            return moments.sum(first);
+        }
+        return moments.cross(first, second);
+    }
+
+    private static Model fit(NodeContext context, String baseTable, List<ColumnSpec> groups,
+                             List<Object> groupValues, MomentSupport.Moments moments,
+                             List<ColumnSpec> predictorColumns, String responseName,
+                             boolean intercept, String robust, double alpha, boolean diagnostics)
+            throws SQLException {
         int predictors = predictorColumns.size();
         int parameters = predictors + (intercept ? 1 : 0);
-        long n = rows.size();
+        int offset = intercept ? 1 : 0;
+        long n = moments.count();
         double dfResidual = n - parameters;
         String[] terms = terms(predictorColumns, intercept);
         if (n <= parameters) {
@@ -257,26 +241,12 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                     + n + " rows" + where + " and " + parameters + " parameters (including the intercept); "
                     + "add rows, drop a predictor or set intercept=false");
         }
-        double[][] design = new double[(int) n][parameters];
-        double[] y = new double[(int) n];
-        for (int i = 0; i < n; i++) {
-            int column = 0;
-            if (intercept) {
-                design[i][column++] = 1.0;
-            }
-            for (int j = 0; j < predictors; j++) {
-                design[i][column++] = rows.get(i).x()[j];
-            }
-            y[i] = rows.get(i).y();
-        }
         double[][] xtx = new double[parameters][parameters];
         double[] xty = new double[parameters];
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < parameters; j++) {
-                xty[j] += design[i][j] * y[i];
-                for (int k = 0; k < parameters; k++) {
-                    xtx[j][k] += design[i][j] * design[i][k];
-                }
+        for (int j = 0; j < parameters; j++) {
+            xty[j] = cross(moments, j - offset, predictors);
+            for (int k = 0; k < parameters; k++) {
+                xtx[j][k] = cross(moments, j - offset, k - offset);
             }
         }
         double[][] inverse;
@@ -289,23 +259,16 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         for (int j = 0; j < parameters; j++) {
             beta[j] = dot(inverse[j], xty);
         }
-        double[] residuals = new double[(int) n];
-        double sse = 0.0;
-        for (int i = 0; i < n; i++) {
-            residuals[i] = y[i] - dot(design[i], beta);
-            sse += residuals[i] * residuals[i];
-        }
-        double mean = 0.0;
-        for (double value : y) {
-            mean += value;
-        }
-        mean /= n;
-        double sst = 0.0;
-        for (double value : y) {
-            double centered = intercept ? value - mean : value;
-            sst += centered * centered;
-        }
+        ResidualStats residualStats = residualStats(context, baseTable, groups, groupValues,
+                predictorColumns, responseName, beta, intercept, "hc1".equals(robust));
+        double sse = residualStats.sse();
+        Double durbinWatson = diagnostics
+                ? durbinWatson(context, baseTable, groups, groupValues, predictorColumns,
+                        responseName, beta, intercept, sse)
+                : null;
         double mse = sse / dfResidual;
+        double sst = cross(moments, predictors, predictors)
+                - (intercept ? moments.sum(predictors) * moments.sum(predictors) / n : 0.0);
         Double r2 = sst > 0.0 ? 1.0 - sse / sst : null;
         Double adjR2 = r2 == null ? null
                 : 1.0 - (1.0 - r2) * (intercept ? n - 1.0 : n) / dfResidual;
@@ -317,7 +280,7 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             fPValue = clamp(1.0 - Distributions.fCdf(fStatistic, df1, dfResidual));
         }
         Double rmse = Math.sqrt(mse);
-        double[][] covariance = covariance(design, inverse, residuals, sse, mse, n, parameters, robust);
+        double[][] covariance = covariance(inverse, residualStats.meat(), mse, n, parameters, robust);
         double[] stdErrors = new double[parameters];
         double[] tStatistics = new double[parameters];
         Double[] pValues = new Double[parameters];
@@ -337,13 +300,120 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             ciLow[j] = beta[j] - critical * stdErrors[j];
             ciHigh[j] = beta[j] + critical * stdErrors[j];
         }
-        Double[] vif = vif(rows, predictors, intercept);
-        Double durbinWatson = durbinWatson(residuals, sse);
+        Double[] vif = vif(moments, predictors, intercept);
         Double aic = sse > 0.0 ? n * Math.log(sse / n) + 2.0 * parameters : null;
         Double bic = sse > 0.0 ? n * Math.log(sse / n) + Math.log(n) * parameters : null;
         return new Model(n, parameters, predictors, intercept, true, terms, beta, stdErrors,
                 tStatistics, pValues, ciLow, ciHigh, vif, covariance, mse, rmse, dfResidual, r2,
-                adjR2, fStatistic, fPValue, residuals, durbinWatson, aic, bic);
+                adjR2, fStatistic, fPValue, null, durbinWatson, aic, bic);
+    }
+
+    private static ResidualStats residualStats(NodeContext context, String baseTable,
+            List<ColumnSpec> groups, List<Object> groupValues, List<ColumnSpec> predictorColumns,
+            String responseName, double[] beta, boolean intercept, boolean hc1)
+            throws SQLException {
+        StringJoiner base = new StringJoiner(", ");
+        for (int j = 0; j < predictorColumns.size(); j++) {
+            base.add(MomentSupport.doubleColumn(predictorColumns.get(j).name()) + " AS "
+                    + NodeSql.quote("dap_x" + j));
+        }
+        base.add(MomentSupport.doubleColumn(responseName) + " AS " + NodeSql.quote("dap_y"));
+        StringJoiner fitted = new StringJoiner(" + ");
+        if (intercept) {
+            fitted.add(doubleSql(beta[0]));
+        }
+        for (int j = 0; j < predictorColumns.size(); j++) {
+            fitted.add("(" + doubleSql(beta[(intercept ? 1 : 0) + j]) + " * "
+                    + NodeSql.quote("dap_x" + j) + ")");
+        }
+        base.add("(dap_y - (" + fitted + ")) AS " + NodeSql.quote("dap_e"));
+        String with = "WITH dap_base AS (SELECT " + base + " FROM " + baseTable
+                + " AND (" + groupWhere(groups, groupValues) + ")) ";
+        StringJoiner select = new StringJoiner(", ");
+        select.add("CAST(SUM(dap_e * dap_e) AS DOUBLE) AS " + NodeSql.quote("dap_sse"));
+        if (hc1) {
+            for (int j = 0; j < predictorColumns.size() + (intercept ? 1 : 0); j++) {
+                for (int k = 0; k < predictorColumns.size() + (intercept ? 1 : 0); k++) {
+                    select.add("CAST(SUM(dap_e * dap_e * " + designSql(j, intercept) + " * "
+                            + designSql(k, intercept) + ") AS DOUBLE) AS "
+                            + NodeSql.quote("dap_m" + j + "_" + k));
+                }
+            }
+        }
+        String sql = with + "SELECT " + select + " FROM dap_base";
+        try (Connection connection = context.db().newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(sql)) {
+            if (!result.next()) {
+                return new ResidualStats(0.0, null);
+            }
+            double sse = value(result, "dap_sse");
+            double[][] meat = null;
+            if (hc1) {
+                int size = predictorColumns.size() + (intercept ? 1 : 0);
+                meat = new double[size][size];
+                for (int j = 0; j < size; j++) {
+                    for (int k = 0; k < size; k++) {
+                        meat[j][k] = value(result, "dap_m" + j + "_" + k);
+                    }
+                }
+            }
+            return new ResidualStats(sse, meat);
+        }
+    }
+
+    /**
+     * Durbin-Watson is order-dependent, so the residuals are streamed once through a
+     * cursor holding only the previous residual; the fit itself never buffers rows.
+     */
+    private static Double durbinWatson(NodeContext context, String baseTable,
+            List<ColumnSpec> groups, List<Object> groupValues, List<ColumnSpec> predictorColumns,
+            String responseName, double[] beta, boolean intercept, double sse) throws SQLException {
+        if (!(sse > 0.0)) {
+            return null;
+        }
+        StringJoiner fitted = new StringJoiner(" + ");
+        if (intercept) {
+            fitted.add(doubleSql(beta[0]));
+        }
+        for (int j = 0; j < predictorColumns.size(); j++) {
+            fitted.add("(" + doubleSql(beta[(intercept ? 1 : 0) + j]) + " * "
+                    + MomentSupport.doubleColumn(predictorColumns.get(j).name()) + ")");
+        }
+        String expression = "(" + MomentSupport.doubleColumn(responseName) + " - (" + fitted + "))";
+        String sql = "SELECT " + expression + " FROM " + baseTable
+                + " AND (" + groupWhere(groups, groupValues) + ")";
+        double sum = 0.0;
+        double previous = 0.0;
+        int seen = 0;
+        try (Connection connection = context.db().newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(sql)) {
+            while (result.next()) {
+                double current = result.getDouble(1);
+                if (seen > 0) {
+                    double difference = current - previous;
+                    sum += difference * difference;
+                }
+                previous = current;
+                seen++;
+            }
+        }
+        return seen > 1 ? sum / sse : null;
+    }
+
+    /** Design value j inside an SQL expression: the constant column or an aliased predictor. */
+    private static String designSql(int index, boolean intercept) {
+        return index == 0 && intercept ? "1.0" : NodeSql.quote("dap_x" + (index - (intercept ? 1 : 0)));
+    }
+
+    private static String doubleSql(double value) {
+        return "CAST(" + NodeSql.literal(Double.toString(value)) + " AS DOUBLE)";
+    }
+
+    private static double value(ResultSet result, String column) throws SQLException {
+        Object value = result.getObject(column);
+        return value == null ? 0.0 : ((Number) value).doubleValue();
     }
 
     private static Model undefined(long n, int parameters, int predictors, boolean intercept,
@@ -366,8 +436,8 @@ public final class LinearRegressionExecutor implements NodeExecutor {
     }
 
     /** (X'X)^-1 scaled by the residual variance, or by the HC1 sandwich estimator. */
-    private static double[][] covariance(double[][] design, double[][] inverse, double[] residuals,
-                                         double sse, double mse, long n, int parameters, String robust) {
+    private static double[][] covariance(double[][] inverse, double[][] meat, double mse,
+                                         long n, int parameters, String robust) {
         if (!"hc1".equals(robust)) {
             double[][] result = new double[parameters][parameters];
             for (int j = 0; j < parameters; j++) {
@@ -377,14 +447,8 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             }
             return result;
         }
-        double[][] meat = new double[parameters][parameters];
-        for (int i = 0; i < n; i++) {
-            double weight = residuals[i] * residuals[i];
-            for (int j = 0; j < parameters; j++) {
-                for (int k = 0; k < parameters; k++) {
-                    meat[j][k] += weight * design[i][j] * design[i][k];
-                }
-            }
+        if (meat == null) {
+            return inverse;
         }
         double[][] middle = Matrix.multiply(Matrix.multiply(inverse, meat), inverse);
         double factor = (double) n / (n - parameters);
@@ -396,8 +460,8 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         return middle;
     }
 
-    /** VIF per predictor: 1 / (1 - R2) of the predictor regressed on the others. */
-    private static Double[] vif(List<SampleRow> rows, int predictors, boolean intercept) {
+    /** VIF from the inverse of the predictor correlation matrix: 1 / diag(R^-1). */
+    private static Double[] vif(MomentSupport.Moments moments, int predictors, boolean intercept) {
         Double[] result = new Double[predictors];
         if (!intercept) {
             return result;
@@ -406,84 +470,25 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             result[0] = 1.0;
             return result;
         }
+        double[][] correlation = new double[predictors][predictors];
         for (int j = 0; j < predictors; j++) {
-            List<double[]> others = new ArrayList<>();
-            for (int k = 0; k < predictors; k++) {
-                if (k != j) {
-                    others.add(column(rows, k));
-                }
-            }
-            Double r2 = rSquared(column(rows, j), others);
-            result[j] = r2 == null || r2 >= 1.0 - 1e-12 ? null : 1.0 / (1.0 - r2);
-        }
-        return result;
-    }
-
-    private static double[] column(List<SampleRow> rows, int predictor) {
-        double[] values = new double[rows.size()];
-        for (int i = 0; i < rows.size(); i++) {
-            values[i] = rows.get(i).x()[predictor];
-        }
-        return values;
-    }
-
-    /** R2 of an intercept-only-plus-others regression, or null when it is singular. */
-    private static Double rSquared(double[] target, List<double[]> others) {
-        int n = target.length;
-        int parameters = others.size() + 1;
-        double[][] xtx = new double[parameters][parameters];
-        double[] xty = new double[parameters];
-        for (int i = 0; i < n; i++) {
-            double[] row = new double[parameters];
-            row[0] = 1.0;
-            for (int j = 0; j < others.size(); j++) {
-                row[j + 1] = others.get(j)[i];
-            }
-            for (int j = 0; j < parameters; j++) {
-                xty[j] += row[j] * target[i];
-                for (int k = 0; k < parameters; k++) {
-                    xtx[j][k] += row[j] * row[k];
-                }
+            correlation[j][j] = 1.0;
+            for (int k = j + 1; k < predictors; k++) {
+                double value = moments.centeredCorrelation(j, k);
+                correlation[j][k] = correlation[k][j] = Double.isNaN(value) ? 0.0 : value;
             }
         }
         double[][] inverse;
         try {
-            inverse = Matrix.invert(xtx);
+            inverse = Matrix.invert(correlation);
         } catch (IllegalArgumentException singular) {
-            return null;
+            return result;
         }
-        double[] beta = new double[parameters];
-        for (int j = 0; j < parameters; j++) {
-            beta[j] = dot(inverse[j], xty);
+        for (int j = 0; j < predictors; j++) {
+            double r2 = inverse[j][j] == 0.0 ? Double.NaN : 1.0 - 1.0 / inverse[j][j];
+            result[j] = !Double.isFinite(r2) || r2 >= 1.0 - 1e-12 ? null : 1.0 / (1.0 - r2);
         }
-        double mean = 0.0;
-        for (double value : target) {
-            mean += value;
-        }
-        mean /= n;
-        double sse = 0.0;
-        double sst = 0.0;
-        for (int i = 0; i < n; i++) {
-            double fitted = beta[0];
-            for (int j = 0; j < others.size(); j++) {
-                fitted += beta[j + 1] * others.get(j)[i];
-            }
-            sse += (target[i] - fitted) * (target[i] - fitted);
-            sst += (target[i] - mean) * (target[i] - mean);
-        }
-        return sst > 0.0 ? 1.0 - sse / sst : null;
-    }
-
-    private static Double durbinWatson(double[] residuals, double sse) {
-        if (sse <= 0.0) {
-            return null;
-        }
-        double sum = 0.0;
-        for (int i = 1; i < residuals.length; i++) {
-            double difference = residuals[i] - residuals[i - 1];
-            sum += difference * difference;
-        }
-        return sum / sse;
+        return result;
     }
 
     private static double dot(double[] left, double[] right) {
@@ -614,17 +619,17 @@ public final class LinearRegressionExecutor implements NodeExecutor {
             if (model.defined()) {
                 String[] coefficientSql = new String[model.parameters()];
                 for (int j = 0; j < model.parameters(); j++) {
-                    coefficientSql[j] = Double.toString(model.beta()[j]);
+                    coefficientSql[j] = doubleSql(model.beta()[j]);
                 }
                 String[][] covarianceSql = new String[model.parameters()][model.parameters()];
                 for (int j = 0; j < model.parameters(); j++) {
                     for (int k = 0; k < model.parameters(); k++) {
-                        covarianceSql[j][k] = Double.toString(model.covariance()[j][k]);
+                        covarianceSql[j][k] = doubleSql(model.covariance()[j][k]);
                     }
                 }
                 addPredictionColumns(projection, prediction, response.name(), xExpressions, intercept,
-                        coefficientSql, covarianceSql, Double.toString(model.mse()),
-                        Double.toString(Distributions.tQuantile(0.975, model.dfResidual())));
+                        coefficientSql, covarianceSql, doubleSql(model.mse()),
+                        doubleSql(Distributions.tQuantile(0.975, model.dfResidual())));
             } else {
                 addNullPredictions(projection, prediction);
             }

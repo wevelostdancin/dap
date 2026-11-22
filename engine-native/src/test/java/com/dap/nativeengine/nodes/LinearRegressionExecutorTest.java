@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.StringJoiner;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -664,6 +665,87 @@ class LinearRegressionExecutorTest {
                     """);
             assertEquals("5", predictions.data().get(0).get(6));
             assertEquals("5", predictions.data().get(0).get(7));
+        }
+    }
+
+    @Test
+    void twoHundredThousandRowsMatchStatsmodelsFromMoments() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = NodeTestSupport.sqlTable(db, "reg_big",
+                    "SELECT ((i % 997) * 0.01 - 4.0) AS x1, ((i % 991) * 0.01 - 4.0) AS x2, "
+                            + "2.5 + 1.7 * ((i % 997) * 0.01 - 4.0) "
+                            + "- 0.9 * ((i % 991) * 0.01 - 4.0) + 0.01 * (i % 13) AS y "
+                            + "FROM range(200000) t(i)",
+                    List.of(ColumnSpec.of("x1", "Float64"), ColumnSpec.of("x2", "Float64"),
+                            ColumnSpec.of("y", "Float64")));
+            TableData data = run(db, input, """
+                    {"x":["x1","x2"],"y":"y"}
+                    """);
+            assertEquals(3, data.rows());
+            List<String> intercept = termRow(data, 0, "intercept");
+            assertEquals(2.5599992971940964, number(intercept, 1), 1e-9);
+            assertEquals(9.194359522173121e-05, number(intercept, 2), 1e-12);
+            assertEquals(27843.14982485078, number(intercept, 3), 1e-6);
+            assertEquals("200000", intercept.get(6));
+            assertEquals(0.9999509705227828, number(intercept, 5), 1e-9);
+            List<String> x1 = termRow(data, 0, "x1");
+            assertEquals(1.699999790211708, number(x1, 1), 1e-9);
+            assertEquals(2.9169172109479647e-05, number(x1, 2), 1e-12);
+            assertEquals(58280.70072853482, number(x1, 3), 1e-6);
+            List<String> x2 = termRow(data, 0, "x2");
+            assertEquals(-0.9000000981179238, number(x2, 1), 1e-9);
+            assertEquals(2.9352398860740978e-05, number(x2, 2), 1e-12);
+            assertEquals(-30661.892487488636, number(x2, 3), 1e-6);
+        }
+    }
+
+    @Test
+    void twentyPredictorsAtOneMillionRowsUseMomentsNotRows() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            StringJoiner select = new StringJoiner(", ");
+            StringJoiner names = new StringJoiner(",");
+            List<ColumnSpec> schema = new ArrayList<>();
+            for (int j = 0; j < 20; j++) {
+                select.add("((i % " + (97 + j) + ") * 0.01) AS x" + j);
+                names.add("\"x" + j + "\"");
+                schema.add(ColumnSpec.of("x" + j, "Float64"));
+            }
+            select.add("(2.5 * ((i % 97) * 0.01) + 0.01 * (i % 13)) AS y");
+            schema.add(ColumnSpec.of("y", "Float64"));
+            LazyPlan input = NodeTestSupport.sqlTable(db, "reg_wide",
+                    "SELECT " + select + " FROM range(1000000) t(i)", schema);
+            LazyPlan plan = plan(db, input, """
+                    {"x":[%s],"y":"y"}
+                    """.formatted(names));
+            assertTrue(!plan.sql().contains("reg_wide"), plan.sql());
+            TableData data = plan.preview(50);
+            assertEquals(21, data.rows());
+            assertEquals("1000000", termRow(data, 0, "intercept").get(6));
+        }
+    }
+
+    @Test
+    void predictWithLargeMseCastsLiteralsToDouble() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            // Raw Double.toString literals on this fit make DuckDB infer
+            // DECIMAL(18,16) and fail with "Casting value ... to DECIMAL failed".
+            double[] xs = {1, 2, 3, 4, 5, 6, 7};
+            double[] ys = new double[xs.length];
+            for (int i = 0; i < xs.length; i++) {
+                ys[i] = 1e16 * (0.12345678901234567 * xs[i] + 0.9876543210987654);
+            }
+            LazyPlan input = line(db, xs, ys);
+            TableData data = run(db, input, """
+                    {"x":["x"],"y":"y","mode":"predict"}
+                    """);
+            assertEquals(xs.length, data.rows());
+            for (List<String> row : data.data()) {
+                assertTrue(Double.isFinite(number(row, 2)), row.toString());
+                assertTrue(Double.isFinite(number(row, 4)), row.toString());
+                assertTrue(Double.isFinite(number(row, 5)), row.toString());
+                assertTrue(number(row, 4) <= number(row, 2) && number(row, 2) <= number(row, 5),
+                        row.toString());
+            }
         }
     }
 

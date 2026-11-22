@@ -7,7 +7,7 @@
   "tier": "core",
   "deprecated": false,
   "available": true,
-  "description": "Principal component analysis of one or more numeric columns by the covariance matrix and a Jacobi eigen decomposition. scores mode appends pc1..pcN to the input, loadings mode returns one row per component and column, and explained mode returns the eigenvalue, the explained-variance fraction and the cumulative fraction per component. Features are optionally z-score standardized; the sign of every component is fixed so its largest absolute loading is positive.",
+  "description": "Principal component analysis of one or more numeric columns. The covariance (or correlation when standardize is true) matrix comes from DuckDB sums and cross products and is decomposed in Java by a Jacobi eigen decomposition, so only p-by-p matrices are held in memory and the row count is unbounded. scores mode appends pc1..pcN to the input via an SQL projection, loadings mode returns one row per component and column, and explained mode returns the eigenvalue, the explained-variance fraction and the cumulative fraction per component. Features are optionally z-score standardized; the sign of every component is fixed so its largest absolute loading is positive.",
   "inPorts": [
     {
       "index": 0,
@@ -60,12 +60,19 @@
         ],
         "default": "scores"
       },
-      "max_rows": {
+      "sample_rows": {
         "type": "integer",
-        "title": "Maximum rows",
-        "description": "The fit reads complete rows into memory and supports at most this many; a larger input is an error with a hint to raise the cap or pre-filter.",
-        "default": 100000,
-        "minimum": 1
+        "title": "Sample rows",
+        "description": "0 uses every complete row (no cap); a positive N computes the covariance matrix on a deterministic reservoir sample of N rows (DuckDB USING SAMPLE reservoir(N ROWS) REPEATABLE(seed)).",
+        "default": 0,
+        "minimum": 0
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Sampling seed",
+        "description": "Seed for the repeatable reservoir sample; the same input and seed give the same fit. Ignored when sample_rows is 0. Must be 0 or positive.",
+        "default": 42,
+        "minimum": 0
       }
     },
     "required": [

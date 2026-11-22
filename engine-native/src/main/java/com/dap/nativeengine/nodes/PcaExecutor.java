@@ -8,7 +8,6 @@ import com.dap.nativeengine.exec.NodeExecutor;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -22,14 +21,15 @@ import java.util.StringJoiner;
  * expressions over the input (a linear combination of the standardized, centered columns),
  * {@code loadings} returns one row per component and column, and {@code explained} returns the
  * eigenvalue, the explained-variance fraction and the cumulative fraction per component.
- * Features are optionally z-score standardized first; the sign of every component is fixed so
- * that its largest absolute loading is positive, which keeps the output reproducible.</p>
+ * The covariance matrix is built from DuckDB sums and cross products, so only p-by-p
+ * matrices live in Java and the row count is unbounded. Features are optionally z-score
+ * standardized first; the sign of every component is fixed so that its largest absolute
+ * loading is positive, which keeps the output reproducible.</p>
  */
 public final class PcaExecutor implements NodeExecutor {
     private static final String NODE = "pca";
     private static final Set<String> MODES = Set.of("scores", "loadings", "explained");
     private static final int DEFAULT_COMPONENTS = 2;
-    private static final int DEFAULT_MAX_ROWS = 100_000;
     private static final List<ColumnSpec> LOADINGS = List.of(
             ColumnSpec.of("component", "Int64"),
             ColumnSpec.of("column", "Utf8"),
@@ -56,7 +56,14 @@ public final class PcaExecutor implements NodeExecutor {
                     + features.size() + " selected columns; reduce components");
         }
         boolean standardize = NodeSql.bool(config, "standardize", true);
-        int maxRows = StatsSupport.positiveInt(config, "max_rows", DEFAULT_MAX_ROWS, NODE, 10_000_000);
+        int sampleRows = config == null ? 0 : config.path("sample_rows").asInt(0);
+        if (sampleRows < 0) {
+            throw new IllegalArgumentException("pca: 'sample_rows' must be 0 or positive");
+        }
+        int seed = config == null ? 42 : config.path("seed").asInt(42);
+        if (seed < 0) {
+            throw new IllegalArgumentException("pca: 'seed' must be 0 or positive");
+        }
         String mode = NodeSql.text(config, "mode", "scores").trim().toLowerCase(Locale.ROOT);
         if (!MODES.contains(mode)) {
             throw new IllegalArgumentException("pca: unknown mode '" + mode
@@ -67,13 +74,27 @@ public final class PcaExecutor implements NodeExecutor {
                 TransformSupport.requireNewName(input.columns(), "pc" + (component + 1), NODE);
             }
         }
-        List<double[]> points = StatsSupport.readFeatures(context, input, features, maxRows, NODE);
-        if (points.size() < 2) {
+        List<String> expressions = new ArrayList<>(features.size());
+        StringJoiner where = new StringJoiner(" AND ");
+        for (ColumnSpec feature : features) {
+            String value = MomentSupport.doubleColumn(feature.name());
+            expressions.add(value);
+            where.add(NodeSql.quote(feature.name()) + " IS NOT NULL AND isfinite(" + value + ")");
+        }
+        String table = input.asTable();
+        String source = sampleRows <= 0
+                ? table + " AS dap_input WHERE " + where
+                : "(SELECT * FROM " + table + " AS dap_src WHERE " + where
+                        + " USING SAMPLE reservoir(" + sampleRows + " ROWS) REPEATABLE(" + seed
+                        + ")) AS dap_input WHERE TRUE";
+        MomentSupport.Moments moments = MomentSupport.read(context, "", " FROM " + source,
+                expressions, false, List.of()).values().iterator().next();
+        if (moments.count() < 2) {
             throw new IllegalArgumentException("pca: need at least 2 complete rows to fit the "
-                    + "covariance matrix, got " + points.size()
+                    + "covariance matrix, got " + moments.count()
                     + "; filter the input or select columns with fewer NULL values");
         }
-        Fit fit = fit(points, features.size(), standardize, components);
+        Fit fit = fit(moments, features.size(), standardize, components);
         return switch (mode) {
             case "loadings" -> loadings(context, features, fit);
             case "explained" -> explained(context, fit);
@@ -85,47 +106,30 @@ public final class PcaExecutor implements NodeExecutor {
                        double[] explained, double[] cumulative) {
     }
 
-    private static Fit fit(List<double[]> points, int dimensions, boolean standardize, int components) {
-        int n = points.size();
+    private static Fit fit(MomentSupport.Moments moments, int dimensions, boolean standardize,
+                           int components) {
         double[] mean = new double[dimensions];
-        for (double[] point : points) {
-            for (int dimension = 0; dimension < dimensions; dimension++) {
-                mean[dimension] += point[dimension];
-            }
-        }
-        for (int dimension = 0; dimension < dimensions; dimension++) {
-            mean[dimension] /= n;
-        }
         double[] scale = new double[dimensions];
+        double[][] covariance = new double[dimensions][dimensions];
+        for (int i = 0; i < dimensions; i++) {
+            mean[i] = moments.mean(i);
+            scale[i] = 1.0;
+        }
+        for (int i = 0; i < dimensions; i++) {
+            for (int j = 0; j < dimensions; j++) {
+                covariance[i][j] = moments.covariance(i, j) / (moments.count() - 1.0);
+            }
+        }
         if (standardize) {
-            double[] squares = new double[dimensions];
-            for (double[] point : points) {
-                for (int dimension = 0; dimension < dimensions; dimension++) {
-                    double delta = point[dimension] - mean[dimension];
-                    squares[dimension] += delta * delta;
+            for (int i = 0; i < dimensions; i++) {
+                scale[i] = covariance[i][i] <= 0.0 ? 0.0 : Math.sqrt(covariance[i][i]);
+            }
+            for (int i = 0; i < dimensions; i++) {
+                for (int j = 0; j < dimensions; j++) {
+                    covariance[i][j] = scale[i] == 0.0 || scale[j] == 0.0
+                            ? 0.0
+                            : covariance[i][j] / (scale[i] * scale[j]);
                 }
-            }
-            for (int dimension = 0; dimension < dimensions; dimension++) {
-                double variance = squares[dimension] / (n - 1);
-                scale[dimension] = variance <= 0.0 ? 0.0 : Math.sqrt(variance);
-            }
-        } else {
-            Arrays.fill(scale, 1.0);
-        }
-        double[][] centered = new double[n][dimensions];
-        for (int row = 0; row < n; row++) {
-            for (int dimension = 0; dimension < dimensions; dimension++) {
-                double value = points.get(row)[dimension] - mean[dimension];
-                if (standardize) {
-                    value = scale[dimension] == 0.0 ? 0.0 : value / scale[dimension];
-                }
-                centered[row][dimension] = value;
-            }
-        }
-        double[][] covariance = Matrix.multiply(Matrix.transpose(centered), centered);
-        for (int row = 0; row < dimensions; row++) {
-            for (int column = 0; column < dimensions; column++) {
-                covariance[row][column] /= (n - 1);
             }
         }
         Matrix.Eigen eigen = Matrix.symmetricEigen(covariance);
