@@ -42,6 +42,29 @@ class ClusterExecutorTest {
         return rows;
     }
 
+    /** One isolated point (id 1) and a group of three; shared with tests/reference/silhouette.py. */
+    private static List<Object[]> singletonAndGroup() {
+        return List.of(
+                new Object[]{1L, 0.0, 0.0},
+                new Object[]{2L, 10.0, 0.0},
+                new Object[]{3L, 10.0, 1.0},
+                new Object[]{4L, 11.0, 0.0});
+    }
+
+    /** Three well separated groups of three; shared with tests/reference/silhouette.py. */
+    private static List<Object[]> threeGroups() {
+        return List.of(
+                new Object[]{1L, 0.0, 0.0},
+                new Object[]{2L, 0.0, 1.0},
+                new Object[]{3L, 1.0, 0.0},
+                new Object[]{4L, 10.0, 0.0},
+                new Object[]{5L, 10.0, 1.0},
+                new Object[]{6L, 11.0, 0.0},
+                new Object[]{7L, 0.0, 10.0},
+                new Object[]{8L, 1.0, 10.0},
+                new Object[]{9L, 0.0, 11.0});
+    }
+
     private static List<String> row(TableData data, String id) {
         return data.data().stream()
                 .filter(row -> id.equals(row.get(0)))
@@ -106,7 +129,50 @@ class ClusterExecutorTest {
     }
 
     @Test
+    void singletonPointGetsZeroSilhouette() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            TableData data = cluster(db, COLUMNS, singletonAndGroup(), """
+                    {"columns":["x","y"],"method":"kmeans","k":2,"standardize":false,"seed":42}
+                    """).preview(10);
+
+            assertEquals(4L, data.rows());
+            // sklearn sets s = 0 for a singleton cluster (Rousseeuw); before the fix it was 1.0.
+            assertEquals(0.0, Double.parseDouble(row(data, "1").get(4)), 0.0);
+            assertEquals(0.9, Double.parseDouble(row(data, "2").get(4)), 1e-9);
+            assertEquals(0.8798883860164713, Double.parseDouble(row(data, "3").get(4)), 1e-9);
+            assertEquals(0.890263019892132, Double.parseDouble(row(data, "4").get(4)), 1e-9);
+            // The singleton is included in the mean as a zero, not dropped and not 1.0.
+            assertEquals(0.6675378514771508, meanSilhouette(data), 1e-9);
+        }
+    }
+
+    @Test
+    void silhouetteMatchesSklearnReferenceForThreeClusters() throws Exception {
+        // Frozen from tests/reference/silhouette.py (sklearn 1.9.1), indexed by id - 1.
+        double[] expected = {
+                0.9033812554804784, 0.8709224512253457, 0.8709224512253457,
+                0.8967293340898564, 0.8755784951211024, 0.8869939289615936,
+                0.8967293340898564, 0.8755784951211024, 0.8869939289615936};
+        try (DuckDbSession db = new DuckDbSession()) {
+            TableData data = cluster(db, COLUMNS, threeGroups(), """
+                    {"columns":["x","y"],"method":"kmeans","k":3,"standardize":false,"seed":42}
+                    """).preview(20);
+
+            assertEquals(9L, data.rows());
+            Map<String, Integer> counts = clusterCounts(data);
+            assertEquals(3, counts.size(), counts.toString());
+            assertTrue(counts.values().stream().allMatch(size -> size == 3), counts.toString());
+            for (int id = 1; id <= expected.length; id++) {
+                assertEquals(expected[id - 1], Double.parseDouble(row(data, String.valueOf(id)).get(4)),
+                        1e-9, "id=" + id);
+            }
+            assertEquals(0.8848699638084749, meanSilhouette(data), 1e-9);
+        }
+    }
+
+    @Test
     void kOneLeavesSilhouetteNull() throws Exception {
+        // Undefined: sklearn raises "Number of labels is 1" (reference script); DAP emits NULL.
         try (DuckDbSession db = new DuckDbSession()) {
             TableData data = cluster(db, COLUMNS, threeBlobs(), """
                     {"columns":["x","y"],"method":"kmeans","k":1,"standardize":false}
