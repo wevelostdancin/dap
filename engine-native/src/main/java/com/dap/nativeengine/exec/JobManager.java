@@ -261,8 +261,9 @@ public final class JobManager implements AutoCloseable {
             // Reset only after the job actually starts: a cancel that wins the queued
             // window must not wipe the results of the previous successful run.
             workflow.resetResults();
-            // A new run must not serve profile statistics computed by the previous one.
+            // A new run must not serve profile statistics or /table pages of the previous one.
             db.invalidateProfiles(workflow.id());
+            db.invalidateTables(workflow.id());
             Connection connection = db.newConnection();
             connections.put(job.id(), connection);
             dag.execute(workflow, db, connection, job::progress);
