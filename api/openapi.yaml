@@ -475,7 +475,11 @@ paths:
       tags: [execution]
       operationId: runWorkflow
       summary: Run a workflow
-      description: Sync mode blocks the HTTP dispatcher. Async mode returns 202. Timeout counts from submission.
+      description: >-
+        Sync mode blocks the HTTP dispatcher. Async mode returns 202. Timeout counts from
+        submission. In sync mode a node that fails with a 4xx (for example path_not_allowed)
+        returns that client status with a Job view carrying its code and hint; other failures
+        are 500 with code node_failed. A timeout is 408 with code query_timeout.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
         - name: async
@@ -627,21 +631,27 @@ paths:
       operationId: getNodeTable
       summary: Preview an output table
       description: >-
-        If the requested port is not a table, the first table port is used silently. Before a
-        run the node has no table: 409 not_materialized; when the node failed: 409 node_failed
-        with the node message. Unknown workflow nodes are 404 unknown_node.
+        The requested port must exist on the node: an out-of-range port is 400 bad_request.
+        Before a run the node has no table: 409 not_materialized; when the node failed: 409
+        node_failed with the node message. Unknown workflow nodes are 404 unknown_node.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
         - $ref: '#/components/parameters/WorkflowNodeId'
         - name: port
           in: query
           required: false
+          description: Zero-based output port index; out-of-range indices are 400 bad_request.
           schema:
             type: integer
+            minimum: 0
             default: 0
         - name: limit
           in: query
           required: false
+          description: >-
+            Rows per page; negative values yield an empty page. Values above
+            DAP_TABLE_MAX_LIMIT (default 10000) are rejected with 400 limit_too_large; pages
+            are never silently truncated.
           schema:
             type: integer
             default: 50
@@ -665,9 +675,12 @@ paths:
           in: query
           required: false
           description: >-
-            Boolean SQL predicate over the output columns. ;, --, /*, SELECT, FROM, read_,
-            ATTACH, COPY and PRAGMA are rejected with 400 invalid_filter; an unboundable
-            predicate is 400 invalid_filter too.
+            Boolean SQL predicate over the output columns. String literals and quoted
+            identifiers are opaque, so predicates such as `from_date > 0`, `status =
+            'selected'` and `title LIKE '%from%'` are allowed. Statements (`;`), comments,
+            ATTACH/COPY/PRAGMA/GLOB and read_*/ *_scan functions outside quotes are rejected
+            with 400 invalid_filter; the predicate is also checked by the SQL path guard.
+            An unboundable predicate is 400 invalid_filter too.
           schema:
             type: string
         - $ref: '#/components/parameters/SessionHeader'
@@ -1170,7 +1183,10 @@ components:
       example: iris
   responses:
     BadRequest:
-      description: Invalid request, settings, session id, or disallowed operation
+      description: >-
+        Invalid request, settings, session id, limit_too_large, or disallowed operation.
+        A sync run whose node rejected the request with a 4xx keeps that status and the node's
+        code/hint in the Job view (for example path_not_allowed).
       content:
         application/json:
           schema:
@@ -1183,8 +1199,10 @@ components:
             $ref: '#/components/schemas/Error'
     Timeout:
       description: >-
-        The materialization exceeded DAP_QUERY_TIMEOUT_SEC; the read connection was closed and
-        the engine stays healthy. code is query_timeout.
+        The materialization exceeded DAP_QUERY_TIMEOUT_SEC (or a sync run exceeded
+        timeoutSec); the read connection was closed and the engine stays healthy. A sync run
+        answers with a Job view carrying code query_timeout and a hint; /table and /profile
+        answer with the Error envelope.
       content:
         application/json:
           schema:
@@ -1193,7 +1211,7 @@ components:
       description: >-
         The request conflicts with the current state: workflow_limit (session workflow cap),
         not_materialized (node has no table output yet), node_failed (the node failed during
-        the run; error carries its message).
+        the run; the Job view carries its message and code).
       content:
         application/json:
           schema:
@@ -1587,7 +1605,12 @@ components:
           type: string
         code:
           type: string
-          description: Machine-readable error code of a failed run (node_failed)
+          description: >-
+            Machine-readable code of a timeout (query_timeout) or failed run. A node's client
+            error keeps its own code (for example path_not_allowed); otherwise node_failed.
+        hint:
+          type: string
+          description: Actionable hint for the timeout/failure, when available.
         result:
           oneOf:
             - $ref: '#/components/schemas/RunResult'

@@ -83,6 +83,8 @@ Cold start — около 0.4–0.5 с от `java -jar` до первого `200
 `DAP_QUERY_TIMEOUT_SEC` (60 с; предел материализации `/table` и `/profile`; `0`
 выключает), `DAP_MAX_SESSIONS` (64; LRU-эвикция), `DAP_SESSION_TTL_SEC` (1800 с;
 `0` выключает TTL), `DAP_MAX_RETAINED_JOBS` (200; cap истории заданий на сессию),
+`DAP_TABLE_MAX_LIMIT` (10 000; предел `limit` у `/table`, превышение — 400
+`limit_too_large`),
 `DAP_WARMUP` (1; прогрев движка при старте в фоновом потоке; `0` выключает),
 `DAP_ALLOW_STALE_ENGINE` (0; MCP-адаптер сверяет версию отвечающего движка с
 `VERSION` и заменяет движок старой сборки на текущий jar; если jar или java не

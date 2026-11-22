@@ -8,6 +8,7 @@ import com.dap.nativeengine.engine.ProfileData;
 import com.dap.nativeengine.engine.TableData;
 import com.dap.nativeengine.exec.Workflow;
 import com.dap.nativeengine.exec.WorkflowNode;
+import com.dap.nativeengine.io.PathGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.javalin.http.Context;
 
@@ -22,9 +23,8 @@ import java.util.StringJoiner;
 /** Table previews, column profiles and plan estimates of executed workflow nodes. */
 public final class DataHandlers {
     private static final int DEFAULT_LIMIT = 50;
-    /** Tokens that would turn a 'where' predicate into a second statement or a file read. */
-    private static final List<String> FORBIDDEN_FILTER_TOKENS = List.of(";", "--", "/*", "select",
-            "from", "read_", "attach", "copy", "pragma");
+    /** Statement-level keywords that must never appear in a single boolean predicate. */
+    private static final List<String> FORBIDDEN_FILTER_WORDS = List.of("attach", "copy", "pragma", "glob");
 
     private final ServiceState state;
 
@@ -34,12 +34,22 @@ public final class DataHandlers {
 
     public void table(Context ctx) throws Exception {
         String session = Http.session(ctx);
+        state.session(session);
         Workflow workflow = state.requireWorkflow(session, ctx.pathParam("workflowId"));
         String nodeId = ctx.pathParam("workflowNodeId");
         WorkflowNode node = node(workflow, nodeId);
         NodeSpec spec = spec(node);
         int port = Http.queryInt(ctx, "port", 0);
-        int limit = Math.max(0, Http.queryInt(ctx, "limit", DEFAULT_LIMIT));
+        // An unbounded limit turns a preview into a full scan plus a giant in-memory JSON.
+        // Reject instead of clamp: a silently truncated page would look like a complete answer.
+        int maxLimit = state.settings().maxTableLimit();
+        int limit = Http.queryInt(ctx, "limit", DEFAULT_LIMIT);
+        if (limit > maxLimit) {
+            throw new ApiException(400, "limit_too_large", "limit exceeds " + maxLimit,
+                    "pass a limit up to " + maxLimit + " or set DAP_TABLE_MAX_LIMIT",
+                    Map.of("limit", maxLimit, "requested", limit));
+        }
+        limit = Math.max(0, limit);
         int offset = Math.max(0, Http.queryInt(ctx, "offset", 0));
         LazyPlan plan = materialized(workflow, node,
                 spec.outPorts().stream().map(NodeSpec.Port::toMap).toList());
@@ -79,6 +89,7 @@ public final class DataHandlers {
     /** EXPLAIN (FORMAT JSON) over the node plan: estimated rows and the operator tree. */
     public void estimate(Context ctx) throws Exception {
         String session = Http.session(ctx);
+        state.session(session);
         Workflow workflow = state.requireWorkflow(session, ctx.pathParam("workflowId"));
         String nodeId = ctx.pathParam("workflowNodeId");
         WorkflowNode node = node(workflow, nodeId);
@@ -123,6 +134,7 @@ public final class DataHandlers {
 
     public void profile(Context ctx) throws Exception {
         String session = Http.session(ctx);
+        state.session(session);
         Workflow workflow = state.requireWorkflow(session, ctx.pathParam("workflowId"));
         String nodeId = ctx.pathParam("workflowNodeId");
         WorkflowNode node = node(workflow, nodeId);
@@ -225,21 +237,73 @@ public final class DataHandlers {
         return projected.isEmpty() ? available : projected;
     }
 
-    /** Optional 'where' predicate; anything that could escape the predicate is 400 invalid_filter. */
+    /**
+     * Optional 'where' predicate. Scan tokens rather than substrings: words like {@code from_date}
+     * and literals like {@code 'selected'} are legitimate. Statements, comments and file-reading
+     * functions are rejected outside string literals and quoted identifiers; the surviving
+     * predicate is then checked by the same PathGuard the SQL routes use.
+     */
     private static String filter(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
         }
-        String lower = raw.toLowerCase(Locale.ROOT);
-        for (String token : FORBIDDEN_FILTER_TOKENS) {
-            if (lower.contains(token)) {
-                throw ApiException.badRequest("invalid_filter",
-                        "'where' must be a single boolean predicate over the output columns; '"
-                                + token + "' is not allowed",
-                        "use a plain expression such as \"amount > 10 AND region = 'EU'\"");
+        String predicate = raw.strip();
+        for (int index = 0; index < predicate.length(); ) {
+            char current = predicate.charAt(index);
+            if (current == '\'' || current == '"') {
+                index = skipQuoted(predicate, index, current);
+                continue;
             }
+            if (current == ';' || (current == '-' && next(predicate, index) == '-')
+                    || (current == '/' && next(predicate, index) == '*')) {
+                throw invalidFilter("statements and comments are not allowed");
+            }
+            if (Character.isLetter(current) || current == '_') {
+                int start = index;
+                while (index < predicate.length()) {
+                    char letter = predicate.charAt(index);
+                    if (!Character.isLetterOrDigit(letter) && letter != '_') {
+                        break;
+                    }
+                    index++;
+                }
+                String word = predicate.substring(start, index).toLowerCase(Locale.ROOT);
+                if (FORBIDDEN_FILTER_WORDS.contains(word) || word.startsWith("read_")
+                        || word.endsWith("_scan")) {
+                    throw invalidFilter("'" + word + "' is not allowed");
+                }
+                continue;
+            }
+            index++;
         }
-        return raw;
+        PathGuard.shared().checkSql(predicate);
+        return predicate;
+    }
+
+    private static ApiException invalidFilter(String reason) {
+        return ApiException.badRequest("invalid_filter",
+                "'where' must be a single boolean predicate over the output columns; " + reason,
+                "use a plain expression such as \"amount > 10 AND status = 'selected'\"");
+    }
+
+    /** Index just past a SQL quote, honouring doubled quote escapes. */
+    private static int skipQuoted(String sql, int start, char quote) {
+        int index = start + 1;
+        while (index < sql.length()) {
+            if (sql.charAt(index) == quote) {
+                if (index + 1 < sql.length() && sql.charAt(index + 1) == quote) {
+                    index += 2;
+                    continue;
+                }
+                return index + 1;
+            }
+            index++;
+        }
+        return index;
+    }
+
+    private static char next(String value, int index) {
+        return index + 1 < value.length() ? value.charAt(index + 1) : '\0';
     }
 
     private static String projectionSql(String relation, List<ColumnSpec> columns) {

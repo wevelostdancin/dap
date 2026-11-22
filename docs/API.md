@@ -54,13 +54,16 @@
 
 Исключения: таймаут и падение синхронного run возвращают объект job, отмена
 завершённого job — `CancelResult` (см. §5); в них тоже есть `code`
-(`node_failed` у упавшего run, `not_cancellable` у отмены завершённого job).
+(`query_timeout` у таймаута, `node_failed` у упавшего run, `not_cancellable` у
+отмены завершённого job). Если узел отклонил запрос с 4xx (например, путь вне
+allowlist), синхронный run возвращает этот же статус и `code`/`hint` узла в теле
+job; прочие ошибки исполнения остаются 500 `node_failed`.
 
 | Код | Когда | `code` |
 |---|---|---|
 | 200 | успех | — |
 | 202 | асинхронный запуск принят | — |
-| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, порт вне диапазона, отсутствующий `dir`, путь вне allowlist, неизвестная колонка в `/table?columns=`, запрещённый `/table?where=` | `bad_request`, `unknown_setting`, `invalid_query_param`, `path_not_allowed`, `unknown_column`, `invalid_filter` |
+| 400 | невалидная сессия, битый контракт запроса, неизвестный `factory`/`settings`-ключ, недопустимая связь, порт вне диапазона, `limit` выше `DAP_TABLE_MAX_LIMIT`, отсутствующий `dir`, путь вне allowlist, неизвестная колонка в `/table?columns=`, запрещённый `/table?where=`; 4xx узла при синхронном run | `bad_request`, `unknown_setting`, `invalid_query_param`, `limit_too_large`, `path_not_allowed`, `unknown_column`, `invalid_filter` |
 | 404 | неизвестный или чужой `wf-*`/`job-*`, неизвестный узел каталога в `GET /v1/nodes/{id}`, неизвестный узел workflow в `/table`/`/profile`/`PATCH`/`DELETE`/`dialog`, неизвестное соединение, неизвестный маршрут | `not_found`, `unknown_node` |
 | 408 | истёк `timeoutSec` синхронного run (тело — job со `state: "timeout"`); истёк `DAP_QUERY_TIMEOUT_SEC` у `/table`/`/profile` | `query_timeout` |
 | 409 | отмена уже завершённого job; лимит workflow на сессию; у узла ещё нет таблицы или плана (до run); узел упал | `not_cancellable`, `workflow_limit`, `not_materialized`, `estimate_unavailable`, `node_failed` |
@@ -104,13 +107,21 @@
 
 Сессионная БД создаётся при первом запросе данных (run, job, `/table`, `/profile`)
 и живёт до эвикции. Эвикция освобождает всё сразу: активные задания сессии
-отменяются, её workflow удаляются, DuckDB закрывается. Правила:
+отменяются, вся история заданий, futures, таймауты и локи удаляются, ключ сессии
+в хранилище workflow убирается, workflow удаляются, DuckDB закрывается. Та же
+очистка используется при `DELETE /v1/workflows/{id}` (в границах workflow).
+Правила:
 
 - `DAP_SESSION_TTL_SEC` (по умолчанию 1800 с; `0` выключает TTL) — сессия без
   обращений дольше TTL закрывается;
 - `DAP_MAX_SESSIONS` (по умолчанию 64) — при превышении закрывается самая давно
   не использованная сессия (LRU); активные не трогаются, но лимит жёсткий;
-- проверка идёт в тике watchdog (каждые 1–30 с) и при каждом обращении к сессии.
+- проверка идёт в тике watchdog (каждые 1–30 с) и при каждом обращении к сессии;
+- обращение к сессии — это не только run: маршруты workflow, job, `/table`,
+  `/profile` и `/estimate` обновляют `lastAccess`, поэтому активная сессия не
+  эвиктится посреди работы. Маршруты без запроса данных обновляют `lastAccess` только
+  у уже открытой сессии; БД создают run, job и `/table`/`/profile`/`/estimate`.
+  `/v1/health` и `/v1/sessions` сессию не создают.
 
 ### `GET /v1/sessions`
 
@@ -128,8 +139,9 @@
 
 ### `DELETE /v1/sessions/{id}`
 
-`{"ok":true,"id":"agent-7"}` — сессия закрыта (задания отменены, workflow удалены,
-БД закрыта). Неизвестная сессия — 404. Повторное удаление — тоже 404.
+`{"ok":true,"id":"agent-7"}` — сессия закрыта (задания и их история удалены,
+workflow удалены, локи сняты, БД закрыта). Неизвестная сессия — 404. Повторное
+удаление — тоже 404 (новый запрос данных создаст сессию заново).
 
 ## 3. Каталог узлов
 
@@ -297,8 +309,9 @@ lock запуска. Ответ `{"ok": true}`; неизвестный или ч
 - `404` для неизвестного или чужого.
 
 Поля job: `id`, `workflow`, `state`, `createdAt`, `timeoutSec`,
-`startedAt`/`finishedAt`/`durationMs` (когда известны), `error`, `code`
-(у упавшего run), `result`, `progress`, `statusUrl`. Состояния: `queued`, `running`,
+`startedAt`/`finishedAt`/`durationMs` (когда известны), `error`, `code` и `hint`
+(у таймаута — `query_timeout`, у упавшего run — `node_failed` или код 4xx узла),
+`result`, `progress`, `statusUrl`. Состояния: `queued`, `running`,
 `succeeded`, `failed`, `cancelled`, `timeout`.
 
 `progress` — прогресс по узлам: `{nodesTotal, nodesDone, currentNode, percent}`.
@@ -340,8 +353,9 @@ Dag обновляет его на старте и финише каждого �
 | Параметр | Тип | Смысл |
 |---|---|---|
 | `offset` | int ≥ 0 | пропустить N строк после фильтра |
+| `limit` | int | строк на страницу (по умолчанию 50); отрицательный — пустая страница; больше `DAP_TABLE_MAX_LIMIT` (по умолчанию 10 000) — 400 `limit_too_large` с полями `limit`/`requested` и `hint` (страница не урезается молча) |
 | `columns` | csv | проекция: имена через запятую; неизвестное имя — 400 `unknown_column` с подсказкой |
-| `where` | string | SQL-предикат над выходными колонками; запрещены `;`, `--`, `/*`, `SELECT`, `FROM`, `read_`, `ATTACH`, `COPY`, `PRAGMA` (регистр не важен); нарушение или несвязываемый предикат — 400 `invalid_filter` |
+| `where` | string | SQL-предикат над выходными колонками. Строковые литералы и кавычки непрозрачны: `from_date > 0`, `status = 'selected'`, `title LIKE '%from%'` допустимы. Запрещены `;`, комментарии `--`/`/*`, `ATTACH`, `COPY`, `PRAGMA`, `GLOB`, функции `read_*`/`*_scan` вне кавычек; предикат дополнительно проходит `PathGuard.checkSql`. Нарушение или несвязываемый предикат — 400 `invalid_filter` |
 
 `rows` — всего строк после фильтра, `data` — строки значениями-строками (`null`
 для NULL), `preview` — сколько строк вернулось, `offset` — запрошенное смещение,

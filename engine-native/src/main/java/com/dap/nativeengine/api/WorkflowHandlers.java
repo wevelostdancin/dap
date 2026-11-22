@@ -31,6 +31,7 @@ public final class WorkflowHandlers {
 
     public void list(Context ctx) {
         String session = Http.session(ctx);
+        state.touch(session);
         List<Map<String, Object>> workflows = new ArrayList<>();
         for (Workflow workflow : state.workflows().list(session)) {
             workflows.add(view(workflow));
@@ -42,6 +43,7 @@ public final class WorkflowHandlers {
 
     public void create(Context ctx) throws Exception {
         String session = Http.session(ctx);
+        state.touch(session);
         JsonNode request = Json.parseBody(ctx.body());
         JsonNode nameNode = request.get("name");
         String name = nameNode == null || nameNode.isNull() ? null : nameNode.asText(null);
@@ -52,6 +54,7 @@ public final class WorkflowHandlers {
     /** Create a workflow from a workflow.json written by POST /save. */
     public void load(Context ctx) throws Exception {
         String session = Http.session(ctx);
+        state.touch(session);
         JsonNode request = Json.parseBody(ctx.body());
         JsonNode dirNode = request.get("dir");
         if (dirNode == null || !dirNode.isTextual() || dirNode.asText().isBlank()) {

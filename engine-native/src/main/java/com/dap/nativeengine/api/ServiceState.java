@@ -91,6 +91,18 @@ public final class ServiceState implements AutoCloseable {
         return session.database;
     }
 
+    /**
+     * Refresh the TTL of an already open session without creating a database. Pure lookup and
+     * job-history routes use this: a 404 must not leave a new session behind, and /debug must
+     * still report configured DuckDB resources before the first data request.
+     */
+    public void touch(String sessionId) {
+        Session session = sessions.get(sessionId);
+        if (session != null) {
+            session.lastAccess = System.currentTimeMillis();
+        }
+    }
+
     /** Existing session database, or null; unlike session(id) this never creates one. */
     public DuckDbSession sessionIfPresent(String sessionId) {
         Session session = sessions.get(sessionId);
@@ -114,47 +126,46 @@ public final class ServiceState implements AutoCloseable {
     }
 
     /**
-     * Close one session: cancel its active jobs, delete its workflows and close its
-     * database. Returns false when the session is not open.
+     * Close one session: stop its jobs and reads, drop its tables, forget its jobs/locks and
+     * session key, then close its database. Returns false when the session is not open.
      */
     public boolean closeSession(String sessionId) {
         Session session = sessions.remove(sessionId);
         if (session == null) {
             return false;
         }
-        for (Job job : jobs.list(sessionId)) {
-            if (!job.state().terminal()) {
-                jobs.cancel(job);
-            }
-        }
         for (Workflow workflow : workflows.list(sessionId)) {
-            workflows.delete(sessionId, workflow.id());
+            stopReadsAndDropTables(workflow.id(), session.database);
         }
+        jobs.forgetSession(sessionId);
         session.database.close();
         return true;
     }
 
-    /**
-     * Delete a workflow and everything it owns: cancel its jobs, interrupt its in-flight
-     * /table and /profile reads, drop its reader tables and forget its run lock.
-     */
+    /** Delete a workflow and everything it owns, using the same cleanup as session close. */
     public boolean deleteWorkflow(String sessionId, String workflowId) {
         Workflow workflow = workflows.find(sessionId, workflowId);
         if (workflow == null) {
             return false;
         }
-        for (Job job : jobs.activeForWorkflow(workflow.id())) {
-            jobs.cancel(job);
-        }
-        DuckDbSession database = sessionIfPresent(sessionId);
-        if (database != null) {
-            // A read on its own connection survives the job cancel above; close it first so
-            // the table drop does not race a running scan of the workflow's data.
-            database.interruptReads(workflow.id());
-            database.dropTablesForWorkflow(workflow.id());
-        }
+        stopReadsAndDropTables(workflow.id(), sessionIfPresent(sessionId));
         jobs.forgetWorkflow(workflow.id());
         return workflows.delete(sessionId, workflowId);
+    }
+
+    /**
+     * The shared part of workflow cleanup: cancel its jobs, interrupt its in-flight /table and
+     * /profile reads, and drop its reader tables. A read on its own connection survives the job
+     * cancel, so it must be interrupted before the table drop races a running scan.
+     */
+    private void stopReadsAndDropTables(String workflowId, DuckDbSession database) {
+        for (Job job : jobs.activeForWorkflow(workflowId)) {
+            jobs.cancel(job);
+        }
+        if (database != null) {
+            database.interruptReads(workflowId);
+            database.dropTablesForWorkflow(workflowId);
+        }
     }
 
     /**
@@ -197,6 +208,9 @@ public final class ServiceState implements AutoCloseable {
 
     /** Resolve a workflow or fail with the frozen 404 for unknown and foreign ids alike. */
     public Workflow requireWorkflow(String sessionId, String workflowId) {
+        // Every workflow-scoped route is active use: refresh the TTL before the lookup so a
+        // busy session cannot be evicted by its own watchdog between two requests.
+        touch(sessionId);
         Workflow workflow = workflows.find(sessionId, workflowId);
         if (workflow == null) {
             throw ApiException.notFound("unknown workflow: " + workflowId);

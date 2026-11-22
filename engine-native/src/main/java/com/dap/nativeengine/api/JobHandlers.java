@@ -36,8 +36,14 @@ public final class JobHandlers {
             Http.json(ctx, 408, view(job, false));
         } else {
             Map<String, Object> body = view(job, false);
-            body.put("code", "node_failed");
-            Http.json(ctx, 500, body);
+            Integer clientStatus = job.errorStatus();
+            if (clientStatus != null && clientStatus >= 400 && clientStatus < 500) {
+                // Keep the job view shape; only the status changes for a node's 4xx.
+                Http.json(ctx, clientStatus, body);
+            } else {
+                body.put("code", "node_failed");
+                Http.json(ctx, 500, body);
+            }
         }
     }
 
@@ -50,6 +56,7 @@ public final class JobHandlers {
 
     public void list(Context ctx) {
         String session = Http.session(ctx);
+        state.touch(session);
         List<Map<String, Object>> jobs = new ArrayList<>();
         for (Job job : state.jobs().list(session)) {
             jobs.add(view(job, false));
@@ -62,6 +69,7 @@ public final class JobHandlers {
 
     public void get(Context ctx) {
         String session = Http.session(ctx);
+        state.touch(session);
         String jobId = ctx.pathParam("jobId");
         Job job = state.jobs().find(session, jobId);
         if (job == null) {
@@ -72,6 +80,7 @@ public final class JobHandlers {
 
     public void cancel(Context ctx) {
         String session = Http.session(ctx);
+        state.touch(session);
         String jobId = ctx.pathParam("jobId");
         Job job = state.jobs().find(session, jobId);
         if (job == null) {
@@ -130,6 +139,13 @@ public final class JobHandlers {
         }
         if (job.error() != null) {
             view.put("error", job.error());
+        }
+        if (job.state() == JobState.timeout || job.state() == JobState.failed) {
+            String fallback = job.state() == JobState.timeout ? "query_timeout" : "node_failed";
+            view.put("code", job.errorCode() == null ? fallback : job.errorCode());
+            if (job.errorHint() != null && !job.errorHint().isBlank()) {
+                view.put("hint", job.errorHint());
+            }
         }
         if (withResult && job.result() != null) {
             view.put("result", job.result());

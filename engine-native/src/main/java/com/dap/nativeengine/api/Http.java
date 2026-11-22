@@ -49,7 +49,7 @@ public final class Http {
     }
 
     /** Machine-readable default code for an error without an explicit one. */
-    static String codeForStatus(int status) {
+    public static String codeForStatus(int status) {
         return switch (status) {
             case 400 -> "bad_request";
             case 404 -> "not_found";
