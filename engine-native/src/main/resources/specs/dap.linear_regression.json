@@ -86,8 +86,15 @@
       "sample_rows": {
         "type": "integer",
         "title": "Sample rows",
-        "description": "0 keeps the 100k-row cap and fails above it; a positive N fits on the first N rows in a deterministic order (sorted by every group, predictor and response column), so a large table can be modelled reproducibly without pre-filtering. predict mode reports sampled_rows and total_rows.",
+        "description": "0 keeps the 100k-row cap and fails above it; a positive N fits on a deterministic reservoir sample of N rows (DuckDB USING SAMPLE reservoir(N ROWS) REPEATABLE(seed)), reproducible without sorting the input. predict mode reports sampled_rows and total_rows.",
         "default": 0,
+        "minimum": 0
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Sampling seed",
+        "description": "Seed for the repeatable reservoir sample; the same input and seed give the same fit. Ignored when sample_rows is 0. Must be 0 or positive.",
+        "default": 42,
         "minimum": 0
       },
       "output": {

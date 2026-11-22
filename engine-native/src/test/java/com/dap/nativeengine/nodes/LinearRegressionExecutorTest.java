@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -541,6 +542,12 @@ class LinearRegressionExecutorTest {
                             """));
             assertTrue(badRobust.getMessage().contains("hc3"), badRobust.getMessage());
 
+            IllegalArgumentException badSeed = assertThrows(IllegalArgumentException.class,
+                    () -> run(db, input, """
+                            {"x":["x"],"y":"y","seed":-1}
+                            """));
+            assertTrue(badSeed.getMessage().contains("seed"), badSeed.getMessage());
+
             IllegalArgumentException unknownGroup = assertThrows(IllegalArgumentException.class,
                     () -> run(db, input, """
                             {"x":["x"],"y":"y","group_by":["nope"]}
@@ -580,7 +587,7 @@ class LinearRegressionExecutorTest {
     }
 
     @Test
-    void sampleRowsFitsOnTheFirstNwRowsInsteadOfFailing() throws Exception {
+    void sampleRowsFitsAReservoirSampleInsteadOfFailing() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             int n = 150_000;
             List<ColumnSpec> columns = List.of(ColumnSpec.of("x", "Float64"),
@@ -604,9 +611,8 @@ class LinearRegressionExecutorTest {
     }
 
     /**
-     * Insertion order is a permutation of x, and the first 20 rows by x follow y = x
-     * while the rest follow y = 10x. A bare LIMIT 20 would fit slope 10; the canonical
-     * order-by-every-column sample must fit slope 1.
+     * Insertion order is a permutation of x and y has two regimes (y = x below 20,
+     * y = 10x otherwise), so the fitted coefficients depend on which rows are sampled.
      */
     private static LazyPlan scrambled(DuckDbSession db) throws Exception {
         int n = 100;
@@ -620,21 +626,44 @@ class LinearRegressionExecutorTest {
     }
 
     @Test
-    void sampleRowsIsDeterministicAcrossRuns() throws Exception {
+    void reservoirSampleIsRepeatableAcrossRuns() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             LazyPlan input = scrambled(db);
             String config = """
-                    {"x":["x"],"y":"y","sample_rows":20}
+                    {"x":["x"],"y":"y","sample_rows":20,"seed":42}
                     """;
 
             TableData first = run(db, input, config);
             TableData second = run(db, input, config);
+            TableData otherSeed = run(db, input, """
+                    {"x":["x"],"y":"y","sample_rows":20,"seed":43}
+                    """);
             assertEquals(first.data(), second.data());
+            assertEquals("20", termRow(first, 0, "x").get(6));
+            assertNotEquals(first.data(), otherSeed.data(), "seed must change the sample");
+        }
+    }
 
-            List<String> slope = termRow(first, 0, "x");
-            assertEquals(1.0, number(slope, 1), 1e-9);
-            assertEquals(0.0, number(termRow(first, 0, "intercept"), 1), 1e-9);
-            assertEquals("20", slope.get(6));
+    @Test
+    void sampleRowsAtLeastTotalFitsEveryRow() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = scrambled(db);
+            TableData full = run(db, input, """
+                    {"x":["x"],"y":"y"}
+                    """);
+            TableData sampled = run(db, input, """
+                    {"x":["x"],"y":"y","sample_rows":200,"seed":42}
+                    """);
+            assertEquals(full.data(), sampled.data());
+            assertEquals("100", termRow(sampled, 0, "x").get(6));
+
+            LazyPlan small = line(db, new double[]{1, 2, 3, 4, 5},
+                    new double[]{3, 5, 7, 9, 11});
+            TableData predictions = run(db, small, """
+                    {"x":["x"],"y":"y","mode":"predict","sample_rows":50,"seed":42}
+                    """);
+            assertEquals("5", predictions.data().get(0).get(6));
+            assertEquals("5", predictions.data().get(0).get(7));
         }
     }
 

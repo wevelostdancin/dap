@@ -100,8 +100,12 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         if (sampleRows < 0) {
             throw new IllegalArgumentException("linear_regression: 'sample_rows' must be 0 or positive");
         }
+        int seed = config == null ? 42 : config.path("seed").asInt(42);
+        if (seed < 0) {
+            throw new IllegalArgumentException("linear_regression: 'seed' must be 0 or positive");
+        }
         String prediction = "predict".equals(mode) ? predictionName(input, config) : null;
-        Sample sample = readRows(context, input, groups, predictors, response, sampleRows);
+        Sample sample = readRows(context, input, groups, predictors, response, sampleRows, seed);
         List<SampleRow> rows = sample.rows();
         LinkedHashMap<List<Object>, List<SampleRow>> grouped = group(rows, groups.size());
         LinkedHashMap<List<Object>, Model> models = new LinkedHashMap<>();
@@ -127,7 +131,7 @@ public final class LinearRegressionExecutor implements NodeExecutor {
     private record SampleRow(List<Object> groupValues, double[] x, double y) {
     }
 
-    /** Rows actually fitted, plus the number of eligible rows before the sample LIMIT. */
+    /** Rows actually fitted, plus the number of eligible rows before sampling. */
     private record Sample(List<SampleRow> rows, long totalRows) {
     }
 
@@ -145,34 +149,45 @@ public final class LinearRegressionExecutor implements NodeExecutor {
     }
 
     /**
-     * Eligible rows in a canonical order: every projected column is a sort key, so the
-     * first-N sample is reproducible on the same input. Rows tied on all keys are
-     * interchangeable for the least-squares fit. {@code COUNT(*) OVER ()} reports the
-     * unsampled total in the same scan, even when LIMIT cuts the result short.
+     * Deterministic reservoir sample via DuckDB {@code USING SAMPLE reservoir(N ROWS)
+     * REPEATABLE(seed)}: same input and seed give the same fit without sorting the whole
+     * table. A separate COUNT reports the unsampled total; leaving the window function
+     * out of the sampled query keeps its scan cheap. Without sampling the 100k-row cap
+     * is enforced with LIMIT and the window count comes back in the same result.
      */
     private static Sample readRows(NodeContext context, LazyPlan input,
                                    List<ColumnSpec> groups, List<ColumnSpec> predictors,
-                                   ColumnSpec response, int sampleRows) throws SQLException {
+                                   ColumnSpec response, int sampleRows, int seed) throws SQLException {
         StringJoiner projection = new StringJoiner(", ");
         for (ColumnSpec group : groups) {
             projection.add(NodeSql.quote(group.name()));
         }
         for (ColumnSpec predictor : predictors) {
-            projection.add("CAST(" + NodeSql.quote(predictor.name()) + " AS DOUBLE)");
+            projection.add("CAST(" + NodeSql.quote(predictor.name()) + " AS DOUBLE) AS "
+                    + NodeSql.quote(predictor.name()));
         }
-        projection.add("CAST(" + NodeSql.quote(response.name()) + " AS DOUBLE)");
-        String sql = "SELECT " + projection + ", COUNT(*) OVER () AS " + NodeSql.quote("dap_total")
-                + " FROM " + input.asTable() + " AS dap_input"
-                + " WHERE " + sampleWhere(predictors, response)
-                + " ORDER BY " + sampleOrder(groups, predictors, response)
-                + " LIMIT " + (sampleRows > 0 ? sampleRows : ROW_CAP + 1);
+        projection.add("CAST(" + NodeSql.quote(response.name()) + " AS DOUBLE) AS "
+                + NodeSql.quote(response.name()));
+        String where = sampleWhere(predictors, response);
+        String sql;
+        if (sampleRows > 0) {
+            sql = "SELECT * FROM (SELECT " + projection + " FROM " + input.asTable()
+                    + " AS dap_input WHERE " + where + ") USING SAMPLE reservoir(" + sampleRows
+                    + " ROWS) REPEATABLE (" + seed + ")";
+        } else {
+            sql = "SELECT * FROM (SELECT " + projection + ", COUNT(*) OVER () AS "
+                    + NodeSql.quote("dap_total") + " FROM " + input.asTable()
+                    + " AS dap_input WHERE " + where + ") LIMIT " + (ROW_CAP + 1);
+        }
         List<SampleRow> rows = new ArrayList<>();
         long total = 0;
         try (Connection connection = context.db().newConnection();
              Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(sql)) {
             while (result.next()) {
-                total = result.getLong("dap_total");
+                if (sampleRows == 0) {
+                    total = result.getLong("dap_total");
+                }
                 List<Object> groupValues = new ArrayList<>(groups.size());
                 for (int i = 0; i < groups.size(); i++) {
                     groupValues.add(result.getObject(i + 1));
@@ -185,12 +200,24 @@ public final class LinearRegressionExecutor implements NodeExecutor {
                         x, result.getDouble(groups.size() + predictors.size() + 1)));
             }
         }
-        if (sampleRows == 0 && total > ROW_CAP) {
+        if (sampleRows > 0) {
+            total = countRows(context, input, where);
+        } else if (total > ROW_CAP) {
             throw new IllegalArgumentException("linear_regression: the fit is computed in memory and needs "
                     + "at most " + ROW_CAP + " rows, got more; set sample_rows=N to fit on a "
-                    + "deterministic first-N sample, or pre-filter the input");
+                    + "deterministic reservoir sample, or pre-filter the input");
         }
         return new Sample(rows, total);
+    }
+
+    private static long countRows(NodeContext context, LazyPlan input, String where) throws SQLException {
+        String sql = "SELECT COUNT(*) AS " + NodeSql.quote("dap_total") + " FROM " + input.asTable()
+                + " AS dap_input WHERE " + where;
+        try (Connection connection = context.db().newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(sql)) {
+            return result.next() ? result.getLong("dap_total") : 0;
+        }
     }
 
     private static String sampleWhere(List<ColumnSpec> predictors, ColumnSpec response) {
@@ -200,19 +227,6 @@ public final class LinearRegressionExecutor implements NodeExecutor {
         }
         where.add(NodeSql.quote(response.name()) + " IS NOT NULL");
         return where.toString();
-    }
-
-    private static String sampleOrder(List<ColumnSpec> groups, List<ColumnSpec> predictors,
-                                      ColumnSpec response) {
-        StringJoiner order = new StringJoiner(", ");
-        for (ColumnSpec column : groups) {
-            order.add(NodeSql.quote(column.name()));
-        }
-        for (ColumnSpec column : predictors) {
-            order.add(NodeSql.quote(column.name()));
-        }
-        order.add(NodeSql.quote(response.name()));
-        return order.toString();
     }
 
     private static LinkedHashMap<List<Object>, List<SampleRow>> group(List<SampleRow> rows, int groupCount) {
