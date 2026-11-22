@@ -62,6 +62,10 @@ jobs:
         run: make coverage
       - name: MCP launch tests
         run: python3 tests/test_mcp_launch.py
+      - name: MCP unit tests
+        run: python3 -m unittest discover -s tests -p 'test_mcp_*.py'
+      - name: MCP recipe end-to-end
+        run: python3 tests/mcp_recipe_e2e.py
       - name: MCP end-to-end
         run: python3 tests/mcp_e2e.py
       - name: Black-box smoke

@@ -97,15 +97,20 @@ class PromptsTest(unittest.TestCase):
         text = self.message_text(result)
         self.assertIn("/data/sales.csv", text)
         self.assertIn("which region grew fastest?", text)
-        for step in ("dap_ingest", "dap_profile_table", "dap_sql"):
+        for step in ("dap_analyze", "dap_explore", "dap_profile", "dap_estimate"):
             self.assertIn(step, text)
+        for dead_step in ("dap_ingest", "dap_profile_table"):
+            self.assertNotIn(dead_step, text, "prompt still suggests a 4-5 step pipeline")
         self.assertIn("1.", text, "pipeline steps must be numbered")
+        self.assertNotIn("5.", text, "prompt must not end in a fifth manual step")
 
     def test_quality_check_interpolates_path(self):
         text = self.message_text(self.get("quality_check", {"path": "/data/clean.csv"}))
         self.assertIn("/data/clean.csv", text)
-        for step in ("dap_ingest", "dap_profile_table", "dap_sql"):
+        for step in ("dap_explore", "dap_profile"):
             self.assertIn(step, text)
+        for dead_step in ("dap_ingest", "dap_profile_table", "dap_workflow_create"):
+            self.assertNotIn(dead_step, text)
 
     def test_profile_report_interpolates_path_and_output(self):
         text = self.message_text(self.get("profile_report", {
@@ -114,7 +119,10 @@ class PromptsTest(unittest.TestCase):
         }))
         self.assertIn("/data/iris.csv", text)
         self.assertIn("/tmp/iris-report.md", text)
-        self.assertIn("dap.markdown_report", text)
+        self.assertIn("dap_report", text)
+        self.assertIn("one tool call", text)
+        self.assertNotIn("dap_ingest", text)
+        self.assertNotIn("3.", text, "report prompt must not promise an impossible step 3")
 
     def test_profile_report_has_default_output(self):
         text = self.message_text(self.get("profile_report", {"path": "/data/iris.csv"}))

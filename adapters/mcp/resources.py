@@ -147,8 +147,8 @@ PROMPTS = [
     {
         "name": "analyze_csv",
         "description": (
-            "Ingest a CSV, profile it with DAP tools and answer one analytical question; "
-            "the message spells out the exact pipeline and the arguments to pass."
+            "Analyse a CSV and answer one analytical question with a single dap_analyze "
+            "(or dap_explore) call; the message gives the exact arguments."
         ),
         "arguments": [
             {"name": "path", "description": "CSV file to analyse", "required": True},
@@ -162,8 +162,8 @@ PROMPTS = [
     {
         "name": "quality_check",
         "description": (
-            "Run a data quality pass over a CSV: nulls, duplicates, ranges and row counts, "
-            "reported as PASS/FAIL per check."
+            "Run a one-call data quality pass over a CSV with dap_explore: nulls, duplicates, "
+            "ranges and row counts, reported as PASS/FAIL per check."
         ),
         "arguments": [
             {"name": "path", "description": "CSV file to check", "required": True},
@@ -172,8 +172,8 @@ PROMPTS = [
     {
         "name": "profile_report",
         "description": (
-            "Ingest a CSV and write a Markdown profile report with dap.markdown_report, "
-            "then confirm the pass-through table."
+            "Write a Markdown profile report for a CSV with a single dap_report call; "
+            "the returned table and profile are the confirmation."
         ),
         "arguments": [
             {"name": "path", "description": "CSV file to profile", "required": True},
@@ -206,20 +206,20 @@ def _analyze_csv(values: dict) -> str:
     return (
         'Analyse the CSV file at %s.\n'
         '\n'
-        'DAP pipeline (one tool call per step; do not build the graph by hand):\n'
-        '1. dap_ingest {"file": "%s"} - convert the CSV once into the Parquet cache; keep the returned path.\n'
-        '2. dap_explore {"dataset": "<cached path>"} - profile, quality, relationships and '
-        'hypotheses in one call; use it as the first pass.\n'
-        '3. dap_recipe_run {"name": "analyze_csv", "dataset": "<cached path>"} when that recipe is saved, '
-        'otherwise dap_workflow_create plus dap_add_node {"factory": "dap.parquet_reader", '
-        '"settings": {"file": "<cached path>"}} and dap_run.\n'
-        '4. dap_profile_table {"workflow": "<id>", "node": "<node>"} for the summary, then '
-        'dap_sql {"workflow": "<id>", "node": "<node>", "sql": "<one SELECT>"} if the question '
-        'needs a custom query; call dap_estimate first when the query may be heavy.\n'
+        'DAP pipeline (one tool call; do not build the graph by hand):\n'
+        '1. dap_analyze {"file": "%s"} - one call ingests the CSV, runs the workflow and '
+        'returns the table preview plus the profile. Put a read-only SELECT in "sql" when the '
+        'question needs aggregation (the input table is "src"); for a heavy query call '
+        'dap_estimate {"file": "%s", "sql": "<same SELECT>"} first.\n'
+        '2. For a broader first pass, call dap_explore {"file": "%s"} instead - profile, '
+        'quality, relationships and hypotheses. For the profile alone use '
+        'dap_profile {"file": "%s"}. These one-call tools delete their temporary workflow, '
+        'so do not follow them with dap_get_table or dap_sql on their workflow id.\n'
         '\n'
         'Question: %s\n'
         'Report the table preview, the profile highlights and the numbers that answer the question.\n'
-        % (values["path"], values["path"], question)
+        % (values["path"], values["path"], values["path"], values["path"],
+           values["path"], question)
     )
 
 
@@ -227,17 +227,15 @@ def _quality_check(values: dict) -> str:
     return (
         'Check the data quality of the CSV file at %s.\n'
         '\n'
-        'DAP pipeline (one tool call per step):\n'
-        '1. dap_ingest {"file": "%s"} - convert the CSV once into the Parquet cache.\n'
-        '2. dap_explore {"dataset": "<cached path>"} - quality score and issues in one call.\n'
-        '3. dap_workflow_create, dap_add_node {"factory": "dap.parquet_reader", '
-        '"settings": {"file": "<cached path>"}}, then dap_run.\n'
-        '4. dap_profile_table {"workflow": "<id>", "node": "<node>"} for nulls, uniqueness and '
-        'ranges; use dap_sql {"workflow": "<id>", "node": "<node>", "sql": "<one SELECT>"} for the '
-        'counts that need a query (dap_sql takes one read-only SELECT/WITH statement and rejects DDL).\n'
+        'DAP pipeline (one tool call; do not build the graph by hand):\n'
+        '1. dap_explore {"file": "%s"} - one call returns row counts, the column profile, a '
+        'quality score, issues, relationships and hypotheses.\n'
+        '2. Optional: dap_profile {"file": "%s"} for a compact null/distinct/range summary. '
+        'Both tools delete their temporary workflow, so do not call dap_get_table or dap_sql '
+        'on their workflow id afterwards.\n'
         '\n'
         'Report every check as PASS/FAIL with the row counts that justify it.\n'
-        % (values["path"], values["path"])
+        % (values["path"], values["path"], values["path"])
     )
 
 
@@ -246,13 +244,13 @@ def _profile_report(values: dict) -> str:
     return (
         'Build a profile report for the CSV file at %s.\n'
         '\n'
-        'DAP pipeline (one tool call per step):\n'
-        '1. dap_ingest {"file": "%s"} - convert the CSV once into the Parquet cache.\n'
-        '2. dap_report {"dataset": "<cached path>", "report": "%s", "format": "md"} - one call: '
-        'it wires dap.parquet_reader into dap.markdown_report (table + profile) and returns the '
-        'pass-through table; use format html, pdf or pptx when the user needs that file.\n'
-        '3. dap_get_table on the report node (it passes its input through) and read the report; '
-        'for a dataset that is already in the catalog pass its name as "dataset" instead of the path.\n'
+        'DAP pipeline (one tool call):\n'
+        '1. dap_report {"file": "%s", "report": "%s", "format": "md"} - one call wires '
+        'dap.parquet_reader into dap.markdown_report (table + profile), writes the file and '
+        'returns the same table and profile; use html, pdf or pptx as "format" when another '
+        'file type is needed. For a catalog dataset pass its name as "dataset" instead of '
+        '"file". Do not call dap_get_table afterwards: dap_report deletes its temporary '
+        'workflow, so the returned table is the complete pass-through result.\n'
         '\n'
         'Output file: %s\n'
         % (values["path"], values["path"], output, output)

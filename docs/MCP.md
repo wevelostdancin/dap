@@ -186,11 +186,21 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 → `dap_add_node` → `dap_connect` → `dap_run` → `dap_get_table` нужна только для
 нестандартного графа.
 
+Все ответы с таблицами — `dap_get_table`, `dap_analyze`, `dap_report`, `dap_sql`,
+`dap_recipe_run` и `dap_workflow_build` — проходят через один форматтер: значение
+ячейки по умолчанию обрезается до 200 символов с многоточием, одна ячейка на
+100k символов больше не вытесняет остальной контекст. У всех шести инструментов
+есть `columns` (проекция), `maxCellChars` (0 — пустая ячейка) и `includeColumns`;
+у пяти одновызовных — `tableFormat` (`json`/`objects`/`csv`/`markdown`), у
+`dap_get_table` тот же выбор называется `format`. Постраничные поля `offset`/
+`nextOffset`/`truncated` остаются только у `dap_get_table`: одновызовные
+инструменты удаляют временный workflow и не предлагают дочитать таблицу потом.
+
 Для адаптации пайплайна под задачу вместо ручной сборки графа есть три пути:
 `dap_sql` (один read-only SQL по таблице узла, батч `queries` или `explain`),
 `dap_recipe_run` (сохранённый пайплайн с параметрами) и промпты
 `analyze_csv`/`quality_check`/`profile_report`
-(готовый план в три шага). Сценарий приёмки — ingest, ресурс `dap://recipes`,
+(готовый план на один-два вызова). Сценарий приёмки — ingest, ресурс `dap://recipes`,
 рецепт или `dap_sql` — укладывается в три tool call и проверяется
 `make mcp-recipe-e2e`.
 
@@ -220,9 +230,9 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 
 | Промпт | Аргументы | Что делает |
 |---|---|---|
-| `analyze_csv` | `path` (обязательный), `question` | ingest → `dap_explore` → profile → опционально `dap_sql` (при тяжёлом запросе — сначала `dap_estimate`) |
-| `quality_check` | `path` | ingest → `dap_explore` (score и issues) → profile → SQL-проверки NULL/дублей/диапазонов |
-| `profile_report` | `path`, `output` (по умолчанию `profile.md`) | ingest → `dap_report` (обёртка над `dap.markdown_report`, формат md/html/pdf/pptx) → pass-through таблица |
+| `analyze_csv` | `path` (обязательный), `question` | один вызов `dap_analyze` (таблица + профиль, опционально `sql`); альтернативы — `dap_explore` (quality/связи/гипотезы) и `dap_profile` (только профиль); перед тяжёлым SQL — `dap_estimate` |
+| `quality_check` | `path` | один вызов `dap_explore` (score, issues, профиль), опционально `dap_profile` |
+| `profile_report` | `path`, `output` (по умолчанию `profile.md`) | один вызов `dap_report` (обёртка над `dap.markdown_report`, формат md/html/pdf/pptx); таблица и профиль возвращаются в ответе |
 
 Пропущенный обязательный аргумент — JSON-RPC `-32602` с `data.missing`.
 
@@ -315,7 +325,11 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 `truncated`; если движок их не прислал, адаптер считает их из `rows`/`data`.
 Для `csv` и `markdown` данные приходят одной строкой:
 `{"format":"csv","text":"...","rows":150,"offset":0,"nextOffset":20,"truncated":true}`.
-Формат проверяется до HTTP-запроса.
+Формат проверяется до HTTP-запроса. Те же `columns`, `maxCellChars` и
+`includeColumns` принимают `dap_analyze`, `dap_report`, `dap_sql`, `dap_recipe_run`
+и `dap_workflow_build`; там вместо `format` используется `tableFormat` (у
+`dap_analyze` и `dap_report` имя `format` уже занято входным форматом/форматом
+отчёта). Поля пагинации для этих пяти инструментов не возвращаются.
 
 ```json
 {"name": "dap_get_table", "arguments": {"workflow": "wf-1", "node": "1:2",
@@ -396,11 +410,11 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 "report","profile"?,"chart"?,"bytes"?}`. График по-прежнему строится из pass-through
 таблицы отчёта.
 
-`dap_profile` — тот же вход без SQL, отчёта и графика: `file` или `dataset`, `format`,
-`limit` (10) и `timeoutSec`. Возвращает `{source, cached, profile, rows, columns}` без
-таблицы: `rows` — строк в источнике, `columns` — число колонок профиля. `limit`
-зарезервирован под value counts: `/profile` движка их пока не отдаёт, поэтому параметр
-проверяется и передаётся, но на ответ не влияет.
+`dap_profile` — тот же вход без SQL, отчёта и графика: `file` или `dataset`, `format`
+и `timeoutSec`. Возвращает `{source, cached, profile, rows, columns}` без таблицы:
+`rows` — строк в источнике, `columns` — число колонок профиля. Аргумента `limit`
+у инструмента нет: движок `/profile` не читает этот параметр (value count rows он
+пока не отдаёт), поэтому адаптер его не принимает: параметр ничего не менял.
 
 ```json
 {"name": "dap_report", "arguments": {"file": "/data/sales.csv",
