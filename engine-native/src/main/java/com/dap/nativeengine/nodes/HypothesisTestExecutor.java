@@ -234,10 +234,12 @@ public final class HypothesisTestExecutor implements NodeExecutor {
                     + " and " + columnTotals.size());
         }
         double statistic = 0.0;
-        for (Map.Entry<String, Map<String, Long>> row : table.entrySet()) {
-            for (Map.Entry<String, Long> cell : row.getValue().entrySet()) {
-                double expected = (double) rowTotals.get(row.getKey()) * columnTotals.get(cell.getKey()) / n;
-                double difference = cell.getValue() - expected;
+        for (Map.Entry<String, Long> row : rowTotals.entrySet()) {
+            Map<String, Long> observedRow = table.getOrDefault(row.getKey(), Map.of());
+            for (Map.Entry<String, Long> column : columnTotals.entrySet()) {
+                double expected = (double) row.getValue() * column.getValue() / n;
+                long observed = observedRow.getOrDefault(column.getKey(), 0L);
+                double difference = observed - expected;
                 statistic += difference * difference / expected;
             }
         }

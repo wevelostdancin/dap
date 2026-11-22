@@ -17,10 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * dap.hypothesis_test. Reference statistics and p-values are R values (t.test, chisq.test,
- * aov, wilcox.test, kruskal.test, TukeyHSD) and independent double-precision
- * computations for the rank tests and the studentized range; p-values are pinned with
- * tolerance 1e-6 end to end.
+ * dap.hypothesis_test. Reference statistics and p-values are R values (t.test, aov,
+ * wilcox.test, kruskal.test, TukeyHSD), scipy's chi2_contingency for chi_square and
+ * independent double-precision computations for the rank tests and the studentized
+ * range; p-values are pinned with tolerance 1e-6 end to end (1e-9 for chi_square).
  */
 class HypothesisTestExecutorTest {
     private static final List<ColumnSpec> OUTPUT = List.of(
@@ -67,6 +67,21 @@ class HypothesisTestExecutorTest {
     private static LazyPlan grouped(DuckDbSession db, List<Object[]> rows) throws Exception {
         return NodeTestSupport.table(db,
                 List.of(ColumnSpec.of("g", "Utf8"), ColumnSpec.of("v", "Float64")), rows);
+    }
+
+    /** Expand a contingency matrix into one (v, g) row per observation. */
+    private static LazyPlan contingency(DuckDbSession db, String[] values, String[] groups,
+                                        int[][] counts) throws Exception {
+        List<Object[]> rows = new ArrayList<>();
+        for (int i = 0; i < counts.length; i++) {
+            for (int j = 0; j < counts[i].length; j++) {
+                for (int k = 0; k < counts[i][j]; k++) {
+                    rows.add(new Object[]{values[i], groups[j]});
+                }
+            }
+        }
+        return NodeTestSupport.table(db,
+                List.of(ColumnSpec.of("v", "Utf8"), ColumnSpec.of("g", "Utf8")), rows);
     }
 
     private static LazyPlan twoGroups(DuckDbSession db) throws Exception {
@@ -213,16 +228,79 @@ class HypothesisTestExecutorTest {
                     {"test":"chi_square","value":"v","group":"g"}
                     """);
 
-            assertEquals(6.666666666666667, first(data, 1), 1e-6);
-            assertEquals(1.0, first(data, 2), 1e-6);
-            assertEquals(0.009823274488416911, first(data, 3), 1e-6);
+            // scipy.stats.chi2_contingency(..., correction=False), tests/reference/chi_square.py.
+            assertEquals(6.666666666666667, first(data, 1), 1e-9);
+            assertEquals(1.0, first(data, 2), 1e-9);
+            assertEquals(0.009823274507519249, first(data, 3), 1e-9);
             assertEquals("60", data.data().get(0).get(4));
             assertEquals("v vs g", data.data().get(0).get(5));
             // Cramer's V = sqrt(chi2 / (n * min(r-1, c-1))) = sqrt(6.6667 / 60).
-            assertEquals(0.3333333333333333, first(data, 7), 1e-9);
+            assertEquals(0.33333333333333337, first(data, 7), 1e-9);
             assertEquals("cramers_v", data.data().get(0).get(8));
             assertNull(data.data().get(0).get(9));
             assertNull(data.data().get(0).get(10));
+        }
+    }
+
+    @Test
+    void chiSquareSparse2x2CountsUnobservedCells() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = contingency(db, new String[]{"a", "b"}, new String[]{"g1", "g2"},
+                    new int[][]{{10, 0}, {0, 10}});
+
+            TableData data = run(db, input, """
+                    {"test":"chi_square","value":"v","group":"g"}
+                    """);
+
+            // All four expected frequencies are 5: two observed cells give (10-5)^2/5
+            // each and two unobserved cells give (0-5)^2/5 each, so chi2 = 20.
+            assertEquals(1, data.rows());
+            assertEquals(20.0, first(data, 1), 1e-9);
+            assertEquals(1.0, first(data, 2), 1e-9);
+            assertEquals(7.744216431044084e-06, first(data, 3), 1e-9);
+            assertEquals("20", data.data().get(0).get(4));
+            assertEquals(1.0, first(data, 7), 1e-9);
+            assertEquals("cramers_v", data.data().get(0).get(8));
+        }
+    }
+
+    @Test
+    void chiSquareSparse3x3MatchesReference() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan input = contingency(db, new String[]{"a", "b", "c"},
+                    new String[]{"g1", "g2", "g3"},
+                    new int[][]{{5, 0, 5}, {0, 5, 5}, {5, 5, 0}});
+
+            TableData data = run(db, input, """
+                    {"test":"chi_square","value":"v","group":"g"}
+                    """);
+
+            assertEquals(15.0, first(data, 1), 1e-9);
+            assertEquals(4.0, first(data, 2), 1e-9);
+            assertEquals(0.004701217146256585, first(data, 3), 1e-9);
+            assertEquals("30", data.data().get(0).get(4));
+            assertEquals(0.5, first(data, 7), 1e-9);
+        }
+    }
+
+    @Test
+    void chiSquareGoldenP2FixtureMatchesReference() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            // wf-n11-hypothesis: name x category on p2.csv, six rows over 5x3 categories.
+            LazyPlan input = contingency(db,
+                    new String[]{"alpha", "beta", "gamma", "delta", "epsilon"},
+                    new String[]{"A", "B", "C"},
+                    new int[][]{{1, 0, 0}, {0, 1, 0}, {2, 0, 0}, {0, 0, 1}, {0, 1, 0}});
+
+            TableData data = run(db, input, """
+                    {"test":"chi_square","value":"v","group":"g"}
+                    """);
+
+            assertEquals(12.0, first(data, 1), 1e-9);
+            assertEquals(8.0, first(data, 2), 1e-9);
+            assertEquals(0.15120388277664784, first(data, 3), 1e-9);
+            assertEquals("6", data.data().get(0).get(4));
+            assertEquals(1.0, first(data, 7), 1e-9);
         }
     }
 
