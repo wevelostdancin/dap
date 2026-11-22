@@ -21,6 +21,8 @@ class TypeMapTest {
         assertEquals("Int64", TypeMap.fromDuckDb("UINTEGER"));
         assertEquals("Int64", TypeMap.fromDuckDb("USMALLINT"));
         assertEquals("Int64", TypeMap.fromDuckDb("UTINYINT"));
+        assertEquals("Decimal128(38,0)", TypeMap.fromDuckDb("HUGEINT"));
+        assertEquals("Decimal128(20,0)", TypeMap.fromDuckDb("UBIGINT"));
         assertEquals("Float64", TypeMap.fromDuckDb("DOUBLE"));
         assertEquals("Float64", TypeMap.fromDuckDb("REAL"));
         assertEquals("Float64", TypeMap.fromDuckDb("FLOAT"));
@@ -46,22 +48,15 @@ class TypeMapTest {
     }
 
     @Test
-    void rejectsWideIntegerTypesOutsideInt64Range() {
-        String[][] cases = {{"HUGEINT", "HUGEINT"}, {"UBIGINT", "UBIGINT"},
-                {" hugeint ", "HUGEINT"}, {"ubigint", "UBIGINT"}};
-        for (String[] testCase : cases) {
-            String input = testCase[0];
-            String normalized = testCase[1];
-            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-                    () -> TypeMap.fromDuckDb(input), input);
-            assertTrue(failure.getMessage().contains(normalized), failure.getMessage());
-            assertTrue(failure.getMessage().contains("value out of Int64 range"), failure.getMessage());
-            assertTrue(failure.getMessage().contains("cast the column explicitly"), failure.getMessage());
-        }
+    void mapsWideIntegerTypesToExactDecimals() {
+        assertEquals("Decimal128(38,0)", TypeMap.fromDuckDb(" hugeint "));
+        assertEquals("Decimal128(38,0)", TypeMap.fromDuckDb("hugeint"));
+        assertEquals("Decimal128(20,0)", TypeMap.fromDuckDb(" ubigint "));
+        assertEquals("Decimal128(20,0)", TypeMap.fromDuckDb("ubigint"));
     }
 
     @Test
-    void integerBoundariesReportedByDuckDbAreMappedOrRejected() throws Exception {
+    void integerBoundariesReportedByDuckDbAreMappedWithoutLoss() throws Exception {
         try (DuckDbSession db = new DuckDbSession();
              Connection connection = db.newConnection();
              Statement statement = connection.createStatement()) {
@@ -69,9 +64,35 @@ class TypeMapTest {
             assertEquals("Int64", TypeMap.fromDuckDb(typeOf(statement, "CAST(4294967295 AS UINTEGER)")));
             assertEquals("Int64", TypeMap.fromDuckDb(typeOf(statement, "CAST(65535 AS USMALLINT)")));
             assertEquals("Int64", TypeMap.fromDuckDb(typeOf(statement, "CAST(255 AS UTINYINT)")));
+            assertEquals("Decimal128(38,0)",
+                    TypeMap.fromDuckDb(typeOf(statement, "CAST(9223372036854775808 AS HUGEINT)")));
+            assertEquals("Decimal128(20,0)",
+                    TypeMap.fromDuckDb(typeOf(statement, "CAST(18446744073709551615 AS UBIGINT)")));
+        }
+    }
 
-            assertOutOfInt64Range(statement, "CAST(9223372036854775808 AS HUGEINT)");
-            assertOutOfInt64Range(statement, "CAST(18446744073709551615 AS UBIGINT)");
+    @Test
+    void wideDecimalTypeIsPrintedAsDecimalByDisplayAndColumnSpec() {
+        assertEquals("Decimal128(38,0)", TypeMap.display("Decimal128(38,0)"));
+        ColumnSpec spec = ColumnSpec.of("total", TypeMap.fromDuckDb("HUGEINT"));
+        assertEquals("Decimal128(38,0)", spec.arrowType());
+        assertEquals("Number (Decimal)", spec.knimeType());
+        assertEquals("DECIMAL(38,0)", spec.duckDbType());
+        assertTrue(spec.numeric());
+    }
+
+    @Test
+    void hugeIntAboveDecimal38RangeFailsCastInsteadOfTruncating() throws Exception {
+        try (DuckDbSession db = new DuckDbSession();
+             Connection connection = db.newConnection();
+             Statement statement = connection.createStatement()) {
+            assertEquals("HUGEINT", typeOf(statement, "170141183460469231731687303715884105727"));
+            java.sql.SQLException failure = assertThrows(java.sql.SQLException.class, () -> statement.executeQuery(
+                    "SELECT CAST(170141183460469231731687303715884105727 AS DECIMAL(38,0))"));
+            String message = failure.getMessage().toLowerCase(java.util.Locale.ROOT);
+            assertTrue(message.contains("conversion error"), failure.getMessage());
+            assertTrue(message.contains("decimal(38,0)"), failure.getMessage());
+            assertTrue(message.contains("170141183460469231731687303715884105727"), failure.getMessage());
         }
     }
 
@@ -83,13 +104,6 @@ class TypeMapTest {
             assertEquals("Decimal128(38,9)", columns.get(0).arrowType());
             assertEquals("Decimal128(18,4)", columns.get(1).arrowType());
         }
-    }
-
-    private static void assertOutOfInt64Range(Statement statement, String expression) throws Exception {
-        String type = typeOf(statement, expression);
-        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-                () -> TypeMap.fromDuckDb(type), expression);
-        assertTrue(failure.getMessage().contains("value out of Int64 range"), failure.getMessage());
     }
 
     private static String typeOf(Statement statement, String expression) throws Exception {

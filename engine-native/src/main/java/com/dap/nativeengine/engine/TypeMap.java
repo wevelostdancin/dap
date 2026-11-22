@@ -99,11 +99,12 @@ public final class TypeMap {
             // Narrow unsigned types max out below 2^63 and always fit in a signed Int64.
             case "BIGINT", "INTEGER", "INT", "SMALLINT", "TINYINT",
                  "UINTEGER", "USMALLINT", "UTINYINT" -> "Int64";
-            // HUGEINT is 128-bit and UBIGINT reaches 2^64-1: both exceed Int64, so a
-            // silent Int64 mapping would truncate values and break downstream BIGINT casts.
-            case "HUGEINT", "UBIGINT" -> throw new IllegalArgumentException(
-                    "DuckDB " + value + " value out of Int64 range; cast the column explicitly "
-                            + "(BIGINT for in-range values, DECIMAL or VARCHAR for the full range)");
+            // SUM(BIGINT) is HUGEINT in DuckDB, so this must stay a supported type.
+            // UBIGINT max is 2^64-1 < 10^20. HUGEINT max is 2^127-1 (~1.7e38) and exceeds
+            // DECIMAL(38,0) (~9.99e37): such values make DuckDB fail the cast with a
+            // Conversion Error, never silently truncate.
+            case "HUGEINT" -> "Decimal128(38,0)";
+            case "UBIGINT" -> "Decimal128(20,0)";
             case "DOUBLE", "REAL", "FLOAT" -> "Float64";
             case "VARCHAR", "TEXT", "STRING", "CHAR" -> "Utf8";
             case "BOOLEAN", "BOOL" -> "Boolean";

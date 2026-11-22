@@ -140,6 +140,22 @@ class MathFormulaExecutorTest {
     }
 
     @Test
+    void windowSumOverIntegerColumnAddsExactWideDecimal() throws Exception {
+        try (DuckDbSession db = new DuckDbSession()) {
+            LazyPlan plan = execute(db, input(db), """
+                    {"outputs":[{"name":"huge_total","expression":"SUM(id) OVER ()"}]}
+                    """);
+            assertEquals(ColumnSpec.of("huge_total", "Decimal128(38,0)"),
+                    plan.columns().get(plan.columns().size() - 1));
+
+            TableData data = plan.preview(10);
+            assertEquals("7", data.data().get(0).get(3));
+            assertEquals("7", data.data().get(1).get(3));
+            assertEquals("7", data.data().get(2).get(3));
+        }
+    }
+
+    @Test
     void unknownColumnAndSyntaxErrorsNameTheOutput() throws Exception {
         try (DuckDbSession db = new DuckDbSession()) {
             IllegalArgumentException unknownColumn = assertThrows(IllegalArgumentException.class,
@@ -155,11 +171,9 @@ class MathFormulaExecutorTest {
                             """));
             assertTrue(syntax.getMessage().contains("oops"), syntax.getMessage());
 
-            // AVG keeps this a projection-validation case: SUM(id) is DuckDB HUGEINT,
-            // which TypeMap rejects earlier as out of the Int64 range.
             IllegalArgumentException aggregate = assertThrows(IllegalArgumentException.class,
                     () -> execute(db, input(db), """
-                            {"outputs":[{"name":"total","expression":"AVG(id)"}]}
+                            {"outputs":[{"name":"total","expression":"SUM(id)"}]}
                             """));
             assertTrue(aggregate.getMessage().contains("projection"), aggregate.getMessage());
 
