@@ -21,6 +21,8 @@ public final class Workflow {
     private final LinkedHashMap<String, WorkflowNode> nodes = new LinkedHashMap<>();
     private final List<Connection> connections = new ArrayList<>();
     private int nextIndex = 1;
+    /** Set for the duration of a run so a PATCH/DELETE cannot change the executing graph. */
+    private volatile boolean structureLocked;
 
     public Workflow(String id, String name, String session) {
         this.id = id;
@@ -74,7 +76,32 @@ public final class Workflow {
         return new Graph(List.copyOf(nodeSnapshot), List.copyOf(connections), Map.copyOf(configs));
     }
 
+    /**
+     * Freeze the structure while a run uses this snapshot. Node state stays live (/debug and
+     * job progress), but no node or connection can appear, disappear or change config.
+     */
+    public synchronized void lockStructure() {
+        structureLocked = true;
+    }
+
+    public synchronized void unlockStructure() {
+        structureLocked = false;
+    }
+
+    public boolean structureLocked() {
+        return structureLocked;
+    }
+
+    private void checkStructureUnlocked() {
+        if (structureLocked) {
+            throw ApiException.conflict("workflow_running",
+                    "workflow " + id + " is running; its graph cannot be edited",
+                    "wait for the active job to finish, then retry");
+        }
+    }
+
     public synchronized WorkflowNode addNode(String factory, String displayName, ObjectNode config) {
+        checkStructureUnlocked();
         int numeric = Integer.parseInt(id.substring(3));
         String nodeId = numeric + ":" + nextIndex++;
         WorkflowNode node = new WorkflowNode(nodeId, factory, displayName, config);
@@ -83,6 +110,7 @@ public final class Workflow {
     }
 
     public synchronized void setConfig(String nodeId, ObjectNode config) {
+        checkStructureUnlocked();
         WorkflowNode node = requireNode(nodeId);
         ObjectNode merged = node.config().deepCopy();
         config.fields().forEachRemaining(entry -> merged.set(entry.getKey(), entry.getValue()));
@@ -92,6 +120,7 @@ public final class Workflow {
     public void removeNode(String nodeId) {
         WorkflowNode node;
         synchronized (this) {
+            checkStructureUnlocked();
             node = nodes.get(nodeId);
             if (node == null) {
                 throw ApiException.badRequest("node not found: " + nodeId);
@@ -106,6 +135,7 @@ public final class Workflow {
     }
 
     public synchronized void connect(Connection connection) {
+        checkStructureUnlocked();
         requireNode(connection.from());
         requireNode(connection.to());
         if (connection.from().equals(connection.to())) {
@@ -128,6 +158,7 @@ public final class Workflow {
     }
 
     public synchronized boolean disconnect(Connection connection) {
+        checkStructureUnlocked();
         return connections.remove(connection);
     }
 

@@ -92,8 +92,15 @@ final class IoNodeSupport {
         Path temporary = target.resolveSibling(target.getFileName() + ".tmp-" + UUID.randomUUID());
         String sql = "COPY (SELECT * FROM " + input.asTable() + ") TO "
                 + NodeSql.literal(temporary.toString()) + " (" + options + ")";
-        try (Statement statement = connection.createStatement()) {
-            statement.execute(sql);
+        // Every node of a DAG level shares the job connection; two concurrent COPY statements
+        // on one DuckDB connection are not supported. Serialize the statement, keep the rename
+        // outside the monitor because it touches only this node's private temporary file.
+        try {
+            synchronized (connection) {
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute(sql);
+                }
+            }
             Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,
                     StandardCopyOption.REPLACE_EXISTING);
         } catch (SQLException | IOException failure) {

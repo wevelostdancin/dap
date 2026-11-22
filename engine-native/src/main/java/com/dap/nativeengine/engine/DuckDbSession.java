@@ -68,6 +68,8 @@ public final class DuckDbSession implements AutoCloseable {
     private final DuckDBConnection base;
     private final Resources resources;
     private final AtomicLong tableIds = new AtomicLong();
+    /** Exact names of the stable, workflow-scoped tables created by {@link #load}. */
+    private final ConcurrentHashMap<String, Set<String>> workflowTables = new ConcurrentHashMap<>();
     private final Object loadLock = new Object();
     private final ConcurrentHashMap<DuckDBConnection, Read> reads = new ConcurrentHashMap<>();
     /** Shared by report sections and GET /profile within one run; see {@link ProfileCache}. */
@@ -83,6 +85,12 @@ public final class DuckDbSession implements AutoCloseable {
     private long pageTableRows;
     /** Guards {@link #reads}: openRead, endRead, close and interruptReads all take it. */
     final Object readsLock = new Object();
+    /**
+     * Owner of reads opened on the current thread. Inheritable so node tasks spawned by a job
+     * register their materializations with that job; HTTP /table requests have no owner and
+     * therefore survive another job's cancel.
+     */
+    private final InheritableThreadLocal<String> readOwner = new InheritableThreadLocal<>();
     private boolean closed;
 
     /** Defaults: DuckDB's own resource settings are left untouched. */
@@ -226,10 +234,39 @@ public final class DuckDbSession implements AutoCloseable {
      * zero-copy Arrow registration, so this is a measured row-wise copy.
      */
     public String load(ArrowTable table, String prefix) throws SQLException {
+        return loadNamed(table, sanitize(prefix) + "_" + tableIds.incrementAndGet(), false);
+    }
+
+    /**
+     * Materialize a node's result under a stable, workflow-scoped name. A re-run replaces its
+     * own table instead of leaking one per execution, and workflow deletion can address it.
+     */
+    public String load(ArrowTable table, String prefix, String workflowId, String nodeId) throws SQLException {
+        return load(table, prefix, workflowId, nodeId, null);
+    }
+
+    /**
+     * Same as above, with a discriminator for nodes that create several tables (text_normalize
+     * keeps one mapping per selected column).
+     */
+    public String load(ArrowTable table, String prefix, String workflowId, String nodeId,
+                       String discriminator) throws SQLException {
+        if (workflowId == null || nodeId == null) {
+            return load(table, prefix);
+        }
+        String name = sanitize(prefix) + "_" + sanitize(workflowId) + "_" + sanitize(nodeId)
+                + (discriminator == null || discriminator.isEmpty()
+                        ? "" : "_" + sanitize(discriminator));
+        String loaded = loadNamed(table, name, true);
+        workflowTables.computeIfAbsent(workflowId, ignored -> ConcurrentHashMap.newKeySet()).add(name);
+        return loaded;
+    }
+
+    private String loadNamed(ArrowTable table, String name, boolean replace) throws SQLException {
         Objects.requireNonNull(table, "table");
-        String name = sanitize(prefix) + "_" + tableIds.incrementAndGet();
         List<ColumnSpec> columns = table.columns();
-        StringBuilder ddl = new StringBuilder("CREATE TABLE ").append(quote(name)).append(" (");
+        StringBuilder ddl = new StringBuilder(replace ? "CREATE OR REPLACE TABLE " : "CREATE TABLE ")
+                .append(quote(name)).append(" (");
         for (int i = 0; i < columns.size(); i++) {
             if (i > 0) {
                 ddl.append(", ");
@@ -352,7 +389,7 @@ public final class DuckDbSession implements AutoCloseable {
         int safeLimit = Math.max(0, limit);
         DuckDBConnection connection = openRead(workflowId, nodeId);
         try {
-            return bounded("table", timeoutMillis, workflowId,
+            return bounded("table", timeoutMillis, connection,
                     () -> readPreview(connection, sql, columns, safeLimit));
         } finally {
             endRead(connection);
@@ -388,7 +425,7 @@ public final class DuckDbSession implements AutoCloseable {
         int safeOffset = Math.max(0, offset);
         DuckDBConnection connection = openRead(workflowId, nodeId);
         try {
-            return bounded("table", timeoutMillis, workflowId,
+            return bounded("table", timeoutMillis, connection,
                     () -> readPage(connection, sql, columns, safeLimit, safeOffset, workflowId, nodeId));
         } finally {
             endRead(connection);
@@ -583,27 +620,33 @@ public final class DuckDbSession implements AutoCloseable {
         if (sql == null || sql.isBlank()) {
             throw new IllegalArgumentException("sql must not be empty");
         }
-        try (Statement statement = connection.createStatement();
-             ResultSet result = statement.executeQuery(
-                     "SELECT * FROM (" + LazyPlan.stripSemicolon(sql) + "\n) AS dap_describe LIMIT 0")) {
-            ResultSetMetaData metadata = result.getMetaData();
-            List<ColumnSpec> columns = new ArrayList<>(metadata.getColumnCount());
-            Set<String> names = new LinkedHashSet<>();
-            for (int index = 1; index <= metadata.getColumnCount(); index++) {
-                String name = metadata.getColumnName(index);
-                String duckDbType = metadata.getColumnTypeName(index);
-                String arrowType;
-                try {
-                    arrowType = TypeMap.fromDuckDb(duckDbType);
-                } catch (IllegalArgumentException unsupported) {
-                    throw ApiException.badRequest("sql_type_not_supported",
-                            "column '" + name + "' has unsupported type " + duckDbType,
-                            "LIST, STRUCT, MAP and TIMESTAMPTZ columns cannot be returned; "
-                                    + "cast the column to a scalar type in the query");
+        // The job connection is shared by every node of a DAG level. DuckDB cannot interleave
+        // pending results of several statements on one connection, so every access to it is
+        // serialized (loadInto and db_reader already do the same). Re-entrant: db_reader
+        // calls describe while already holding this monitor.
+        synchronized (connection) {
+            try (Statement statement = connection.createStatement();
+                 ResultSet result = statement.executeQuery(
+                         "SELECT * FROM (" + LazyPlan.stripSemicolon(sql) + "\n) AS dap_describe LIMIT 0")) {
+                ResultSetMetaData metadata = result.getMetaData();
+                List<ColumnSpec> columns = new ArrayList<>(metadata.getColumnCount());
+                Set<String> names = new LinkedHashSet<>();
+                for (int index = 1; index <= metadata.getColumnCount(); index++) {
+                    String name = metadata.getColumnName(index);
+                    String duckDbType = metadata.getColumnTypeName(index);
+                    String arrowType;
+                    try {
+                        arrowType = TypeMap.fromDuckDb(duckDbType);
+                    } catch (IllegalArgumentException unsupported) {
+                        throw ApiException.badRequest("sql_type_not_supported",
+                                "column '" + name + "' has unsupported type " + duckDbType,
+                                "LIST, STRUCT, MAP and TIMESTAMPTZ columns cannot be returned; "
+                                        + "cast the column to a scalar type in the query");
+                    }
+                    columns.add(ColumnSpec.of(uniqueName(names, name), arrowType));
                 }
-                columns.add(ColumnSpec.of(uniqueName(names, name), arrowType));
+                return columns;
             }
-            return columns;
         }
     }
 
@@ -668,7 +711,7 @@ public final class DuckDbSession implements AutoCloseable {
         }
         DuckDBConnection connection = openRead(workflowId, nodeId);
         try {
-            ProfileData data = bounded("profile", timeoutMillis, workflowId,
+            ProfileData data = bounded("profile", timeoutMillis, connection,
                     () -> readProfile(connection, sql, columns, withStddev));
             profiles.put(workflowId, nodeId, sql, columns, withStddev, data);
             if (withStddev) {
@@ -842,10 +885,10 @@ public final class DuckDbSession implements AutoCloseable {
     }
 
     /**
-     * Run one materialization under a timeout. On expiry the registered reads of the
-     * workflow are interrupted (their connections closed) and the caller gets 408.
+     * Run one materialization under a timeout. On expiry only the connection of this call is
+     * closed (the caller gets 408); other clients' reads of the same workflow keep running.
      */
-    private <T> T bounded(String operation, long timeoutMillis, String workflowId,
+    private <T> T bounded(String operation, long timeoutMillis, DuckDBConnection connection,
                           Callable<T> task) throws SQLException {
         if (timeoutMillis <= 0) {
             try {
@@ -860,7 +903,7 @@ public final class DuckDbSession implements AutoCloseable {
         try {
             return future.get(timeoutMillis, TimeUnit.MILLISECONDS);
         } catch (TimeoutException timedOut) {
-            interruptReads(workflowId);
+            endRead(connection);
             future.cancel(true);
             throw ApiException.timeout("query_timeout",
                     "the " + operation + " materialization timed out after " + timeoutMillis + " ms",
@@ -944,13 +987,21 @@ public final class DuckDbSession implements AutoCloseable {
         prefixes.add("excel_" + sanitize(workflowId) + "_");
         prefixes.add("db_" + sanitize(workflowId) + "_");
         prefixes.add("files_" + sanitize(workflowId) + "_");
-        // text_normalize loads a distinct-value mapping table per selected column.
-        prefixes.add("textnorm_");
+        // Node materializations: survival, timeseries and text_normalize (one mapping table
+        // per selected column) are named <prefix>_<workflow>_<node>[_<column>].
+        for (String prefix : List.of("survival_", "timeseries_", "textnorm_")) {
+            prefixes.add(prefix + workflowId + "_");
+            prefixes.add(prefix + sanitize(workflowId) + "_");
+        }
         // The in-memory statistics nodes (outlier methods, cluster, pca) materialize one
         // per-row result mapping table named stats_<workflow>_<node>.
         prefixes.add("stats_" + workflowId + "_");
         prefixes.add("stats_" + sanitize(workflowId) + "_");
         List<String> names = new ArrayList<>();
+        Set<String> registered = workflowTables.remove(workflowId);
+        if (registered != null) {
+            names.addAll(registered);
+        }
         try (Statement statement = base.createStatement();
              ResultSet result = statement.executeQuery(
                      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'")) {
@@ -1074,7 +1125,24 @@ public final class DuckDbSession implements AutoCloseable {
     }
 
     /** One in-flight materialization; closing its connection interrupts the running query. */
-    private record Read(String workflowId, String nodeId) {
+    private record Read(String workflowId, String nodeId, String owner) {
+    }
+
+    /**
+     * Tag reads opened by this thread (and its child threads) with an owner, e.g. a job id.
+     * Cancelling that job interrupts only its own reads, not other clients' /table reads.
+     */
+    public void setReadOwner(String owner) {
+        if (owner == null) {
+            readOwner.remove();
+        } else {
+            readOwner.set(owner);
+        }
+    }
+
+    /** Clear the owner set by {@link #setReadOwner}. */
+    public void clearReadOwner() {
+        readOwner.remove();
     }
 
     private DuckDBConnection openRead(String workflowId, String nodeId) throws SQLException {
@@ -1084,7 +1152,7 @@ public final class DuckDbSession implements AutoCloseable {
                 closeQuietly(connection);
                 throw new SQLException("session is closed");
             }
-            reads.put(connection, new Read(workflowId, nodeId));
+            reads.put(connection, new Read(workflowId, nodeId, readOwner.get()));
         }
         return connection;
     }
@@ -1095,17 +1163,31 @@ public final class DuckDbSession implements AutoCloseable {
     }
 
     /**
-     * Interrupt the in-flight /table and /profile reads of one workflow only. The reads
-     * lock makes the cancel atomic with openRead: a read that was registered before this
-     * call cannot slip past the iteration and keep running.
+     * Interrupt every in-flight read of a workflow (workflow deletion). The reads lock makes
+     * the interrupt atomic with openRead: a read registered before this call cannot slip past
+     * the iteration and keep running.
      */
     public void interruptReads(String workflowId) {
+        interruptReads(workflowId, null, false);
+    }
+
+    /**
+     * Interrupt the reads a specific job started. A null owner matches no job: HTTP /table
+     * requests are unowned and must survive another client's cancel.
+     */
+    public void interruptReads(String workflowId, String owner) {
+        interruptReads(workflowId, owner, true);
+    }
+
+    private void interruptReads(String workflowId, String owner, boolean ownerScoped) {
         if (workflowId == null) {
             return;
         }
         synchronized (readsLock) {
             for (Map.Entry<DuckDBConnection, Read> entry : reads.entrySet()) {
-                if (workflowId.equals(entry.getValue().workflowId())
+                Read read = entry.getValue();
+                if (workflowId.equals(read.workflowId())
+                        && (!ownerScoped || Objects.equals(owner, read.owner()))
                         && reads.remove(entry.getKey()) != null) {
                     closeQuietly(entry.getKey());
                 }

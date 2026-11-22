@@ -246,6 +246,7 @@ public final class JobManager implements AutoCloseable {
     private void run(Job job, Workflow workflow, DuckDbSession db) {
         ReentrantLock lock = workflowLocks.computeIfAbsent(workflow.id(), ignored -> new ReentrantLock(true));
         boolean locked = false;
+        boolean graphFrozen = false;
         try {
             if (job.state().terminal()) {
                 return;
@@ -258,15 +259,26 @@ public final class JobManager implements AutoCloseable {
             if (!job.start()) {
                 return;
             }
+            // Freeze the graph before the snapshot: PATCH/DELETE /nodes of a running job
+            // must not change the nodes its DAG executes.
+            workflow.lockStructure();
+            graphFrozen = true;
             // Reset only after the job actually starts: a cancel that wins the queued
             // window must not wipe the results of the previous successful run.
             workflow.resetResults();
             // A new run must not serve profile statistics or /table pages of the previous one.
             db.invalidateProfiles(workflow.id());
             db.invalidateTables(workflow.id());
+            // Tag the node tasks (and the reads they start) with this job so a cancel only
+            // interrupts its own materializations, not another client's /table request.
+            db.setReadOwner(job.id());
             Connection connection = db.newConnection();
             connections.put(job.id(), connection);
             dag.execute(workflow, db, connection, job::progress);
+            // Release before the job becomes terminal: a client awaiting /run may edit the
+            // graph as soon as it sees the completed state.
+            workflow.unlockStructure();
+            graphFrozen = false;
             completeSuccess(job, workflow);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
@@ -284,6 +296,10 @@ public final class JobManager implements AutoCloseable {
                 timeout.cancel(false);
             }
             closeJobConnection(job);
+            db.clearReadOwner();
+            if (graphFrozen) {
+                workflow.unlockStructure();
+            }
             if (locked) {
                 lock.unlock();
             }
