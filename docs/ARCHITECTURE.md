@@ -38,7 +38,8 @@ JobManager ──► Dag (уровни Кана, параллельные вет
                  ├─ csv_reader: read_csv (ленивое отношение); excel_reader: Arrow → Appender → таблица
                  ├─ parquet_reader / json_reader: read_parquet / read_json_auto
                  ├─ csv_writer / parquet_writer / json_writer: COPY ... TO
-                 ├─ excel_writer: zip + XML (без POI), атомарное переименование
+                 ├─ excel_writer: zip + XML (без POI), страницы по 10k строк прямо в
+                 │                ZipOutputStream, атомарное переименование
                  └─ преобразования: SQL-отношения
 ```
 
@@ -206,6 +207,10 @@ strictMode/nullStrings`; для XLSX сейчас используется фи�
   узлами Arrow не передаётся.
 - CSV читается DuckDB и в JVM heap не попадает; `DAP_DUCKDB_MEMORY_LIMIT`
   ограничивает буферы DuckDB. Arrow-таблицы XLSX живут в heap.
+- `excel_writer` не материализует таблицу в heap: читает план страницами по 10 000
+  строк и пишет XML листа в `ZipOutputStream` через буфер 8 KiB. В heap живут
+  текущая страница `TableData` и одна XML-строка; shared strings не используются.
+  Ограничение памяти на чтение XLSX (`XlsxTableReader`) это не снимает.
 - Потолок памяти процесса — примерно `sessions × DAP_DUCKDB_MEMORY_LIMIT` плюс heap.
   Сессионные БД эвиктятся по `DAP_SESSION_TTL_SEC`/LRU-лимиту `DAP_MAX_SESSIONS`,
   история завершённых jobs ограничена `DAP_MAX_RETAINED_JOBS`; таблица `excel_reader`

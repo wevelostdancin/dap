@@ -21,6 +21,8 @@
     <!-- Default JUnit tag filter: the slow soak suite runs via "make soak"
          (./mvnw -q -Dgroups=soak test), everything else runs in the normal suite. -->
     <groups>!soak</groups>
+    <!-- Extra JVM flags for one-off bounded-heap runs, e.g. -Ddap.test.jvmargs=-Xmx256m. -->
+    <dap.test.jvmargs></dap.test.jvmargs>
     <!-- The shaded jar keeps one platform's duckdb_jdbc native library. Each of these
          properties holds the file to exclude, so a profile hides the build host's own
          library behind a sentinel pattern; -Ddap.duckdb.native=all|osx_universal|
@@ -91,7 +93,7 @@
         <version>3.5.2</version>
         <configuration>
           <groups>${groups}</groups>
-          <argLine>--add-opens=java.base/java.nio=ALL-UNNAMED -Djava.awt.headless=true</argLine>
+          <argLine>${dap.test.jvmargs} --add-opens=java.base/java.nio=ALL-UNNAMED -Djava.awt.headless=true</argLine>
           <systemPropertyVariables>
             <dap.project.root>${project.basedir}/..</dap.project.root>
           </systemPropertyVariables>
