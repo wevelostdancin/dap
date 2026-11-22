@@ -6,6 +6,7 @@ import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
 import com.dap.nativeengine.engine.TableData;
 import com.dap.nativeengine.exec.NodeContext;
+import com.dap.nativeengine.xlsx.XlsxTableReader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -282,7 +283,7 @@ class ExcelReaderExecutorTest {
     }
 
     @Test
-    void sharedStringsConcatenateRunsAndEmptyValueStaysEmptyUnlessEmptyStringIsNull() throws Exception {
+    void sharedStringsConcatenateRunsAndEmptyValueIsNullByDefault() throws Exception {
         Map<String, String> sheets = new LinkedHashMap<>();
         sheets.put("Sheet1", sheet("<row r=\"1\">" + inline(1, "A", "greeting") + inline(1, "B", "note") + "</row>"
                 + "<row r=\"2\"><c r=\"A2\" t=\"s\"><v>0</v></c><c r=\"B2\" t=\"s\"><v>1</v></c></row>"));
@@ -297,14 +298,16 @@ class ExcelReaderExecutorTest {
 
             TableData data = plan.preview(10);
             assertEquals("Hello", data.data().get(0).get(0));
-            assertEquals("", data.data().get(0).get(1));
-            assertEquals(0, plan.profile().columns().get(1).missing());
+            assertNull(data.data().get(0).get(1));
+            assertEquals(1, plan.profile().columns().get(1).missing());
 
-            LazyPlan nulls = read(db, job, "{\"file\":\"" + jsonPath(file) + "\",\"emptyStringIsNull\":true}");
-            TableData withNulls = nulls.preview(10);
-            assertEquals("Hello", withNulls.data().get(0).get(0));
-            assertNull(withNulls.data().get(0).get(1));
-            assertEquals(1, nulls.profile().columns().get(1).missing());
+            // Legacy behaviour stays available explicitly and matches the old default.
+            LazyPlan strings = read(db, job,
+                    "{\"file\":\"" + jsonPath(file) + "\",\"emptyStringIsNull\":false}");
+            TableData withStrings = strings.preview(10);
+            assertEquals("Hello", withStrings.data().get(0).get(0));
+            assertEquals("", withStrings.data().get(0).get(1));
+            assertEquals(0, strings.profile().columns().get(1).missing());
         }
     }
 
@@ -430,7 +433,8 @@ class ExcelReaderExecutorTest {
         Path file = writeXlsx(dir, "formula-bool-error.xlsx", sheets, null, null);
 
         try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
-            LazyPlan plan = read(db, job, "{\"file\":\"" + jsonPath(file) + "\"}");
+            LazyPlan plan = read(db, job,
+                    "{\"file\":\"" + jsonPath(file) + "\",\"errorsAsNull\":true}");
 
             assertEquals(List.of(ColumnSpec.of("formula", "Utf8"), ColumnSpec.of("flag", "Boolean"),
                     ColumnSpec.of("broken", "Utf8"), ColumnSpec.of("plain", "Int64")), plan.columns());
@@ -527,6 +531,114 @@ class ExcelReaderExecutorTest {
             assertTrue(failure.getMessage().contains("id_ed25519"), failure.getMessage());
             assertTrue(failure.hint() != null && failure.hint().contains("allowed roots"),
                     "hint must name the allowed roots: " + failure.hint());
+        }
+    }
+
+    @Test
+    void errorCellsAndUncachedFormulasFailUnlessErrorsAsNullIsSet() throws Exception {
+        Map<String, String> sheets = new LinkedHashMap<>();
+        sheets.put("Sheet1", sheet("<row r=\"1\">" + inline(1, "A", "bad") + inline(1, "B", "uncached") + "</row>"
+                + "<row r=\"2\"><c r=\"A2\" t=\"e\"><v>#N/A</v></c>"
+                + "<c r=\"B2\"><f>1+1</f></c></row>"));
+        Path file = writeXlsx(dir, "errors.xlsx", sheets, null, null);
+
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> read(db, job, "{\"file\":\"" + jsonPath(file) + "\"}"));
+            assertTrue(failure.getMessage().contains("A2"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("#N/A"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("errorsAsNull"), failure.getMessage());
+
+            LazyPlan relaxed = read(db, job,
+                    "{\"file\":\"" + jsonPath(file) + "\",\"errorsAsNull\":true}");
+            TableData data = relaxed.preview(10);
+            assertEquals(1, data.rows());
+            assertNull(data.data().get(0).get(0));
+            assertNull(data.data().get(0).get(1));
+        }
+    }
+
+    @Test
+    void dataCellsOutsideHeaderAreRejectedWithRowAndColumn() throws Exception {
+        Map<String, String> sheets = new LinkedHashMap<>();
+        sheets.put("Sheet1", sheet("<row r=\"1\">" + inline(1, "A", "a") + inline(1, "B", "b") + "</row>"
+                + "<row r=\"2\"><c r=\"A2\"><v>1</v></c><c r=\"B2\"><v>2</v></c>"
+                + "<c r=\"C2\"><v>3</v></c></row>"));
+        Path file = writeXlsx(dir, "extra-column.xlsx", sheets, null, null);
+
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> read(db, job, "{\"file\":\"" + jsonPath(file) + "\"}"));
+            assertTrue(failure.getMessage().contains("row 2"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("column C"), failure.getMessage());
+
+            // An explicit schema is an intentional projection, not silent loss.
+            String config = """
+                    {"file":"%s","columns":[{"name":"a","type":"Int64"},{"name":"b","type":"Int64"}]}
+                    """.formatted(jsonPath(file));
+            assertEquals(List.of("1", "2"), read(db, job, config).preview(10).data().get(0));
+        }
+    }
+
+    /** Minimal OOXML sheet: one inline-string header and numeric data rows. */
+    private static Path writeLargeXlsx(Path dir, int dataRows, int columns) throws IOException {
+        Path file = dir.resolve("large.xlsx");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(file))) {
+            put(zip, "[Content_Types].xml", contentTypes());
+            put(zip, "_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+                    + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+                    + "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>"
+                    + "</Relationships>");
+            put(zip, "xl/workbook.xml", workbook(List.of("Sheet1")));
+            put(zip, "xl/_rels/workbook.xml.rels", workbookRels(1, false, false));
+            zip.putNextEntry(new ZipEntry("xl/worksheets/sheet1.xml"));
+            zip.write(("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+                    + "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">"
+                    + "<sheetData>").getBytes(StandardCharsets.UTF_8));
+            StringBuilder header = new StringBuilder("<row r=\"1\">");
+            for (int column = 0; column < columns; column++) {
+                header.append(inline(1, String.valueOf((char) ('A' + column)), "c" + column));
+            }
+            zip.write(header.append("</row>").toString().getBytes(StandardCharsets.UTF_8));
+            for (int row = 2; row <= dataRows + 1; row++) {
+                StringBuilder line = new StringBuilder("<row r=\"").append(row).append("\">");
+                for (int column = 0; column < columns; column++) {
+                    line.append("<c r=\"").append((char) ('A' + column)).append(row)
+                            .append("\"><v>").append(row - 1).append("</v></c>");
+                }
+                zip.write(line.append("</row>").toString().getBytes(StandardCharsets.UTF_8));
+            }
+            zip.write("</sheetData></worksheet>".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        return file;
+    }
+
+    @Test
+    void streamingLoadPeakChunkDependsOnChunkSizeNotRowCount() throws Exception {
+        int dataRows = 60_000;
+        Path file = writeLargeXlsx(dir, dataRows, 10);
+        XlsxTableReader.Options options = new XlsxTableReader.Options(null, true, List.of(), true, false);
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            XlsxTableReader.LoadResult small = XlsxTableReader.streamInto(job, "chunk_small", file, options, 1024);
+            assertEquals(dataRows, small.rows());
+            assertEquals(1024, small.maxChunkRows());
+            assertEquals((dataRows + 1023) / 1024, small.chunks());
+            assertEquals(10, small.columns().size());
+
+            XlsxTableReader.LoadResult large = XlsxTableReader.streamInto(job, "chunk_large", file, options, 8192);
+            assertEquals(dataRows, large.rows());
+            assertEquals(8192, large.maxChunkRows());
+            assertEquals((dataRows + 8191) / 8192, large.chunks());
+
+            try (Statement statement = job.createStatement();
+                 ResultSet result = statement.executeQuery(
+                         "SELECT COUNT(*), MIN(c0), MAX(c9) FROM chunk_large")) {
+                assertTrue(result.next());
+                assertEquals(dataRows, result.getLong(1));
+                assertEquals("1", result.getString(2));
+                assertEquals(String.valueOf(dataRows), result.getString(3));
+            }
         }
     }
 

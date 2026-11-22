@@ -183,7 +183,7 @@ class NodeRegistryTest {
         assertEquals(Set.of("renames"), registry.require("dap.column_renamer").settingKeys());
         assertEquals(Set.of("keys", "collation"), registry.require("dap.sorter").settingKeys());
         assertEquals(Set.of("rules"), registry.require("dap.missing_value").settingKeys());
-        assertEquals(Set.of("file", "sheet", "header", "columns", "emptyStringIsNull"),
+        assertEquals(Set.of("file", "sheet", "header", "columns", "emptyStringIsNull", "errorsAsNull"),
                 registry.require("dap.excel_reader").settingKeys());
         assertEquals(Set.of("keys", "aggregations"), registry.require("dap.group_by").settingKeys());
         assertEquals(Set.of("how", "left_keys", "right_keys", "merge_keys",
