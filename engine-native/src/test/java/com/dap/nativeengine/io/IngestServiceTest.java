@@ -1,10 +1,13 @@
 package com.dap.nativeengine.io;
 
 import com.dap.nativeengine.api.ApiException;
+import com.dap.nativeengine.engine.ArrowTable;
 import com.dap.nativeengine.engine.DuckDbSession;
+import com.dap.nativeengine.xlsx.XlsxTableReader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,12 +18,15 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -349,5 +355,216 @@ class IngestServiceTest {
 
         assertFalse(withHeader.path().equals(withoutHeader.path()),
                 "different CSV options must not share a cache entry");
+    }
+
+    // ---------------------------------------------------------------- Excel ingest
+
+    private static final String XLSX_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    private static final String REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+    private static void putXlsx(ZipOutputStream zip, String name, String content) throws IOException {
+        zip.putNextEntry(new ZipEntry(name));
+        zip.write(content.getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+    }
+
+    /** Minimal OOXML workbook: one sheet plus optional shared strings and styles. */
+    private static Path writeXlsx(Path dir, String name, String sheetRows, String sharedStrings, String styles)
+            throws IOException {
+        Path file = dir.resolve(name);
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(file))) {
+            putXlsx(zip, "[Content_Types].xml", "<?xml version=\"1.0\"?><Types/>");
+            putXlsx(zip, "_rels/.rels", "<?xml version=\"1.0\"?><Relationships>"
+                    + "<Relationship Id=\"rId1\" Target=\"xl/workbook.xml\"/></Relationships>");
+            putXlsx(zip, "xl/workbook.xml", "<?xml version=\"1.0\"?>"
+                    + "<workbook xmlns=\"" + XLSX_NS + "\" xmlns:r=\"" + REL_NS + "\"><sheets>"
+                    + "<sheet name=\"Sheet1\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>");
+            StringBuilder rels = new StringBuilder("<?xml version=\"1.0\"?><Relationships>"
+                    + "<Relationship Id=\"rId1\" Type=\"" + REL_NS + "/worksheet\""
+                    + " Target=\"worksheets/sheet1.xml\"/>");
+            if (sharedStrings != null) {
+                rels.append("<Relationship Id=\"rId2\" Type=\"" + REL_NS + "/sharedStrings\""
+                        + " Target=\"sharedStrings.xml\"/>");
+            }
+            if (styles != null) {
+                rels.append("<Relationship Id=\"rId3\" Type=\"" + REL_NS + "/styles\""
+                        + " Target=\"styles.xml\"/>");
+            }
+            putXlsx(zip, "xl/_rels/workbook.xml.rels", rels.append("</Relationships>").toString());
+            putXlsx(zip, "xl/worksheets/sheet1.xml", "<?xml version=\"1.0\"?>"
+                    + "<worksheet xmlns=\"" + XLSX_NS + "\"><sheetData>" + sheetRows
+                    + "</sheetData></worksheet>");
+            if (sharedStrings != null) {
+                putXlsx(zip, "xl/sharedStrings.xml", sharedStrings);
+            }
+            if (styles != null) {
+                putXlsx(zip, "xl/styles.xml", styles);
+            }
+        }
+        return file;
+    }
+
+    /** Numeric-only sheet: one inline-string header and {@code dataRows} rows of ten integers. */
+    private static Path writeWideXlsx(Path dir, String name, int dataRows) throws IOException {
+        StringBuilder sheet = new StringBuilder("<row r=\"1\">");
+        for (int column = 0; column < 10; column++) {
+            sheet.append("<c r=\"").append((char) ('A' + column)).append("1\" t=\"inlineStr\">"
+                    + "<is><t>c").append(column).append("</t></is></c>");
+        }
+        sheet.append("</row>");
+        for (int row = 2; row <= dataRows + 1; row++) {
+            sheet.append("<row r=\"").append(row).append("\">");
+            for (int column = 0; column < 10; column++) {
+                sheet.append("<c r=\"").append((char) ('A' + column)).append(row)
+                        .append("\"><v>").append(row - 1).append("</v></c>");
+            }
+            sheet.append("</row>");
+        }
+        return writeXlsx(dir, name, sheet.toString(), null, null);
+    }
+
+    @Test
+    void excelBecomesParquetMatchingExcelReader() throws Exception {
+        String shared = "<?xml version=\"1.0\"?><sst xmlns=\"" + XLSX_NS + "\">"
+                + "<si><t>alpha</t></si></sst>";
+        String styles = "<?xml version=\"1.0\"?><styleSheet xmlns=\"" + XLSX_NS + "\">"
+                + "<cellXfs count=\"2\"><xf numFmtId=\"0\"/><xf numFmtId=\"14\"/></cellXfs>"
+                + "</styleSheet>";
+        String sheet = """
+                <row r="1">
+                  <c r="A1" t="inlineStr"><is><t>id</t></is></c>
+                  <c r="B1" t="inlineStr"><is><t>score</t></is></c>
+                  <c r="C1" t="inlineStr"><is><t>note</t></is></c>
+                  <c r="D1" t="inlineStr"><is><t>born</t></is></c>
+                  <c r="E1" t="inlineStr"><is><t>flag</t></is></c>
+                </row>
+                <row r="2">
+                  <c r="A2"><v>1</v></c><c r="B2"><v>9.5</v></c><c r="C2" t="s"><v>0</v></c>
+                  <c r="D2" s="1"><v>45292</v></c><c r="E2" t="b"><v>1</v></c>
+                </row>
+                <row r="3">
+                  <c r="A3"><v>2</v></c><c r="B3"><v>7.0</v></c>
+                  <c r="D3" t="d"><v>2024-03-04</v></c><c r="E3" t="b"><v>0</v></c>
+                </row>
+                """;
+        Path file = writeXlsx(dir, "small.xlsx", sheet, shared, styles);
+        XlsxTableReader.Options options = new XlsxTableReader.Options(null, true, List.of(), true, false);
+
+        List<IngestService.Column> expectedColumns;
+        List<List<String>> expectedRows;
+        try (ArrowTable expected = XlsxTableReader.read(file, options)) {
+            expectedColumns = expected.columns().stream()
+                    .map(column -> new IngestService.Column(column.name(), column.arrowType())).toList();
+            expectedRows = new ArrayList<>();
+            for (int row = 0; row < expected.rowCount(); row++) {
+                List<String> values = new ArrayList<>();
+                for (int column = 0; column < expected.columns().size(); column++) {
+                    values.add(DuckDbSession.format(expected.get(column, row)));
+                }
+                expectedRows.add(values);
+            }
+        }
+
+        IngestService.Result result = service().ingest(file, "xlsx");
+
+        assertTrue(Files.isRegularFile(result.path()));
+        assertFalse(result.cached());
+        assertEquals(2, result.rows());
+        assertEquals(expectedColumns, result.columns());
+        assertTrue(expectedColumns.contains(new IngestService.Column("born", "Date32")),
+                "date inference must survive the streaming ingest path: " + expectedColumns);
+        expectedRows.sort(Comparator.comparing(values -> values.get(0)));
+        assertEquals(expectedRows, rows(result.path()));
+        assertEquals("2024-01-01", expectedRows.get(0).get(3));
+        assertEquals("2024-03-04", expectedRows.get(1).get(3));
+        assertEquals(null, expectedRows.get(1).get(2), "missing shared-string cell must stay NULL");
+
+        IngestService.Result cached = service().ingest(file, "xlsx");
+        assertTrue(cached.cached(), "ingest must keep its rows/columns/cached behaviour");
+        assertEquals(result.path(), cached.path());
+    }
+
+    @Test
+    void excelIngestUsesBoundedChunksRegardlessOfRowCount() throws Exception {
+        Path small = writeWideXlsx(dir, "small-wide.xlsx", 2_000);
+        Path large = writeWideXlsx(dir, "large-wide.xlsx", 20_000);
+        try (DuckDbSession db = new DuckDbSession(); Connection connection = db.newConnection()) {
+            XlsxTableReader.LoadResult first = IngestService.loadExcel(connection, "ingest_small", small, 512);
+            XlsxTableReader.LoadResult second = IngestService.loadExcel(connection, "ingest_large", large, 512);
+
+            assertEquals(2_000, first.rows());
+            assertEquals(20_000, second.rows());
+            assertEquals(512, first.maxChunkRows());
+            assertEquals(512, second.maxChunkRows(),
+                    "peak buffered rows must not grow with the sheet size");
+            assertEquals(10, second.columns().size());
+        }
+        assertEquals(2_000, service().ingest(small, "xlsx").rows());
+        assertEquals(20_000, service().ingest(large, "xlsx").rows());
+    }
+
+    @Test
+    void largeSharedStringsAreSpooledAndKeepTheirValues() throws Exception {
+        String previous = System.getProperty("dap.xlsx.sst.heapBytes");
+        System.setProperty("dap.xlsx.sst.heapBytes", "1");
+        try {
+            String shared = "<?xml version=\"1.0\"?><sst xmlns=\"" + XLSX_NS + "\">"
+                    + "<si><t>alpha</t></si><si><t></t></si>"
+                    + "<si><t>beta &amp; &lt;tag&gt;</t></si><si><t>gamma</t></si></sst>";
+            String sheet = "<row r=\"1\">"
+                    + "<c r=\"A1\" t=\"inlineStr\"><is><t>a</t></is></c>"
+                    + "<c r=\"B1\" t=\"inlineStr\"><is><t>b</t></is></c>"
+                    + "<c r=\"C1\" t=\"inlineStr\"><is><t>c</t></is></c>"
+                    + "<c r=\"D1\" t=\"inlineStr\"><is><t>d</t></is></c></row>"
+                    + "<row r=\"2\"><c r=\"A2\" t=\"s\"><v>0</v></c><c r=\"B2\" t=\"s\"><v>1</v></c>"
+                    + "<c r=\"C2\" t=\"s\"><v>2</v></c><c r=\"D2\" t=\"s\"><v>3</v></c></row>"
+                    + "<row r=\"3\"><c r=\"A3\" t=\"s\"><v>3</v></c><c r=\"B3\" t=\"s\"><v>2</v></c>"
+                    + "<c r=\"C3\" t=\"s\"><v>0</v></c><c r=\"D3\" t=\"s\"><v>1</v></c></row>";
+            Path file = writeXlsx(dir, "spooled.xlsx", sheet, shared, null);
+
+            IngestService.Result result = service().ingest(file, "xlsx");
+
+            assertEquals(2, result.rows());
+            assertEquals(List.of(
+                    java.util.Arrays.asList("alpha", "", "beta & <tag>", "gamma"),
+                    java.util.Arrays.asList("gamma", "beta & <tag>", "alpha", "")),
+                    rows(result.path()), "ingest keeps empty strings (emptyStringIsNull=false)");
+        } finally {
+            if (previous == null) {
+                System.clearProperty("dap.xlsx.sst.heapBytes");
+            } else {
+                System.setProperty("dap.xlsx.sst.heapBytes", previous);
+            }
+        }
+    }
+
+    @Test
+    void oversizedSharedStringTableFailsWithActionableMessage() throws Exception {
+        String previous = System.getProperty("dap.xlsx.sst.maxStrings");
+        System.setProperty("dap.xlsx.sst.maxStrings", "3");
+        try {
+            StringBuilder sst = new StringBuilder("<?xml version=\"1.0\"?><sst xmlns=\"")
+                    .append(XLSX_NS).append("\">");
+            for (int index = 0; index < 5; index++) {
+                sst.append("<si><t>value-").append(index).append("</t></si>");
+            }
+            Path file = writeXlsx(dir, "sst-limit.xlsx",
+                    "<row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>name</t></is></c></row>"
+                            + "<row r=\"2\"><c r=\"A2\" t=\"s\"><v>0</v></c></row>",
+                    sst.append("</sst>").toString(), null);
+
+            IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                    () -> service().ingest(file, "xlsx"));
+
+            assertTrue(failure.getMessage().contains("shared strings"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("split the file or convert it to CSV"),
+                    failure.getMessage());
+        } finally {
+            if (previous == null) {
+                System.clearProperty("dap.xlsx.sst.maxStrings");
+            } else {
+                System.setProperty("dap.xlsx.sst.maxStrings", previous);
+            }
+        }
     }
 }

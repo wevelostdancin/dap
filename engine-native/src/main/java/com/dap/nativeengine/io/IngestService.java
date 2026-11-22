@@ -1,6 +1,5 @@
 package com.dap.nativeengine.io;
 
-import com.dap.nativeengine.engine.ArrowTable;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.TypeMap;
 import com.dap.nativeengine.xlsx.XlsxTableReader;
@@ -42,7 +41,12 @@ import java.util.concurrent.TimeUnit;
 public final class IngestService {
     private static final int FINGERPRINT_BYTES = 64 * 1024;
 
-    /** Ingest currently reads every workbook with one fixed option set; keep it in the key. */
+    /**
+     * Ingest has no Excel request options: every workbook uses the first sheet, a header row,
+     * inferred columns, empty strings kept as empty strings (not NULL), and hard errors for
+     * error cells / uncached formulas. Keep the fixed set in the cache key so a reader change
+     * rebuilds stale entries.
+     */
     private static final XlsxTableReader.Options EXCEL_OPTIONS =
             new XlsxTableReader.Options(null, true, List.of(), false);
     private static final String EXCEL_READER = "excel:" + EXCEL_OPTIONS.sheet() + "\n"
@@ -192,7 +196,7 @@ public final class IngestService {
             // All CSVs go through DuckDB read_csv, so ingest shares the csv_reader NULL
             // semantics and heap usage stays bounded by DuckDB's read buffer.
             case CSV -> copy(db, csvRelation(source, options), target);
-            case EXCEL -> copyArrow(db, excel(source), target);
+            case EXCEL -> writeExcel(db, source, target);
             case JSON -> copy(db, "read_json_auto(" + literal(source.toString()) + ")", target);
             case PARQUET -> copy(db, "read_parquet(" + literal(source.toString()) + ")", target);
         }
@@ -227,25 +231,45 @@ public final class IngestService {
         return list.append(']').toString();
     }
 
-    private static ArrowTable excel(Path source) {
+    /**
+     * Stream the worksheet into a scratch DuckDB table and copy that to Parquet. The sheet
+     * never becomes an Arrow table, so JVM heap does not grow with the row count.
+     */
+    private static void writeExcel(DuckDbSession db, Path source, Path target) throws SQLException {
+        String table = db.nextTableName("ingest_xlsx");
+        try (Connection connection = db.newConnection()) {
+            try {
+                loadExcel(connection, table, source, XlsxTableReader.DEFAULT_CHUNK_ROWS);
+                copy(connection, DuckDbSession.quote(table), target);
+            } finally {
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute("DROP TABLE IF EXISTS " + DuckDbSession.quote(table));
+                } catch (SQLException | RuntimeException ignored) {
+                    // best effort: a failed ingest only leaks a scratch table in this session
+                }
+            }
+        }
+    }
+
+    /** Package-visible so tests can assert the chunk bound of the ingest path itself. */
+    static XlsxTableReader.LoadResult loadExcel(Connection connection, String table, Path source, int chunkRows)
+            throws SQLException {
         try {
-            return XlsxTableReader.read(source, EXCEL_OPTIONS);
+            return XlsxTableReader.streamInto(connection, table, source, EXCEL_OPTIONS, chunkRows);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("ingest interrupted", interrupted);
         }
     }
 
-    private static void copyArrow(DuckDbSession db, ArrowTable table, Path target) throws SQLException {
-        try (table) {
-            String name = db.load(table, "ingest");
-            copy(db, DuckDbSession.quote(name), target);
+    private static void copy(DuckDbSession db, String source, Path target) throws SQLException {
+        try (Connection connection = db.newConnection()) {
+            copy(connection, source, target);
         }
     }
 
-    private static void copy(DuckDbSession db, String source, Path target) throws SQLException {
-        try (Connection connection = db.newConnection();
-             Statement statement = connection.createStatement()) {
+    private static void copy(Connection connection, String source, Path target) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
             validateTypes(statement, source);
             statement.execute("COPY (SELECT * FROM " + source + ") TO " + literal(target.toString())
                     + " (FORMAT PARQUET)");

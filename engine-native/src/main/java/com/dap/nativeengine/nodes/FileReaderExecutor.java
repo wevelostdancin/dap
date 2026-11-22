@@ -130,7 +130,7 @@ public final class FileReaderExecutor implements NodeExecutor {
                     + invalid.getMessage(), invalid);
         }
         if (hasGlob(entry)) {
-            collectGlob(entry, path, recursive, found);
+            collectGlob(entry, path, found);
             return;
         }
         Path checked = PathGuard.shared().checkRead(path.toString());
@@ -161,8 +161,7 @@ public final class FileReaderExecutor implements NodeExecutor {
         }
     }
 
-    private static void collectGlob(String entry, Path absolutePattern, boolean recursive,
-                                    Set<Path> found) {
+    private static void collectGlob(String entry, Path absolutePattern, Set<Path> found) {
         Path root = globRoot(absolutePattern);
         PathGuard.shared().checkRead(root.toString());
         PathMatcher matcher;
@@ -172,9 +171,10 @@ public final class FileReaderExecutor implements NodeExecutor {
             throw new IllegalArgumentException("file_reader: invalid glob '" + entry + "': "
                     + invalid.getMessage(), invalid);
         }
-        // A glob already encodes its own depth; 'recursive' only widens the walk.
-        int depth = recursive ? Integer.MAX_VALUE : Integer.MAX_VALUE;
-        try (Stream<Path> paths = Files.walk(root, depth)) {
+        // A glob pattern already encodes its own depth and the PathMatcher below picks
+        // the matches, so walk the whole subtree regardless of 'recursive' (which only
+        // has meaning for directory entries). No dead ternary here.
+        try (Stream<Path> paths = Files.walk(root, Integer.MAX_VALUE)) {
             List<Path> matches = paths.filter(Files::isRegularFile)
                     .filter(matcher::matches)
                     .sorted(Comparator.comparing(Path::toString))
