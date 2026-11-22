@@ -1070,12 +1070,21 @@ paths:
         SELECT/WITH statement; the ingested Parquet file is available as the
         view src.
 
-        Profile aggregates scan the whole relation. Relationships, group
-        differences and hypotheses read at most sampleRows rows (default 1000,
-        deterministic first rows in scan order) and are capped at 20, 10 and 5
-        entries. Ordering is deterministic: relationships by descending |value|
-        then names, group differences by p-value then names, hypotheses by
-        priority then id.
+        Profile aggregates scan the whole relation. Above 100000 rows the quality
+        scans of outliers and duplicates read only 100000 rows; quality_sampled
+        and quality_scanned_rows report this, and the outlier share uses the
+        scanned-row count. distinct is exact up to 100000 rows; above it a sketch
+        estimate is reported with distinct_exact=false, except for estimates of
+        at most 10000, which get one exact recount (distinct_exact=true).
+        Relationships, group differences and hypotheses read at most sampleRows
+        rows (default 1000, deterministic first rows in scan order) and are
+        capped at 20, 10 and 5 entries. Group-difference p_adjusted is a
+        Benjamini-Hochberg FDR correction over every tested pair, not just the
+        ten returned, and drives ordering, thresholds and hypothesis priority.
+        A relationship hypothesis is high only with n>=20 and p<0.05; the same
+        gate applies to the modelling recommendation. Ordering is deterministic:
+        relationships by descending |value| then names, group differences by
+        adjusted p then names, hypotheses by priority then id.
       parameters:
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'
@@ -2137,6 +2146,11 @@ components:
           type: integer
         distinct:
           type: integer
+        distinct_exact:
+          type: boolean
+          description: >-
+            True when distinct is exact (up to 100000 rows or after the exact
+            recount of a low-cardinality sketch); false for a sketch estimate.
         min:
           type: number
         max:
@@ -2222,6 +2236,9 @@ components:
         p_value:
           type: number
           description: May be 0.0 when the true p-value underflows a double
+        p_adjusted:
+          type: number
+          description: Benjamini-Hochberg FDR adjustment over all tested pairs
         effect_size:
           type: number
           description: Eta squared for anova, epsilon squared for kruskal
@@ -2265,6 +2282,12 @@ components:
           type: string
         rows:
           type: integer
+        quality_sampled:
+          type: boolean
+          description: True when quality scans read only the first 100000 rows
+        quality_scanned_rows:
+          type: integer
+          description: Rows actually scanned by the quality pass
         columns:
           type: array
           items:

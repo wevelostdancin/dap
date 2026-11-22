@@ -13,6 +13,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,6 +52,11 @@ public final class ExploreService {
     private static final double OUTLIER_FENCE = 1.5;
     /** Above this row count profile uses approximate distinct/quantiles to stay bounded. */
     private static final long EXACT_DISTINCT_LIMIT = 100_000;
+    /** Like DuckDbSession.readProfile: only cheap sketch estimates get an exact recount. */
+    private static final long REFINE_SMALL_DISTINCT = 10_000;
+    /** Relationships/hypotheses need this many observations before a 'high' call. */
+    private static final long MIN_RELIABLE_N = 20;
+    private static final double SIGNIFICANCE = 0.05;
     /** Below this cardinality IQR fences are meaningless (e.g. a 1..4 severity score). */
     private static final long MIN_OUTLIER_DISTINCT = 10;
     /** Quantiles/outliers/duplicates are sampled above this row count; profile stays exact. */
@@ -132,7 +138,9 @@ public final class ExploreService {
                     groupDifferences, time, score, issues);
             List<String> recommendations = recommendations(profile, columns, relationships,
                     groupDifferences, time);
-            return new ExploreResult(sourceLabel, profile.rows(), profileColumns,
+            return new ExploreResult(sourceLabel, profile.rows(),
+                    profile.rows() > QUALITY_SAMPLE_ROWS, profile.qualityScannedRows(),
+                    profileColumns,
                     new ExploreResult.Quality(score, issues), relationships, groupDifferences,
                     time, hypotheses, recommendations);
         }
@@ -164,19 +172,21 @@ public final class ExploreService {
     }
 
     /** One profiled column with the fences needed to describe its outliers. */
-    private record ColumnStat(ColumnSpec spec, long missing, long distinct,
+    private record ColumnStat(ColumnSpec spec, long missing, long distinct, boolean distinctExact,
                               Double min, Double max, Double mean, Double stddev,
                               Long zeros, Long negatives, Long outliers,
                               Double lowerFence, Double upperFence) {
     }
 
-    private record Profile(long rows, List<ColumnStat> columns, long duplicateRows) {
+    private record Profile(long rows, long qualityScannedRows, List<ColumnStat> columns,
+                           long duplicateRows) {
     }
 
     private static Profile profile(Connection connection, String base, List<ColumnSpec> columns)
             throws SQLException {
         long rowCount = countRows(connection, base);
         boolean exact = rowCount <= EXACT_DISTINCT_LIMIT;
+        long qualityScannedRows = Math.min(rowCount, QUALITY_SAMPLE_ROWS);
         StringBuilder aggregates = new StringBuilder("COUNT(*) AS \"dap_rows\"");
         for (int index = 0; index < columns.size(); index++) {
             String ref = "#" + (index + 1);
@@ -236,16 +246,50 @@ public final class ExploreService {
                 outliers[index] = 0L;
             }
         }
+        boolean[] distinctExact = new boolean[columns.size()];
+        if (exact) {
+            Arrays.fill(distinctExact, true);
+        } else {
+            // As in DuckDbSession.readProfile, recount cheap sketch estimates once so a
+            // handful of categories is reported exactly instead of as an approximation.
+            List<Integer> refine = new ArrayList<>();
+            for (int index = 0; index < columns.size(); index++) {
+                if (distinct[index] <= REFINE_SMALL_DISTINCT) {
+                    refine.add(index);
+                }
+            }
+            if (!refine.isEmpty()) {
+                StringBuilder small = new StringBuilder();
+                for (int position = 0; position < refine.size(); position++) {
+                    if (position > 0) {
+                        small.append(", ");
+                    }
+                    int index = refine.get(position);
+                    small.append("COUNT(DISTINCT #").append(index + 1).append(") AS \"r")
+                            .append(index).append('"');
+                }
+                try (Statement statement = connection.createStatement();
+                     ResultSet result = statement.executeQuery("SELECT " + small
+                             + " FROM (" + base + ") AS dap_explore")) {
+                    result.next();
+                    for (int index : refine) {
+                        distinct[index] = result.getLong("r" + index);
+                        distinctExact[index] = true;
+                    }
+                }
+            }
+        }
         long duplicateRows = rows == 0 ? 0
                 : Math.max(0, rows - distinctRows(connection, base, rows, columns.size()));
         List<ColumnStat> stats = new ArrayList<>(columns.size());
         for (int index = 0; index < columns.size(); index++) {
             stats.add(new ColumnStat(columns.get(index), missing[index], distinct[index],
+                    distinctExact[index],
                     min[index], max[index], mean[index], stddev[index],
                     zeros[index], negatives[index], outliers[index],
                     lowerFence[index], upperFence[index]));
         }
-        return new Profile(rows, stats, duplicateRows);
+        return new Profile(rows, qualityScannedRows, stats, duplicateRows);
     }
 
     /** First and third quartiles of every numeric column in one scan; null when undefined. */
@@ -440,12 +484,16 @@ public final class ExploreService {
             }
             if (stat.outliers() != null && stat.outliers() > 0
                     && stat.spec().numeric() && stat.distinct() > MIN_OUTLIER_DISTINCT) {
-                double ratio = (double) stat.outliers() / rows;
+                // Outliers are counted on qualitySource (the first QUALITY_SAMPLE_ROWS rows
+                // for large inputs), so the share must use that scan, not the full source.
+                double ratio = (double) stat.outliers() / profile.qualityScannedRows();
                 if (ratio > 0.01) {
                     String severity = ratio > 0.1 ? "medium" : "low";
                     issues.add(new ExploreResult.Issue(severity, "outliers", name, stat.outliers(),
-                            stat.outliers() + " rows outside 1.5x IQR ["
-                                    + number(stat.lowerFence()) + ", "
+                            stat.outliers() + " of " + profile.qualityScannedRows()
+                                    + " scanned rows (" + percent(stat.outliers(),
+                                    profile.qualityScannedRows())
+                                    + ") outside 1.5x IQR [" + number(stat.lowerFence()) + ", "
                                     + number(stat.upperFence()) + "]"));
                     penalty += penalty(severity);
                 }
@@ -671,10 +719,20 @@ public final class ExploreService {
                 }
             }
         }
-        found.sort(Comparator.comparingDouble(ExploreResult.GroupDifference::pValue)
+        // Correction spans every test we ran, not just the ten returned to the caller.
+        List<Double> adjusted = benjaminiHochberg(found.stream()
+                .map(ExploreResult.GroupDifference::pValue).toList());
+        List<ExploreResult.GroupDifference> corrected = new ArrayList<>(found.size());
+        for (int index = 0; index < found.size(); index++) {
+            ExploreResult.GroupDifference raw = found.get(index);
+            corrected.add(new ExploreResult.GroupDifference(raw.value(), raw.group(), raw.test(),
+                    raw.statistic(), raw.pValue(), adjusted.get(index), raw.effectSize()));
+        }
+        corrected.sort(Comparator.comparingDouble(ExploreResult.GroupDifference::pAdjusted)
+                .thenComparingDouble(ExploreResult.GroupDifference::pValue)
                 .thenComparing(ExploreResult.GroupDifference::value)
                 .thenComparing(ExploreResult.GroupDifference::group));
-        return List.copyOf(found.subList(0, Math.min(MAX_GROUP_DIFFERENCES, found.size())));
+        return List.copyOf(corrected.subList(0, Math.min(MAX_GROUP_DIFFERENCES, corrected.size())));
     }
 
     private static void anova(ColumnSpec value, ColumnSpec group, Map<String, List<Double>> groups,
@@ -712,7 +770,7 @@ public final class ExploreService {
         int dfWithin = n - k;
         double f = (between / dfBetween) / (within / dfWithin);
         double p = clamp01(1.0 - Distributions.fCdf(f, dfBetween, dfWithin));
-        found.add(new ExploreResult.GroupDifference(value.name(), group.name(), "anova", f, p,
+        found.add(new ExploreResult.GroupDifference(value.name(), group.name(), "anova", f, p, p,
                 between / (between + within)));
     }
 
@@ -778,7 +836,7 @@ public final class ExploreService {
         }
         double p = clamp01(1.0 - Distributions.chiSquareCdf(Math.max(0.0, h), k - 1));
         double epsilonSquared = Math.max(0.0, (h - k + 1) / (double) (n - k));
-        found.add(new ExploreResult.GroupDifference(value.name(), group.name(), "kruskal", h, p,
+        found.add(new ExploreResult.GroupDifference(value.name(), group.name(), "kruskal", h, p, p,
                 Math.min(1.0, epsilonSquared)));
     }
 
@@ -843,7 +901,7 @@ public final class ExploreService {
             if (relationshipCandidates >= 2 || Math.abs(pair.value()) < 0.5) {
                 break;
             }
-            String priority = Math.abs(pair.value()) >= 0.7 ? "high" : "medium";
+            String priority = relationshipPriority(pair);
             String association = "pearson".equals(pair.method()) ? "correlation" : "association";
             candidates.add(new ExploreResult.Hypothesis("",
                     "Do " + pair.left() + " and " + pair.right() + " move together?",
@@ -856,10 +914,10 @@ public final class ExploreService {
         }
         int differenceCandidates = 0;
         for (ExploreResult.GroupDifference difference : differences) {
-            if (differenceCandidates >= 2 || difference.pValue() >= 0.05) {
+            if (differenceCandidates >= 2 || difference.pAdjusted() >= SIGNIFICANCE) {
                 break;
             }
-            String priority = difference.pValue() < 0.001 ? "high" : "medium";
+            String priority = difference.pAdjusted() < 0.001 ? "high" : "medium";
             String effect = "anova".equals(difference.test()) ? "eta squared" : "epsilon squared";
             candidates.add(new ExploreResult.Hypothesis("",
                     "Does " + difference.value() + " differ across " + difference.group()
@@ -867,6 +925,7 @@ public final class ExploreService {
                     difference.test(), List.of(difference.value(), difference.group()),
                     testName(difference.test()) + " (statistic="
                             + decimal(difference.statistic()) + ", " + pText(difference.pValue())
+                            + ", p_adjusted=" + pText(difference.pAdjusted())
                             + ", " + effect + "=" + decimal(difference.effectSize()) + ").",
                     priority));
             differenceCandidates++;
@@ -1015,7 +1074,7 @@ public final class ExploreService {
         }
         int relationshipAdded = 0;
         for (ExploreResult.Relationship pair : relationships) {
-            if (relationshipAdded >= 3 || Math.abs(pair.value()) < 0.5) {
+            if (relationshipAdded >= 3 || Math.abs(pair.value()) < 0.5 || !reliable(pair)) {
                 break;
             }
             result.add("Model " + pair.right() + " with " + pair.left() + " (" + pair.method()
@@ -1024,11 +1083,12 @@ public final class ExploreService {
         }
         int differenceAdded = 0;
         for (ExploreResult.GroupDifference difference : differences) {
-            if (differenceAdded >= 3 || difference.pValue() >= 0.05) {
+            if (differenceAdded >= 3 || difference.pAdjusted() >= SIGNIFICANCE) {
                 break;
             }
             result.add("Compare " + difference.value() + " across " + difference.group()
                     + " groups (" + testName(difference.test()) + " " + pText(difference.pValue())
+                    + ", p_adjusted=" + pText(difference.pAdjusted())
                     + ", effect size " + decimal(difference.effectSize()) + ").");
             differenceAdded++;
         }
@@ -1074,6 +1134,19 @@ public final class ExploreService {
         };
     }
 
+    /** A correlation is actionable only with enough observations and a significant p-value. */
+    private static boolean reliable(ExploreResult.Relationship pair) {
+        return pair.n() >= MIN_RELIABLE_N
+                && pair.pValue() != null && pair.pValue() < SIGNIFICANCE;
+    }
+
+    private static String relationshipPriority(ExploreResult.Relationship pair) {
+        if (!reliable(pair)) {
+            return "low";
+        }
+        return Math.abs(pair.value()) >= 0.7 ? "high" : "medium";
+    }
+
     private static String strength(double value) {
         double magnitude = Math.abs(value);
         if (magnitude >= 0.9) {
@@ -1093,6 +1166,36 @@ public final class ExploreService {
 
     private static double clamp01(double value) {
         return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    /**
+     * Benjamini-Hochberg step-up FDR over all tested p-values, input order preserved.
+     * Package-private so JUnit can compare it with statsmodels multipletests(fdr_bh).
+     */
+    static List<Double> benjaminiHochberg(List<Double> pValues) {
+        Double[] adjusted = new Double[pValues.size()];
+        List<Integer> order = new ArrayList<>();
+        for (int index = 0; index < pValues.size(); index++) {
+            Double p = pValues.get(index);
+            if (p != null && !p.isNaN()) {
+                order.add(index);
+            }
+        }
+        order.sort(Comparator.comparingDouble(pValues::get));
+        int m = order.size();
+        double next = 1.0;
+        for (int rank = m - 1; rank >= 0; rank--) {
+            int index = order.get(rank);
+            double value = Math.min(1.0, pValues.get(index) * m / (rank + 1.0));
+            next = Math.min(next, value);
+            adjusted[index] = next;
+        }
+        for (int index = 0; index < adjusted.length; index++) {
+            if (adjusted[index] == null) {
+                adjusted[index] = pValues.get(index);
+            }
+        }
+        return List.copyOf(Arrays.asList(adjusted));
     }
 
     private static String capitalised(String text) {
@@ -1121,7 +1224,7 @@ public final class ExploreService {
 
     private static ExploreResult.Column view(ColumnStat stat) {
         return new ExploreResult.Column(stat.spec().name(), stat.spec().arrowType(),
-                stat.missing(), stat.distinct(), stat.min(), stat.max(), stat.mean(),
+                stat.missing(), stat.distinct(), stat.distinctExact(), stat.min(), stat.max(), stat.mean(),
                 stat.stddev(), stat.zeros(), stat.negatives(), stat.outliers());
     }
 
