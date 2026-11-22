@@ -102,6 +102,7 @@ public final class DbWriterExecutor implements NodeExecutor {
         String connection = NodeSql.requiredText(config, "connection");
         if ("duckdb".equals(driver) || "sqlite".equals(driver)) {
             Path target = Path.of(connection).toAbsolutePath();
+            Path checked = PathGuard.shared().checkWrite(target.toString());
             Path parent = target.getParent();
             if (parent != null) {
                 try {
@@ -111,7 +112,7 @@ public final class DbWriterExecutor implements NodeExecutor {
                             + ": " + failure.getMessage(), failure);
                 }
             }
-            return PathGuard.shared().checkWrite(target.toString()).toString();
+            return checked.toString();
         }
         return connection;
     }

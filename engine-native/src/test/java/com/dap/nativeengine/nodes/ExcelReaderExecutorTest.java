@@ -1,5 +1,6 @@
 package com.dap.nativeengine.nodes;
 
+import com.dap.nativeengine.api.ApiException;
 import com.dap.nativeengine.engine.ColumnSpec;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.engine.LazyPlan;
@@ -511,6 +512,21 @@ class ExcelReaderExecutorTest {
             assertTrue(failure.getMessage().contains("'n'"), failure.getMessage());
             assertTrue(failure.getMessage().toLowerCase(java.util.Locale.ROOT).contains("row"),
                     failure.getMessage());
+        }
+    }
+
+    @Test
+    void fileOutsideTheAllowlistIsRejectedBeforeParsing() throws Exception {
+        Path secret = Path.of(System.getProperty("user.home"), ".ssh", "id_ed25519");
+        try (DuckDbSession db = new DuckDbSession(); Connection job = db.newConnection()) {
+            ApiException failure = assertThrows(ApiException.class,
+                    () -> read(db, job, "{\"file\":\"" + jsonPath(secret) + "\"}"));
+
+            assertEquals(400, failure.status(), failure.getMessage());
+            assertEquals("path_not_allowed", failure.code(), failure.getMessage());
+            assertTrue(failure.getMessage().contains("id_ed25519"), failure.getMessage());
+            assertTrue(failure.hint() != null && failure.hint().contains("allowed roots"),
+                    "hint must name the allowed roots: " + failure.hint());
         }
     }
 
