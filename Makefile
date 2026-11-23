@@ -7,7 +7,8 @@ export DAP_JDK
 JAR := engine-native/target/dap-native.jar
 
 .PHONY: help build-native test-native run-native goldens goldens-validate coverage test-mcp smoke \
-        mcp mcp-e2e mcp-recipe-e2e dist install-e2e extensions bench bench-full image-native run-native-image lint check soak clean-native
+        mcp mcp-e2e mcp-recipe-e2e dist install-e2e extensions bench bench-full bench-gate image-native \
+        run-native-image lint check soak clean-native
 
 help:
 	@echo "DAP 1.0.0 — native analytics backend for agents"
@@ -27,6 +28,7 @@ help:
 	@echo "  make extensions     install the DuckDB sqlite/postgres/httpfs extensions (network once)"
 	@echo "  make bench          native 100k-row benchmark"
 	@echo "  make bench-full     native 10M-row benchmark -> build/bench.json"
+	@echo "  make bench-gate     P6 bench with accuracy/token CI gate"
 	@echo "  make image-native   build the dap-native image (Docker host required)"
 	@echo "  make lint           static checks (scripts/check_repo.py)"
 	@echo "  make check          JUnit + goldens + validate + MCP launch/e2e + lint"
@@ -96,6 +98,16 @@ bench: build-native
 
 bench-full: build-native
 	python3 tests/bench.py --jar $(JAR) --json build/bench.json --keep-data
+
+bench-gate: build-native
+	python3 tests/p6_bench.py \
+		--manifest tests/p6_bench_manifest.example.json \
+		--data-dir build/p6-bench/data \
+		--out build/p6-bench/gate \
+		--start \
+		--reference tests/p6_bench_reference.json \
+		--gate tests/p6_bench_gate.json \
+		--java "$(DAP_JDK)/bin/java"
 
 DAP_NATIVE_IMAGE ?= dap-native:local
 
