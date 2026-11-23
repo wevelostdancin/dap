@@ -82,7 +82,7 @@ class RestartNoticeTest(unittest.TestCase):
                 "unknown workflow: wf-1",
                 data={"status": 404, "body": {"error": "unknown workflow: wf-1"}})])
         message = failure["error"]["message"]
-        self.assertTrue(message.startswith("engine restarted; workflows lost: "), message)
+        self.assertTrue(message.startswith("engine restarted (idle shutdown or crash); workflows lost: "), message)
         self.assertIn("unknown workflow: wf-1", message)
 
     def test_same_generation_keeps_the_error_clean(self):

@@ -155,7 +155,16 @@ def _restart_note() -> str:
     if not _RESTART_PENDING:
         return ""
     _RESTART_PENDING = False
-    return "engine restarted; workflows lost: "
+    return "engine restarted (idle shutdown or crash); workflows lost: "
+
+
+def _restart_data(note: str, data):
+    """Mark the error envelope as a restart without dropping existing fields."""
+    if not note:
+        return data
+    result = dict(data) if isinstance(data, dict) else {}
+    result["restarted"] = True
+    return result
 
 
 VERSION_FILE = os.path.join(DAP_HOME, "VERSION")
@@ -510,6 +519,16 @@ _COMPACT_TABLE_PROPS = {
     },
 }
 
+# CSV/Excel read options shared by every one-call tool that can ingest a file.
+_CSV_PROPS = {
+    "header": {"type": "boolean", "description": "CSV: первая строка — заголовок (по умолчанию true)"},
+    "delimiter": _str("CSV: разделитель; по умолчанию автоопределение (, ; TAB |)"),
+    "encoding": _str("CSV: кодировка — auto (по умолчанию), utf-8, utf-16, latin-1, cp1251, cp866, koi8-r"),
+    "allVarchar": {"type": "boolean", "description": "CSV: все колонки как строки"},
+    "decimalComma": {"type": "boolean", "description": "CSV: «5 449,72» -> число (пробелы/NBSP убрать, запятую -> точку)"},
+    "sheet": _str("Excel: имя листа или 0-based индекс; по умолчанию первый лист"),
+}
+
 
 TOOLS = [
     {
@@ -710,14 +729,15 @@ TOOLS = [
         "description": (
             "Один раз прочитать CSV/Excel/JSON/Parquet и сохранить в Parquet-кэш. "
             "Повторный вызов для неизменённого файла возвращает тот же путь без перезаписи "
-            "(cached=true). Возвращает path, rows, columns и cached."
+            "(cached=true). Возвращает path, rows, columns и cached. "
+            "Поддерживаются кодировки CSV (auto, utf-8, utf-16, latin-1, cp1251, cp866, koi8-r) "
+            "и выбор листа Excel."
         ),
         "inputSchema": _obj(
             {
                 "file": _str("путь к файлу CSV, XLSX, JSON или Parquet"),
                 "format": _str("csv, excel, json или parquet; по умолчанию по расширению"),
-                "header": {"type": "boolean", "description": "CSV: первая строка — заголовок (по умолчанию true)"},
-                "delimiter": _str("CSV: разделитель, по умолчанию ','"),
+                **_CSV_PROPS,
                 "quote": _str("CSV: символ кавычки, по умолчанию двойная кавычка"),
                 "escape": _str("CSV: символ escape, по умолчанию двойная кавычка"),
                 "ignoreErrors": {"type": "boolean", "description": "CSV: пропускать битые строки"},
@@ -935,6 +955,7 @@ TOOLS = [
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
                 "limit": _int("строк таблицы", 20),
                 **_COMPACT_TABLE_PROPS,
+                **_CSV_PROPS,
             },
         ),
     },
@@ -954,6 +975,7 @@ TOOLS = [
                 "sql": _str("read-only SELECT/WITH; вход доступен как src"),
                 "maxColumns": _int("сколько колонок профилировать (по умолчанию движка)"),
                 "sampleRows": _int("сколько строк сэмплировать (по умолчанию движка)"),
+                **_CSV_PROPS,
             },
         ),
     },
@@ -972,6 +994,7 @@ TOOLS = [
                 "format": _str("формат входного файла: csv, excel, json или parquet"),
                 "sql": _str("read-only SELECT/WITH; вход доступен как src"),
                 "limit": _int("cap строк узла sql_query (как в dap_sql)"),
+                **_CSV_PROPS,
             },
         ),
     },
@@ -1009,6 +1032,7 @@ TOOLS = [
                         ["sql"],
                     ),
                 },
+                **_CSV_PROPS,
                 "report": _str("путь к файлу отчёта (обязательный)"),
                 "chart": _str("путь к графику .svg/.png; без него график не строится"),
                 "chartType": {
@@ -1049,6 +1073,7 @@ TOOLS = [
                 "dataset": _str(
                     "путь к готовому Parquet-датасету (из dap_ingest) или имя из "
                     "каталога датасетов (dap_dataset action=list)"),
+                **_CSV_PROPS,
                 "timeoutSec": _int("лимит исполнения, по умолчанию настройка движка"),
             },
         ),
@@ -1475,8 +1500,9 @@ def tool_profile_table(args: dict):
 
 
 def _csv_body(args: dict, body: dict) -> dict:
-    for key in ("header", "delimiter", "quote", "escape", "ignoreErrors",
-                "nullPadding", "strictMode", "nullStrings"):
+    for key in ("header", "delimiter", "encoding", "allVarchar", "decimalComma",
+                "sheet", "quote", "escape", "ignoreErrors", "nullPadding",
+                "strictMode", "nullStrings"):
         if args.get(key) is not None:
             body[key] = args[key]
     return body
@@ -1865,19 +1891,12 @@ def tool_analyze(args: dict):
     with_profile = args.get("profile") is not False
     stages = 4 if with_profile else 3
     ensure_service()
-    cached = None
+    ingested = {}
     ingest_cached = False
-    source = _resolve_dataset(args["dataset"]) if not has_file else None
     if has_file:
-        ingest_body = {"file": args["file"]}
-        if args.get("format"):
-            ingest_body["format"] = args["format"]
-        ingested = call("POST", "/v1/datasets", ingest_body)
-        cached = ingested.get("path") if isinstance(ingested, dict) else None
-        if not cached:
-            raise DapError("движок не вернул путь Parquet-кэша")
-        ingest_cached = bool(ingested.get("cached"))
-        source = cached
+        source, ingest_cached, ingested = _source(args, has_file)
+    else:
+        source = _resolve_dataset(args["dataset"])
     _emit_progress(1, stages, "ingest")
     created = call("POST", "/v1/workflows", {"name": "analyze"})
     workflow = created.get("id") if isinstance(created, dict) else None
@@ -1905,6 +1924,7 @@ def tool_analyze(args: dict):
         _emit_progress(3, stages, "table")
         result = {"workflow": workflow, "node": node_id, "source": source,
                   "cached": ingest_cached, "run": run, "table": _tool_table(table, args)}
+        result.update(_ingest_details(ingested))
         if with_profile:
             result["profile"] = call(
                 "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(reader_id)}/profile")
@@ -1939,7 +1959,7 @@ def tool_explore(args: dict):
     max_columns = _positive_int(args, "maxColumns")
     sample_rows = _positive_int(args, "sampleRows")
     ensure_service()
-    source, cached = _source(args, has_file)
+    source, cached, _ = _source(args, has_file)
     _emit_progress(1, 2, "ingest")
     body = {"dataset": source}
     if sql:
@@ -1960,7 +1980,7 @@ def tool_estimate(args: dict):
     sql = _read_only_sql(sql) if sql else None
     limit = _table_limit(args) if args.get("limit") is not None else None
     ensure_service()
-    source, cached = _source(args, has_file)
+    source, cached, _ = _source(args, has_file)
     _emit_progress(1, 2, "ingest")
     workflow = _new_workflow("estimate")
     try:
@@ -2053,19 +2073,26 @@ def _resolve_dataset(value) -> str:
 _UNSET = object()
 
 
-def _source(args: dict, has_file: bool, source_format=_UNSET) -> tuple[str, bool]:
+def _source(args: dict, has_file: bool, source_format=_UNSET) -> tuple[str, bool, dict]:
     """Ingest the file (once, through the engine cache) or take the dataset path."""
     if not has_file:
-        return _resolve_dataset(args["dataset"]), False
+        return _resolve_dataset(args["dataset"]), False, {}
     body = {"file": args["file"]}
     format_value = args.get("format") if source_format is _UNSET else source_format
     if format_value:
         body["format"] = format_value
     ingested = call("POST", "/v1/datasets", _csv_body(args, body))
-    path = ingested.get("path") if isinstance(ingested, dict) else None
+    details = ingested if isinstance(ingested, dict) else {}
+    path = details.get("path")
     if not path:
         raise DapError("движок не вернул путь Parquet-кэша")
-    return str(path), bool(ingested.get("cached"))
+    return str(path), bool(details.get("cached")), details
+
+
+def _ingest_details(ingested: dict) -> dict:
+    """Optional sheet/encoding metadata to surface in one-call tool results."""
+    return {key: ingested[key] for key in ("sheet", "sheets", "encoding")
+            if ingested.get(key) is not None}
 
 
 def _read_only_sql(value):
@@ -2181,7 +2208,7 @@ def tool_report(args: dict):
         sql = args.get("sql")
         sql = _read_only_sql(sql) if sql else None
     ensure_service()
-    source, cached = _source(args, has_file, legacy_source_format)
+    source, cached, ingested = _source(args, has_file, legacy_source_format)
     _emit_progress(1, stages, "ingest")
     workflow = _new_workflow("report")
     try:
@@ -2249,6 +2276,7 @@ def tool_report(args: dict):
         _emit_progress(3, stages, "table")
         result = {"source": source, "cached": cached, "format": fmt,
                   "report": report}
+        result.update(_ingest_details(ingested))
         if queries is None:
             result["node"] = table_nodes[0]
             result["table"] = _tool_table(tables[0]["table"], args)
@@ -2280,7 +2308,7 @@ def tool_report(args: dict):
 def tool_profile(args: dict):
     has_file, _ = _source_args(args)
     ensure_service()
-    source, cached = _source(args, has_file)
+    source, cached, ingested = _source(args, has_file)
     _emit_progress(1, 3, "ingest")
     workflow = _new_workflow("profile")
     try:
@@ -2291,6 +2319,7 @@ def tool_profile(args: dict):
             "GET", f"/v1/workflows/{_seg(workflow)}/nodes/{_seg(reader)}/profile")
         _emit_progress(3, 3, "profile")
         result = {"source": source, "cached": cached, "profile": profile}
+        result.update(_ingest_details(ingested))
         if isinstance(profile, dict):
             result["rows"] = profile.get("rows")
             columns = profile.get("columns")
@@ -2500,7 +2529,7 @@ def handle(msg: dict) -> None:
             text = read_resource(uri)
         except DapError as e:
             note = _restart_note() if e.code in (-32000, -32001) else ""
-            fail(msg_id, e.code, note + str(e), e.data)
+            fail(msg_id, e.code, note + str(e), _restart_data(note, e.data))
         except Exception as e:  # noqa: BLE001 — граница протокола
             fail(msg_id, -32603, f"{type(e).__name__}: {e}")
         else:
@@ -2533,7 +2562,8 @@ def handle(msg: dict) -> None:
                 ensure_service()
             result = handler(args)
         except DapError as e:
-            fail(msg_id, e.code, _restart_note() + str(e), e.data)
+            note = _restart_note()
+            fail(msg_id, e.code, note + str(e), _restart_data(note, e.data))
         except (ValueError, TypeError) as e:
             fail(msg_id, -32602, f"неверные аргументы: {e}")
         except Exception as e:  # noqa: BLE001 — граница протокола
