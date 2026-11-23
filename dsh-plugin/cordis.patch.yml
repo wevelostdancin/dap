@@ -1,0 +1,16 @@
+# dap-dsh bundle patch (package.json#dsh.bundle.patch).
+# Top-level loader rows: first register this bundle, then patch mcp-manager.
+- insert: [{id: dap-dsh, name: dap-dsh}]
+- id: mcp-manager
+  config:
+    servers:
+      dap:
+        transport: stdio
+        command: !!js process.env.HOME + '/.dap/bin/dap'
+        args: ['mcp']
+        env:
+          DAP_HOME: !!js process.env.HOME + '/.dap'
+        enabled: true
+        startupTimeoutMs: 60000
+        toolCallTimeoutMs: 300000
+        reconnect: {enabled: true}
