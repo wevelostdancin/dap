@@ -9,7 +9,7 @@ REFPYTHON := $(if $(wildcard build/refvenv/bin/python),build/refvenv/bin/python,
 
 .PHONY: help build-native test-native run-native goldens goldens-validate coverage accuracy test-mcp smoke \
         mcp mcp-e2e mcp-recipe-e2e dist install-e2e package-e2e extensions bench bench-full bench-gate image-native \
-        run-native-image lint check soak clean-native runtime python-runtime package test-package \
+        run-native-image lint check soak clean-native runtime python-runtime package package-fast test-package \
         test-python recipe-library-e2e
 
 help:
@@ -30,6 +30,7 @@ help:
 	@echo "  make runtime        build the bundled jlink JRE in build/package/runtime"
 	@echo "  make python-runtime download the pinned Python runtime into build/tools/python"
 	@echo "  make package        build the self-contained archive in build/package/"
+	@echo "  make package-fast   same, but use the system Python (no download)"
 	@echo "  make test-package   run the package unit tests (no jlink)"
 	@echo "  make install-e2e    install from dist/ into a temp HOME and run the stdio preflight"
 	@echo "  make package-e2e    build the self-contained archive and install it in a temp HOME"
@@ -119,6 +120,9 @@ python-runtime:
 
 package: build-native runtime python-runtime
 	python3 scripts/package.py --jar $(JAR)
+
+package-fast: build-native runtime
+	python3 scripts/package.py --jar $(JAR) --skip-python
 
 package-e2e: build-native
 	python3 tests/package_e2e.py

@@ -16,8 +16,10 @@ Usage: scripts/jlink-runtime.sh --jar PATH [--output DIR]
 EOF
 }
 
+force=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --force) force=1; shift ;;
     --jar)
       [ $# -ge 2 ] || { echo "jlink: --jar needs a path" >&2; exit 2; }
       jar=$2; shift 2 ;;
@@ -53,6 +55,10 @@ case "$output" in
   /*) ;;
   *) output=$(pwd)/$output ;;
 esac
+if [ "$force" -eq 0 ] && [ -x "$output/bin/java" ] && [ "$output/bin/java" -nt "$jar" ]; then
+  echo "jlink: $output is up to date (use --force to rebuild)"
+  exit 0
+fi
 case "$output" in
   /|/bin|/sbin|/usr|/usr/*|/System|/System/*)
     echo "jlink: refusing unsafe output directory: $output" >&2; exit 2 ;;

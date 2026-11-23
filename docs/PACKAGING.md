@@ -37,9 +37,10 @@ The JDK is only used at build time to run jdeps and jlink.
 
 ```bash
 make test-package       # pure unit tests, no jlink and no network
-make runtime            # jlink JRE -> build/package/runtime
+make runtime            # jlink JRE -> build/package/runtime (skipped when fresh)
 make python-runtime     # pinned Python -> build/tools/python (once)
 make package            # build jar + both runtimes + archive
+make package-fast       # same, system Python (no 24 MB download)
 ```
 
 Useful variants:
@@ -58,6 +59,11 @@ of recreating it. `SHA256SUMS` covers every regular file in the stage except
 itself. Bytecode caches are stripped and disabled at runtime so the archive
 stays byte-for-byte stable after use. The `.sha256` file next to the archive
 contains the archive digest.
+
+The first build downloads the pinned Python runtime (24 MB) and runs jlink;
+the cached build is about 30 s on an M1, mostly gzip and the 100 MB copy.
+Use `make package-fast` while iterating and `--force` on
+`scripts/jlink-runtime.sh` only when you need a fresh JRE.
 
 ## Verify
 
