@@ -86,6 +86,11 @@ jobs:
               cp "$f.sha256" "$latest.sha256"
             fi
           done
+      - name: Pack DSH plugin
+        run: |
+          set -eu
+          cd dsh-plugin
+          npm pack --pack-destination ../assets
       - name: Publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
