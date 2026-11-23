@@ -33,14 +33,25 @@ script, and declares no capabilities.
 
 ## Install
 
-From the CLI:
+The Desktop profile is managed by the Electron application: `dsh plugin
+--profile desktop add` is refused by design. Publish the package once (requires
+`npm login`), then install it from the Desktop UI:
 
 ```bash
-dsh plugin --profile desktop add dap-dsh
+cd dsh-plugin
+npm publish --access public
 ```
 
-From the Desktop UI: **Settings -> Plugins**, search for `dap-dsh`, install it
-and restart DSH so the patch layer is reloaded.
+Open **Settings -> Plugins**, search for `dap-dsh`, install it and restart DSH
+so the patch layer is reloaded. If your plugin manager supports a URL, use the
+release tarball `dap-dsh-1.3.0.tgz` from the GitHub Release.
+
+For a plain `dsh web` or another non-Desktop profile the CLI works:
+
+```bash
+dsh plugin --profile web add dap-dsh
+dsh plugin --profile web remove dap-dsh
+```
 
 ## Diagnostics
 
@@ -64,8 +75,11 @@ and restart DSH so the patch layer is reloaded.
 
 ## Remove
 
+In Desktop use **Settings -> Plugins -> dap-dsh -> uninstall**. For a plain
+`dsh web` profile:
+
 ```bash
-dsh plugin --profile desktop remove dap-dsh
+dsh plugin --profile web remove dap-dsh
 ```
 
 Restart DSH afterwards. Uninstalling the plugin does not delete `~/.dap`;

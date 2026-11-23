@@ -13,22 +13,32 @@ curl -fsSL https://raw.githubusercontent.com/wevelostdancin/dap/main/scripts/ins
 ~/.dap/bin/dap doctor --client dsh
 ```
 
-Затем добавьте плагин через CLI:
+Затем установите плагин. **Desktop-профилем управляет само приложение:**
+`dsh plugin --profile desktop add` возвращает «profile desktop is managed
+exclusively by the Electron application», поэтому CLI для Desktop не подходит.
+
+1. Опубликуйте пакет (один раз, нужен `npm login`):
+
+   ```bash
+   cd dsh-plugin
+   npm publish --access public
+   ```
+
+2. В Desktop откройте **Settings -> Plugins**, найдите `dap-dsh`, установите и
+   перезапустите DSH, чтобы применился слой патчей.
+
+Если плагинный менеджер умеет ставить по URL, используйте tarball из GitHub
+Release: `.../releases/download/v1.3.0/dap-dsh-1.3.0.tgz` (после публикации
+релиза).
+
+Для обычного `dsh web` или отдельного профиля CLI работает:
 
 ```bash
-dsh plugin --profile desktop add dap-dsh
+dsh plugin --profile web add dap-dsh
+dsh plugin --profile web remove dap-dsh
 ```
 
-или через Desktop UI: **Settings -> Plugins**, найти `dap-dsh`, установить и
-перезапустить DSH для перезагрузки слоя патчей.
-
-Удаление:
-
-```bash
-dsh plugin --profile desktop remove dap-dsh
-```
-
-После удаления перезапустите DSH. Каталог `~/.dap` остаётся на месте.
+После установки/удаления перезапустите DSH. Каталог `~/.dap` остаётся на месте.
 
 ## Как работает
 

@@ -132,14 +132,15 @@ class DocsTest(unittest.TestCase):
     def test_readme_documents_install_and_license(self) -> None:
         text = read(PLUGIN / "README.md")
         self.assertIn("install.sh", text)
-        self.assertIn("dsh plugin --profile desktop add dap-dsh", text)
-        self.assertIn("dsh plugin --profile desktop remove dap-dsh", text)
+        self.assertIn("Settings -> Plugins", text)
+        self.assertIn("npm publish", text)
+        self.assertIn("dsh plugin --profile web add dap-dsh", text)
         self.assertIn("Apache-2.0", text)
 
     def test_dsh_plugin_doc(self) -> None:
         text = read(ROOT / "docs" / "DSH-PLUGIN.md")
-        for token in ("install.sh", "dsh plugin --profile desktop add dap-dsh",
-                      "mcp__dap__*", "Apache-2.0"):
+        for token in ("install.sh", "Settings -> Plugins", "npm publish",
+                      "dsh plugin --profile web add dap-dsh", "mcp__dap__*", "Apache-2.0"):
             self.assertIn(token, text)
 
     def test_no_cjk_in_docs_and_readme(self) -> None:
