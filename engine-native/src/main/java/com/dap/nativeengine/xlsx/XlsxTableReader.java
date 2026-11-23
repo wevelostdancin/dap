@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -51,6 +52,9 @@ import java.util.zip.ZipFile;
  * errors unless {@code errorsAsNull} is set.
  */
 public final class XlsxTableReader {
+    private static final byte[] OLE2_MAGIC = {
+            (byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0, (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1
+    };
     private static final String REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private static final Set<String> TYPES =
             Set.of("Int64", "Float64", "Utf8", "Boolean", "Date32", "Timestamp");
@@ -110,6 +114,7 @@ public final class XlsxTableReader {
         if (!Files.isRegularFile(file)) {
             throw new IllegalArgumentException("cannot read Excel workbook " + file + ": file does not exist");
         }
+        checkContainer(file);
         try (ZipFile zip = new ZipFile(file.toFile());
              WorkbookContext context = open(zip, file, options)) {
             SchemaProbe probe = probe(context, options, file);
@@ -166,6 +171,7 @@ public final class XlsxTableReader {
         if (!Files.isRegularFile(file)) {
             throw new IllegalArgumentException("cannot read Excel workbook " + file + ": file does not exist");
         }
+        checkContainer(file);
         // Parallel readers share one job connection and DuckDB cannot interleave
         // pending query results; the same serialization as loadInto applies.
         synchronized (connection) {
@@ -204,6 +210,33 @@ public final class XlsxTableReader {
         }
     }
 
+    /**
+     * Return the worksheet names in workbook order without reading any cells.
+     * The container is validated before the ZIP is opened, so legacy .xls and
+     * .xlsb inputs fail with an actionable message instead of a low-level
+     * ZIP error.
+     */
+    public static List<String> sheetNames(Path file) {
+        Objects.requireNonNull(file, "file");
+        checkContainer(file);
+        if (!Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("cannot read Excel workbook " + file + ": file does not exist");
+        }
+        try (ZipFile zip = new ZipFile(file.toFile())) {
+            if (zip.getEntry("xl/workbook.xml") == null) {
+                throw new IllegalArgumentException("not an .xlsx workbook: " + file
+                        + " (missing xl/workbook.xml)");
+            }
+            return readWorkbook(zip, file).sheets().stream().map(Sheet::name).toList();
+        } catch (IOException failure) {
+            throw new IllegalArgumentException("cannot read Excel workbook " + file + ": "
+                    + failure.getMessage(), failure);
+        } catch (XMLStreamException failure) {
+            throw new IllegalArgumentException("cannot read Excel workbook " + file + ": "
+                    + failure.getMessage(), failure);
+        }
+    }
+
     private static String createTableDdl(List<ColumnSpec> columns, String tableName) {
         StringBuilder ddl = new StringBuilder("CREATE OR REPLACE TABLE ")
                 .append(DuckDbSession.quote(tableName)).append(" (");
@@ -238,6 +271,30 @@ public final class XlsxTableReader {
     private static void checkInterrupted() throws InterruptedException {
         if (Thread.currentThread().isInterrupted()) {
             throw new InterruptedException("excel_reader interrupted");
+        }
+    }
+
+    private static void checkContainer(Path file) {
+        byte[] magic = new byte[8];
+        try (InputStream in = Files.newInputStream(file, StandardOpenOption.READ)) {
+            in.readNBytes(magic, 0, magic.length);
+            if (Arrays.equals(magic, OLE2_MAGIC)) {
+                throw new IllegalArgumentException("cannot read Excel workbook " + file
+                        + ": legacy .xls (BIFF/OLE2) is not supported; save it as .xlsx or .csv and retry");
+            }
+            if (magic[0] != 0x50 || magic[1] != 0x4B || magic[2] != 0x03 || magic[3] != 0x04) {
+                throw new IllegalArgumentException("cannot read Excel workbook " + file
+                        + ": not an .xlsx workbook (expected a ZIP container)");
+            }
+            try (ZipFile zip = new ZipFile(file.toFile())) {
+                if (zip.getEntry("xl/workbook.bin") != null && zip.getEntry("xl/workbook.xml") == null) {
+                    throw new IllegalArgumentException("cannot read Excel workbook " + file
+                            + ": .xlsb is not supported; save it as .xlsx and retry");
+                }
+            }
+        } catch (IOException failure) {
+            throw new IllegalArgumentException("cannot read Excel workbook " + file + ": "
+                    + failure.getMessage(), failure);
         }
     }
 
