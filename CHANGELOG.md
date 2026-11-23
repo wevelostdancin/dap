@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Ingest request options: `encoding` (auto-detection or an explicit charset),
+  `allVarchar`, `decimalComma` and `sheet`. Ingest results now report the
+  effective `encoding`, the Excel `sheet` that was read and all `sheets`.
+- MCP one-call tools pass the CSV/Excel read options through to ingest and
+  return the sheet and encoding metadata.
+
+### Fixed
+
+- CP1251 and other non-UTF CSV files are transcoded to UTF-8 before DuckDB,
+  which only reads UTF-8/UTF-16/Latin-1.
+- An omitted or empty `delimiter` now lets DuckDB detect the CSV dialect
+  instead of assuming a comma.
+- Legacy `.xls` (BIFF/OLE2) and `.xlsb` workbooks are rejected with a hint
+  to save them as `.xlsx` or `.csv` and retry.
+- Concurrent ingest rebuilds are bounded by `DAP_INGEST_PARALLELISM`
+  (default 2), and ingest sessions inherit the engine's `memory_limit`,
+  `threads` and `temp_directory`.
+- Ingest errors report the underlying cause instead of starting with
+  "Attempting to execute an unsuccessful or closed pending query result".
+- An engine restart is reported as "engine restarted (idle shutdown or crash);
+  workflows lost: " with `data.restarted=true`.
+
 ## [1.3.1] - 2026-11-23
 
 ### Added

@@ -865,16 +865,33 @@ paths:
         <cache>/<sha256>.parquet, keyed by the file's absolute path, size,
         modification time and format. An unchanged source returns the existing
         file with cached=true instead of converting again. The cache directory is
-        DAP_CACHE_DIR, or ~/.dap/cache. CSV uses the csv_reader rules (comma,
-        header row, type inference); Excel has no request options and uses the
-        first worksheet with a header row, inferred types, empty strings kept as
-        empty strings (emptyStringIsNull=false) and hard errors on error cells or
-        uncached formulas (errorsAsNull=false) — CSV options are ignored for it.
-        Excel sheets stream into DuckDB in bounded chunks before the Parquet copy,
-        so heap does not grow with the row count; a sharedStrings.xml above 8 MiB
-        is spooled to temp files and above 5 million strings or 512 MiB fails with
-        a hint to split the workbook or convert it to CSV. JSON uses DuckDB
-        read_json_auto; Parquet is copied through read_parquet.
+        DAP_CACHE_DIR, or ~/.dap/cache. CSV uses the csv_reader rules with header
+        enabled by default. The delimiter is optional: when it is omitted or empty
+        DuckDB detects the dialect automatically (comma, semicolon, TAB or pipe),
+        so there is no fixed comma default. encoding defaults to "auto" (BOM,
+        strict UTF-8 validation and heuristics) and also accepts utf-8, utf-16,
+        latin-1, cp1251, cp866, koi8-r or any Java charset name; non-UTF data such
+        as cp1251 is transcoded to UTF-8 before DuckDB, which reads only
+        utf-8/utf-16/latin-1. allVarchar keeps every CSV column as VARCHAR, while
+        decimalComma turns values like "5 449,72" into DOUBLE by removing spaces
+        and NBSP and replacing the comma with a dot; a column is converted only
+        when all non-empty values parse, otherwise it stays text.
+        Excel (xlsx) accepts sheet: a worksheet name or a 0-based index such as
+        "0", defaulting to the first sheet. It uses a header row, inferred types,
+        empty strings kept as empty strings (emptyStringIsNull=false) and hard
+        errors on error cells or uncached formulas (errorsAsNull=false). The
+        response reports the sheet actually read and all sheet names. Legacy .xls
+        (BIFF/OLE2) and .xlsb files are rejected with a hint to save them as .xlsx
+        or .csv and retry. Excel sheets stream into DuckDB in bounded chunks
+        before the Parquet copy, so heap does not grow with the row count; a
+        sharedStrings.xml above 8 MiB is spooled to temp files and above 5 million
+        strings or 512 MiB fails with a hint to split the workbook or convert it
+        to CSV. JSON uses DuckDB read_json_auto; Parquet is copied through
+        read_parquet. Parallel rebuilds are capped by DAP_INGEST_PARALLELISM
+        (default 2), and ingest sessions inherit the engine's memory_limit,
+        threads and temp_directory settings. Errors report the underlying cause
+        instead of starting with "Attempting to execute an unsuccessful or closed
+        pending query result".
       parameters:
         - $ref: '#/components/parameters/SessionHeader'
         - $ref: '#/components/parameters/SessionQuery'
@@ -1812,7 +1829,32 @@ components:
           description: CSV first row is a header
         delimiter:
           type: string
-          default: ','
+          description: >-
+            CSV field separator; when omitted or empty, DuckDB detects the
+            dialect automatically (comma, semicolon, TAB or pipe)
+        encoding:
+          type: string
+          default: auto
+          description: >-
+            CSV encoding: auto (BOM, strict UTF-8 validation and heuristics),
+            utf-8, utf-16, latin-1, cp1251, cp866, koi8-r or any Java charset
+            name. Non-UTF data is transcoded to UTF-8 before DuckDB.
+        allVarchar:
+          type: boolean
+          default: false
+          description: Read every CSV column as VARCHAR
+        decimalComma:
+          type: boolean
+          default: false
+          description: >-
+            Convert CSV values like "5 449,72" to DOUBLE by removing spaces and
+            NBSP and replacing the comma with a dot; a column stays text unless
+            all non-empty values parse
+        sheet:
+          type: string
+          description: >-
+            Excel worksheet name or 0-based index ("0"); defaults to the first
+            sheet
         quote:
           type: string
           default: '"'
@@ -1859,6 +1901,17 @@ components:
         cached:
           type: boolean
           description: True when the cache entry already existed and was not rewritten
+        encoding:
+          type: string
+          description: Effective CSV encoding, e.g. windows-1251
+        sheet:
+          type: string
+          description: Excel worksheet actually read
+        sheets:
+          type: array
+          items:
+            type: string
+          description: Names of all worksheets in the workbook
       additionalProperties: false
     Ok:
       type: object
