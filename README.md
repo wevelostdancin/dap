@@ -279,6 +279,15 @@ Makefile         build-native, package, test-native, goldens, check
   без Arrow в heap. `DAP_DUCKDB_MEMORY_LIMIT=512MB` и spill в
   `$DAP_HOME/build/duckdb-tmp` включены по умолчанию. Потолок теперь задаёт диск, а не `-Xmx`.
 
+## Участие
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — сборка, тесты, стиль коммитов, DCO, добавление узла.
+- [SECURITY.md](SECURITY.md) — приватное сообщение об уязвимостях.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — правила общения.
+- [Issues](https://github.com/wevelostdancin/dap/issues) и
+  [Discussions](https://github.com/wevelostdancin/dap/discussions) — вопросы и идеи.
+- [CITATION.cff](CITATION.cff) — как цитировать DAP.
+
 ## Лицензия
 
 DAP распространяется под **Apache-2.0**; текст — [LICENSE](LICENSE),
