@@ -30,7 +30,7 @@ class PackageManifestTest(unittest.TestCase):
 
     def test_identity(self) -> None:
         self.assertEqual(self.data["name"], "dap-dsh")
-        self.assertEqual(self.data["version"], "1.3.1")
+        self.assertEqual(self.data["version"], "1.4.0")
         self.assertTrue(self.data["description"].strip())
         self.assertEqual(self.data["license"], "Apache-2.0")
         self.assertEqual(self.data["type"], "module")

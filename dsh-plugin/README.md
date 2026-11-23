@@ -39,7 +39,7 @@ the plugin manager instead.
 
 Open **Settings -> Plugins**, search for `dap-dsh`, install it and restart DSH
 so the patch layer is reloaded. If your plugin manager supports a URL, use the
-release tarball `dap-dsh-1.3.1.tgz` from the GitHub Release.
+release tarball `dap-dsh-1.4.0.tgz` from the GitHub Release.
 
 Maintainers publish new versions with `npm publish --access public` from this
 directory; see

@@ -1,7 +1,7 @@
 # DAP
 
 [![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![version: 1.3.1](https://img.shields.io/badge/version-1.3.1-blue.svg)](CHANGELOG.md)
+[![version: 1.4.0](https://img.shields.io/badge/version-1.4.0-blue.svg)](CHANGELOG.md)
 [![npm: dap-dsh](https://img.shields.io/npm/v/dap-dsh.svg?label=dsh%20plugin)](https://www.npmjs.com/package/dap-dsh)
 
 **DAP** is a local analytics backend for agents: a single JVM process with an
@@ -11,7 +11,7 @@ in-process; data never leaves the machine.
 
 Engine: Javalin 6.7 + DuckDB 1.5.6 (in-memory) + Arrow 19.0 on Java 21.
 Catalog: 66 `dap.*` nodes. Contract: 31 paths and 38 operations under `/v1`.
-Version: **1.3.1**.
+Version: **1.4.0**.
 
 ## What it is
 
@@ -89,7 +89,7 @@ curl -s http://127.0.0.1:7800/v1/health
 ```
 
 ```json
-{"ok":true,"name":"DAP","version":"1.3.1","api":"1","nodes":66,"coreNodes":66,
+{"ok":true,"name":"DAP","version":"1.4.0","api":"1","nodes":66,"coreNodes":66,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 

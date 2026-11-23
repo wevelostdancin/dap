@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-23
+
 ### Added
 
 - Ingest request options: `encoding` (auto-detection or an explicit charset),
@@ -15,6 +17,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   keep identifiers, codes and long keys as text.
 - MCP one-call tools pass the CSV/Excel read options through to ingest and
   return the sheet and encoding metadata.
+- `dap_explore` reports the effective `sheet`, `sheets` and `encoding` of its
+  source file.
+
+### Changed
+
+- An omitted or empty `delimiter` is auto-detected instead of defaulting to a
+  comma; clients that relied on the comma default should pass `delimiter`
+  explicitly.
+- Ingest rebuilds open bounded DuckDB sessions and are capped by
+  `DAP_INGEST_PARALLELISM`, including the dataset catalog path.
 
 ### Fixed
 

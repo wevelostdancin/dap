@@ -24,7 +24,7 @@ curl -fsSL https://raw.githubusercontent.com/wevelostdancin/dap/main/scripts/ins
 
 | Флаг | Смысл |
 |---|---|
-| `--version 1.3.1` | конкретная версия (по умолчанию `latest`) |
+| `--version 1.4.0` | конкретная версия (по умолчанию `latest`) |
 | `--home DIR` | каталог установки (по умолчанию `~/.dap`) |
 | `--client dsh\|hermes` | сразу подключить к клиенту |
 | `--path` | добавить `~/.dap/bin` в `~/.zshrc`/`~/.bashrc` |
@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/wevelostdancin/dap/main/scripts/ins
 ## Вручную
 
 ```bash
-VERSION=1.3.1
+VERSION=1.4.0
 OS=macos          # macos | linux
 ARCH=arm64        # arm64 | x64
 curl -fLO "https://github.com/wevelostdancin/dap/releases/download/v$VERSION/dap-$VERSION-$OS-$ARCH.tar.gz"
