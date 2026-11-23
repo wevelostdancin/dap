@@ -1,0 +1,75 @@
+{
+  "format": "dap-native-workflow/1",
+  "name": "regression",
+  "nodes": [
+    {
+      "id": "src",
+      "factory": "dap.parquet_reader",
+      "name": "Parquet Reader",
+      "settings": {
+        "file": "placeholder.parquet"
+      }
+    },
+    {
+      "id": "fit",
+      "factory": "dap.linear_regression",
+      "name": "Linear regression",
+      "settings": {
+        "x": [
+          "age",
+          "income"
+        ],
+        "y": "spend",
+        "mode": "coefficients"
+      }
+    },
+    {
+      "id": "report",
+      "factory": "dap.markdown_report",
+      "name": "Markdown Report",
+      "settings": {
+        "file": "report.md",
+        "title": "Regression coefficients",
+        "sections": [
+          {
+            "kind": "table"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "src",
+      "fromPort": 0,
+      "to": "fit",
+      "toPort": 0
+    },
+    {
+      "from": "fit",
+      "fromPort": 0,
+      "to": "report",
+      "toPort": 0
+    }
+  ],
+  "recipe": {
+    "name": "regression",
+    "description": "Fit spend on age and income and report the regression coefficients.",
+    "tags": [
+      "regression",
+      "statistics",
+      "report"
+    ],
+    "dataset": {
+      "node": "src",
+      "setting": "file"
+    },
+    "params": {
+      "report": {
+        "node": "report",
+        "setting": "file"
+      }
+    },
+    "output": "report"
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "format": "dap-native-workflow/1",
+  "name": "segmentation",
+  "nodes": [
+    {
+      "id": "src",
+      "factory": "dap.parquet_reader",
+      "name": "Parquet Reader",
+      "settings": {
+        "file": "placeholder.parquet"
+      }
+    },
+    {
+      "id": "clusters",
+      "factory": "dap.cluster",
+      "name": "Customer clusters",
+      "settings": {
+        "columns": [
+          "age",
+          "income",
+          "spend"
+        ],
+        "k": 3,
+        "standardize": true,
+        "seed": 42
+      }
+    },
+    {
+      "id": "summary",
+      "factory": "dap.group_by",
+      "name": "Cluster profiles",
+      "settings": {
+        "keys": [
+          "cluster"
+        ],
+        "aggregations": [
+          {
+            "column": "age",
+            "fn": "mean"
+          },
+          {
+            "column": "income",
+            "fn": "mean"
+          },
+          {
+            "column": "spend",
+            "fn": "mean"
+          }
+        ]
+      }
+    },
+    {
+      "id": "report",
+      "factory": "dap.markdown_report",
+      "name": "Markdown Report",
+      "settings": {
+        "file": "report.md",
+        "title": "Customer segments",
+        "sections": [
+          {
+            "kind": "table"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "src",
+      "fromPort": 0,
+      "to": "clusters",
+      "toPort": 0
+    },
+    {
+      "from": "clusters",
+      "fromPort": 0,
+      "to": "summary",
+      "toPort": 0
+    },
+    {
+      "from": "summary",
+      "fromPort": 0,
+      "to": "report",
+      "toPort": 0
+    }
+  ],
+  "recipe": {
+    "name": "segmentation",
+    "description": "Cluster customers on age, income and spend, then profile each cluster with means.",
+    "tags": [
+      "segmentation",
+      "cluster",
+      "report"
+    ],
+    "dataset": {
+      "node": "src",
+      "setting": "file"
+    },
+    "params": {
+      "report": {
+        "node": "report",
+        "setting": "file"
+      }
+    },
+    "output": "report"
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "format": "dap-native-workflow/1",
+  "name": "time_series",
+  "nodes": [
+    {
+      "id": "src",
+      "factory": "dap.parquet_reader",
+      "name": "Parquet Reader",
+      "settings": {
+        "file": "placeholder.parquet"
+      }
+    },
+    {
+      "id": "resample",
+      "factory": "dap.resample",
+      "name": "Daily resample",
+      "settings": {
+        "timeColumn": "date",
+        "every": "1 day",
+        "aggregations": [
+          {
+            "column": "value",
+            "fn": "mean",
+            "output": "value"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cast",
+      "factory": "dap.type_cast",
+      "name": "Date for forecasting",
+      "settings": {
+        "columns": [
+          {
+            "column": "date",
+            "type": "Date32"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rolling",
+      "factory": "dap.rolling",
+      "name": "7-day rolling mean",
+      "settings": {
+        "column": "value",
+        "output": "rolling_mean",
+        "window": 7,
+        "fn": "mean",
+        "orderBy": [
+          {
+            "column": "date",
+            "direction": "asc"
+          }
+        ]
+      }
+    },
+    {
+      "id": "forecast",
+      "factory": "dap.time_series",
+      "name": "Forecast",
+      "settings": {
+        "mode": "forecast",
+        "time": "date",
+        "value": "rolling_mean",
+        "horizon": 7,
+        "method": "drift"
+      }
+    },
+    {
+      "id": "report",
+      "factory": "dap.markdown_report",
+      "name": "Markdown Report",
+      "settings": {
+        "file": "report.md",
+        "title": "Time series forecast",
+        "sections": [
+          {
+            "kind": "table"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "src",
+      "fromPort": 0,
+      "to": "resample",
+      "toPort": 0
+    },
+    {
+      "from": "resample",
+      "fromPort": 0,
+      "to": "cast",
+      "toPort": 0
+    },
+    {
+      "from": "cast",
+      "fromPort": 0,
+      "to": "rolling",
+      "toPort": 0
+    },
+    {
+      "from": "rolling",
+      "fromPort": 0,
+      "to": "forecast",
+      "toPort": 0
+    },
+    {
+      "from": "forecast",
+      "fromPort": 0,
+      "to": "report",
+      "toPort": 0
+    }
+  ],
+  "recipe": {
+    "name": "time_series",
+    "description": "Resample to days, smooth with a 7-day rolling mean and forecast seven steps ahead.",
+    "tags": [
+      "time-series",
+      "forecast",
+      "report"
+    ],
+    "dataset": {
+      "node": "src",
+      "setting": "file"
+    },
+    "params": {
+      "report": {
+        "node": "report",
+        "setting": "file"
+      }
+    },
+    "output": "report"
+  }
+}
