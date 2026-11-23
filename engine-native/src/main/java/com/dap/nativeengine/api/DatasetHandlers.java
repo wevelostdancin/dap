@@ -1,5 +1,6 @@
 package com.dap.nativeengine.api;
 
+import com.dap.nativeengine.NativeService;
 import com.dap.nativeengine.io.IngestService;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.javalin.http.Context;
@@ -18,6 +19,12 @@ public final class DatasetHandlers {
 
     public DatasetHandlers() {
         this(new IngestService());
+    }
+
+    /** Production wiring: ingest sessions inherit the engine's DuckDB resource settings. */
+    public DatasetHandlers(NativeService.Settings settings) {
+        this(new IngestService(settings.duckdbMemoryLimit(), settings.duckdbThreads(),
+                settings.duckdbTempDirectory()));
     }
 
     /** Test seam: an explicit ingest service. */
@@ -50,7 +57,7 @@ public final class DatasetHandlers {
                             "cannot infer format from the file name, pass 'format': " + file);
                 }
             }
-            IngestService.CsvOptions options = csvOptions(request);
+            IngestService.IngestOptions options = ingestOptions(request);
             result = ingest.ingest(file, format, options);
         } catch (IllegalArgumentException invalid) {
             throw ApiException.badRequest(invalid.getMessage());
@@ -63,21 +70,34 @@ public final class DatasetHandlers {
                 .map(column -> Map.of("name", column.name(), "type", column.type()))
                 .toList());
         body.put("cached", result.cached());
+        if (result.encoding() != null) {
+            body.put("encoding", result.encoding());
+        }
+        if (result.sheet() != null) {
+            body.put("sheet", result.sheet());
+        }
+        if (!result.sheets().isEmpty()) {
+            body.put("sheets", result.sheets());
+        }
         Http.ok(ctx, body);
     }
 
-    /** CSV reader options; ignored for non-CSV formats. */
-    private static IngestService.CsvOptions csvOptions(JsonNode request) {
-        IngestService.CsvOptions defaults = IngestService.CsvOptions.defaults();
-        return new IngestService.CsvOptions(
+    /** CSV/Excel reader options; ignored for non-CSV and non-Excel formats. */
+    private static IngestService.IngestOptions ingestOptions(JsonNode request) {
+        IngestService.IngestOptions defaults = IngestService.IngestOptions.defaults();
+        return new IngestService.IngestOptions(
                 bool(request, "header", defaults.header()),
-                text(request, "delimiter", defaults.delimiter()),
+                textOrNull(request, "delimiter"),
                 text(request, "quote", defaults.quote()),
                 text(request, "escape", defaults.escape()),
                 bool(request, "ignoreErrors", defaults.ignoreErrors()),
                 bool(request, "nullPadding", defaults.nullPadding()),
                 bool(request, "strictMode", defaults.strictMode()),
-                strings(request, "nullStrings"));
+                strings(request, "nullStrings"),
+                textOrNull(request, "encoding"),
+                bool(request, "allVarchar", false),
+                bool(request, "decimalComma", false),
+                textOrNull(request, "sheet"));
     }
 
     private static boolean bool(JsonNode request, String name, boolean fallback) {
@@ -120,7 +140,20 @@ public final class DatasetHandlers {
         return node.asText();
     }
 
-    /** Format from the file extension: .csv/.xlsx/.json/.parquet, or null. */
+    /** Optional text: absent, null or blank means "use the default/auto value". */
+    private static String textOrNull(JsonNode request, String name) {
+        JsonNode node = request.get(name);
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (!node.isTextual()) {
+            throw ApiException.badRequest("'" + name + "' must be a string");
+        }
+        String value = node.asText();
+        return value.isBlank() ? null : value;
+    }
+
+    /** Format from the file extension: .csv/.xlsx/.json/.parquet (and .xls/.xlsb), or null. */
     private static String formatOf(Path file) {
         Path name = file.getFileName();
         if (name == null) {
@@ -131,7 +164,8 @@ public final class DatasetHandlers {
         String extension = dot < 0 ? "" : value.substring(dot + 1);
         return switch (extension) {
             case "csv" -> "csv";
-            case "xlsx" -> "excel";
+            // Legacy workbooks fail later with an explicit "convert to .xlsx" message.
+            case "xlsx", "xls", "xlsb" -> "excel";
             case "json" -> "json";
             case "parquet" -> "parquet";
             default -> null;

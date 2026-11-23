@@ -352,7 +352,7 @@ public final class DatasetCatalog {
         }
         return switch (format) {
             case "csv" -> "csv";
-            case "excel", "xlsx" -> "excel";
+            case "excel", "xlsx", "xls", "xlsb" -> "excel";
             case "json" -> "json";
             case "parquet" -> "parquet";
             default -> throw ApiException.badRequest("invalid_format",
@@ -370,7 +370,7 @@ public final class DatasetCatalog {
         String extension = dot < 0 ? "" : value.substring(dot + 1);
         return switch (extension) {
             case "csv" -> "csv";
-            case "xlsx", "excel" -> "excel";
+            case "xlsx", "excel", "xls", "xlsb" -> "excel";
             case "json", "jsonl", "ndjson" -> "json";
             case "parquet" -> "parquet";
             default -> null;

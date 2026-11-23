@@ -30,7 +30,8 @@ public final class ExploreHandlers {
     public ExploreHandlers(NativeService.Settings settings) {
         this(new ExploreService(settings.duckdbMemoryLimit(), settings.duckdbThreads(),
                 settings.duckdbTempDirectory(), settings.duckdbExtensionDirectory()),
-                new IngestService());
+                new IngestService(settings.duckdbMemoryLimit(), settings.duckdbThreads(),
+                        settings.duckdbTempDirectory()));
     }
 
     /** Test seam: explicit services. */
@@ -135,7 +136,8 @@ public final class ExploreHandlers {
         String extension = dot < 0 ? "" : value.substring(dot + 1);
         return switch (extension) {
             case "csv" -> "csv";
-            case "xlsx" -> "xlsx";
+            // Legacy workbooks fail later with an explicit "convert to .xlsx" message.
+            case "xlsx", "xls", "xlsb" -> "xlsx";
             case "json" -> "json";
             case "parquet" -> "parquet";
             default -> null;

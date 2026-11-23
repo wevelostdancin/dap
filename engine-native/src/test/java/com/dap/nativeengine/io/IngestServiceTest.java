@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -198,7 +199,7 @@ class IngestServiceTest {
     @Test
     void headerlessCsvKeepsEveryRowWithHeaderFalse() throws Exception {
         Path source = write("noheader.csv", "1,alpha\n2,beta\n");
-        IngestService.CsvOptions options = new IngestService.CsvOptions(
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
                 false, ",", "\"", "\"", false, false, true);
 
         IngestService.Result result = service().ingest(source, "csv", options);
@@ -210,7 +211,7 @@ class IngestServiceTest {
     @Test
     void malformedRowsCanBeSkippedWithIgnoreErrors() throws Exception {
         Path source = write("ragged.csv", "a,b\n1,2\n3,4,5\n6,7\n");
-        IngestService.CsvOptions options = new IngestService.CsvOptions(
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
                 true, ",", "\"", "\"", true, false, true);
 
         IngestService.Result result = service().ingest(source, "csv", options);
@@ -224,7 +225,7 @@ class IngestServiceTest {
     @Test
     void nullStringsBecomeNulls() throws Exception {
         Path source = write("nulls.csv", "id,value\n1,NA\n2,5\n");
-        IngestService.CsvOptions options = new IngestService.CsvOptions(
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
                 true, ",", "\"", "\"", false, false, true, List.of("NA"));
 
         IngestService.Result result = service().ingest(source, "csv", options);
@@ -351,7 +352,7 @@ class IngestServiceTest {
 
         IngestService.Result withHeader = service.ingest(source, "csv");
         IngestService.Result withoutHeader = service.ingest(source, "csv",
-                new IngestService.CsvOptions(false, ",", "\"", "\"", false, false, true));
+                new IngestService.IngestOptions(false, ",", "\"", "\"", false, false, true));
 
         assertFalse(withHeader.path().equals(withoutHeader.path()),
                 "different CSV options must not share a cache entry");
@@ -566,5 +567,177 @@ class IngestServiceTest {
                 System.setProperty("dap.xlsx.sst.maxStrings", previous);
             }
         }
+    }
+
+    // ------------------------------------------------ encodings, dialects, sheets
+
+    @Test
+    void cp1251SemicolonCsvIsDetectedAndTranscoded() throws Exception {
+        Path source = dir.resolve("rating.csv");
+        Files.write(source, "Год;Подразделение\n2025;УППР\n2026;ЦДС\n"
+                .getBytes(Charset.forName("windows-1251")));
+
+        IngestService.Result result = service().ingest(source, "csv");
+
+        assertEquals(2, result.rows());
+        assertEquals(List.of(
+                new IngestService.Column("Год", "Int64"),
+                new IngestService.Column("Подразделение", "Utf8")), result.columns());
+        assertEquals("windows-1251", result.encoding());
+    }
+
+    @Test
+    void explicitCp1251AndSemicolonAreHonoured() throws Exception {
+        Path source = dir.resolve("rating-explicit.csv");
+        Files.write(source, "Год;Подразделение\n2025;УППР\n"
+                .getBytes(Charset.forName("windows-1251")));
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
+                true, ";", "\"", "\"", false, false, true, List.of(), "cp1251", false, false, null);
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(1, result.rows());
+        assertEquals("Год", result.columns().get(0).name());
+        assertEquals("windows-1251", result.encoding());
+    }
+
+    @Test
+    void semicolonDelimiterIsSniffedWhenDelimiterIsNotGiven() throws Exception {
+        Path source = write("semicolon.csv", "id;name;score\n1;alpha;9.5\n2;beta;7.0\n");
+
+        IngestService.Result result = service().ingest(source, "csv");
+
+        assertEquals(2, result.rows());
+        assertEquals(List.of("id", "name", "score"),
+                result.columns().stream().map(IngestService.Column::name).toList());
+    }
+
+    @Test
+    void unsupportedEncodingIsRejectedWithAHint() throws Exception {
+        Path source = write("people.csv", "id\n1\n");
+
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> service().ingest(source, "csv", new IngestService.IngestOptions(
+                        true, null, "\"", "\"", false, false, true, List.of(), "cp9999",
+                        false, false, null)));
+
+        assertTrue(failure.getMessage().contains("unsupported CSV encoding"),
+                failure.getMessage());
+    }
+
+    @Test
+    void allVarcharKeepsEveryColumnAsText() throws Exception {
+        Path source = write("numbers.csv", "id,score\n1,9.5\n2,7\n");
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
+                true, null, "\"", "\"", false, false, true, List.of(), null, true, false, null);
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(List.of(
+                new IngestService.Column("id", "Utf8"),
+                new IngestService.Column("score", "Utf8")), result.columns());
+    }
+
+    @Test
+    void decimalCommaTurnsRussianNumbersIntoDoubles() throws Exception {
+        Path source = write("money.csv", "Сумма\n5 449,72\n1 234,50\n");
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
+                true, null, "\"", "\"", false, false, true, List.of(), null, false, true, null);
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(List.of(new IngestService.Column("Сумма", "Float64")), result.columns());
+        try (DuckDbSession db = new DuckDbSession();
+             Connection connection = db.newConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("SELECT sum(\"Сумма\") FROM read_parquet("
+                     + literal(result.path()) + ")")) {
+            assertTrue(rows.next());
+            assertEquals(6684.22, rows.getDouble(1), 0.0001);
+        }
+    }
+
+    @Test
+    void excelSheetCanBeSelectedAndIsReported() throws Exception {
+        Path file = writeTwoSheetXlsx(dir, "two-sheets.xlsx");
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
+                true, null, "\"", "\"", false, false, true, List.of(), null, false, false, "Second");
+
+        IngestService.Result result = service().ingest(file, "xlsx", options);
+
+        assertEquals(1, result.rows());
+        assertEquals(List.of(new IngestService.Column("value", "Int64")), result.columns());
+        assertEquals("Second", result.sheet());
+        assertEquals(List.of("First", "Second"), result.sheets());
+    }
+
+    @Test
+    void unknownExcelSheetListsAvailableOnes() throws Exception {
+        Path file = writeTwoSheetXlsx(dir, "two-sheets.xlsx");
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
+                true, null, "\"", "\"", false, false, true, List.of(), null, false, false, "Missing");
+
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> service().ingest(file, "xlsx", options));
+
+        assertTrue(failure.getMessage().contains("available sheets"), failure.getMessage());
+        assertTrue(failure.getMessage().contains("Second"), failure.getMessage());
+    }
+
+    @Test
+    void legacyXlsFailsWithAnActionableMessage() throws Exception {
+        Path file = dir.resolve("old.xls");
+        Files.write(file, new byte[] {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0,
+                (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1, 0, 0, 0, 0});
+
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> service().ingest(file, "excel"));
+
+        assertTrue(failure.getMessage().contains("legacy .xls"), failure.getMessage());
+        assertTrue(failure.getMessage().contains(".xlsx"), failure.getMessage());
+    }
+
+    @Test
+    void closedPendingResultWrapperIsStrippedFromTheMessage() {
+        String message = "Invalid Input Error: Attempting to execute an unsuccessful or closed "
+                + "pending query result\nError: Invalid Input Error: CSV Error on Line: 1\n"
+                + "Invalid unicode (byte sequence mismatch) detected.";
+
+        String described = IngestService.describeFailure(new IllegalStateException(message));
+
+        assertTrue(described.startsWith("Invalid Input Error: CSV Error on Line: 1"), described);
+        assertTrue(described.contains("Invalid unicode"), described);
+    }
+
+    /** Two-sheet workbook: "First" (n=1) and "Second" (value=42). */
+    private static Path writeTwoSheetXlsx(Path dir, String name) throws IOException {
+        Path file = dir.resolve(name);
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(file))) {
+            putXlsx(zip, "[Content_Types].xml", "<?xml version=\"1.0\"?><Types/>");
+            putXlsx(zip, "_rels/.rels", "<?xml version=\"1.0\"?><Relationships>"
+                    + "<Relationship Id=\"rId1\" Target=\"xl/workbook.xml\"/></Relationships>");
+            putXlsx(zip, "xl/workbook.xml", "<?xml version=\"1.0\"?>"
+                    + "<workbook xmlns=\"" + XLSX_NS + "\" xmlns:r=\"" + REL_NS + "\"><sheets>"
+                    + "<sheet name=\"First\" sheetId=\"1\" r:id=\"rId1\"/>"
+                    + "<sheet name=\"Second\" sheetId=\"2\" r:id=\"rId2\"/>"
+                    + "</sheets></workbook>");
+            putXlsx(zip, "xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\"?><Relationships>"
+                    + "<Relationship Id=\"rId1\" Type=\"" + REL_NS + "/worksheet\""
+                    + " Target=\"worksheets/sheet1.xml\"/>"
+                    + "<Relationship Id=\"rId2\" Type=\"" + REL_NS + "/worksheet\""
+                    + " Target=\"worksheets/sheet2.xml\"/>"
+                    + "</Relationships>");
+            putXlsx(zip, "xl/worksheets/sheet1.xml", "<?xml version=\"1.0\"?>"
+                    + "<worksheet xmlns=\"" + XLSX_NS + "\"><sheetData>"
+                    + "<row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>n</t></is></c></row>"
+                    + "<row r=\"2\"><c r=\"A2\"><v>1</v></c></row>"
+                    + "</sheetData></worksheet>");
+            putXlsx(zip, "xl/worksheets/sheet2.xml", "<?xml version=\"1.0\"?>"
+                    + "<worksheet xmlns=\"" + XLSX_NS + "\"><sheetData>"
+                    + "<row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t>value</t></is></c></row>"
+                    + "<row r=\"2\"><c r=\"A2\"><v>42</v></c></row>"
+                    + "</sheetData></worksheet>");
+        }
+        return file;
     }
 }

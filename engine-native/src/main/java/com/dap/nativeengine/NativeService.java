@@ -432,7 +432,7 @@ public final class NativeService implements AutoCloseable {
         WorkflowHandlers workflows = new WorkflowHandlers(state);
         JobHandlers jobs = new JobHandlers(state);
         DataHandlers data = new DataHandlers(state);
-        DatasetHandlers datasets = new DatasetHandlers();
+        DatasetHandlers datasets = new DatasetHandlers(settings);
         DatasetCatalogHandlers datasetCatalog = new DatasetCatalogHandlers(catalog);
         ExploreHandlers explore = new ExploreHandlers(state.settings());
         OpsHandlers ops = new OpsHandlers(state, this::shutdownAsync);
