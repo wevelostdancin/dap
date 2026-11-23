@@ -416,7 +416,8 @@ public final class IngestService {
                 select.append(quote(names.get(index)));
             }
         }
-        return select.append(" FROM ").append(relation).toString();
+        // Parenthesized so the caller can wrap it in DESCRIBE/COPY SELECT * FROM <relation>.
+        return "(" + select.append(" FROM ").append(relation) + ")";
     }
 
     /** Text form with space/NBSP thousands separators removed and the comma decimal point. */

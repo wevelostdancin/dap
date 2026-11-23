@@ -1,5 +1,6 @@
 package com.dap.nativeengine.io;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -76,7 +77,13 @@ public final class CsvEncoding {
      * @throws IOException if either file cannot be read or written
      */
     public static void transcode(Path source, Path target, Charset charset) throws IOException {
-        try (Reader reader = Files.newBufferedReader(source, charset);
+        // REPLACE, not REPORT: a non-text byte must not abort the copy with an opaque
+        // "Input length = 1"; undefined bytes become U+FFFD and DuckDB reports the parse error.
+        CharsetDecoder decoder = charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE);
+        try (Reader reader = new BufferedReader(new InputStreamReader(
+                Files.newInputStream(source), decoder));
              Writer writer = Files.newBufferedWriter(target, StandardCharsets.UTF_8,
                      StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
                      StandardOpenOption.WRITE)) {
@@ -108,7 +115,9 @@ public final class CsvEncoding {
         if (isStrictUtf8(source)) {
             return new Plan(requested, "utf-8", StandardCharsets.UTF_8, false, "utf-8");
         }
-        Charset charset = bestLegacyCharset(source);
+        byte[] sample = sample(source);
+        rejectBinary(sample, source);
+        Charset charset = bestLegacyCharset(sample);
         return new Plan(requested, charset.name().toLowerCase(Locale.ROOT), charset, true, "utf-8");
     }
 
@@ -146,11 +155,38 @@ public final class CsvEncoding {
         }
     }
 
-    private static Charset bestLegacyCharset(Path source) throws IOException {
-        byte[] sample;
+    private static byte[] sample(Path source) throws IOException {
         try (InputStream in = Files.newInputStream(source)) {
-            sample = in.readNBytes(SAMPLE_BYTES);
+            return in.readNBytes(SAMPLE_BYTES);
         }
+    }
+
+    /**
+     * Reject a workbook or archive passed as CSV before the decoder turns it into mojibake.
+     * A text file may contain a stray control byte; NUL bytes or a tenth of the sample being
+     * control characters is binary content, not CSV.
+     */
+    private static void rejectBinary(byte[] sample, Path source) {
+        if (sample.length == 0) {
+            return;
+        }
+        int nul = 0;
+        int controls = 0;
+        for (byte value : sample) {
+            int current = value & 0xFF;
+            if (current == 0) {
+                nul++;
+            } else if (current < 0x20 && current != '\t' && current != '\n' && current != '\r') {
+                controls++;
+            }
+        }
+        if (nul * 100 > sample.length || controls * 10 > sample.length) {
+            throw new IllegalArgumentException("cannot read " + source + " as CSV: binary content "
+                    + "detected; convert the file to CSV or pass the matching format");
+        }
+    }
+
+    private static Charset bestLegacyCharset(byte[] sample) {
         Charset best = LEGACY[0];
         double bestScore = score(sample, best);
         for (int index = 1; index < LEGACY.length; index++) {

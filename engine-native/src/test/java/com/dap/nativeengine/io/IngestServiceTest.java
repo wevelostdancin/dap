@@ -640,9 +640,10 @@ class IngestServiceTest {
 
     @Test
     void decimalCommaTurnsRussianNumbersIntoDoubles() throws Exception {
+        // A decimal comma needs an explicit non-comma delimiter; otherwise DuckDB sniffs ','.
         Path source = write("money.csv", "Сумма\n5 449,72\n1 234,50\n");
         IngestService.IngestOptions options = new IngestService.IngestOptions(
-                true, null, "\"", "\"", false, false, true, List.of(), null, false, true, null);
+                true, ";", "\"", "\"", false, false, true, List.of(), null, false, true, null);
 
         IngestService.Result result = service().ingest(source, "csv", options);
 
@@ -695,6 +696,18 @@ class IngestServiceTest {
 
         assertTrue(failure.getMessage().contains("legacy .xls"), failure.getMessage());
         assertTrue(failure.getMessage().contains(".xlsx"), failure.getMessage());
+    }
+
+    @Test
+    void binaryFileIsRejectedAsCsvWithAClearMessage() throws Exception {
+        Path file = dir.resolve("book.xls");
+        Files.write(file, new byte[] {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0,
+                (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1, 0, 0, 0, 0, 0, 0, 0, 0});
+
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> service().ingest(file, "csv"));
+
+        assertTrue(failure.getMessage().contains("binary content"), failure.getMessage());
     }
 
     @Test
