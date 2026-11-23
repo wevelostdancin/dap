@@ -17,19 +17,15 @@ curl -fsSL https://raw.githubusercontent.com/wevelostdancin/dap/main/scripts/ins
 `dsh plugin --profile desktop add` возвращает «profile desktop is managed
 exclusively by the Electron application», поэтому CLI для Desktop не подходит.
 
-1. Опубликуйте пакет (один раз, нужен `npm login`):
+1. Пакет опубликован в npm: `dap-dsh@1.3.1`. В Desktop откройте
+   **Settings -> Plugins**, найдите `dap-dsh`, установите и перезапустите DSH,
+   чтобы применился слой патчей.
 
-   ```bash
-   cd dsh-plugin
-   npm publish --access public
-   ```
-
-2. В Desktop откройте **Settings -> Plugins**, найдите `dap-dsh`, установите и
-   перезапустите DSH, чтобы применился слой патчей.
+2. Публикация новой версии — задача мейнтейнера: `npm publish --access public`
+   из `dsh-plugin/`, порядок описан в [RELEASING.md](RELEASING.md).
 
 Если плагинный менеджер умеет ставить по URL, используйте tarball из GitHub
-Release: `.../releases/download/v1.3.0/dap-dsh-1.3.0.tgz` (после публикации
-релиза).
+Release: `.../releases/download/v1.3.1/dap-dsh-1.3.1.tgz`.
 
 Для обычного `dsh web` или отдельного профиля CLI работает:
 
@@ -94,7 +90,7 @@ npx @deepseek-ai/dsh --profile desktop-test --dump-config | grep -A12 'id: mcp-m
 - Плагин не проверяет и не обновляет версию DAP: это делает `install.sh` и
   `dap doctor`. Лаунчер печатает версию в stderr лучшим усилием, но не
   блокирует запуск, если `dap version` недоступен.
-- Требуется установленный DAP 1.3.0 с `~/.dap/bin/dap`; без него сервер в DSH
+- Требуется установленный DAP 1.3.1 с `~/.dap/bin/dap`; без него сервер в DSH
   не запустится.
 - Пакет не запрашивает capabilities; доступ к данным определяется самим
   MCP-сервером DAP.

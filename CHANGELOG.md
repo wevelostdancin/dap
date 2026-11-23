@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-23
+
+### Added
+
+- The `dap-dsh` plugin is published on npm (`dap-dsh@1.3.1`) and can be installed from the DSH plugin manager.
+
+### Changed
+
+- README rewritten in English and brought in line with 1.3.1: plugin install from the registry, 33 MCP tools, 31 API paths, 970 JUnit tests, 35 golden workflows.
+
 ### Fixed
 
 - `dap doctor --client dsh` recognises a `dap-dsh` bundle install and no longer

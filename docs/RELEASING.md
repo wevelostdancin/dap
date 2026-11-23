@@ -22,18 +22,18 @@ x86_64/arm64, проверяет контрольные суммы и созда
 ## Тег и сборка
 
 ```bash
-git tag -a v1.3.0 -m "DAP 1.3.0"
-git push origin v1.3.0
+git tag -a v1.3.1 -m "DAP 1.3.1"
+git push origin v1.3.1
 ```
 
 `.github/workflows/release.yml` собирает:
 
 | Артефакт | Платформа |
 |---|---|
-| `dap-1.3.0-macos-arm64.tar.gz` | macOS Apple Silicon |
-| `dap-1.3.0-macos-x64.tar.gz` | macOS Intel |
-| `dap-1.3.0-linux-x64.tar.gz` | Linux x86_64 |
-| `dap-1.3.0-linux-arm64.tar.gz` | Linux arm64 |
+| `dap-1.3.1-macos-arm64.tar.gz` | macOS Apple Silicon |
+| `dap-1.3.1-macos-x64.tar.gz` | macOS Intel |
+| `dap-1.3.1-linux-x64.tar.gz` | Linux x86_64 |
+| `dap-1.3.1-linux-arm64.tar.gz` | Linux arm64 |
 
 Плюс `.sha256` для каждого и копии `dap-latest-<os>-<arch>.tar.gz` для
 установщика.
@@ -41,7 +41,7 @@ git push origin v1.3.0
 ## Проверка релиза
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/wevelostdancin/dap/main/scripts/install.sh | sh -s -- --version 1.3.0
+curl -fsSL https://raw.githubusercontent.com/wevelostdancin/dap/main/scripts/install.sh | sh -s -- --version 1.3.1
 ~/.dap/bin/dap version
 ~/.dap/bin/dap doctor
 ```

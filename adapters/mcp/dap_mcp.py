@@ -2453,7 +2453,7 @@ def handle(msg: dict) -> None:
                     "resources": {"listChanged": False},
                     "prompts": {"listChanged": False},
                 },
-                "serverInfo": {"name": "dap-mcp", "version": "1.3.0"},
+                "serverInfo": {"name": "dap-mcp", "version": "1.3.1"},
             },
         )
         return

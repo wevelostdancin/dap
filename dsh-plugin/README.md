@@ -33,18 +33,17 @@ script, and declares no capabilities.
 
 ## Install
 
-The Desktop profile is managed by the Electron application: `dsh plugin
---profile desktop add` is refused by design. Publish the package once (requires
-`npm login`), then install it from the Desktop UI:
-
-```bash
-cd dsh-plugin
-npm publish --access public
-```
+`dap-dsh` is published on npm. The Desktop profile is managed by the Electron
+application: `dsh plugin --profile desktop add` is refused by design, so use
+the plugin manager instead.
 
 Open **Settings -> Plugins**, search for `dap-dsh`, install it and restart DSH
 so the patch layer is reloaded. If your plugin manager supports a URL, use the
-release tarball `dap-dsh-1.3.0.tgz` from the GitHub Release.
+release tarball `dap-dsh-1.3.1.tgz` from the GitHub Release.
+
+Maintainers publish new versions with `npm publish --access public` from this
+directory; see
+[docs/RELEASING.md](https://github.com/wevelostdancin/dap/blob/main/docs/RELEASING.md).
 
 For a plain `dsh web` or another non-Desktop profile the CLI works:
 
