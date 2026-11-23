@@ -40,6 +40,34 @@ dsh plugin --profile web remove dap-dsh
 
 После установки/удаления перезапустите DSH. Каталог `~/.dap` остаётся на месте.
 
+### Локальная установка до публикации в npm
+
+Desktop-профиль управляется приложением, но для разработки пакет можно
+поставить вручную (приложение может перезаписать профиль при обновлении —
+сделайте бэкап):
+
+```bash
+cd ~/.dsh/profiles/desktop
+cp package.json package.json.bak
+cp pnpm-lock.yaml pnpm-lock.yaml.bak
+cp cordis.patch.yml cordis.patch.yml.bak
+
+node ~/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/pnpm/bin/pnpm.cjs \
+  add file:/path/to/dap/dsh-plugin --ignore-scripts --prefer-offline
+```
+
+Затем добавьте `"dap-dsh"` в `dsh.profile.bundles` в `package.json` и
+**удалите ручную запись** `mcp-manager.servers.dap` из `cordis.patch.yml`:
+пользовательский слой применяется после bundle-патчей и иначе перекрывает
+команду плагина. Перезапустите DSH.
+
+Проверка композиции без запуска Desktop (на копии профиля):
+
+```bash
+npx @deepseek-ai/dsh --profile desktop-test --dump-config | grep -A12 'id: mcp-manager'
+# ожидается command: !!js process.env.HOME + '/.dap/bin/dap'
+```
+
 ## Как работает
 
 - `package.json` описывает bundle: `dsh.manifestVersion: 1`, `kind: plugin`,
