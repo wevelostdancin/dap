@@ -112,6 +112,9 @@ npx --yes dsh-standards dsh-plugin --scope entry --entry-claim static
 
 Ручная проверка после установки: в сессии DSH должны появиться инструменты
 `mcp__dap__*`; `~/.dap/bin/dap doctor --client dsh` должен пройти без ошибок.
+Doctor распознаёт bundle-установку: запись `mcp-manager` берётся из
+`node_modules/dap-dsh/cordis.patch.yml`, если `dap-dsh` перечислен в
+`dsh.profile.bundles`; ручная запись в `cordis.patch.yml` профиля не нужна.
 Отсутствие `!!js` в поддержке `yaml.safe_load` ожидаемо: тест снимает тег перед
 разбором и дополнительно проверяет исходный текст.
 

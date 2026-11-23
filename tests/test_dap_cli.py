@@ -411,6 +411,17 @@ class DoctorTest(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
 
+    def make_dsh_profile(self, bundles=("dap-dsh",)):
+        """Lay out a Desktop profile with dap-dsh installed as a bundle."""
+        profile = self.home / ".dsh" / "profiles" / "desktop"
+        bundle = profile / "node_modules" / "dap-dsh"
+        bundle.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / "dsh-plugin" / "cordis.patch.yml", bundle / "cordis.patch.yml")
+        manifest = {"dsh": {"profile": {"bundles": list(bundles)}}}
+        (profile / "package.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (profile / "cordis.patch.yml").write_text("[]\n", encoding="utf-8")
+        return profile
+
     def doctor(self, *extra):
         return run_cli(["doctor", "--client", "hermes", *extra])
 
@@ -447,6 +458,24 @@ class DoctorTest(unittest.TestCase):
         code, out, err = self.doctor()
         self.assertEqual(code, 1)
         self.assertRegex(out, r"FAIL  config\b")
+
+    def test_dsh_bundle_install_passes_config(self):
+        self.make_jar()
+        self.make_adapter(33)
+        self.make_dsh_profile()
+        code, out, err = run_cli(["doctor", "--client", "dsh"])
+        self.assertEqual(code, 0, out + err)
+        self.assertRegex(out, r"PASS  config\b")
+        self.assertIn("via dap-dsh bundle", out)
+
+    def test_dsh_bundle_disabled_fails_config(self):
+        self.make_jar()
+        self.make_adapter(33)
+        self.make_dsh_profile(bundles=())
+        code, out, err = run_cli(["doctor", "--client", "dsh"])
+        self.assertEqual(code, 1)
+        self.assertRegex(out, r"FAIL  config\b")
+        self.assertIn("no dap entry", out)
 
     def test_preflight_counts_tools(self):
         self.make_jar()

@@ -390,6 +390,23 @@ def _check_port() -> Check:
     return Check("port", True, f"{port} free")
 
 
+def _dsh_bundle_patch(profile_patch: pathlib.Path, module) -> pathlib.Path | None:
+    """dap-dsh carries the mcp-manager patch in node_modules, not the user layer."""
+    profile = profile_patch.parent
+    bundle = profile / "node_modules" / "dap-dsh" / "cordis.patch.yml"
+    if not bundle.is_file():
+        return None
+    try:
+        manifest = json.loads((profile / "package.json").read_text(encoding="utf-8"))
+        text = bundle.read_text(encoding="utf-8")
+    except (OSError, json.JSONDecodeError):
+        return None
+    bundles = manifest.get("dsh", {}).get("profile", {}).get("bundles") or []
+    if "dap-dsh" not in bundles or not module.has_entry("dsh", text):
+        return None
+    return bundle
+
+
 def _check_config(client: str | None) -> Check:
     module = _load_config()
     names = [client] if client else sorted(CLIENT_CONFIGS)
@@ -397,18 +414,24 @@ def _check_config(client: str | None) -> Check:
     failed: list[str] = []
     for name in names:
         path = _client_config_path(name, None, None)
-        if not path.is_file():
-            failed.append(f"{name}: config not found ({path})")
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError as exc:
-            failed.append(f"{name}: cannot read {path}: {exc}")
-            continue
-        if module.has_entry(name, text):
-            passed.append(f"{name}: dap entry in {path}")
-        else:
+        if path.is_file():
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError as exc:
+                failed.append(f"{name}: cannot read {path}: {exc}")
+                continue
+            if module.has_entry(name, text):
+                passed.append(f"{name}: dap entry in {path}")
+                continue
+        if name == "dsh":
+            bundle = _dsh_bundle_patch(path, module)
+            if bundle is not None:
+                passed.append(f"{name}: dap entry via dap-dsh bundle ({bundle})")
+                continue
+        if path.is_file():
             failed.append(f"{name}: no dap entry in {path}")
+        else:
+            failed.append(f"{name}: config not found ({path})")
     if failed:
         return Check("config", False, "; ".join(failed))
     return Check("config", True, "; ".join(passed))
