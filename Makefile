@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 # JDK 21. Override with: make build-native DAP_JDK=/path/to/jdk-21
-DAP_JDK ?= $(HOME)/Projects/tools/jdk-21.0.13+9/Contents/Home
+DAP_JDK ?= $(or $(JAVA_HOME),$(HOME)/Projects/tools/jdk-21.0.13+9/Contents/Home)
 export DAP_JDK
 
 JAR := engine-native/target/dap-native.jar
@@ -136,7 +136,7 @@ bench-full: build-native
 	python3 tests/bench.py --jar $(JAR) --json build/bench.json --keep-data
 
 bench-gate: build-native
-	python3 tests/p6_bench.py \
+	JAVA_HOME="$(DAP_JDK)" python3 tests/p6_bench.py \
 		--manifest tests/p6_bench_manifest.example.json \
 		--data-dir build/p6-bench/data \
 		--out build/p6-bench/gate \

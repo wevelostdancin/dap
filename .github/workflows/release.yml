@@ -44,6 +44,8 @@ jobs:
           python-version: "3.12"
       - name: Build jar
         run: cd engine-native && ./mvnw -B -DskipTests package
+      - name: Build jlink runtime
+        run: sh scripts/jlink-runtime.sh --jar engine-native/target/dap-native.jar --output build/package/runtime
       - name: Fetch Python runtime
         run: scripts/python-runtime.sh
       - name: Build archive

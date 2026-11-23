@@ -47,6 +47,7 @@ Useful variants:
 python3 scripts/package.py --skip-python              # system Python, no download
 python3 scripts/package.py --skip-runtime             # inspect layout only
 python3 scripts/package.py --python-runtime DIR       # preinstalled Python
+python3 scripts/package.py --runtime DIR              # preinstalled jlink runtime
 python3 scripts/package.py --version 1.3.0 --keep     # reuse an existing stage
 DAP_BUNDLE_PYTHON=0 make package                      # same as --skip-python
 ```

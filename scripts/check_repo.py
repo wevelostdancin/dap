@@ -58,6 +58,12 @@ def check_version() -> None:
     adapter = read("adapters/mcp/dap_mcp.py")
     if f'"version": "{version}"' not in adapter:
         warn(f"adapters/mcp/dap_mcp.py does not advertise version {version}")
+    engine = read("engine-native/src/main/java/com/dap/nativeengine/NativeService.java")
+    match = re.search(r'public static final String VERSION = "([^"]+)"', engine)
+    if not match:
+        fail("NativeService.VERSION is missing")
+    elif match.group(1) != version:
+        fail(f"NativeService.VERSION {match.group(1)} != VERSION {version}")
 
 
 def check_openapi() -> None:
