@@ -102,6 +102,7 @@ class LayoutTest(unittest.TestCase):
             "runtime": root / "runtime",
             "python": root / "python",
             "adapters/mcp": root / "adapters" / "mcp",
+            "api/openapi.yaml": root / "api" / "openapi.yaml",
             "recipes": root / "recipes",
             "examples": root / "examples",
             "VERSION": root / "VERSION",

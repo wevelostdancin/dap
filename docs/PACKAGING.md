@@ -15,6 +15,7 @@ dap-<version>-<os>-<arch>/
   runtime/                jlink JRE (Java 21 modules only)
   python/                 python-build-standalone 3.12.16 (stripped)
   adapters/mcp/*.py       MCP adapter, CLI, recipes and resources
+  api/openapi.yaml        /v1 contract, used by `dap mcp version`
   recipes/                shipped recipes, when present
   examples/               demo data, when present
   VERSION

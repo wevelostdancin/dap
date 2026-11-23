@@ -85,6 +85,7 @@ def layout(root: pathlib.Path) -> dict[str, pathlib.Path]:
         "runtime": root / "runtime",
         "python": root / "python",
         "adapters/mcp": root / "adapters" / "mcp",
+        "api/openapi.yaml": root / "api" / "openapi.yaml",
         "recipes": root / "recipes",
         "examples": root / "examples",
         "VERSION": root / "VERSION",
@@ -136,7 +137,7 @@ def build(args: argparse.Namespace) -> pathlib.Path:
     stage.mkdir(parents=True, exist_ok=True)
 
     paths = layout(stage)
-    for key in ("bin", "lib", "adapters/mcp", "recipes", "examples"):
+    for key in ("bin", "lib", "adapters/mcp", "api", "recipes", "examples"):
         (stage / key).mkdir(parents=True, exist_ok=True)
 
     shutil.copyfile(ROOT / "scripts" / "dap.sh", paths["bin/dap"])
@@ -161,6 +162,7 @@ def build(args: argparse.Namespace) -> pathlib.Path:
 
     for source in sorted((ROOT / "adapters" / "mcp").glob("*.py")):
         shutil.copyfile(source, paths["adapters/mcp"] / source.name)
+    shutil.copyfile(ROOT / "api" / "openapi.yaml", stage / "api" / "openapi.yaml")
     readme = ROOT / "adapters" / "mcp" / "README.md"
     if readme.is_file():
         shutil.copyfile(readme, paths["adapters/mcp"] / readme.name)
