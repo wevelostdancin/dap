@@ -39,7 +39,7 @@ jobs:
           curl -fsS -X POST http://127.0.0.1:7800/v1/shutdown >/dev/null || true
       - name: Upload logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: native-image-log
           path: |
