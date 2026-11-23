@@ -106,7 +106,7 @@ jobs:
         run: python3 tests/reference/validate_dap.py --jar engine-native/target/dap-native.jar --json build/accuracy.json --min-cases 27
       - name: Upload accuracy report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: accuracy-report
           path: build/accuracy.json
@@ -139,7 +139,7 @@ jobs:
             --java "$JAVA_HOME/bin/java"
       - name: Upload gate report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: p6-bench-gate
           path: build/p6-bench/gate
@@ -170,7 +170,7 @@ jobs:
       - name: Package end-to-end
         run: python3 tests/package_e2e.py
       - name: Upload archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dap-package-${{ matrix.os }}
           path: build/package/dap-*.tar.gz*
