@@ -1,0 +1,76 @@
+name: Feature request
+description: Suggest an improvement or a new capability
+title: '[Feature]: '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the problem you want to solve before proposing a solution.
+        For questions about usage, open a discussion instead of an issue.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Nodes
+        - HTTP API
+        - MCP adapter
+        - CLI and packaging
+        - DSH plugin
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the task you cannot complete today and how often it occurs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: For a new node, include the suggested dap.<type> id, inputs, outputs, and configuration.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Can this be done with existing nodes or a workflow instead?
+    validations:
+      required: false
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example workflow or data
+      description: A minimal JSON workflow or a link to a fixture is very helpful.
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Who benefits?
+      description: Note any compatibility impact or new dependencies.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to submit a pull request.
+          required: false
+        - label: I can provide tests, a golden, or documentation.
+          required: false

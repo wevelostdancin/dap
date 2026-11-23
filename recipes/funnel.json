@@ -1,0 +1,73 @@
+{
+  "format": "dap-native-workflow/1",
+  "name": "funnel",
+  "nodes": [
+    {
+      "id": "src",
+      "factory": "dap.parquet_reader",
+      "name": "Parquet Reader",
+      "settings": {
+        "file": "placeholder.parquet"
+      }
+    },
+    {
+      "id": "steps",
+      "factory": "dap.sql_query",
+      "name": "Funnel steps",
+      "settings": {
+        "sql": "WITH per_step AS (\n  SELECT step, COUNT(DISTINCT user_id) AS users FROM src GROUP BY step\n), baseline AS (\n  SELECT MAX(CASE WHEN step = 'view' THEN users ELSE 0 END) AS view_users FROM per_step\n)\nSELECT p.step, p.users,\n       ROUND(100.0 * p.users / NULLIF(b.view_users, 0), 2) AS conversion_pct\nFROM per_step AS p CROSS JOIN baseline AS b\nORDER BY CASE p.step WHEN 'view' THEN 0 WHEN 'cart' THEN 1\n                WHEN 'checkout' THEN 2 ELSE 3 END",
+        "inputs": [
+          "src"
+        ]
+      }
+    },
+    {
+      "id": "report",
+      "factory": "dap.markdown_report",
+      "name": "Markdown Report",
+      "settings": {
+        "file": "report.md",
+        "title": "Conversion funnel",
+        "sections": [
+          {
+            "kind": "table"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "src",
+      "fromPort": 0,
+      "to": "steps",
+      "toPort": 0
+    },
+    {
+      "from": "steps",
+      "fromPort": 0,
+      "to": "report",
+      "toPort": 0
+    }
+  ],
+  "recipe": {
+    "name": "funnel",
+    "description": "Count distinct users per funnel step and compute conversion relative to the view step.",
+    "tags": [
+      "funnel",
+      "sql",
+      "report"
+    ],
+    "dataset": {
+      "node": "src",
+      "setting": "file"
+    },
+    "params": {
+      "report": {
+        "node": "report",
+        "setting": "file"
+      }
+    },
+    "output": "report"
+  }
+}

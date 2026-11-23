@@ -1,0 +1,99 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v1.3.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos
+            arch: arm64
+            runs-on: macos-14
+          - os: macos
+            arch: x64
+            runs-on: macos-13
+          - os: linux
+            arch: x64
+            runs-on: ubuntu-latest
+          - os: linux
+            arch: arm64
+            runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build jar
+        run: cd engine-native && ./mvnw -B -DskipTests package
+      - name: Build jlink runtime
+        run: sh scripts/jlink-runtime.sh --jar engine-native/target/dap-native.jar --output build/package/runtime
+      - name: Fetch Python runtime
+        run: scripts/python-runtime.sh
+      - name: Build archive
+        run: |
+          set -eu
+          version="${{ github.event.inputs.tag || github.ref_name }}"
+          version="${version#v}"
+          python3 scripts/package.py --version "$version"
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: dap-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            build/package/dap-*.tar.gz
+            build/package/dap-*.tar.gz.sha256
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create latest aliases
+        run: |
+          set -eu
+          cd assets
+          for f in dap-*.tar.gz; do
+            case "$f" in
+              dap-latest-*) continue ;;
+            esac
+            latest=$(echo "$f" | sed -E 's/^dap-[0-9]+\.[0-9]+\.[0-9]+-/dap-latest-/')
+            cp "$f" "$latest"
+            if [ -f "$f.sha256" ]; then
+              cp "$f.sha256" "$latest.sha256"
+            fi
+          done
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          gh release create "$tag" assets/* \
+            --repo "${{ github.repository }}" \
+            --title "DAP $tag" \
+            --notes-file CHANGELOG.md \
+            --verify-tag

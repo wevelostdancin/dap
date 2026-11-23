@@ -1,0 +1,74 @@
+{
+  "format": "dap-native-workflow/1",
+  "name": "cohort_analysis",
+  "nodes": [
+    {
+      "id": "src",
+      "factory": "dap.parquet_reader",
+      "name": "Parquet Reader",
+      "settings": {
+        "file": "placeholder.parquet"
+      }
+    },
+    {
+      "id": "cohorts",
+      "factory": "dap.sql_query",
+      "name": "Cohort retention",
+      "settings": {
+        "sql": "WITH users AS (\n  SELECT user_id, CAST(MIN(signup_date) AS DATE) AS signup\n  FROM src GROUP BY user_id\n), events AS (\n  SELECT s.user_id, u.signup, CAST(s.activity_date AS DATE) AS activity\n  FROM src AS s JOIN users AS u ON s.user_id = u.user_id\n)\nSELECT strftime(signup, '%Y-%m') AS cohort,\n       date_diff('month', signup, activity) AS period,\n       COUNT(DISTINCT user_id) AS users\nFROM events GROUP BY 1, 2 ORDER BY 1, 2",
+        "inputs": [
+          "src"
+        ]
+      }
+    },
+    {
+      "id": "report",
+      "factory": "dap.markdown_report",
+      "name": "Markdown Report",
+      "settings": {
+        "file": "report.md",
+        "title": "Cohort retention",
+        "sections": [
+          {
+            "kind": "table"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "src",
+      "fromPort": 0,
+      "to": "cohorts",
+      "toPort": 0
+    },
+    {
+      "from": "cohorts",
+      "fromPort": 0,
+      "to": "report",
+      "toPort": 0
+    }
+  ],
+  "recipe": {
+    "name": "cohort_analysis",
+    "description": "Group users by signup month and report distinct active users per month since signup.",
+    "tags": [
+      "cohort",
+      "retention",
+      "sql",
+      "report"
+    ],
+    "dataset": {
+      "node": "src",
+      "setting": "file"
+    },
+    "params": {
+      "report": {
+        "node": "report",
+        "setting": "file"
+      }
+    },
+    "output": "report"
+  }
+}

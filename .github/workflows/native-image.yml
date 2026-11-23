@@ -1,0 +1,47 @@
+name: native-image-spike
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-image:
+    name: native-image (spike, non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: "21"
+          distribution: graalvm-community
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build jar
+        run: cd engine-native && ./mvnw -B -DskipTests package
+      - name: Native-image spike
+        run: scripts/native-image.sh
+      - name: Smoke the binary
+        run: |
+          build/native-image/dap-engine >/tmp/native.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          for _ in $(seq 1 100); do
+            if curl -fsS -m 1 http://127.0.0.1:7800/v1/health >/dev/null 2>&1; then break; fi
+            sleep 0.1
+          done
+          curl -fsS http://127.0.0.1:7800/v1/health
+          curl -fsS -X POST http://127.0.0.1:7800/v1/shutdown >/dev/null || true
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-image-log
+          path: |
+            build/native-image/trace.log
+            /tmp/native.log

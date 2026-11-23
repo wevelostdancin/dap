@@ -239,3 +239,56 @@ A/B, time_series. Фикстуры данных:
   запускается на свободном порту со своим временным каталогом.
 - `expected.json` коммитится; изменение ожиданий — отдельный коммит с причиной.
 - Прогон не трогает резидентный сервис на `:7800`.
+
+## 8. CI-гейты
+
+Гейты — обязательные проверки в `.github/workflows/ci.yml`: красный гейт блокирует
+слияние. Пороги зафиксированы в [дизайне P3](superpowers/specs/2026-11-23-p3-packaging-design.md).
+
+| Гейт | Команда | Порог прохода |
+|---|---|---|
+| `accuracy` | `make accuracy` | `cases_failed == 0` и `cases_total >= 27` (все 27 кейсов `validate_dap.py`) |
+| `bench` | `make bench-gate` | 0 failed steps/MCP calls, MCP calls <= 12, tokens <= 4000, rows/group counts exact, means abs diff <= 1e-3 |
+| `package` | `make package-e2e` | архив собирается, SHA256SUMS сходится, `dap doctor` PASS |
+| `recipes` | `make recipe-library-e2e` | все 8 рецептов проходят на demo-данных |
+| `unit` | `make test-native` | 0 падений JUnit |
+| `lint` | `make lint` | 0 ошибок `scripts/check_repo.py`; нет CJK в `md/yml/yaml` |
+
+Локальный прогон точности:
+
+```bash
+python3 -m venv build/refvenv
+build/refvenv/bin/pip install -r tests/reference/requirements.txt
+make accuracy
+# или напрямую (точная команда CI-гейта):
+build/refvenv/bin/python tests/reference/validate_dap.py \
+  --jar engine-native/target/dap-native.jar \
+  --json build/accuracy.json --min-cases 27
+```
+
+Если `build/refvenv` нет, `make accuracy` использует `python3`; зависимости из
+`tests/reference/requirements.txt` должны быть установлены в нём заранее.
+`--json` пишет сводку даже при падении движка: проваленный кейс или запуск менее
+`--min-cases` кейсов даёт `exit_code: 1`. Формат файла:
+
+```json
+{
+  "cases_total": 27,
+  "cases_passed": 27,
+  "cases_failed": 0,
+  "failures": [],
+  "min_cases": 27,
+  "exit_code": 0
+}
+```
+
+`--only` и `--list` сохранили прежнее поведение: `--list` печатает имена кейсов и
+выходит с кодом 0, `--only a,b` запускает подмножество (для гейта нужно 27 кейсов).
+Чистая функция `summarize_results()` тестируется без движка и без scipy:
+`python3 -m unittest tests.test_validate_gate -v` (проверка полного стека
+numpy/scipy пропускается, если он не установлен).
+
+CI job `accuracy`: `ubuntu-latest`, Java 21, Python 3.12, pip из
+`tests/reference/requirements.txt`, сборка jar через `./mvnw -B -DskipTests package`,
+команда выше и загрузка `build/accuracy.json` артефактом. Гейт `bench` из спеки
+подключается отдельно.

@@ -36,8 +36,11 @@ def check_layout() -> None:
     for legacy in ("engine", "catalog", "runtime"):
         if (ROOT / legacy).exists():
             fail(f"legacy directory still present: {legacy}/")
-    for required in ("README.md", "docs/ROADMAP.md", "docs/ARCHITECTURE.md",
-                     "docs/NODES.md", "docs/QUALITY.md", "docs/API.md"):
+    for required in ("README.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md",
+                     "CODE_OF_CONDUCT.md", "docs/ROADMAP.md", "docs/ARCHITECTURE.md",
+                     "docs/NODES.md", "docs/QUALITY.md", "docs/API.md",
+                     "docs/INSTALL.md", "docs/PACKAGING.md", "docs/RELEASING.md",
+                     "docs/DSH-PLUGIN.md", "docs/NATIVE-IMAGE.md", "recipes/README.md"):
         if not (ROOT / required).is_file():
             fail(f"missing document: {required}")
 
@@ -55,6 +58,12 @@ def check_version() -> None:
     adapter = read("adapters/mcp/dap_mcp.py")
     if f'"version": "{version}"' not in adapter:
         warn(f"adapters/mcp/dap_mcp.py does not advertise version {version}")
+    engine = read("engine-native/src/main/java/com/dap/nativeengine/NativeService.java")
+    match = re.search(r'public static final String VERSION = "([^"]+)"', engine)
+    if not match:
+        fail("NativeService.VERSION is missing")
+    elif match.group(1) != version:
+        fail(f"NativeService.VERSION {match.group(1)} != VERSION {version}")
 
 
 def check_openapi() -> None:
@@ -169,6 +178,39 @@ def check_legacy_markers() -> None:
         fail("legacy references: " + "; ".join(hits[:8]))
 
 
+CJK_RE = re.compile(r"[\u1100-\u11ff\u2e80-\u303f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]")
+DOC_SUFFIXES = {".md", ".yml", ".yaml"}
+DOC_SKIP_PARTS = {".git", ".worktrees", "build", "target", "node_modules", "__pycache__"}
+DOC_SKIP_PREFIXES = {("tests", "fixtures"), ("tests", "goldens-native")}
+
+
+def find_cjk_lines(text: str) -> list[tuple[int, str]]:
+    """Lines that contain CJK ideographs (Chinese/Japanese/Korean)."""
+    return [
+        (number, line)
+        for number, line in enumerate(text.splitlines(), 1)
+        if CJK_RE.search(line)
+    ]
+
+
+def check_docs_language() -> None:
+    """Documentation must stay Russian/English: no CJK characters in md/yml/yaml."""
+    for path in sorted(ROOT.rglob("*")):
+        if not path.is_file() or path.suffix not in DOC_SUFFIXES:
+            continue
+        relative = path.relative_to(ROOT)
+        if any(part in DOC_SKIP_PARTS for part in relative.parts):
+            continue
+        if relative.parts[:2] in DOC_SKIP_PREFIXES:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for number, line in find_cjk_lines(text):
+            fail(f"CJK characters in {relative}:{number}: {line.strip()[:80]}")
+
+
 def check_shell() -> None:
     if shutil.which("bash") is None:
         warn("bash not found; shell syntax skipped")
@@ -188,6 +230,7 @@ def main() -> int:
     check_jar()
     check_python()
     check_legacy_markers()
+    check_docs_language()
     check_shell()
     for message in WARNINGS:
         print("WARN  " + message)

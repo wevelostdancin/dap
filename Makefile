@@ -1,16 +1,19 @@
 SHELL := /bin/bash
 
 # JDK 21. Override with: make build-native DAP_JDK=/path/to/jdk-21
-DAP_JDK ?= $(HOME)/Projects/tools/jdk-21.0.13+9/Contents/Home
+DAP_JDK ?= $(or $(JAVA_HOME),$(HOME)/Projects/tools/jdk-21.0.13+9/Contents/Home)
 export DAP_JDK
 
 JAR := engine-native/target/dap-native.jar
+REFPYTHON := $(if $(wildcard build/refvenv/bin/python),build/refvenv/bin/python,python3)
 
-.PHONY: help build-native test-native run-native goldens goldens-validate coverage test-mcp smoke \
-        mcp mcp-e2e mcp-recipe-e2e dist install-e2e extensions bench bench-full image-native run-native-image lint check soak clean-native
+.PHONY: help build-native test-native run-native goldens goldens-validate coverage accuracy test-mcp smoke \
+        mcp mcp-e2e mcp-recipe-e2e dist install-e2e package-e2e extensions bench bench-full bench-gate image-native \
+        run-native-image lint check soak clean-native runtime python-runtime package test-package \
+        test-python recipe-library-e2e
 
 help:
-	@echo "DAP 1.0.0 — native analytics backend for agents"
+	@echo "DAP 1.3.0 — native analytics backend for agents"
 	@echo ""
 	@echo "  make build-native   build $(JAR) (DuckDB + Arrow + Javalin)"
 	@echo "  make test-native    run the JUnit suite"
@@ -18,15 +21,24 @@ help:
 	@echo "  make goldens        run the native golden suite (starts/stops its own engine)"
 	@echo "  make goldens-validate  structural check of the golden fixtures (no engine)"
 	@echo "  make coverage       run the 69-task coverage suite (starts/stops its own engine)"
+	@echo "  make accuracy       reference accuracy gate: 27 cases -> build/accuracy.json"
 	@echo "  make smoke          black-box smoke against a running engine (DAP_BASE)"
 	@echo "  make mcp            run the stdio MCP adapter (client-facing entrypoint)"
 	@echo "  make mcp-e2e        MCP create/add/run/table e2e"
 	@echo "  make mcp-recipe-e2e MCP resources/prompts/recipes/dap_sql e2e"
 	@echo "  make dist           build the distributable dist/ (jar, adapter, CLI, checksums)"
+	@echo "  make runtime        build the bundled jlink JRE in build/package/runtime"
+	@echo "  make python-runtime download the pinned Python runtime into build/tools/python"
+	@echo "  make package        build the self-contained archive in build/package/"
+	@echo "  make test-package   run the package unit tests (no jlink)"
 	@echo "  make install-e2e    install from dist/ into a temp HOME and run the stdio preflight"
+	@echo "  make package-e2e    build the self-contained archive and install it in a temp HOME"
+	@echo "  make test-python    run the stdlib unit tests (lint, package, gates, plugin, MCP)"
+	@echo "  make recipe-library-e2e  run all 8 recipes on the demo data"
 	@echo "  make extensions     install the DuckDB sqlite/postgres/httpfs extensions (network once)"
 	@echo "  make bench          native 100k-row benchmark"
 	@echo "  make bench-full     native 10M-row benchmark -> build/bench.json"
+	@echo "  make bench-gate     P6 bench with accuracy/token CI gate"
 	@echo "  make image-native   build the dap-native image (Docker host required)"
 	@echo "  make lint           static checks (scripts/check_repo.py)"
 	@echo "  make check          JUnit + goldens + validate + MCP launch/e2e + lint"
@@ -50,11 +62,22 @@ goldens: build-native
 goldens-validate:
 	python3 tests/goldens-native/runner.py --validate
 
+accuracy: build-native
+	@mkdir -p build
+	$(REFPYTHON) tests/reference/validate_dap.py --jar $(JAR) --json build/accuracy.json --min-cases 27
+
 coverage: build-native
 	python3 tests/coverage/runner.py
 
 test-mcp:
 	python3 tests/test_mcp_launch.py
+
+test-python:
+	python3 -m unittest tests.test_check_repo tests.test_package tests.test_p6_bench \
+		tests.test_validate_gate tests.test_dsh_plugin tests.test_mcp_resources tests.test_mcp_prompts
+
+recipe-library-e2e: build-native
+	python3 tests/recipe_library_e2e.py
 
 smoke:
 	python3 tests/native_smoke.py --base ${DAP_BASE:-http://127.0.0.1:7800}
@@ -88,6 +111,21 @@ dist: build-native
 install-e2e: dist
 	python3 tests/install_e2e.py
 
+runtime:
+	sh scripts/jlink-runtime.sh --jar $(JAR) --output build/package/runtime
+
+python-runtime:
+	sh scripts/python-runtime.sh
+
+package: build-native runtime python-runtime
+	python3 scripts/package.py --jar $(JAR)
+
+package-e2e: build-native
+	python3 tests/package_e2e.py
+
+test-package:
+	python3 -m unittest tests.test_package -v
+
 extensions: build-native
 	DAP_HOME="$(CURDIR)" "$(DAP_JDK)/bin/java" -jar $(JAR) --install-extensions sqlite postgres mysql httpfs
 
@@ -96,6 +134,16 @@ bench: build-native
 
 bench-full: build-native
 	python3 tests/bench.py --jar $(JAR) --json build/bench.json --keep-data
+
+bench-gate: build-native
+	JAVA_HOME="$(DAP_JDK)" python3 tests/p6_bench.py \
+		--manifest tests/p6_bench_manifest.example.json \
+		--data-dir build/p6-bench/data \
+		--out build/p6-bench/gate \
+		--start \
+		--reference tests/p6_bench_reference.json \
+		--gate tests/p6_bench_gate.json \
+		--java "$(DAP_JDK)/bin/java"
 
 DAP_NATIVE_IMAGE ?= dap-native:local
 
@@ -111,7 +159,7 @@ soak:
 lint:
 	python3 scripts/check_repo.py
 
-check: test-native goldens goldens-validate test-mcp mcp-e2e mcp-recipe-e2e lint
+check: test-native goldens goldens-validate test-mcp mcp-e2e mcp-recipe-e2e test-python recipe-library-e2e lint
 
 clean-native:
 	rm -rf engine-native/target

@@ -397,5 +397,136 @@ class SummaryTest(HarnessCase):
         self.assertIn("no reference.json", md)
 
 
+class GateTest(HarnessCase):
+    """Gate parser and thresholds; pure helpers, no engine required."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = pathlib.Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, name, text):
+        path = self.dir / name
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def summary(self):
+        return {
+            "accuracy": {"available": True, "datasets": ["iris"]},
+            "totals": {"datasets": 1, "steps": 3, "failed": 0},
+            "mcp": {"enabled": True, "callCount": 8, "failedCalls": 0,
+                     "totalTokens": 2000},
+            "datasets": [{"name": "iris", "accuracy": {
+                "rows": {"reference": 150, "observed": 150, "abs": 0.0},
+                "numeric_means": {"sepal_length": {
+                    "reference": 5.84, "observed": 5.84, "abs": 0.0}},
+                "group_counts": {"setosa": {
+                    "reference": 50, "observed": 50, "abs": 0.0}},
+            }}],
+        }
+
+    def test_load_gate_reads_thresholds(self):
+        path = self.write("gate.json", json.dumps({
+            "maxFailedSteps": 2, "maxFailedMcpCalls": 3, "maxMcpCalls": 10,
+            "maxMcpTokens": 3500, "maxMeanAbsDiff": 1e-4,
+            "requireAccuracy": False,
+        }))
+        self.assertEqual(self.bench.load_gate(path), {
+            "maxFailedSteps": 2, "maxFailedMcpCalls": 3, "maxMcpCalls": 10,
+            "maxMcpTokens": 3500, "maxMeanAbsDiff": 1e-4,
+            "requireAccuracy": False,
+        })
+
+    def test_load_gate_defaults_missing_keys(self):
+        gate = self.bench.load_gate(self.write("gate.json", "{}"))
+        self.assertEqual(gate, self.bench.DEFAULT_GATE)
+
+    def test_load_gate_rejects_broken_json(self):
+        with self.assertRaises(self.bench.BenchError):
+            self.bench.load_gate(self.write("bad.json", "{not json"))
+
+    def test_load_gate_rejects_missing_file(self):
+        with self.assertRaises(self.bench.BenchError):
+            self.bench.load_gate(self.dir / "missing.json")
+
+    def test_load_gate_rejects_wrong_threshold_type(self):
+        with self.assertRaises(self.bench.BenchError):
+            self.bench.load_gate(self.write("bad.json", '{"maxMcpTokens": "4000"}'))
+
+    def test_load_gate_rejects_non_object(self):
+        with self.assertRaises(self.bench.BenchError):
+            self.bench.load_gate(self.write("bad.json", "[]"))
+
+    def test_check_gate_passes_clean_summary(self):
+        self.assertEqual(self.bench.check_gate(self.summary(), self.bench.DEFAULT_GATE), [])
+
+    def test_check_gate_token_overflow(self):
+        summary = self.summary()
+        summary["mcp"]["totalTokens"] = 4001
+        violations = self.bench.check_gate(summary, self.bench.DEFAULT_GATE)
+        self.assertTrue(any("tokens" in violation for violation in violations), violations)
+
+    def test_check_gate_requires_accuracy(self):
+        summary = self.summary()
+        summary["accuracy"] = {"available": False, "note": "no reference"}
+        violations = self.bench.check_gate(summary, self.bench.DEFAULT_GATE)
+        self.assertTrue(any("accuracy" in violation for violation in violations), violations)
+
+    def test_check_gate_accuracy_can_be_optional(self):
+        summary = self.summary()
+        summary["accuracy"] = {"available": False}
+        self.assertEqual(self.bench.check_gate(summary, {"requireAccuracy": False}), [])
+
+    def test_check_gate_failed_steps_and_mcp_calls(self):
+        summary = self.summary()
+        summary["totals"]["failed"] = 1
+        summary["mcp"]["failedCalls"] = 1
+        summary["mcp"]["callCount"] = 13
+        violations = self.bench.check_gate(summary, self.bench.DEFAULT_GATE)
+        self.assertEqual(len(violations), 3, violations)
+        self.assertTrue(any("steps" in violation for violation in violations))
+        self.assertTrue(any("failed MCP calls" in violation for violation in violations))
+        self.assertTrue(any("MCP calls" in violation for violation in violations))
+
+    def test_check_gate_rows_must_be_exact(self):
+        summary = self.summary()
+        summary["datasets"][0]["accuracy"]["rows"]["abs"] = 0.5
+        violations = self.bench.check_gate(summary, self.bench.DEFAULT_GATE)
+        self.assertTrue(any("rows" in violation for violation in violations), violations)
+
+    def test_check_gate_rows_exact_below_mean_tolerance(self):
+        summary = self.summary()
+        summary["datasets"][0]["accuracy"]["rows"]["abs"] = 1e-4
+        violations = self.bench.check_gate(summary, self.bench.DEFAULT_GATE)
+        self.assertTrue(any("rows" in violation for violation in violations), violations)
+
+    def test_check_gate_group_counts_must_be_exact(self):
+        summary = self.summary()
+        summary["datasets"][0]["accuracy"]["group_counts"]["setosa"]["abs"] = 1
+        violations = self.bench.check_gate(summary, self.bench.DEFAULT_GATE)
+        self.assertTrue(any("setosa" in violation for violation in violations), violations)
+
+    def test_check_gate_mean_abs_diff(self):
+        summary = self.summary()
+        summary["datasets"][0]["accuracy"]["numeric_means"]["sepal_length"]["abs"] = 1.01e-3
+        violations = self.bench.check_gate(summary, self.bench.DEFAULT_GATE)
+        self.assertTrue(any("sepal_length" in violation for violation in violations), violations)
+
+    def test_check_gate_without_mcp_section(self):
+        summary = self.summary()
+        del summary["mcp"]
+        self.assertEqual(self.bench.check_gate(summary, self.bench.DEFAULT_GATE), [])
+
+    def test_check_gate_missing_observed_value(self):
+        summary = self.summary()
+        rows = summary["datasets"][0]["accuracy"]["rows"]
+        rows["observed"] = None
+        rows["abs"] = None
+        violations = self.bench.check_gate(summary, self.bench.DEFAULT_GATE)
+        self.assertTrue(any("rows" in violation for violation in violations), violations)
+
+
 if __name__ == "__main__":
     unittest.main()

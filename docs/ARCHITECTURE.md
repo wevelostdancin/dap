@@ -307,3 +307,25 @@ strictMode/nullStrings`; для XLSX сейчас используется фи�
 - Остановка: `POST /v1/shutdown` (ответ 200, закрытие через ~100 мс), сигнал
   процессу или простой дольше `DAP_IDLE_TIMEOUT_SEC` без активных jobs (§6).
 - Каталог — 66 узлов; расширение идёт по правилу «спека + исполнитель + goldens + docs».
+
+## 9. Упаковка и установка
+
+Пользовательская поставка — один архив `dap-<version>-<os>-<arch>.tar.gz`:
+
+- `runtime/` — jlink-JRE (только модули, которые нужны движку);
+- `python/` — python-build-standalone 3.12 (stripped), pinned SHA256;
+- `lib/dap-native.jar` и относительный symlink
+  `engine-native/target/dap-native.jar` для совместимости с `dap_cli.py doctor`;
+- `bin/dap` — единая точка входа (`engine`, `mcp`, `doctor`, `install`, `version`);
+- `adapters/mcp/`, `recipes/`, `examples/`, `LICENSE`, `NOTICE`, `SHA256SUMS`.
+
+`scripts/install.sh` скачивает архив с GitHub Releases, проверяет SHA256,
+распаковывает в `~/.dap` (атомарно, с сохранением `recipes/` и `build/`) и по флагу
+`--client` прописывает MCP-сервер. DSH-плагин `dap-dsh` — отдельный bundle,
+который патчит `mcp-manager` и запускает `~/.dap/bin/dap mcp`; он не скачивает
+бинарник и не выполняет postinstall. Подробности — [INSTALL.md](INSTALL.md),
+[PACKAGING.md](PACKAGING.md), [DSH-PLUGIN.md](DSH-PLUGIN.md).
+
+Версия фиксируется в `VERSION`, `api/openapi.yaml` и `serverInfo` адаптера;
+`scripts/check_repo.py` проверяет согласованность. Релиз собирается
+`.github/workflows/release.yml` по тегу `v*` для macOS/Linux x86_64/arm64.
