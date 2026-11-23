@@ -5,8 +5,9 @@ DAP_JDK ?= $(HOME)/Projects/tools/jdk-21.0.13+9/Contents/Home
 export DAP_JDK
 
 JAR := engine-native/target/dap-native.jar
+REFPYTHON := $(if $(wildcard build/refvenv/bin/python),build/refvenv/bin/python,python3)
 
-.PHONY: help build-native test-native run-native goldens goldens-validate coverage test-mcp smoke \
+.PHONY: help build-native test-native run-native goldens goldens-validate coverage accuracy test-mcp smoke \
         mcp mcp-e2e mcp-recipe-e2e dist install-e2e extensions bench bench-full bench-gate image-native \
         run-native-image lint check soak clean-native
 
@@ -19,6 +20,7 @@ help:
 	@echo "  make goldens        run the native golden suite (starts/stops its own engine)"
 	@echo "  make goldens-validate  structural check of the golden fixtures (no engine)"
 	@echo "  make coverage       run the 69-task coverage suite (starts/stops its own engine)"
+	@echo "  make accuracy       reference accuracy gate: 27 cases -> build/accuracy.json"
 	@echo "  make smoke          black-box smoke against a running engine (DAP_BASE)"
 	@echo "  make mcp            run the stdio MCP adapter (client-facing entrypoint)"
 	@echo "  make mcp-e2e        MCP create/add/run/table e2e"
@@ -51,6 +53,10 @@ goldens: build-native
 
 goldens-validate:
 	python3 tests/goldens-native/runner.py --validate
+
+accuracy: build-native
+	@mkdir -p build
+	$(REFPYTHON) tests/reference/validate_dap.py --jar $(JAR) --json build/accuracy.json --min-cases 27
 
 coverage: build-native
 	python3 tests/coverage/runner.py

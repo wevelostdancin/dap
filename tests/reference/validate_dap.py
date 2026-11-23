@@ -8,10 +8,11 @@ unexpected error or invalid JSON.
 
 Usage (reference environment, never the runtime environment):
   /Users/vitalypesnev/Projects/dap/build/refvenv/bin/python tests/reference/validate_dap.py \
-      --jar engine-native/target/dap-native.jar
+      --jar engine-native/target/dap-native.jar \
+      --json build/accuracy.json --min-cases 27
 
-Exit code 0 only when every case passes. `--only a,b` runs a subset,
-`--list` prints the case names.
+Exit code 1 when a case fails or fewer than `--min-cases` cases ran (default 0).
+`--only a,b` runs a subset, `--list` prints the case names.
 """
 
 from __future__ import annotations
@@ -29,8 +30,12 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import numpy as np
-from scipy import stats
+try:
+    import numpy as np
+    from scipy import stats
+except ImportError:  # the pure summary helpers below need no reference stack
+    np = None
+    stats = None
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_JAR = ROOT / "engine-native" / "target" / "dap-native.jar"
@@ -745,12 +750,39 @@ CASES = {
 }
 
 
+def summarize_results(results, min_cases=0) -> dict:
+    """Build the accuracy summary and gate exit code from per-case outcomes.
+
+    Each item of ``results`` is a mapping with ``case``, ``passed`` and an
+    optional ``detail``. The returned dict is both the JSON payload and the
+    only source of the process exit code; it needs no engine or reference
+    dependency, so it can be unit-tested on a plain interpreter.
+    """
+    failures = [
+        {"case": item["case"], "detail": item.get("detail", "")}
+        for item in results
+        if not item["passed"]
+    ]
+    total = len(results)
+    return {
+        "cases_total": total,
+        "cases_passed": total - len(failures),
+        "cases_failed": len(failures),
+        "failures": failures,
+        "min_cases": min_cases,
+        "exit_code": 1 if failures or total < min_cases else 0,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jar", default=str(DEFAULT_JAR))
     parser.add_argument("--port", type=int, default=7895)
     parser.add_argument("--only", default="")
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--json", default="", help="write the accuracy summary to this path")
+    parser.add_argument("--min-cases", type=int, default=0,
+                        help="fail when fewer than N cases ran (default: 0)")
     args = parser.parse_args()
     if args.list:
         print("\n".join(CASES))
@@ -760,27 +792,43 @@ def main() -> int:
     if unknown:
         print(f"unknown cases: {unknown}", file=sys.stderr)
         return 2
+    if np is None or stats is None:
+        print("reference dependencies missing: pip install -r tests/reference/requirements.txt",
+              file=sys.stderr)
+        return 2
     jar = Path(args.jar)
     if not jar.exists():
         print(f"jar not found: {jar} (run make build-native)", file=sys.stderr)
         return 2
     workdir = Path(tempfile.mkdtemp(prefix="dap-validate-"))
     engine = Engine(jar, args.port, workdir)
-    failures = 0
+    results = []
     try:
         engine.start()
         for name in selected:
             try:
                 checks = CASES[name](engine, workdir)
                 print(f"PASS {name:22s} {', '.join(checks)}")
+                results.append({"case": name, "passed": True})
             except Exception as failure:  # noqa: BLE001 - a case failure must not stop the run
-                failures += 1
                 print(f"FAIL {name:22s} {failure}")
+                results.append({"case": name, "passed": False, "detail": str(failure)})
+    except Exception as failure:  # noqa: BLE001 - still report a start-up/harness crash
+        print(f"FAIL engine {failure}")
+        results.append({"case": "engine", "passed": False, "detail": str(failure)})
     finally:
         engine.stop()
         shutil.rmtree(workdir, ignore_errors=True)
-    print(f"\n{len(selected) - failures}/{len(selected)} cases passed")
-    return 0 if failures == 0 else 1
+    summary = summarize_results(results, args.min_cases)
+    print(f"\n{summary['cases_passed']}/{summary['cases_total']} cases passed")
+    if args.json:
+        report = Path(args.json)
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if summary["exit_code"] and summary["cases_failed"] == 0:
+        print(f"accuracy gate: {summary['cases_total']} cases < --min-cases {args.min_cases}",
+              file=sys.stderr)
+    return summary["exit_code"]
 
 
 if __name__ == "__main__":
