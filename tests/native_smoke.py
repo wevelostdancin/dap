@@ -160,21 +160,21 @@ def check_workflow(api, tmpdir):
     if table["preview"] != 3 or len(table["data"]) != 3:
         raise AssertionError("preview mismatch: %r" % (table,))
 
-    # NULL vs "": bob's unquoted city is NULL, carol's quoted "" is a value.
+    # NULL semantics follow DuckDB: bob's unquoted and carol's quoted "" are both NULL.
     src_profile = api.profile(workflow, nodes["src"])
     city = next(column for column in src_profile["columns"] if column["name"] == "city")
-    if city["missing"] != 1 or city["distinct"] != 3:
+    if city["missing"] != 2 or city["distinct"] != 2:
         raise AssertionError("city profile mismatch: %r" % (city,))
     age = next(column for column in src_profile["columns"] if column["name"] == "age")
     if age["type"] != "Number (Integer)" or age["min"] != 28 or age["max"] != 41:
         raise AssertionError("age profile mismatch: %r" % (age,))
 
-    # constant fill: NULL becomes UNKNOWN, "" stays a value.
+    # constant fill: every NULL, including the former quoted empty field, becomes UNKNOWN.
     fixed = api.table(workflow, nodes["missing"], limit=10)
     city_index = [column["name"] for column in fixed["columns"]].index("city")
     values = {row[0]: row[city_index] for row in fixed["data"]}
-    if values.get("bob") != "UNKNOWN" or values.get("carol") != "":
-        raise AssertionError("missing_value/empty-string mismatch: %r" % (values,))
+    if values.get("bob") != "UNKNOWN" or values.get("carol") != "UNKNOWN":
+        raise AssertionError("missing_value/NULL mismatch: %r" % (values,))
 
     debug = api.debug(workflow)
     if len(debug.get("nodes", [])) != 5 or len(debug.get("connections", [])) != 4:
