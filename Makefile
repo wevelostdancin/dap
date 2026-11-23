@@ -8,7 +8,7 @@ JAR := engine-native/target/dap-native.jar
 REFPYTHON := $(if $(wildcard build/refvenv/bin/python),build/refvenv/bin/python,python3)
 
 .PHONY: help build-native test-native run-native goldens goldens-validate coverage accuracy test-mcp smoke \
-        mcp mcp-e2e mcp-recipe-e2e dist install-e2e extensions bench bench-full bench-gate image-native \
+        mcp mcp-e2e mcp-recipe-e2e dist install-e2e package-e2e extensions bench bench-full bench-gate image-native \
         run-native-image lint check soak clean-native
 
 help:
@@ -27,6 +27,7 @@ help:
 	@echo "  make mcp-recipe-e2e MCP resources/prompts/recipes/dap_sql e2e"
 	@echo "  make dist           build the distributable dist/ (jar, adapter, CLI, checksums)"
 	@echo "  make install-e2e    install from dist/ into a temp HOME and run the stdio preflight"
+	@echo "  make package-e2e    build the self-contained archive and install it in a temp HOME"
 	@echo "  make extensions     install the DuckDB sqlite/postgres/httpfs extensions (network once)"
 	@echo "  make bench          native 100k-row benchmark"
 	@echo "  make bench-full     native 10M-row benchmark -> build/bench.json"
@@ -95,6 +96,9 @@ dist: build-native
 
 install-e2e: dist
 	python3 tests/install_e2e.py
+
+package-e2e: build-native
+	python3 tests/package_e2e.py
 
 extensions: build-native
 	DAP_HOME="$(CURDIR)" "$(DAP_JDK)/bin/java" -jar $(JAR) --install-extensions sqlite postgres mysql httpfs
