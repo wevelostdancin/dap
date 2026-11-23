@@ -1,0 +1,89 @@
+{
+  "format": "dap-native-workflow/1",
+  "name": "data_quality",
+  "nodes": [
+    {
+      "id": "src",
+      "factory": "dap.parquet_reader",
+      "name": "Parquet Reader",
+      "settings": {
+        "file": "placeholder.parquet"
+      }
+    },
+    {
+      "id": "quality",
+      "factory": "dap.data_quality",
+      "name": "Data Quality",
+      "settings": {
+        "checks": [
+          {
+            "kind": "not_null",
+            "column": "id",
+            "severity": "error"
+          },
+          {
+            "kind": "unique",
+            "column": "id",
+            "severity": "warn"
+          },
+          {
+            "kind": "range",
+            "column": "amount",
+            "min": 0,
+            "severity": "warn"
+          }
+        ],
+        "fail_on": "never",
+        "output": "long"
+      }
+    },
+    {
+      "id": "report",
+      "factory": "dap.markdown_report",
+      "name": "Markdown Report",
+      "settings": {
+        "file": "report.md",
+        "title": "Data quality checks",
+        "sections": [
+          {
+            "kind": "table"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "src",
+      "fromPort": 0,
+      "to": "quality",
+      "toPort": 0
+    },
+    {
+      "from": "quality",
+      "fromPort": 0,
+      "to": "report",
+      "toPort": 0
+    }
+  ],
+  "recipe": {
+    "name": "data_quality",
+    "description": "Check required IDs, duplicate IDs and non-negative amounts; write a Markdown report.",
+    "tags": [
+      "quality",
+      "validation",
+      "report"
+    ],
+    "dataset": {
+      "node": "src",
+      "setting": "file"
+    },
+    "params": {
+      "report": {
+        "node": "report",
+        "setting": "file"
+      }
+    },
+    "output": "report"
+  }
+}

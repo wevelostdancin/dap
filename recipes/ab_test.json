@@ -1,0 +1,73 @@
+{
+  "format": "dap-native-workflow/1",
+  "name": "ab_test",
+  "nodes": [
+    {
+      "id": "src",
+      "factory": "dap.parquet_reader",
+      "name": "Parquet Reader",
+      "settings": {
+        "file": "placeholder.parquet"
+      }
+    },
+    {
+      "id": "ab",
+      "factory": "dap.ab_test",
+      "name": "A/B Test",
+      "settings": {
+        "group": "variant",
+        "value": "converted",
+        "alpha": 0.05,
+        "power": 0.8
+      }
+    },
+    {
+      "id": "report",
+      "factory": "dap.markdown_report",
+      "name": "Markdown Report",
+      "settings": {
+        "file": "report.md",
+        "title": "A/B test result",
+        "sections": [
+          {
+            "kind": "table"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "src",
+      "fromPort": 0,
+      "to": "ab",
+      "toPort": 0
+    },
+    {
+      "from": "ab",
+      "fromPort": 0,
+      "to": "report",
+      "toPort": 0
+    }
+  ],
+  "recipe": {
+    "name": "ab_test",
+    "description": "Two-proportion z-test of conversions by variant (control vs treatment).",
+    "tags": [
+      "ab-test",
+      "statistics",
+      "report"
+    ],
+    "dataset": {
+      "node": "src",
+      "setting": "file"
+    },
+    "params": {
+      "report": {
+        "node": "report",
+        "setting": "file"
+      }
+    },
+    "output": "report"
+  }
+}

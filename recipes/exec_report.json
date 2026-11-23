@@ -1,0 +1,103 @@
+{
+  "format": "dap-native-workflow/1",
+  "name": "exec_report",
+  "nodes": [
+    {
+      "id": "src",
+      "factory": "dap.parquet_reader",
+      "name": "Parquet Reader",
+      "settings": {
+        "file": "placeholder.parquet"
+      }
+    },
+    {
+      "id": "totals",
+      "factory": "dap.group_by",
+      "name": "Sales by region",
+      "settings": {
+        "keys": [
+          "region"
+        ],
+        "aggregations": [
+          {
+            "column": "amount",
+            "fn": "sum"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chart",
+      "factory": "dap.chart",
+      "name": "Regional sales chart",
+      "settings": {
+        "file": "chart.svg",
+        "type": "bar",
+        "x": "region",
+        "y": [
+          "Sum(amount)"
+        ],
+        "title": "Sales by region"
+      }
+    },
+    {
+      "id": "report",
+      "factory": "dap.markdown_report",
+      "name": "Markdown Report",
+      "settings": {
+        "file": "report.md",
+        "title": "Executive sales report",
+        "sections": [
+          {
+            "kind": "table"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "src",
+      "fromPort": 0,
+      "to": "totals",
+      "toPort": 0
+    },
+    {
+      "from": "totals",
+      "fromPort": 0,
+      "to": "chart",
+      "toPort": 0
+    },
+    {
+      "from": "chart",
+      "fromPort": 0,
+      "to": "report",
+      "toPort": 0
+    }
+  ],
+  "recipe": {
+    "name": "exec_report",
+    "description": "Aggregate sales by region, draw a bar chart and write an executive Markdown report.",
+    "tags": [
+      "executive",
+      "sales",
+      "chart",
+      "report"
+    ],
+    "dataset": {
+      "node": "src",
+      "setting": "file"
+    },
+    "params": {
+      "report": {
+        "node": "report",
+        "setting": "file"
+      },
+      "chart": {
+        "node": "chart",
+        "setting": "file"
+      }
+    },
+    "output": "report"
+  }
+}
