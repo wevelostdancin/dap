@@ -171,6 +171,14 @@ dap home
 `SECURITY.md`, `CHANGELOG.md`, issue/PR templates, `.github/dependabot.yml`,
 release workflow по тегу `v*`.
 
+### 5.10 Лицензия
+
+Проект уже распространяется под **GPL-3.0-or-later** (см. `LICENSE` и `NOTICE`:
+«either version 3 of the License, or (at your option) any later version»).
+Новые файлы, пакет `dap-dsh` и документация используют тот же SPDX-идентификатор
+`GPL-3.0-or-later`; перелицензирование не выполняется. Смена лицензии — отдельное
+юридическое решение владельца проекта, вне P3.
+
 ## 6. Контракты и совместимость
 
 - `/v1` не меняется; версия 1.3.0.
