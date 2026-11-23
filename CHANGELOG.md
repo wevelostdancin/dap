@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Ingest request options: `encoding` (auto-detection or an explicit charset),
   `allVarchar`, `decimalComma` and `sheet`. Ingest results now report the
   effective `encoding`, the Excel `sheet` that was read and all `sheets`.
+  `decimalComma` only converts columns that actually use a decimal comma and
+  keep identifiers, codes and long keys as text.
 - MCP one-call tools pass the CSV/Excel read options through to ingest and
   return the sheet and encoding metadata.
 

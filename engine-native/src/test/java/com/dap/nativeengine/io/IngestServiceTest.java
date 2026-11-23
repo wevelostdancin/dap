@@ -21,6 +21,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -655,6 +656,70 @@ class IngestServiceTest {
                      + literal(result.path()) + ")")) {
             assertTrue(rows.next());
             assertEquals(6684.22, rows.getDouble(1), 0.0001);
+        }
+    }
+
+    @Test
+    void decimalCommaKeepsIdentifiersAndLongKeysAsText() throws Exception {
+        Path source = write("ids.csv",
+                "id;amount;long_id\n00123;5 449,72;123456789012345678\n"
+                        + "00456;1 234,50;876543210987654321\n");
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
+                true, ";", "\"", "\"", false, false, true, List.of(), null, true, true, null);
+
+        IngestService.Result result = service().ingest(source, "csv", options);
+
+        assertEquals(List.of(
+                new IngestService.Column("id", "Utf8"),
+                new IngestService.Column("amount", "Float64"),
+                new IngestService.Column("long_id", "Utf8")), result.columns());
+    }
+
+    @Test
+    void explicitWrongEncodingFailsInsteadOfCorruptingValues() throws Exception {
+        Path source = dir.resolve("not-ascii.csv");
+        Files.write(source, new byte[] {'a', ';', 'b', '\n', '1', ';', (byte) 0xFF, '\n'});
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
+                true, ";", "\"", "\"", false, false, true, List.of(), "us-ascii",
+                false, false, null);
+
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> service().ingest(source, "csv", options));
+
+        assertTrue(failure.getMessage().contains("cannot decode"), failure.getMessage());
+        assertTrue(failure.getMessage().contains("us-ascii"), failure.getMessage());
+    }
+
+    @Test
+    void newReaderOptionsArePartOfTheCacheKey() throws Exception {
+        Path source = write("key.csv", "id;value\n1;9.5\n2;7.0\n");
+        IngestService service = service();
+
+        IngestService.Result auto = service.ingest(source, "csv");
+        IngestService.Result semicolon = service.ingest(source, "csv",
+                new IngestService.IngestOptions(true, ";", "\"", "\"", false, false, true));
+        IngestService.Result varchar = service.ingest(source, "csv",
+                new IngestService.IngestOptions(true, null, "\"", "\"", false, false, true,
+                        List.of(), null, true, false, null));
+        IngestService.Result comma = service.ingest(source, "csv",
+                new IngestService.IngestOptions(true, ";", "\"", "\"", false, false, true,
+                        List.of(), null, false, true, null));
+
+        assertEquals(4, Set.of(auto.path(), semicolon.path(), varchar.path(), comma.path()).size(),
+                "every reader option must produce its own cache entry");
+    }
+
+    @Test
+    void failedIngestLeavesNoTemporaryFiles() throws Exception {
+        Path source = dir.resolve("ragged-cp1251.csv");
+        Files.write(source, "a;b\n1;2\n3;4;5\n".getBytes(Charset.forName("windows-1251")));
+        Path cache = dir.resolve("cache");
+
+        assertThrows(IllegalStateException.class, () -> service().ingest(source, "csv"));
+
+        try (Stream<Path> files = Files.list(cache)) {
+            assertTrue(files.noneMatch(path -> path.getFileName().toString().endsWith(".tmp")),
+                    "a failed ingest must delete its temporary files");
         }
     }
 

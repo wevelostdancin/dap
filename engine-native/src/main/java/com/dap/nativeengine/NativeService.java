@@ -16,6 +16,7 @@ import com.dap.nativeengine.catalog.NodeRegistry;
 import com.dap.nativeengine.engine.DuckDbSession;
 import com.dap.nativeengine.exec.Executors;
 import com.dap.nativeengine.io.DatasetCatalog;
+import com.dap.nativeengine.io.IngestService;
 import com.dap.nativeengine.nodes.AbTestExecutor;
 import com.dap.nativeengine.nodes.BinnerExecutor;
 import com.dap.nativeengine.nodes.CalendarExecutor;
@@ -363,7 +364,9 @@ public final class NativeService implements AutoCloseable {
 
     /** Test seam: inject catalog and executors (for example a test-only node). */
     public NativeService(Settings settings, NodeRegistry registry, Executors executors) {
-        this(settings, registry, executors, new DatasetCatalog());
+        this(settings, registry, executors, new DatasetCatalog(
+                new IngestService(settings.duckdbMemoryLimit(), settings.duckdbThreads(),
+                        settings.duckdbTempDirectory())));
     }
 
     /** Test seam: inject the dataset catalog so tests do not touch the shared datasets.json. */

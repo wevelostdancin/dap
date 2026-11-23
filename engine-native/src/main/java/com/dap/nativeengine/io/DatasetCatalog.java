@@ -97,6 +97,11 @@ public final class DatasetCatalog {
         this(defaultFile(System.getenv()));
     }
 
+    /** Production catalog with an ingest service that carries the engine's DuckDB resources. */
+    public DatasetCatalog(IngestService ingest) {
+        this(defaultFile(System.getenv()), ingest);
+    }
+
     /** Test seam: an explicit catalog file and the production ingest cache. */
     public DatasetCatalog(Path file) {
         this(file, new IngestService());

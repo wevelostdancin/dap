@@ -261,7 +261,15 @@ public final class IngestService {
                 if (plan != null && plan.transcode()) {
                     decoded = cacheDir.resolve("." + target.getFileName() + "."
                             + UUID.randomUUID() + ".utf8.tmp");
-                    CsvEncoding.transcode(source, decoded, plan.charset());
+                    try {
+                        // Detected encodings may meet stray bytes; explicit ones must not
+                        // silently turn them into U+FFFD.
+                        CsvEncoding.transcode(source, decoded, plan.charset(), plan.auto());
+                    } catch (java.nio.charset.CharacterCodingException invalid) {
+                        throw new IllegalArgumentException("cannot decode " + source + " as "
+                                + plan.resolved() + ": the bytes are not valid for this encoding; "
+                                + "check the 'encoding' option or use auto", invalid);
+                    }
                     readSource = decoded;
                 }
                 write(db, readSource, parsed, temporary, options, plan);
@@ -385,10 +393,14 @@ public final class IngestService {
             if (slot > 0) {
                 check.append(", ");
             }
-            check.append("count(*) FILTER (WHERE ").append(quote(names.get(varchar.get(slot))))
-                    .append(" IS NOT NULL AND TRY_CAST(")
-                    .append(decimalExpression(names.get(varchar.get(slot))))
-                    .append(" AS DOUBLE) IS NULL) AS c").append(slot);
+            String column = quote(names.get(varchar.get(slot)));
+            check.append("count(*) FILTER (WHERE ").append(column)
+                    .append(" IS NOT NULL AND NOT regexp_full_match(")
+                    .append(compactExpression(names.get(varchar.get(slot))))
+                    .append(", '^-?(0|[1-9][0-9]{0,14})(,[0-9]+)?$')) AS b").append(slot)
+                    .append(", count(*) FILTER (WHERE ").append(column)
+                    .append(" IS NOT NULL AND contains(").append(column)
+                    .append(", ',')) AS m").append(slot);
         }
         check.append(" FROM ").append(relation);
         boolean[] numeric = new boolean[varchar.size()];
@@ -397,7 +409,10 @@ public final class IngestService {
              ResultSet result = statement.executeQuery(check.toString())) {
             result.next();
             for (int slot = 0; slot < numeric.length; slot++) {
-                numeric[slot] = result.getLong("c" + slot) == 0;
+                // A decimal comma must actually occur, and every value must be a plain
+                // decimal number: identifiers such as "00123" or 18-digit keys stay text.
+                numeric[slot] = result.getLong("b" + slot) == 0
+                        && result.getLong("m" + slot) > 0;
                 any |= numeric[slot];
             }
         }
@@ -424,9 +439,14 @@ public final class IngestService {
 
     /** Text form with space/NBSP thousands separators removed and the comma decimal point. */
     private static String decimalExpression(String column) {
+        return "replace(" + compactExpression(column) + ", ',', '.')";
+    }
+
+    /** Trimmed text with thousands spaces (space, NBSP, narrow NBSP) removed. */
+    private static String compactExpression(String column) {
         String value = quote(column);
-        return "replace(replace(replace(replace(trim(" + value + "), ' ', ''), chr(160), ''), "
-                + "chr(8239), ''), ',', '.')";
+        return "replace(replace(replace(trim(" + value + "), ' ', ''), chr(160), ''), "
+                + "chr(8239), '')";
     }
 
     private static String quote(String identifier) {
@@ -517,9 +537,10 @@ public final class IngestService {
         }
     }
 
-    private static Result describe(Path parquet, boolean cached, CsvEncoding.Plan plan,
-                                   ExcelMeta excel) throws SQLException {
-        try (DuckDbSession db = new DuckDbSession()) {
+    /** Cached-entry metadata read; uses the same DuckDB resources as a rebuild. */
+    private Result describe(Path parquet, boolean cached, CsvEncoding.Plan plan,
+                            ExcelMeta excel) throws SQLException {
+        try (DuckDbSession db = new DuckDbSession(memoryLimit, threads, tempDirectory)) {
             return describe(db, parquet, cached, plan, excel);
         }
     }
@@ -643,7 +664,9 @@ public final class IngestService {
         while (message.startsWith(duplicate)) {
             message = "Invalid Input Error: " + message.substring(duplicate.length());
         }
-        return message.strip();
+        String stripped = message.strip();
+        // Never hand the client an empty reason: fall back to the raw driver text.
+        return stripped.isEmpty() ? failure.getMessage().strip() : stripped;
     }
 
     private static int parallelism() {

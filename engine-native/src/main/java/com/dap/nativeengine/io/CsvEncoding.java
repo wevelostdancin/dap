@@ -44,6 +44,10 @@ public final class CsvEncoding {
      */
     public record Plan(String requested, String resolved, Charset charset, boolean transcode,
                        String duckdbEncoding) {
+        /** True when the caller did not choose an encoding and detection picked one. */
+        public boolean auto() {
+            return isAuto(requested);
+        }
     }
 
     /**
@@ -77,11 +81,22 @@ public final class CsvEncoding {
      * @throws IOException if either file cannot be read or written
      */
     public static void transcode(Path source, Path target, Charset charset) throws IOException {
-        // REPLACE, not REPORT: a non-text byte must not abort the copy with an opaque
-        // "Input length = 1"; undefined bytes become U+FFFD and DuckDB reports the parse error.
+        transcode(source, target, charset, true);
+    }
+
+    /**
+     * Streams {@code source} through {@code charset} into UTF-8 at {@code target}.
+     *
+     * @param lenient {@code true} replaces undecodable bytes with U+FFFD (detected encodings,
+     *                where the goal is to let DuckDB report the parse error); {@code false}
+     *                throws {@link java.nio.charset.CharacterCodingException} so an explicit
+     *                wrong encoding fails loudly instead of silently corrupting values
+     */
+    public static void transcode(Path source, Path target, Charset charset, boolean lenient)
+            throws IOException {
         CharsetDecoder decoder = charset.newDecoder()
-                .onMalformedInput(CodingErrorAction.REPLACE)
-                .onUnmappableCharacter(CodingErrorAction.REPLACE);
+                .onMalformedInput(lenient ? CodingErrorAction.REPLACE : CodingErrorAction.REPORT)
+                .onUnmappableCharacter(lenient ? CodingErrorAction.REPLACE : CodingErrorAction.REPORT);
         try (Reader reader = new BufferedReader(new InputStreamReader(
                 Files.newInputStream(source), decoder));
              Writer writer = Files.newBufferedWriter(target, StandardCharsets.UTF_8,

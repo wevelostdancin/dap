@@ -138,10 +138,10 @@ class IngestParamsTest(unittest.TestCase):
     def test_dap_ingest_forwards_new_options(self):
         _result, engine = self.run_tool("dap_ingest", {
             "file": "/data/x.csv", "encoding": "cp1251", "allVarchar": True,
-            "decimalComma": True, "sheet": 1})
+            "decimalComma": True, "sheet": "1"})
         self.assertEqual(engine.body_of("POST", "/v1/datasets"), {
             "file": "/data/x.csv", "encoding": "cp1251", "allVarchar": True,
-            "decimalComma": True, "sheet": 1})
+            "decimalComma": True, "sheet": "1"})
 
     def test_analyze_sends_csv_options_to_ingest(self):
         result, engine = self.run_tool("dap_analyze", {

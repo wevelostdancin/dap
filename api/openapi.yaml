@@ -1848,8 +1848,10 @@ components:
           default: false
           description: >-
             Convert CSV values like "5 449,72" to DOUBLE by removing spaces and
-            NBSP and replacing the comma with a dot; a column stays text unless
-            all non-empty values parse
+            NBSP and replacing the comma with a dot. A column is converted only
+            when at least one value uses a decimal comma and every non-empty
+            value is a plain decimal number (no leading zeros, at most 15 integer
+            digits); identifiers, keys and codes stay text
         sheet:
           type: string
           description: >-
