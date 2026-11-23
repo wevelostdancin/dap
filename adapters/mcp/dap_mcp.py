@@ -1959,7 +1959,7 @@ def tool_explore(args: dict):
     max_columns = _positive_int(args, "maxColumns")
     sample_rows = _positive_int(args, "sampleRows")
     ensure_service()
-    source, cached, _ = _source(args, has_file)
+    source, cached, ingested = _source(args, has_file)
     _emit_progress(1, 2, "ingest")
     body = {"dataset": source}
     if sql:
@@ -1970,7 +1970,9 @@ def tool_explore(args: dict):
         body["sampleRows"] = sample_rows
     report = call("POST", "/v1/explore", body)
     _emit_progress(2, 2, "explore")
-    return {"source": source, "cached": cached, "report": report}
+    result = {"source": source, "cached": cached, "report": report}
+    result.update(_ingest_details(ingested))
+    return result
 
 
 def tool_estimate(args: dict):

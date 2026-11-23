@@ -81,6 +81,8 @@ class FakeEngine:
             return TABLE
         if method == "GET" and path.endswith("/profile"):
             return PROFILE
+        if method == "POST" and path == "/v1/explore":
+            return {"source": "/cache/sales.parquet", "columns": []}
         if method == "DELETE" and path == "/v1/workflows/wf-1":
             return {"ok": True}
         raise AssertionError("unexpected HTTP call: %s %s %r" % (method, path, body))
@@ -182,6 +184,15 @@ class IngestParamsTest(unittest.TestCase):
             self.assertEqual(result["sheet"], 0)
             self.assertEqual(result["sheets"], ["S1"])
             self.assertEqual(result["encoding"], "utf-8")
+
+    def test_explore_returns_ingest_metadata(self):
+        ingest = {"path": "/cache/sales.parquet", "rows": 3, "cached": False,
+                  "sheet": "S2", "sheets": ["S1", "S2"], "encoding": "windows-1251"}
+        result, _engine = self.run_tool(
+            "dap_explore", {"file": "/data/x.xlsx"}, ingest=ingest)
+        self.assertEqual(result["sheet"], "S2")
+        self.assertEqual(result["sheets"], ["S1", "S2"])
+        self.assertEqual(result["encoding"], "windows-1251")
 
     def test_restart_note_is_prefixed_and_flagged(self):
         self.module._note_generation("gen-a")
