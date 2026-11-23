@@ -710,12 +710,16 @@ class IngestServiceTest {
     }
 
     @Test
-    void failedIngestLeavesNoTemporaryFiles() throws Exception {
-        Path source = dir.resolve("ragged-cp1251.csv");
-        Files.write(source, "a;b\n1;2\n3;4;5\n".getBytes(Charset.forName("windows-1251")));
+    void failedTranscodeLeavesNoTemporaryFiles() throws Exception {
+        Path source = dir.resolve("not-ascii.csv");
+        Files.write(source, new byte[] {'a', ';', 'b', '\n', '1', ';', (byte) 0xFF, '\n'});
         Path cache = dir.resolve("cache");
+        IngestService.IngestOptions options = new IngestService.IngestOptions(
+                true, ";", "\"", "\"", false, false, true, List.of(), "us-ascii",
+                false, false, null);
 
-        assertThrows(IllegalStateException.class, () -> service().ingest(source, "csv"));
+        assertThrows(IllegalArgumentException.class,
+                () -> service().ingest(source, "csv", options));
 
         try (Stream<Path> files = Files.list(cache)) {
             assertTrue(files.noneMatch(path -> path.getFileName().toString().endsWith(".tmp")),
