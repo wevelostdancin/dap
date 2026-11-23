@@ -117,6 +117,7 @@ def build(args: argparse.Namespace) -> pathlib.Path:
     jar = _resolve(args.jar)
     out = _resolve(args.out)
     python_runtime = _resolve(args.python_runtime)
+    runtime_source = _resolve(args.runtime)
     version = args.version or (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     if not version:
         raise SystemExit("package: empty version (check VERSION)")
@@ -145,10 +146,11 @@ def build(args: argparse.Namespace) -> pathlib.Path:
     shutil.copyfile(jar, paths["lib/dap-native.jar"])
 
     if not args.skip_runtime:
-        runtime = out / "runtime"
-        if not (runtime / "bin" / "java").is_file():
-            raise SystemExit(f"package: runtime missing: {runtime} (run make runtime)")
-        shutil.copytree(runtime, paths["runtime"], symlinks=True, dirs_exist_ok=True)
+        if not (runtime_source / "bin" / "java").is_file():
+            raise SystemExit(
+                f"package: runtime missing: {runtime_source} (run make runtime)"
+            )
+        shutil.copytree(runtime_source, paths["runtime"], symlinks=True, dirs_exist_ok=True)
     if not args.skip_python:
         if not (python_runtime / "bin" / "python3").is_file():
             raise SystemExit(
@@ -201,6 +203,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skip-python", action="store_true", help="do not bundle Python")
     parser.add_argument("--python-runtime", default="build/tools/python",
                         help="prepared Python runtime directory")
+    parser.add_argument("--runtime", default="build/package/runtime",
+                        help="prepared jlink runtime directory")
     parser.add_argument("--keep", action="store_true",
                         help="reuse the existing staging directory instead of recreating it")
     parser.add_argument("--os", default=os.uname().sysname, help=argparse.SUPPRESS)

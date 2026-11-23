@@ -137,3 +137,34 @@ jobs:
         with:
           name: p6-bench-gate
           path: build/p6-bench/gate
+
+  package:
+    name: package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build jar
+        run: cd engine-native && ./mvnw -B -DskipTests package
+      - name: Build jlink runtime
+        run: sh scripts/jlink-runtime.sh --jar engine-native/target/dap-native.jar --output build/package/runtime
+      - name: Package with system Python
+        run: python3 scripts/package.py --skip-python
+      - name: Package end-to-end
+        run: python3 tests/package_e2e.py
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: dap-package-${{ matrix.os }}
+          path: build/package/dap-*.tar.gz*

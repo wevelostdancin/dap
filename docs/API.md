@@ -82,13 +82,13 @@ job; прочие ошибки исполнения остаются 500 `node_f
 ### `GET /v1`
 
 ```json
-{"name":"DAP","version":"1.2.0","api":"v1","endpoints":"/v1/nodes, /v1/workflows, /v1/jobs, /v1/health"}
+{"name":"DAP","version":"1.3.0","api":"v1","endpoints":"/v1/nodes, /v1/workflows, /v1/jobs, /v1/health"}
 ```
 
 ### `GET /v1/health`
 
 ```json
-{"ok":true,"name":"DAP","version":"1.2.0","api":"1",
+{"ok":true,"name":"DAP","version":"1.3.0","api":"1",
  "generation":"0f8c2f7a-…","extensions":{"installed":["sqlite_scanner"]},
  "nodes":44,"coreNodes":44,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}

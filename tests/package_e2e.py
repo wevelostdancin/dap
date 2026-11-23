@@ -79,8 +79,9 @@ def build_runtime(jdk: str) -> bool:
         return True
     if not jdk:
         return False
+    env = dict(os.environ, DAP_JDK=jdk)
     result = run(["sh", str(ROOT / "scripts" / "jlink-runtime.sh"),
-                  "--jar", str(JAR), "--output", str(runtime)], timeout=300)
+                  "--jar", str(JAR), "--output", str(runtime)], env=env, timeout=300)
     if result.returncode != 0:
         print(result.stderr[-2000:])
     return result.returncode == 0
@@ -120,7 +121,10 @@ def main(argv=None) -> int:
             unsafe = [name for name in names if name.startswith("/") or ".." in pathlib.PurePosixPath(name).parts]
             if not check("archive paths", not unsafe, str(unsafe[:3])):
                 return 1
-            tar.extractall(home)
+            try:
+                tar.extractall(home, filter="data")
+            except TypeError:  # Python < 3.12 has no filter argument
+                tar.extractall(home)
         top = next(home.iterdir())
         dap = top / "bin" / "dap"
         if not check("launcher", dap.is_file() and os.access(dap, os.X_OK), str(dap)):

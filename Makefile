@@ -9,12 +9,10 @@ REFPYTHON := $(if $(wildcard build/refvenv/bin/python),build/refvenv/bin/python,
 
 .PHONY: help build-native test-native run-native goldens goldens-validate coverage accuracy test-mcp smoke \
         mcp mcp-e2e mcp-recipe-e2e dist install-e2e package-e2e extensions bench bench-full bench-gate image-native \
-        run-native-image lint check soak clean-native
-
-.PHONY: runtime python-runtime package test-package
+        run-native-image lint check soak clean-native runtime python-runtime package test-package
 
 help:
-	@echo "DAP 1.0.0 — native analytics backend for agents"
+	@echo "DAP 1.3.0 — native analytics backend for agents"
 	@echo ""
 	@echo "  make build-native   build $(JAR) (DuckDB + Arrow + Javalin)"
 	@echo "  make test-native    run the JUnit suite"

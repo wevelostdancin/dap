@@ -6,7 +6,7 @@
 машину.
 
 Движок: Javalin 6.7 + DuckDB 1.5.6 (in-memory) + Arrow 19.0, Java 21. Каталог —
-66 узлов `dap.*`, контракт — 30 операций `/v1`. Версия: **1.2.0**.
+66 узлов `dap.*`, контракт — 30 операций `/v1`. Версия: **1.3.0**.
 
 ## Что это
 
@@ -66,7 +66,7 @@ curl -s http://127.0.0.1:7800/v1/health
 ```
 
 ```json
-{"ok":true,"name":"DAP","version":"1.2.0","api":"1","nodes":66,"coreNodes":66,
+{"ok":true,"name":"DAP","version":"1.3.0","api":"1","nodes":66,"coreNodes":66,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
