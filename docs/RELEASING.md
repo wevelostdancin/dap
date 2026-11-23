@@ -55,6 +55,12 @@ cd dsh-plugin
 npm publish --access public
 ```
 
+Registry отвечает `202 Accepted`: версия появляется в `npm view dap-dsh versions`
+через несколько минут. Служебная версия `0.0.0-stage` — placeholder npm для
+обрабатываемого первого релиза, её не удаляют. Проверка после публикации:
+`npm view dap-dsh dist-tags` должен показывать `latest: <версия>`, а integrity
+tarball — совпадать с `npm pack --dry-run --json`.
+
 Перед публикацией — `npx dsh-standards dsh-plugin --scope entry --entry-claim static`.
 
 ## Откат
