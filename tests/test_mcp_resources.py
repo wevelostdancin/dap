@@ -176,5 +176,87 @@ class ResourcesTest(unittest.TestCase):
         self.assertEqual(reply["error"]["code"], -32602)
 
 
+RECIPE_PROMPTS = (
+    "cohort_analysis",
+    "ab_test",
+    "time_series",
+    "segmentation",
+    "regression",
+    "funnel",
+    "exec_report",
+)
+
+
+class PromptsTest(unittest.TestCase):
+    def setUp(self):
+        self.module = load_adapter(DAP_HOME=str(ROOT))
+
+    def get_prompt(self, name, arguments):
+        reply = rpc(self.module, "prompts/get", {"name": name, "arguments": arguments})
+        self.assertNotIn("error", reply, "prompts/get failed: %r" % (reply,))
+        return reply["result"]
+
+    def message_text(self, result):
+        messages = result.get("messages")
+        self.assertEqual(len(messages), 1, "expected one message: %r" % (result,))
+        message = messages[0]
+        self.assertEqual(message["role"], "user")
+        self.assertEqual(message["content"]["type"], "text")
+        return message["content"]["text"]
+
+    def test_prompts_list_has_ten_prompts(self):
+        reply = rpc(self.module, "prompts/list", {})
+        prompts = reply["result"]["prompts"]
+        by_name = {prompt["name"]: prompt for prompt in prompts}
+        self.assertEqual(len(prompts), 10)
+        self.assertEqual(set(by_name), {
+            "analyze_csv", "quality_check", "profile_report", *RECIPE_PROMPTS,
+        })
+        for prompt in prompts:
+            self.assertTrue(prompt.get("description"))
+            self.assertIsInstance(prompt.get("arguments"), list)
+        for name in RECIPE_PROMPTS:
+            args = {arg["name"]: arg for arg in by_name[name]["arguments"]}
+            self.assertEqual(set(args), {"dataset", "report"})
+            self.assertTrue(args["dataset"]["required"])
+            self.assertFalse(args["report"]["required"])
+            self.assertIn(name + ".md", args["report"]["description"])
+
+    def test_recipe_prompt_reads_recipe_and_runs_it(self):
+        for name in RECIPE_PROMPTS:
+            with self.subTest(prompt=name):
+                text = self.message_text(self.get_prompt(name, {"dataset": "demo.parquet"}))
+                self.assertIn(name, text)
+                self.assertIn("dap://recipes/" + name, text)
+                self.assertIn("dap_recipe_run", text)
+                self.assertIn('"name": "%s"' % name, text)
+                self.assertIn('"dataset": "demo.parquet"', text)
+                self.assertIn('"params": {"report": "%s.md"}' % name, text)
+                for tool in ("dap_profile", "dap_explore", "dap_add_node", "dap_sql"):
+                    self.assertIn(tool, text)
+                self.assertIn("4.", text, "must end with the result step")
+
+    def test_recipe_prompt_uses_explicit_report_path(self):
+        text = self.message_text(self.get_prompt("ab_test", {
+            "dataset": "ab.parquet", "report": "/tmp/ab.md",
+        }))
+        self.assertIn('"report": "/tmp/ab.md"', text)
+        self.assertIn("/tmp/ab.md", text)
+        self.assertNotIn("ab_test.md", text)
+
+    def test_recipe_prompt_missing_dataset_is_invalid_params(self):
+        for name in RECIPE_PROMPTS:
+            with self.subTest(prompt=name):
+                reply = rpc(self.module, "prompts/get", {"name": name, "arguments": {}})
+                self.assertEqual(reply["error"]["code"], -32602)
+                self.assertEqual(reply["error"].get("data", {}).get("missing"), ["dataset"])
+
+    def test_recipe_prompt_empty_dataset_is_invalid_params(self):
+        reply = rpc(self.module, "prompts/get", {
+            "name": "funnel", "arguments": {"dataset": "  "},
+        })
+        self.assertEqual(reply["error"]["code"], -32602)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

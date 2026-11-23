@@ -225,7 +225,7 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 
 ## Промпты
 
-Адаптер объявляет capability `prompts`; `prompts/list` отдаёт три промпта, а
+Адаптер объявляет capability `prompts`; `prompts/list` отдаёт десять промптов, а
 `prompts/get` — одно user-сообщение с готовым планом и подставленными аргументами:
 
 | Промпт | Аргументы | Что делает |
@@ -233,6 +233,18 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 | `analyze_csv` | `path` (обязательный), `question` | один вызов `dap_analyze` (таблица + профиль, опционально `sql`); альтернативы — `dap_explore` (quality/связи/гипотезы) и `dap_profile` (только профиль); перед тяжёлым SQL — `dap_estimate` |
 | `quality_check` | `path` | один вызов `dap_explore` (score, issues, профиль), опционально `dap_profile` |
 | `profile_report` | `path`, `output` (по умолчанию `profile.md`) | один вызов `dap_report` (обёртка над `dap.markdown_report`, формат md/html/pdf/pptx); таблица и профиль возвращаются в ответе |
+| `cohort_analysis` | `dataset` (обязательный), `report` | рецепт `cohort_analysis`: когорты и retention |
+| `ab_test` | `dataset` (обязательный), `report` | рецепт `ab_test`: сравнение A/B |
+| `time_series` | `dataset` (обязательный), `report` | рецепт `time_series`: ресемплинг и прогноз |
+| `segmentation` | `dataset` (обязательный), `report` | рецепт `segmentation`: кластеры и сегменты |
+| `regression` | `dataset` (обязательный), `report` | рецепт `regression`: линейная регрессия |
+| `funnel` | `dataset` (обязательный), `report` | рецепт `funnel`: шаги и конверсия |
+| `exec_report` | `dataset` (обязательный), `report` | рецепт `exec_report`: сводка и график |
+
+Семь сценарных промптов сначала читают `dap://recipes/<name>`, затем вызывают
+`dap_recipe_run` с `dataset` и `params.report` (по умолчанию `<name>.md`); при
+несовпадении колонок — `dap_profile`/`dap_explore`, затем эквивалент через
+`dap_add_node`/`dap_sql`. В ответе — таблица и путь отчёта.
 
 Пропущенный обязательный аргумент — JSON-RPC `-32602` с `data.missing`.
 
