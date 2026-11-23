@@ -201,7 +201,7 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 
 `delimiter` и `header` `dap_ingest` принимал и раньше; новые опции —
 `encoding`, `sheet`, `allVarchar`, `decimalComma`. Ответы `dap_ingest`,
-`dap_analyze`, `dap_profile` и `dap_report` дополнительно содержат `sheet`
+`dap_analyze`, `dap_profile`, `dap_report` и `dap_explore` дополнительно содержат `sheet`
 (фактически прочитанный лист Excel), `sheets` (имена всех листов) и `encoding`
 (фактическая кодировка CSV), когда они применимы к формату.
 
