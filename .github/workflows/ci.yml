@@ -78,3 +78,35 @@ jobs:
             sleep 0.1
           done
           python3 tests/native_smoke.py --base http://127.0.0.1:7861
+
+  bench:
+    name: bench gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build jar
+        run: cd engine-native && ./mvnw -B -DskipTests package
+      - name: Accuracy and token gate
+        run: |
+          python3 tests/p6_bench.py \
+            --manifest tests/p6_bench_manifest.example.json \
+            --data-dir build/p6-bench/data \
+            --out build/p6-bench/gate \
+            --start \
+            --reference tests/p6_bench_reference.json \
+            --gate tests/p6_bench_gate.json \
+            --java "$JAVA_HOME/bin/java"
+      - name: Upload gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p6-bench-gate
+          path: build/p6-bench/gate
