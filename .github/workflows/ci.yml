@@ -78,3 +78,30 @@ jobs:
             sleep 0.1
           done
           python3 tests/native_smoke.py --base http://127.0.0.1:7861
+
+  accuracy:
+    name: reference accuracy (27 cases)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Reference dependencies
+        run: python3 -m pip install --disable-pip-version-check -r tests/reference/requirements.txt
+      - name: Build engine
+        run: cd engine-native && ./mvnw -B -DskipTests package
+      - name: Validate accuracy
+        run: python3 tests/reference/validate_dap.py --jar engine-native/target/dap-native.jar --json build/accuracy.json --min-cases 27
+      - name: Upload accuracy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accuracy-report
+          path: build/accuracy.json
+          if-no-files-found: warn
