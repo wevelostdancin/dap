@@ -292,6 +292,96 @@ def _number(value):
     return text or "0"
 
 
+# --------------------------------------------------------------------- gate
+
+DEFAULT_GATE = {
+    "maxFailedSteps": 0,
+    "maxFailedMcpCalls": 0,
+    "maxMcpCalls": 12,
+    "maxMcpTokens": 4000,
+    "maxMeanAbsDiff": 1e-3,
+    "requireAccuracy": True,
+}
+
+
+def load_gate(path):
+    """Read a CI gate JSON; missing thresholds use DEFAULT_GATE.
+
+    Broken JSON, a missing file, a non-object, or a wrongly typed/negative
+    threshold raises BenchError (CLI exit 2).
+    """
+    path = pathlib.Path(path)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise BenchError("cannot read gate %s: %s" % (path, exc))
+    except ValueError as exc:
+        raise BenchError("gate %s is not valid JSON: %s" % (path, exc))
+    if not isinstance(data, dict):
+        raise BenchError("gate %s must be a JSON object" % path)
+    gate = dict(DEFAULT_GATE)
+    for key in gate:
+        if key not in data:
+            continue
+        value = data[key]
+        if key == "requireAccuracy":
+            if not isinstance(value, bool):
+                raise BenchError("gate %s: %s must be a boolean" % (path, key))
+        elif isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+            raise BenchError("gate %s: %s must be a non-negative number" % (path, key))
+        gate[key] = value
+    return gate
+
+
+def check_gate(summary, gate):
+    """Return human-readable threshold violations (empty list means pass)."""
+    limits = dict(DEFAULT_GATE)
+    limits.update(gate or {})
+    violations = []
+    totals = summary.get("totals") or {}
+    failed = totals.get("failed") or 0
+    if failed > limits["maxFailedSteps"]:
+        violations.append("failed steps %s > %s" % (failed, limits["maxFailedSteps"]))
+    mcp = summary.get("mcp") or {}
+    failed_calls = mcp.get("failedCalls") or 0
+    if failed_calls > limits["maxFailedMcpCalls"]:
+        violations.append("failed MCP calls %s > %s" % (
+            failed_calls, limits["maxFailedMcpCalls"]))
+    calls = mcp.get("callCount") or 0
+    if calls > limits["maxMcpCalls"]:
+        violations.append("MCP calls %s > %s" % (calls, limits["maxMcpCalls"]))
+    tokens = mcp.get("totalTokens") or 0
+    if tokens > limits["maxMcpTokens"]:
+        violations.append("MCP tokens %s > %s" % (tokens, limits["maxMcpTokens"]))
+    accuracy = summary.get("accuracy") or {}
+    if limits["requireAccuracy"] and not accuracy.get("available"):
+        violations.append("accuracy unavailable but required")
+    for dataset in summary.get("datasets") or []:
+        diff = dataset.get("accuracy")
+        if not diff:
+            if limits["requireAccuracy"]:
+                violations.append("%s: no accuracy comparison" % dataset.get("name", "?"))
+            continue
+        checks = []
+        if diff.get("rows"):
+            checks.append(("rows", diff["rows"], True))
+        checks.extend(("mean:%s" % key, value, False)
+                      for key, value in (diff.get("numeric_means") or {}).items())
+        checks.extend(("group:%s" % key, value, True)
+                      for key, value in (diff.get("group_counts") or {}).items())
+        for metric, entry, exact in checks:
+            name = "%s: %s" % (dataset.get("name", "?"), metric)
+            absolute = entry.get("abs")
+            if entry.get("observed") is None or absolute is None:
+                violations.append("%s has no observed value" % name)
+            elif exact and absolute != 0:
+                violations.append("%s abs diff %s != 0" % (name, _number(absolute)))
+            elif not exact and absolute > limits["maxMeanAbsDiff"]:
+                violations.append("%s abs diff %s > %s" % (
+                    name, _number(absolute), limits["maxMeanAbsDiff"]))
+    return violations
+
+
 def _ok_text(result):
     return "yes" if result.get("ok") else "no: %s" % (result.get("error") or "error")
 
@@ -1104,17 +1194,23 @@ def environment_info(args, data_dir):
     }
 
 
+def read_reference(path):
+    """Read a dataset -> rows/numeric_means/group_counts reference JSON."""
+    path = pathlib.Path(path)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise BenchError("reference %s is unreadable: %s" % (path, exc))
+    if not isinstance(data, dict):
+        raise BenchError("reference %s must map a dataset name to metrics" % path)
+    return data
+
+
 def load_reference(data_dir):
     path = pathlib.Path(data_dir) / "reference.json"
     if not path.is_file():
         return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise BenchError("reference.json is unreadable: %s" % exc)
-    if not isinstance(data, dict):
-        raise BenchError("reference.json must map a dataset name to metrics")
-    return data
+    return read_reference(path)
 
 
 def observed_accuracy(dataset):
@@ -1144,7 +1240,8 @@ def run(args):
     entries = select_entries(load_manifest(args.manifest), parse_datasets(args.datasets))
     if not entries:
         raise BenchError("manifest %s selects no datasets" % args.manifest)
-    reference = load_reference(data_dir)
+    reference = (read_reference(resolve_path(args.reference)) if args.reference
+                 else load_reference(data_dir))
     engine = Engine(args)
     summary = {
         "format": "dap-p6-bench/1",
@@ -1217,7 +1314,7 @@ def run(args):
             else:
                 summary["accuracy"] = {
                     "available": False,
-                    "note": "reference.json has no entry for the measured datasets"}
+                    "note": "reference has no entry for the measured datasets"}
         steps_total = 0
         failed = 0
         for dataset in summary["datasets"]:
@@ -1272,11 +1369,24 @@ def parse_args(argv=None):
                         help="measure the MCP adapter's one-call tools")
     parser.add_argument("--java", default=None,
                         help="java binary (default: $DAP_JDK, $JAVA_HOME, then PATH)")
+    parser.add_argument("--gate", default=None,
+                        help="CI gate JSON; exit 1 on violations, 2 if unreadable")
+    parser.add_argument("--reference", default=None,
+                        help="checked-in reference JSON (dataset -> rows/means/counts)")
+    parser.add_argument("--json", default=None,
+                        help="gate result JSON (default: <out>/gate.json with --gate)")
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
+    gate = None
+    if args.gate:
+        try:
+            gate = load_gate(args.gate)
+        except (BenchError, OSError, ValueError) as exc:
+            print("p6-bench: %s" % exc, file=sys.stderr)
+            return 2
     try:
         summary = run(args)
     except (BenchError, OSError, ValueError) as exc:
@@ -1286,6 +1396,38 @@ def main(argv=None):
         summary["totals"]["datasets"], summary["totals"]["steps"],
         summary["totals"]["failed"],
         pathlib.Path(args.out).resolve()), flush=True)
+    if gate is None:
+        return 0
+    violations = check_gate(summary, gate)
+    mcp = summary.get("mcp") or {}
+    totals = summary.get("totals") or {}
+    accuracy = summary.get("accuracy") or {}
+    report = {
+        "format": "dap-p6-bench-gate/1",
+        "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "ok": not violations,
+        "violations": violations,
+        "gate": gate,
+        "observed": {
+            "failedSteps": totals.get("failed", 0),
+            "mcpCalls": mcp.get("callCount", 0),
+            "mcpFailedCalls": mcp.get("failedCalls", 0),
+            "mcpTokens": mcp.get("totalTokens", 0),
+            "accuracyAvailable": accuracy.get("available", False),
+        },
+        "summary": str(pathlib.Path(args.out) / "summary.json"),
+    }
+    json_path = resolve_path(args.json) if args.json else pathlib.Path(args.out) / "gate.json"
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    json_path.write_text(
+        json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if violations:
+        for violation in violations:
+            print("p6-bench gate: %s" % violation, file=sys.stderr)
+        print("p6-bench gate: FAIL (%d violation(s)); wrote %s" % (
+            len(violations), json_path), file=sys.stderr)
+        return 1
+    print("p6-bench gate: PASS; wrote %s" % json_path, flush=True)
     return 0
 
 

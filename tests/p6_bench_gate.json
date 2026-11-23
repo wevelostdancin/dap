@@ -1,0 +1,8 @@
+{
+  "maxFailedSteps": 0,
+  "maxFailedMcpCalls": 0,
+  "maxMcpCalls": 12,
+  "maxMcpTokens": 4000,
+  "maxMeanAbsDiff": 0.001,
+  "requireAccuracy": true
+}

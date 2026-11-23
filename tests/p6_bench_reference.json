@@ -1,0 +1,24 @@
+{
+  "iris": {
+    "rows": 150,
+    "numeric_means": {
+      "sepal_length": 5.843333333333335,
+      "sepal_width": 3.0540000000000007,
+      "petal_length": 3.7586666666666693,
+      "petal_width": 1.1986666666666672
+    },
+    "group_counts": {
+      "setosa": 50,
+      "versicolor": 50,
+      "virginica": 50
+    }
+  },
+  "p2": {
+    "rows": 6,
+    "numeric_means": {
+      "id": 3.0,
+      "score": 3.0
+    },
+    "group_counts": {}
+  }
+}
