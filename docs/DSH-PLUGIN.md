@@ -64,7 +64,7 @@ dsh plugin --profile desktop remove dap-dsh
 ## Проверка
 
 ```bash
-python3 -m unittest tests.dsh_plugin_test -v
+python3 -m unittest tests.test_dsh_plugin -v
 node --check dsh-plugin/index.js
 node --check dsh-plugin/bin/launch.mjs
 python3 scripts/check_repo.py

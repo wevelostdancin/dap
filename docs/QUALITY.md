@@ -248,8 +248,11 @@ A/B, time_series. Фикстуры данных:
 | Гейт | Команда | Порог прохода |
 |---|---|---|
 | `accuracy` | `make accuracy` | `cases_failed == 0` и `cases_total >= 27` (все 27 кейсов `validate_dap.py`) |
+| `bench` | `make bench-gate` | 0 failed steps/MCP calls, MCP calls <= 12, tokens <= 4000, rows/group counts exact, means abs diff <= 1e-3 |
+| `package` | `make package-e2e` | архив собирается, SHA256SUMS сходится, `dap doctor` PASS |
+| `recipes` | `make recipe-library-e2e` | все 8 рецептов проходят на demo-данных |
 | `unit` | `make test-native` | 0 падений JUnit |
-| `lint` | `make lint` | 0 ошибок `scripts/check_repo.py` |
+| `lint` | `make lint` | 0 ошибок `scripts/check_repo.py`; нет CJK в `md/yml/yaml` |
 
 Локальный прогон точности:
 

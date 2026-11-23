@@ -246,6 +246,10 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 несовпадении колонок — `dap_profile`/`dap_explore`, затем эквивалент через
 `dap_add_node`/`dap_sql`. В ответе — таблица и путь отчёта.
 
+Готовая библиотека — [recipes/README.md](../recipes/README.md): 8 рецептов и demo-данные
+в `examples/data/`. Установленный архив кладёт их в `$DAP_HOME/recipes` и
+`$DAP_HOME/examples`; `dap_recipe_list` показывает все восемь.
+
 Пропущенный обязательный аргумент — JSON-RPC `-32602` с `data.missing`.
 
 ## Рецепты

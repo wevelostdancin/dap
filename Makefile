@@ -9,7 +9,8 @@ REFPYTHON := $(if $(wildcard build/refvenv/bin/python),build/refvenv/bin/python,
 
 .PHONY: help build-native test-native run-native goldens goldens-validate coverage accuracy test-mcp smoke \
         mcp mcp-e2e mcp-recipe-e2e dist install-e2e package-e2e extensions bench bench-full bench-gate image-native \
-        run-native-image lint check soak clean-native runtime python-runtime package test-package
+        run-native-image lint check soak clean-native runtime python-runtime package test-package \
+        test-python recipe-library-e2e
 
 help:
 	@echo "DAP 1.3.0 — native analytics backend for agents"
@@ -32,6 +33,8 @@ help:
 	@echo "  make test-package   run the package unit tests (no jlink)"
 	@echo "  make install-e2e    install from dist/ into a temp HOME and run the stdio preflight"
 	@echo "  make package-e2e    build the self-contained archive and install it in a temp HOME"
+	@echo "  make test-python    run the stdlib unit tests (lint, package, gates, plugin, MCP)"
+	@echo "  make recipe-library-e2e  run all 8 recipes on the demo data"
 	@echo "  make extensions     install the DuckDB sqlite/postgres/httpfs extensions (network once)"
 	@echo "  make bench          native 100k-row benchmark"
 	@echo "  make bench-full     native 10M-row benchmark -> build/bench.json"
@@ -68,6 +71,13 @@ coverage: build-native
 
 test-mcp:
 	python3 tests/test_mcp_launch.py
+
+test-python:
+	python3 -m unittest tests.test_check_repo tests.test_package tests.test_p6_bench \
+		tests.test_validate_gate tests.test_dsh_plugin tests.test_mcp_resources tests.test_mcp_prompts
+
+recipe-library-e2e: build-native
+	python3 tests/recipe_library_e2e.py
 
 smoke:
 	python3 tests/native_smoke.py --base ${DAP_BASE:-http://127.0.0.1:7800}
@@ -149,7 +159,7 @@ soak:
 lint:
 	python3 scripts/check_repo.py
 
-check: test-native goldens goldens-validate test-mcp mcp-e2e mcp-recipe-e2e lint
+check: test-native goldens goldens-validate test-mcp mcp-e2e mcp-recipe-e2e test-python recipe-library-e2e lint
 
 clean-native:
 	rm -rf engine-native/target

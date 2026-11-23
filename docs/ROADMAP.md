@@ -11,10 +11,15 @@ Parquet-ingest, 16 узлов, 247 тестов. **P2 «Ядро аналити�
 рецепты, coverage-сьют 68/69, установка одной командой. **P6 «Аналитик» закрыт
 16.11.2026:** 66 узлов, 33 инструмента, глубокая статистика, мультифайл/каталог
 датасетов, пагинация/оценка/прогресс, HTML/PDF/PPTX, карта и facets.
+**P8 «Упаковка и принятие» закрыт 23.11.2026:** самодостаточный архив (jlink + Python
+3.12), установка одной командой, 8 рецептов, CI-гейты точности/токенов, DSH-плагин.
+(В переписке этот этап назывался P3; в ROADMAP P3 — «Статистика и время», поэтому
+здесь он P8.)
 **Цель:** лёгкий, быстрый и точный аналитический бэкенд для агента: локальный, по требованию,
 без KNIME.
 **Связанные документы:** [ARCHITECTURE.md](ARCHITECTURE.md), [NODES.md](NODES.md),
-[API.md](API.md), [QUALITY.md](QUALITY.md), [BENCH.md](BENCH.md).
+[API.md](API.md), [QUALITY.md](QUALITY.md), [BENCH.md](BENCH.md),
+[INSTALL.md](INSTALL.md), [PACKAGING.md](PACKAGING.md), [RELEASING.md](RELEASING.md).
 
 ## 1. Продукт
 
@@ -125,6 +130,7 @@ Parquet.
 | **P4. Hardening** ✅ | таймауты чтения, эвикция сессий/jobs/таблиц, контракт `{error, code, hint}`, soak | закрыто 15.11.2026: 534 теста, 25 goldens, `make check` и `make soak` зелёные | 3 дня |
 | **P5. MCP-сервис** ✅ | 8 узлов, 3 расширения, 7 SQL-рецептов, `dap-mcp install/doctor`, resources/prompts, coverage harness | закрыто 15.11.2026: 52 узла, 30 инструментов, покрытие 68/69, `make install-e2e` | 1 день |
 | **P6. Аналитик** ✅ | 14 узлов и расширения: file_reader/db_writer/text/geo/calendar, корреляция с p-value и partial, непараметрика/post-hoc/effect size, множественная регрессия/логистика, DBSCAN/LOF/IF, cluster/PCA, bootstrap/permutation, survival, A/B, time_series, chart-типы/карта/facets/chart_grid, отчёты HTML/PDF/PPTX | закрыто 16.11.2026: 66 узлов, 33 инструмента, 35 goldens, пагинация/estimate/progress/explore/каталог датасетов, `make check` зелёный | 1 день |
+| **P8. Упаковка и принятие** ✅ | jlink-архив без JDK/Python, `install.sh`, `dap` CLI, 8 рецептов и 7 промптов, CI-гейты accuracy/bench, DSH-плагин `dap-dsh`, release workflow | закрыто 23.11.2026: `make package-e2e`, `make recipe-library-e2e`, 27/27 accuracy, bench gate PASS, версия 1.3.0 | 2 дня |
 
 **Веха:** после P1 (~1,5 недели) — ежедневное использование на CSV/Excel; после P2 —
 полноценная аналитика; после P4 — стабильный продукт.

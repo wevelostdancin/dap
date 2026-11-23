@@ -74,7 +74,7 @@
 ### D. DSH-плагин и open-source (owner: plugin)
 
 Файлы: `dsh-plugin/` (`package.json`, `cordis.patch.yml`, `bin/launch.mjs`,
-`README.md`, `LICENSE`), `tests/dsh_plugin_test.py`, `docs/DSH-PLUGIN.md`,
+`README.md`, `LICENSE`), `tests/test_dsh_plugin.py`, `docs/DSH-PLUGIN.md`,
 `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CHANGELOG.md`,
 `.github/ISSUE_TEMPLATE/*`, `.github/pull_request_template.md`.
 
@@ -86,7 +86,7 @@
 4. Open-source файлы; `CHANGELOG` 1.3.0.
 5. Документация установки плагина (Desktop UI и CLI).
 
-Приёмка: `python3 -m unittest tests.dsh_plugin_test`;
+Приёмка: `python3 -m unittest tests.test_dsh_plugin`;
 `npx dsh-standards dsh-plugin --scope entry --entry-claim static` (или not-run).
 
 ### E. Интеграция (owner: lead)

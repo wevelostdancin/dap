@@ -3,7 +3,7 @@
 
 Run from the repository root:
 
-    python3 -m unittest tests.dsh_plugin_test -v
+    python3 -m unittest tests.test_dsh_plugin -v
 """
 from __future__ import annotations
 

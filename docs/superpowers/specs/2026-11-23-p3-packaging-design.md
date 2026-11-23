@@ -126,7 +126,7 @@ dap home
   код и данные, не требует postinstall и работает с pnpm.
 
 Если DSH не сохраняет `PATH` для дочернего процесса, patch использует
-`!!js process.env.HOME + '/.dap/bin/dap'`; это проверяется в `tests/dsh_plugin_test.py`
+`!!js process.env.HOME + '/.dap/bin/dap'`; это проверяется в `tests/test_dsh_plugin.py`
 статически и в ручном smoke.
 
 ### 5.7 Рецепты и промпты
@@ -206,7 +206,7 @@ release workflow по тегу `v*`.
 - `tests/mcp_recipe_e2e.py` — прогнать все 8 рецептов на demo-данных.
 - `tests/test_p6_bench.py` — парсер gate и порогов.
 - `tests/test_validate_gate.py` — `--json`/`--min-cases`.
-- `tests/dsh_plugin_test.py` — манифест, patch YAML, отсутствие CJK, launcher.
+- `tests/test_dsh_plugin.py` — манифест, patch YAML, отсутствие CJK, launcher.
 - `scripts/check_repo.py` — CJK, версия, наличие docs.
 
 ## 9. Критерии приёмки

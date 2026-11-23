@@ -36,8 +36,11 @@ def check_layout() -> None:
     for legacy in ("engine", "catalog", "runtime"):
         if (ROOT / legacy).exists():
             fail(f"legacy directory still present: {legacy}/")
-    for required in ("README.md", "docs/ROADMAP.md", "docs/ARCHITECTURE.md",
-                     "docs/NODES.md", "docs/QUALITY.md", "docs/API.md"):
+    for required in ("README.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md",
+                     "CODE_OF_CONDUCT.md", "docs/ROADMAP.md", "docs/ARCHITECTURE.md",
+                     "docs/NODES.md", "docs/QUALITY.md", "docs/API.md",
+                     "docs/INSTALL.md", "docs/PACKAGING.md", "docs/RELEASING.md",
+                     "docs/DSH-PLUGIN.md", "docs/NATIVE-IMAGE.md", "recipes/README.md"):
         if not (ROOT / required).is_file():
             fail(f"missing document: {required}")
 

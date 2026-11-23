@@ -1,5 +1,9 @@
 # DAP
 
+[![ci](https://github.com/wevelostdancin/dap/actions/workflows/ci.yml/badge.svg)](https://github.com/wevelostdancin/dap/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/wevelostdancin/dap)](https://github.com/wevelostdancin/dap/releases)
+[![license: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
+
 **DAP** — локальный аналитический бэкенд для агента: один JVM-процесс с HTTP API
 `/v1` и stdio MCP-адаптер. Агент собирает workflow из JSON-узлов, запускает его и
 получает таблицу и профиль колонок. Вычисления идут в процессе, данные не покидают
@@ -42,21 +46,33 @@
 DAP не является GUI, многопользовательским сервисом или облачным решением.
 Пользователь один, данные локальные, интерфейс — чат агента.
 
-## Требования
+## Установка
 
-- **JDK 21** (проверено на Temurin 21.0.13). Путь задаётся `DAP_JDK`.
-- **Python 3.10+** — для MCP-адаптера и проверок; только стандартная библиотека.
-- macOS или Linux, x86_64/aarch64. Jar содержит native-библиотеку DuckDB платформы
-  сборки; для кросс-платформенной упаковки — `-Ddap.duckdb.native=all`.
-- Внешняя БД и Docker не нужны.
+Готовый архив содержит JRE и Python: на машине пользователя **не нужны JDK и Python**.
 
-## Быстрый старт
+```bash
+curl -fsSL https://raw.githubusercontent.com/wevelostdancin/dap/main/scripts/install.sh | sh
+~/.dap/bin/dap doctor
+```
+
+Установка в DSH: `~/.dap/bin/dap install --client dsh` или плагин `dap-dsh`
+(см. [docs/DSH-PLUGIN.md](docs/DSH-PLUGIN.md)). Подробности, флаги и обновление —
+[docs/INSTALL.md](docs/INSTALL.md).
+
+## Сборка из исходников
+
+Для сборки нужны **JDK 21** (проверено на Temurin 21.0.13, путь — `DAP_JDK`) и
+**Python 3.10+** для MCP-адаптера и проверок (только стандартная библиотека).
+macOS или Linux, x86_64/aarch64. Jar содержит native-библиотеку DuckDB платформы
+сборки; для кросс-платформенной упаковки — `-Ddap.duckdb.native=all`.
+Внешняя БД и Docker не нужны.
 
 ```bash
 export DAP_JDK=/path/to/jdk-21        # по умолчанию ~/Projects/tools/jdk-21.0.13+9/Contents/Home
 
 make build-native                     # engine-native/target/dap-native.jar (~44 MiB)
 make run-native                       # 127.0.0.1:7800, блокирующий процесс
+make package                          # build/package/dap-<version>-<os>-<arch>.tar.gz
 ```
 
 В другом терминале:
@@ -168,8 +184,12 @@ python3 adapters/mcp/dap_cli.py install --client hermes   # или --client dsh
 python3 adapters/mcp/dap_cli.py doctor --client hermes
 ```
 
-Дистрибутив: `make dist` → `dist/` (jar, адаптер, CLI, `SHA256SUMS`); проверка
-установки из него — `make install-e2e`. Подробности — [docs/MCP.md](docs/MCP.md).
+В установленном архиве то же самое короче: `dap install --client dsh` и
+`dap doctor --client dsh`. DSH-плагин: `dsh plugin --profile desktop add dap-dsh`.
+
+Дистрибутив: `make package` → `build/package/dap-<version>-<os>-<arch>.tar.gz`
+(самодостаточный архив с JRE и Python), проверка — `make package-e2e`.
+Установка из архива — `scripts/install.sh`; подробности — [docs/PACKAGING.md](docs/PACKAGING.md).
 
 Инструменты: `dap_search_nodes`, `dap_node_dialog_schema`, `dap_workflow_create`,
 `dap_add_node`, `dap_connect`, `dap_run`, `dap_get_table`, `dap_profile_table`,
@@ -187,10 +207,14 @@ make smoke          # чёрный smoke по HTTP против запущенн
 make mcp-e2e        # create → add_node → connect → run → table → delete через MCP
 make mcp-recipe-e2e # resources/prompts/recipes/dap_sql через MCP
 make install-e2e    # установка из dist/ во временный HOME + stdio preflight
+make package-e2e    # сборка самодостаточного архива + установка в temp HOME
+make recipe-library-e2e # все 8 рецептов на demo-данных через MCP
+make accuracy       # эталонная точность (27 кейсов, scipy/statsmodels/sklearn)
+make bench-gate     # p6 bench с порогами по точности и токенам
 make extensions     # sqlite/postgres/mysql/httpfs в $DAP_HOME/build/duckdb-ext
 make soak           # 200 × create/run/table/delete
-make lint           # статические проверки репозитория
-make check          # test-native + goldens + goldens-validate + test-mcp + mcp-e2e + mcp-recipe-e2e + lint
+make lint           # статические проверки репозитория (включая запрет CJK в docs)
+make check          # test-native + goldens + test-python + mcp-e2e + lint
 ```
 
 ## Структура репозитория
@@ -199,15 +223,24 @@ make check          # test-native + goldens + goldens-validate + test-mcp + mcp-
 engine-native/   движок: Java 21, specs/*.json, JUnit-тесты
 adapters/mcp/    stdio MCP-адаптер (Python, только stdlib)
 api/             контракт /v1: openapi.yaml
-docs/            ARCHITECTURE, NODES, QUALITY, ROADMAP, API, MCP, BENCH
-tests/           goldens-native/, native_smoke.py, mcp_e2e.py, install_e2e.py, bench.py
+recipes/         8 готовых рецептов (dap-native-workflow/1 + recipe)
+examples/        демо-данные для рецептов
+dsh-plugin/      DSH bundle dap-dsh (MCP-сервер + диагностика)
+docs/            INSTALL, PACKAGING, DSH-PLUGIN, ARCHITECTURE, NODES, QUALITY, ROADMAP
+tests/           goldens-native/, native_smoke.py, mcp_e2e.py, package_e2e.py, bench.py
 deploy/          опциональный Dockerfile (Docker не нужен для локальной работы)
-scripts/         статические проверки репозитория
-Makefile         build-native, test-native, run-native, goldens, dist, check
+scripts/         install.sh, dap.sh, jlink/python runtime, package.py, проверки
+Makefile         build-native, package, test-native, goldens, check
 ```
 
 ## Документация
 
+- [docs/INSTALL.md](docs/INSTALL.md) — установка одной командой, обновление, удаление.
+- [docs/PACKAGING.md](docs/PACKAGING.md) — jlink/Python runtime, сборка архива.
+- [docs/RELEASING.md](docs/RELEASING.md) — тег, CI, GitHub Release, npm-плагин.
+- [docs/DSH-PLUGIN.md](docs/DSH-PLUGIN.md) — плагин `dap-dsh`.
+- [docs/NATIVE-IMAGE.md](docs/NATIVE-IMAGE.md) — спайк GraalVM native-image.
+- [recipes/README.md](recipes/README.md) — 8 сценариев для агента.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — компоненты, жизненный цикл запроса,
   память и ресурсы DuckDB, отмена, MCP-адаптер.
 - [docs/NODES.md](docs/NODES.md) — 66 узлов: назначение, config, примеры JSON.
@@ -248,6 +281,6 @@ Makefile         build-native, test-native, run-native, goldens, dist, check
 
 ## Лицензия
 
-Текст лицензии — [LICENSE](LICENSE). Движок собирается из собственного кода и
-сторонних библиотек, перечисленных в [engine-native/pom.xml](engine-native/pom.xml);
-гарантий нет.
+DAP распространяется под **GPL-3.0-or-later**; текст — [LICENSE](LICENSE),
+сторонние компоненты — [NOTICE](NOTICE). Движок собирается из собственного кода и
+библиотек, перечисленных в [engine-native/pom.xml](engine-native/pom.xml); гарантий нет.

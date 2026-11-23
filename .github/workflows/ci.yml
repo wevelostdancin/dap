@@ -64,8 +64,14 @@ jobs:
         run: python3 tests/test_mcp_launch.py
       - name: MCP unit tests
         run: python3 -m unittest discover -s tests -p 'test_mcp_*.py'
+      - name: Stdlib unit tests
+        run: |
+          python3 -m unittest tests.test_check_repo tests.test_package tests.test_p6_bench \
+            tests.test_validate_gate tests.test_dsh_plugin
       - name: MCP recipe end-to-end
         run: python3 tests/mcp_recipe_e2e.py
+      - name: Recipe library end-to-end
+        run: python3 tests/recipe_library_e2e.py
       - name: MCP end-to-end
         run: python3 tests/mcp_e2e.py
       - name: Black-box smoke
