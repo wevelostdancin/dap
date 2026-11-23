@@ -1,8 +1,7 @@
 # DAP
 
-[![ci](https://github.com/wevelostdancin/dap/actions/workflows/ci.yml/badge.svg)](https://github.com/wevelostdancin/dap/actions/workflows/ci.yml)
-[![release](https://img.shields.io/github/v/release/wevelostdancin/dap)](https://github.com/wevelostdancin/dap/releases)
 [![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![version: 1.3.0](https://img.shields.io/badge/version-1.3.0-blue.svg)](CHANGELOG.md)
 
 **DAP** — локальный аналитический бэкенд для агента: один JVM-процесс с HTTP API
 `/v1` и stdio MCP-адаптер. Агент собирает workflow из JSON-узлов, запускает его и
