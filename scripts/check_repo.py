@@ -144,7 +144,8 @@ def check_jar() -> None:
 def check_python() -> None:
     paths = (list((ROOT / "tests").glob("*.py"))
              + list((ROOT / "tests/goldens-native").glob("*.py"))
-             + list((ROOT / "adapters/mcp").glob("*.py")))
+             + list((ROOT / "adapters/mcp").glob("*.py"))
+             + list((ROOT / "scripts").glob("*.py")))
     for path in sorted(paths):
         try:
             compile(path.read_text(encoding="utf-8"), str(path), "exec")
