@@ -124,6 +124,10 @@ if [ -z "$top" ]; then
   echo "install.sh: archive is empty" >&2
   rm -rf "$staging"; exit 1
 fi
+if [ ! -x "$top/bin/dap" ]; then
+  echo "install.sh: archive has no executable bin/dap" >&2
+  rm -rf "$staging"; exit 1
+fi
 if [ -d "$HOME_DIR" ]; then
   # Keep user recipes and cache across upgrades.
   if [ -d "$HOME_DIR/recipes" ]; then
