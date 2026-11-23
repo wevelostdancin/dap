@@ -16,7 +16,7 @@
     <javalin.version>6.7.0</javalin.version>
     <duckdb.version>1.5.6.0</duckdb.version>
     <arrow.version>19.0.0</arrow.version>
-    <jackson.version>2.21.6</jackson.version>
+    <jackson.version>2.21.7</jackson.version>
     <junit.version>5.11.4</junit.version>
     <!-- Default JUnit tag filter: the slow soak suite runs via "make soak"
          (./mvnw -q -Dgroups=soak test), everything else runs in the normal suite. -->
