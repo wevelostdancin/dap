@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/wevelostdancin/dap/actions/workflows/ci.yml/badge.svg)](https://github.com/wevelostdancin/dap/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/wevelostdancin/dap)](https://github.com/wevelostdancin/dap/releases)
-[![license: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
+[![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 **DAP** — локальный аналитический бэкенд для агента: один JVM-процесс с HTTP API
 `/v1` и stdio MCP-адаптер. Агент собирает workflow из JSON-узлов, запускает его и
@@ -281,6 +281,6 @@ Makefile         build-native, package, test-native, goldens, check
 
 ## Лицензия
 
-DAP распространяется под **GPL-3.0-or-later**; текст — [LICENSE](LICENSE),
+DAP распространяется под **Apache-2.0**; текст — [LICENSE](LICENSE),
 сторонние компоненты — [NOTICE](NOTICE). Движок собирается из собственного кода и
 библиотек, перечисленных в [engine-native/pom.xml](engine-native/pom.xml); гарантий нет.

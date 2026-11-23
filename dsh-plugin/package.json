@@ -2,7 +2,7 @@
   "name": "dap-dsh",
   "version": "1.3.0",
   "description": "DSH bundle that registers the DAP MCP server and adds startup diagnostics",
-  "license": "GPL-3.0-or-later",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./index.js",
   "exports": {

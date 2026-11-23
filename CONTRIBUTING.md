@@ -4,7 +4,7 @@ Thank you for contributing. DAP is a local analytics backend: one JVM process, a
 
 ## License and Developer Certificate of Origin
 
-- DAP is licensed under [GPL-3.0-or-later](LICENSE). See [NOTICE](NOTICE) for third-party notices. By contributing you agree that your contribution is licensed under the same terms.
+- DAP is licensed under [Apache-2.0](LICENSE). See [NOTICE](NOTICE) for third-party notices. By contributing you agree that your contribution is licensed under the same terms.
 - Every commit must carry a Developer Certificate of Origin (DCO) sign-off. Create it with `git commit -s`, which appends `Signed-off-by: Your Name <you@example.com>` to the commit message. By signing off you certify DCO 1.1: you have the right to submit the contribution under the project license and you grant permission to use it under those terms. See <https://developercertificate.org/>.
 - Use the name and email associated with your GitHub account. Do not amend or remove an existing sign-off.
 - Never commit secrets, credentials, personal data, build outputs, or generated cache files.

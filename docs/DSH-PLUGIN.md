@@ -79,4 +79,4 @@ npx --yes dsh-standards dsh-plugin --scope entry --entry-claim static
 
 ## Лицензия
 
-GPL-3.0-or-later; текст совпадает с корневым `LICENSE`.
+Apache-2.0; текст совпадает с корневым `LICENSE`.

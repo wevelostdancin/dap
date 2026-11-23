@@ -32,7 +32,7 @@ class PackageManifestTest(unittest.TestCase):
         self.assertEqual(self.data["name"], "dap-dsh")
         self.assertEqual(self.data["version"], "1.3.0")
         self.assertTrue(self.data["description"].strip())
-        self.assertEqual(self.data["license"], "GPL-3.0-or-later")
+        self.assertEqual(self.data["license"], "Apache-2.0")
         self.assertEqual(self.data["type"], "module")
         self.assertEqual(self.data["main"], "./index.js")
         self.assertEqual(self.data["exports"], {".": "./index.js"})
@@ -134,12 +134,12 @@ class DocsTest(unittest.TestCase):
         self.assertIn("install.sh", text)
         self.assertIn("dsh plugin --profile desktop add dap-dsh", text)
         self.assertIn("dsh plugin --profile desktop remove dap-dsh", text)
-        self.assertIn("GPL-3.0-or-later", text)
+        self.assertIn("Apache-2.0", text)
 
     def test_dsh_plugin_doc(self) -> None:
         text = read(ROOT / "docs" / "DSH-PLUGIN.md")
         for token in ("install.sh", "dsh plugin --profile desktop add dap-dsh",
-                      "mcp__dap__*", "GPL-3.0-or-later"):
+                      "mcp__dap__*", "Apache-2.0"):
             self.assertIn(token, text)
 
     def test_no_cjk_in_docs_and_readme(self) -> None:

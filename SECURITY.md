@@ -1,8 +1,5 @@
 # Security Policy
 
-<!-- The contact address below is a placeholder. Replace maintainer@example.com
-     with the real maintainer contact address before publishing the repository. -->
-
 ## Supported versions
 
 Security fixes are applied to the current minor line only.
@@ -19,7 +16,7 @@ Upgrade to the latest 1.3.x release before reporting an issue; reports against o
 Please report suspected vulnerabilities privately:
 
 1. Preferred: use GitHub private vulnerability reporting from the repository **Security** tab and choose **Report a vulnerability**. This creates a private channel with the maintainers.
-2. If private reporting is unavailable, email maintainer@example.com with the subject `DAP security report`. Do not open a public issue, discussion, or pull request for a suspected vulnerability.
+2. If private reporting is unavailable, contact the maintainer [@wevelostdancin](https://github.com/wevelostdancin) on GitHub and ask for a private channel. Do not open a public issue, discussion, or pull request for a suspected vulnerability.
 
 Include as much of the following as you can:
 

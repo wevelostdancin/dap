@@ -66,6 +66,16 @@ def check_version() -> None:
         fail(f"NativeService.VERSION {match.group(1)} != VERSION {version}")
 
 
+def check_license() -> None:
+    license_text = read("LICENSE")
+    if "Apache License" not in license_text or "Version 2.0" not in license_text:
+        fail("LICENSE is not Apache-2.0")
+    if "Apache License" not in read("NOTICE"):
+        fail("NOTICE does not mention the Apache License")
+    if '"license": "Apache-2.0"' not in read("dsh-plugin/package.json"):
+        fail("dsh-plugin/package.json license is not Apache-2.0")
+
+
 def check_openapi() -> None:
     try:
         import yaml  # type: ignore
@@ -225,6 +235,7 @@ def check_shell() -> None:
 def main() -> int:
     check_layout()
     check_version()
+    check_license()
     check_openapi()
     check_native_boundary()
     check_specs()

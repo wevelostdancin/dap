@@ -97,4 +97,4 @@ rm -rf ~/.dap
 
 ## Лицензия
 
-GPL-3.0-or-later; см. [LICENSE](../LICENSE) и [NOTICE](../NOTICE).
+Apache-2.0; см. [LICENSE](../LICENSE) и [NOTICE](../NOTICE).

@@ -73,4 +73,4 @@ remove that directory yourself if you no longer need DAP.
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE).

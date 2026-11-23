@@ -16,8 +16,8 @@ info:
     Variable port is handled by the server. Job timeouts count from submission,
     including queue time.
   license:
-    name: GNU General Public License v3.0 or later
-    identifier: GPL-3.0-or-later
+    name: Apache License 2.0
+    identifier: Apache-2.0
 servers:
   - url: http://127.0.0.1:7800
     description: Default loopback endpoint
