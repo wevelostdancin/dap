@@ -15,7 +15,11 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ADAPTER = ROOT / "adapters" / "mcp" / "dap_mcp.py"
-PROMPTS = {"analyze_csv", "quality_check", "profile_report"}
+PROMPTS = {
+    "analyze_csv", "quality_check", "profile_report",
+    "cohort_analysis", "ab_test", "time_series", "segmentation",
+    "regression", "funnel", "exec_report",
+}
 
 
 def load_adapter(**environment):
@@ -71,7 +75,7 @@ class PromptsTest(unittest.TestCase):
         self.assertEqual(capabilities.get("prompts"), {"listChanged": False})
         self.assertIn("resources", capabilities, "resources capability must survive")
 
-    def test_prompts_list_returns_three_prompts(self):
+    def test_prompts_list_returns_all_prompts(self):
         reply = rpc(self.module, "prompts/list", {})
         prompts = reply["result"]["prompts"]
         names = {prompt["name"] for prompt in prompts}

@@ -143,6 +143,26 @@ class PromptError(ValueError):
         self.data = data
 
 
+def _scenario_prompt(name: str, description: str) -> dict:
+    """Definition of a saved-recipe scenario prompt."""
+    return {
+        "name": name,
+        "description": description,
+        "arguments": [
+            {
+                "name": "dataset",
+                "description": "dataset name or path to a Parquet file",
+                "required": True,
+            },
+            {
+                "name": "report",
+                "description": "Markdown report path (default: %s.md)" % name,
+                "required": False,
+            },
+        ],
+    }
+
+
 PROMPTS = [
     {
         "name": "analyze_csv",
@@ -184,6 +204,35 @@ PROMPTS = [
             },
         ],
     },
+] + [
+    _scenario_prompt(
+        "cohort_analysis",
+        "Run the saved cohort_analysis recipe: cohort retention table and Markdown report.",
+    ),
+    _scenario_prompt(
+        "ab_test",
+        "Run the saved ab_test recipe: A/B comparison table and Markdown report.",
+    ),
+    _scenario_prompt(
+        "time_series",
+        "Run the saved time_series recipe: resampled forecast table and Markdown report.",
+    ),
+    _scenario_prompt(
+        "segmentation",
+        "Run the saved segmentation recipe: cluster segments table and Markdown report.",
+    ),
+    _scenario_prompt(
+        "regression",
+        "Run the saved regression recipe: linear regression table and Markdown report.",
+    ),
+    _scenario_prompt(
+        "funnel",
+        "Run the saved funnel recipe: funnel steps and conversion table plus Markdown report.",
+    ),
+    _scenario_prompt(
+        "exec_report",
+        "Run the saved exec_report recipe: grouped summary, chart and Markdown report.",
+    ),
 ]
 
 
@@ -257,10 +306,41 @@ def _profile_report(values: dict) -> str:
     )
 
 
+def _scenario_renderer(recipe: str):
+    """Build the prompt renderer for one saved-recipe scenario."""
+    def render(values: dict) -> str:
+        dataset = values["dataset"]
+        report = values.get("report") or (recipe + ".md")
+        return (
+            'Run the %s scenario on %s with the saved DAP recipe.\n'
+            '\n'
+            'DAP pipeline:\n'
+            '1. Read the resource dap://recipes/%s - it returns the workflow JSON and the '
+            'recipe block with the expected dataset and params.\n'
+            '2. Call dap_recipe_run {"name": "%s", "dataset": "%s", "params": {"report": "%s"}} '
+            '- it applies the dataset and report override, runs the saved pipeline and returns '
+            'the result table.\n'
+            '3. If the input columns do not match the recipe, first call dap_profile '
+            '{"dataset": "%s"} or dap_explore {"dataset": "%s"} to see the real columns, then '
+            'rebuild the equivalent pipeline with dap_add_node and dap_sql instead of the '
+            'mismatching nodes.\n'
+            '4. Return the resulting table and the report path %s.\n'
+            % (recipe, dataset, recipe, recipe, dataset, report, dataset, dataset, report)
+        )
+    return render
+
+
 _TEMPLATES = {
     "analyze_csv": _analyze_csv,
     "quality_check": _quality_check,
     "profile_report": _profile_report,
+    "cohort_analysis": _scenario_renderer("cohort_analysis"),
+    "ab_test": _scenario_renderer("ab_test"),
+    "time_series": _scenario_renderer("time_series"),
+    "segmentation": _scenario_renderer("segmentation"),
+    "regression": _scenario_renderer("regression"),
+    "funnel": _scenario_renderer("funnel"),
+    "exec_report": _scenario_renderer("exec_report"),
 }
 
 
