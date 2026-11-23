@@ -11,6 +11,8 @@ REFPYTHON := $(if $(wildcard build/refvenv/bin/python),build/refvenv/bin/python,
         mcp mcp-e2e mcp-recipe-e2e dist install-e2e package-e2e extensions bench bench-full bench-gate image-native \
         run-native-image lint check soak clean-native
 
+.PHONY: runtime python-runtime package test-package
+
 help:
 	@echo "DAP 1.0.0 — native analytics backend for agents"
 	@echo ""
@@ -26,6 +28,10 @@ help:
 	@echo "  make mcp-e2e        MCP create/add/run/table e2e"
 	@echo "  make mcp-recipe-e2e MCP resources/prompts/recipes/dap_sql e2e"
 	@echo "  make dist           build the distributable dist/ (jar, adapter, CLI, checksums)"
+	@echo "  make runtime        build the bundled jlink JRE in build/package/runtime"
+	@echo "  make python-runtime download the pinned Python runtime into build/tools/python"
+	@echo "  make package        build the self-contained archive in build/package/"
+	@echo "  make test-package   run the package unit tests (no jlink)"
 	@echo "  make install-e2e    install from dist/ into a temp HOME and run the stdio preflight"
 	@echo "  make package-e2e    build the self-contained archive and install it in a temp HOME"
 	@echo "  make extensions     install the DuckDB sqlite/postgres/httpfs extensions (network once)"
@@ -97,8 +103,20 @@ dist: build-native
 install-e2e: dist
 	python3 tests/install_e2e.py
 
+runtime:
+	sh scripts/jlink-runtime.sh --jar $(JAR) --output build/package/runtime
+
+python-runtime:
+	sh scripts/python-runtime.sh
+
+package: build-native runtime python-runtime
+	python3 scripts/package.py --jar $(JAR)
+
 package-e2e: build-native
 	python3 tests/package_e2e.py
+
+test-package:
+	python3 -m unittest tests.test_package -v
 
 extensions: build-native
 	DAP_HOME="$(CURDIR)" "$(DAP_JDK)/bin/java" -jar $(JAR) --install-extensions sqlite postgres mysql httpfs
