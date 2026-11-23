@@ -84,7 +84,9 @@ public final class IngestService {
     public IngestService(Path cacheDir, String memoryLimit, Integer threads, String tempDirectory) {
         this.cacheDir = Objects.requireNonNull(cacheDir, "cacheDir");
         this.memoryLimit = memoryLimit;
-        this.threads = threads == null ? Math.min(Runtime.getRuntime().availableProcessors(), 8) : threads;
+        this.threads = threads == null
+                ? Math.min(Runtime.getRuntime().availableProcessors(), DEFAULT_THREADS)
+                : threads;
         this.tempDirectory = tempDirectory;
     }
 
