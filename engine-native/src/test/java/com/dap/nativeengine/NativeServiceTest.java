@@ -105,7 +105,7 @@ class NativeServiceTest {
         Resp meta = send("GET", "/v1", "bad session!", null);
         assertEquals(200, meta.status());
         assertEquals("DAP", meta.body().path("name").asText());
-        assertEquals("1.2.0", meta.body().path("version").asText());
+        assertEquals(NativeService.VERSION, meta.body().path("version").asText());
         assertEquals("v1", meta.body().path("api").asText());
         assertEquals("/v1/nodes, /v1/workflows, /v1/jobs, /v1/health", meta.body().path("endpoints").asText());
         assertEquals("1", meta.header("X-DAP-Api-Version"));
@@ -118,7 +118,7 @@ class NativeServiceTest {
         JsonNode body = health.body();
         assertTrue(body.path("ok").asBoolean());
         assertEquals("DAP", body.path("name").asText());
-        assertEquals("1.2.0", body.path("version").asText());
+        assertEquals(NativeService.VERSION, body.path("version").asText());
         assertEquals("1", body.path("api").asText());
         assertEquals(66, body.path("nodes").asInt());
         assertEquals(66, body.path("coreNodes").asInt());
