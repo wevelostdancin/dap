@@ -1,116 +1,124 @@
 # DAP
 
 [![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![version: 1.3.0](https://img.shields.io/badge/version-1.3.0-blue.svg)](CHANGELOG.md)
+[![version: 1.3.1](https://img.shields.io/badge/version-1.3.1-blue.svg)](CHANGELOG.md)
+[![npm: dap-dsh](https://img.shields.io/npm/v/dap-dsh.svg?label=dsh%20plugin)](https://www.npmjs.com/package/dap-dsh)
 
-**DAP** — локальный аналитический бэкенд для агента: один JVM-процесс с HTTP API
-`/v1` и stdio MCP-адаптер. Агент собирает workflow из JSON-узлов, запускает его и
-получает таблицу и профиль колонок. Вычисления идут в процессе, данные не покидают
-машину.
+**DAP** is a local analytics backend for agents: a single JVM process with an
+HTTP `/v1` API and a stdio MCP adapter. An agent builds a workflow from JSON
+nodes, runs it, and gets a table plus a column profile. Everything is computed
+in-process; data never leaves the machine.
 
-Движок: Javalin 6.7 + DuckDB 1.5.6 (in-memory) + Arrow 19.0, Java 21. Каталог —
-66 узлов `dap.*`, контракт — 30 операций `/v1`. Версия: **1.3.0**.
+Engine: Javalin 6.7 + DuckDB 1.5.6 (in-memory) + Arrow 19.0 on Java 21.
+Catalog: 66 `dap.*` nodes. Contract: 31 paths and 38 operations under `/v1`.
+Version: **1.3.1**.
 
-## Что это
+## What it is
 
-- **Аналитика по запросу.** Адаптер поднимает движок при первом вызове; отдельного
-  демона, Docker и внешней БД в ежедневном пути нет.
-- **Два интерфейса.** MCP (stdio, 33 инструмента `dap_*`) для агента и HTTP `/v1`
-  для скриптов и тестов.
-- **Узлы как данные.** Узел описывается JSON-спекой: id, порты, `configSchema`.
-  Агент читает схему настроек и собирает граф без XML и без GUI.
-- **66 узлов.** IO (5 читателей, multi-file/glob `file_reader`, SQL-БД и список
-  файлов, 4 писателя, `db_writer`), очистка (фильтры, дедупликация, замена значений,
-  приведение типов, порядок колонок, выбросы, regex/split, `text_normalize`),
-  преобразование (дата/время, правила, бины, нормализация, кодирование, выборка,
-  train/test, `calendar`, `geo_distance`), агрегация и форма (group_by с
-  median/percentile, построчные агрегаты, pivot/unpivot, window, top-N,
-  joiner/concatenate/asof/cross, `fuzzy_join`), статистика (describe, value_counts,
-  correlation с p-value/partial, hypothesis_test с post-hoc и непараметрикой,
-  linear/logistic regression, outlier_detect с DBSCAN/LOF/IF, cluster, PCA,
-  resample_test, survival, ab_test, histogram, quantile), временные ряды (resample,
-  rolling, diff, date_range, `time_series`), SQL (`sql_query`), визуализация и отчёты
-  (`chart` с pie/boxplot/heatmap/map/facets, `chart_grid`, `markdown_report` в
-  md/html/pdf/pptx), качество (`data_quality`).
-- **DuckDB внутри.** Преобразования — ленивые SQL-отношения; данные материализуются
-  только при чтении таблицы или профиля.
-- **Parquet-кэш.** `POST /v1/datasets` (инструмент `dap_ingest`) один раз конвертирует
-  CSV/Excel/JSON/Parquet в `$DAP_HOME/build/cache` (или `~/.dap/cache`); повторный
-  анализ читает Parquet. Ключ зависит от пути, размера, mtime, формата, параметров
-  чтения и отпечатка содержимого (первых и последних 64 КиБ), поэтому `dap_ingest`
-  идемпотентен по содержимому: неизменный файл даёт `cached: true`, а перезапись с
-  тем же размером и mtime — новую запись. Испорченный кэш пересоздаётся сам; подробности —
-  в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- **Analytics on demand.** The adapter starts the engine on the first call;
+  there is no daemon, no Docker and no external database in the daily path.
+- **Two interfaces.** MCP (stdio, 33 `dap_*` tools) for agents and HTTP `/v1`
+  for scripts and tests.
+- **Nodes as data.** Every node is described by a JSON spec: id, ports,
+  `configSchema`. The agent reads the settings schema and builds a graph
+  without XML and without a GUI.
+- **66 nodes.** IO (5 readers, multi-file/glob `file_reader`, SQL databases and
+  file listing, 4 writers, `db_writer`), cleaning (filters, deduplication,
+  value replacement, type casting, column order, outliers, regex/split,
+  `text_normalize`), transformation (date/time, rules, binning, normalization,
+  encoding, sampling, train/test, `calendar`, `geo_distance`), aggregation and
+  shape (group_by with median/percentile, row aggregates, pivot/unpivot, window,
+  top-N, joiner/concatenate/asof/cross, `fuzzy_join`), statistics (describe,
+  value_counts, correlation with p-value/partial, hypothesis_test with post-hoc
+  and non-parametric tests, linear/logistic regression, outlier_detect with
+  DBSCAN/LOF/IF, cluster, PCA, resample_test, survival, ab_test, histogram,
+  quantile), time series (resample, rolling, diff, date_range, `time_series`),
+  SQL (`sql_query`), visualization and reports (`chart` with
+  pie/boxplot/heatmap/map/facets, `chart_grid`, `markdown_report` in
+  md/html/pdf/pptx), and quality (`data_quality`).
+- **DuckDB inside.** Transformations are lazy SQL relations; data is
+  materialized only when a table or profile is read.
+- **Parquet cache.** `POST /v1/datasets` (the `dap_ingest` tool) converts
+  CSV/Excel/JSON/Parquet once into `$DAP_HOME/build/cache` (or `~/.dap/cache`);
+  later analyses read Parquet. The key covers path, size, mtime, format, read
+  options and a content fingerprint (first and last 64 KiB), so `dap_ingest` is
+  idempotent by content: an unchanged file returns `cached: true`, while a
+  rewrite with the same size and mtime produces a new entry. A corrupt cache
+  entry is recreated automatically; see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-DAP не является GUI, многопользовательским сервисом или облачным решением.
-Пользователь один, данные локальные, интерфейс — чат агента.
+DAP is not a GUI, a multi-user service or a cloud product. There is one user,
+the data is local, and the interface is the agent's chat.
 
-## Установка
+## Install
 
-Готовый архив содержит JRE и Python: на машине пользователя **не нужны JDK и Python**.
+The release archive bundles a JRE and Python: **no JDK or Python is required**
+on the target machine.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wevelostdancin/dap/main/scripts/install.sh | sh
 ~/.dap/bin/dap doctor
 ```
 
-Установка в DSH: `~/.dap/bin/dap install --client dsh` или плагин `dap-dsh`
-(см. [docs/DSH-PLUGIN.md](docs/DSH-PLUGIN.md)). Подробности, флаги и обновление —
-[docs/INSTALL.md](docs/INSTALL.md).
+For DSH, install the `dap-dsh` plugin from npm (**Settings -> Plugins** in
+Desktop, or `dsh plugin --profile <name> add dap-dsh` for a CLI profile) — the
+plugin registers the MCP server and adds startup diagnostics. Without the
+plugin, `dap install --client dsh` writes the MCP entry by hand. Details, flags
+and upgrades: [docs/INSTALL.md](docs/INSTALL.md) and
+[docs/DSH-PLUGIN.md](docs/DSH-PLUGIN.md).
 
-## Сборка из исходников
+## Build from source
 
-Для сборки нужны **JDK 21** (проверено на Temurin 21.0.13, путь — `DAP_JDK`) и
-**Python 3.10+** для MCP-адаптера и проверок (только стандартная библиотека).
-macOS или Linux, x86_64/aarch64. Jar содержит native-библиотеку DuckDB платформы
-сборки; для кросс-платформенной упаковки — `-Ddap.duckdb.native=all`.
-Внешняя БД и Docker не нужны.
+Building requires **JDK 21** (tested with Temurin 21.0.13, path in `DAP_JDK`)
+and **Python 3.10+** for the MCP adapter and checks (standard library only).
+macOS or Linux, x86_64/aarch64. The jar contains the DuckDB native library for
+the build platform; for cross-platform packaging use
+`-Ddap.duckdb.native=all`. No external database or Docker is needed.
 
 ```bash
-export DAP_JDK=/path/to/jdk-21        # по умолчанию ~/Projects/tools/jdk-21.0.13+9/Contents/Home
+export DAP_JDK=/path/to/jdk-21        # defaults to ~/Projects/tools/jdk-21.0.13+9/Contents/Home
 
 make build-native                     # engine-native/target/dap-native.jar (~44 MiB)
-make run-native                       # 127.0.0.1:7800, блокирующий процесс
+make run-native                       # 127.0.0.1:7800, blocking process
 make package                          # build/package/dap-<version>-<os>-<arch>.tar.gz
 ```
 
-В другом терминале:
+In another terminal:
 
 ```bash
 curl -s http://127.0.0.1:7800/v1/health
 ```
 
 ```json
-{"ok":true,"name":"DAP","version":"1.3.0","api":"1","nodes":66,"coreNodes":66,
+{"ok":true,"name":"DAP","version":"1.3.1","api":"1","nodes":66,"coreNodes":66,
  "workflows":0,"sessions":0,"jobs":0,"memory":{"usedMb":…,"maxMb":…}}
 ```
 
-(`memory` — текущие `usedMb`/`maxMb` JVM.)
+(`memory` is the current JVM `usedMb`/`maxMb`.)
 
-Cold start — около 0.4–0.5 с от `java -jar` до первого `200`. Сразу после ответа
-`health` движок прогревается в фоне (`DAP_WARMUP`), поэтому первый вызов после
-прогрева не платит инициализацию DuckDB и JIT. Остановка —
-`POST /v1/shutdown`, сигнал процессу или простой дольше `DAP_IDLE_TIMEOUT_SEC`.
+Cold start is about 0.4–0.5 s from `java -jar` to the first `200`. Right after
+`health` answers, the engine warms up in the background (`DAP_WARMUP`), so the
+first call does not pay DuckDB and JIT initialization. Shutdown happens via
+`POST /v1/shutdown`, a process signal, or idle timeout (`DAP_IDLE_TIMEOUT_SEC`).
 
-Переменные: `DAP_PORT` (7800), `DAP_BIND` (`127.0.0.1`; также `localhost` и
-`0.0.0.0`), `DAP_MAX_WORKFLOWS` (100 на сессию), `DAP_JOB_TIMEOUT` (600 с),
-`DAP_IDLE_TIMEOUT_SEC` (900 с; `0` выключает автозавершение),
-`DAP_QUERY_TIMEOUT_SEC` (60 с; предел материализации `/table` и `/profile`; `0`
-выключает), `DAP_MAX_SESSIONS` (64; LRU-эвикция), `DAP_SESSION_TTL_SEC` (1800 с;
-`0` выключает TTL), `DAP_MAX_RETAINED_JOBS` (200; cap истории заданий на сессию),
-`DAP_TABLE_MAX_LIMIT` (100 000; предел `limit` у `/table`, превышение — 400
-`limit_too_large`),
-`DAP_WARMUP` (1; прогрев движка при старте в фоновом потоке; `0` выключает),
-`DAP_ALLOW_STALE_ENGINE` (0; MCP-адаптер сверяет версию отвечающего движка с
-`VERSION` и заменяет движок старой сборки на текущий jar; если jar или java не
-готовы, движок не гасится — адаптер возвращает ошибку и оставляет порт живым;
-`1` — подключиться к нему как есть),
+Environment variables: `DAP_PORT` (7800), `DAP_BIND` (`127.0.0.1`; also
+`localhost` and `0.0.0.0`), `DAP_MAX_WORKFLOWS` (100 per session),
+`DAP_JOB_TIMEOUT` (600 s), `DAP_IDLE_TIMEOUT_SEC` (900 s; `0` disables
+auto-shutdown), `DAP_QUERY_TIMEOUT_SEC` (60 s; materialization limit for
+`/table` and `/profile`; `0` disables), `DAP_MAX_SESSIONS` (64; LRU eviction),
+`DAP_SESSION_TTL_SEC` (1800 s; `0` disables TTL), `DAP_MAX_RETAINED_JOBS` (200;
+cap on job history per session), `DAP_TABLE_MAX_LIMIT` (100,000; `limit` cap for
+`/table`, above it a 400 `limit_too_large`), `DAP_WARMUP` (1; warm the engine in
+a background thread at startup; `0` disables), `DAP_ALLOW_STALE_ENGINE` (0; the
+MCP adapter compares the running engine version with `VERSION` and replaces an
+older engine with the current jar; if the jar or Java is not ready the engine is
+left running and the adapter returns an error; `1` connects to it as is),
 `DAP_DUCKDB_MEMORY_LIMIT`, `DAP_DUCKDB_THREADS`, `DAP_DUCKDB_TEMP_DIR`,
-`DAP_DUCKDB_EXTENSION_DIR` (расширения DuckDB; ставятся `--install-extensions`),
-`DAP_CACHE_DIR` (Parquet-кэш; по умолчанию `$DAP_HOME/build/cache` при заданном
-`DAP_HOME`, иначе `~/.dap/cache`; в sandbox — `$TMPDIR/dap-cache`).
+`DAP_DUCKDB_EXTENSION_DIR` (DuckDB extensions; installed by
+`--install-extensions`), `DAP_CACHE_DIR` (Parquet cache; defaults to
+`$DAP_HOME/build/cache` when `DAP_HOME` is set, otherwise `~/.dap/cache`; in a
+sandbox `$TMPDIR/dap-cache`).
 
-## Пример вызова
+## Example call
 
 ```bash
 B=http://127.0.0.1:7800
@@ -120,45 +128,48 @@ curl -s -X POST $B/v1/workflows -H 'Content-Type: application/json' \
   -d '{"name":"demo"}'
 # {"id":"wf-1","name":"demo","session":"default","nodes":0}
 
-# 2. источник
+# 2. source
 curl -s -X POST $B/v1/workflows/wf-1/nodes -H 'Content-Type: application/json' -d '{
   "factory":"dap.csv_reader",
   "settings":{"file":"/data/iris.csv","delimiter":",","header":true}
 }'
 # {"node":"1:1","name":"CSV Reader"}
 
-# 3. фильтр
+# 3. filter
 curl -s -X POST $B/v1/workflows/wf-1/nodes -H 'Content-Type: application/json' -d '{
   "factory":"dap.row_filter",
   "settings":{"logic":"and","where":[{"column":"species","op":"eq","value":"setosa"}]}
 }'
 # {"node":"1:2","name":"Row Filter"}
 
-# 4. связь и запуск
+# 4. connect and run
 curl -s -X POST $B/v1/workflows/wf-1/connect -H 'Content-Type: application/json' \
   -d '{"from":"1:1","to":"1:2"}'
 curl -s -X POST $B/v1/workflows/wf-1/run -H 'Content-Type: application/json' -d '{}'
 # {"ok":true,"durationMs":…,"workflow":"wf-1","nodes":[{"node":"1:1","name":"CSV Reader","state":"EXECUTED"}, …]}
 
-# 5. таблица и профиль
+# 5. table and profile
 curl -s "$B/v1/workflows/wf-1/nodes/1:2/table?limit=5"
 curl -s "$B/v1/workflows/wf-1/nodes/1:2/profile"
 ```
 
-Идентификатор узла — `<номер workflow>:<индекс>`, например `1:2` для `wf-1`.
-Сессия — заголовок `X-DAP-Session` или `?session=`, по умолчанию `default`.
-Асинхронный запуск — `POST .../run?async=true` или `POST .../jobs` (202 + `job-N`).
+A node id is `<workflow number>:<index>`, for example `1:2` for `wf-1`. The
+session comes from the `X-DAP-Session` header or `?session=`, defaulting to
+`default`. For asynchronous runs use `POST .../run?async=true` or
+`POST .../jobs` (202 + `job-N`).
 
-## MCP-адаптер
+## MCP adapter
 
-Адаптер — тонкий stdio-транспорт JSON-RPC 2.0; вычисления остаются в движке.
+The adapter is a thin stdio JSON-RPC 2.0 transport; computation stays in the
+engine.
 
 ```bash
 python3 adapters/mcp/dap_mcp.py
 ```
 
-Если движок не отвечает на `/v1/health`, адаптер запускает jar сам и ждёт готовности
-до 60 с; уже работающий сервис не перезапускает. Конфигурация MCP-клиента:
+If the engine does not answer `/v1/health`, the adapter starts the jar itself
+and waits up to 60 s; it never restarts a service that is already running.
+MCP client configuration:
 
 ```json
 {
@@ -176,119 +187,125 @@ python3 adapters/mcp/dap_mcp.py
 }
 ```
 
-Подключить одной командой (stdlib-CLI, идемпотентно, с бэкапом и `--dry-run`):
+One-command setup (stdlib CLI, idempotent, backs up and supports `--dry-run`):
 
 ```bash
-python3 adapters/mcp/dap_cli.py install --client hermes   # или --client dsh
+python3 adapters/mcp/dap_cli.py install --client hermes   # or --client dsh
 python3 adapters/mcp/dap_cli.py doctor --client hermes
 ```
 
-В установленном архиве то же самое короче: `dap install --client dsh` и
-`dap doctor --client dsh`. DSH-плагин: `dsh plugin --profile desktop add dap-dsh`.
+In an installed archive the same is shorter: `dap install --client dsh` and
+`dap doctor --client dsh`. The DSH plugin is published as
+[`dap-dsh`](https://www.npmjs.com/package/dap-dsh).
 
-Дистрибутив: `make package` → `build/package/dap-<version>-<os>-<arch>.tar.gz`
-(самодостаточный архив с JRE и Python), проверка — `make package-e2e`.
-Установка из архива — `scripts/install.sh`; подробности — [docs/PACKAGING.md](docs/PACKAGING.md).
+Distribution: `make package` → `build/package/dap-<version>-<os>-<arch>.tar.gz`
+(a self-contained archive with JRE and Python); verify with `make package-e2e`.
+Install from an archive with `scripts/install.sh`; see
+[docs/PACKAGING.md](docs/PACKAGING.md).
 
-Инструменты: `dap_search_nodes`, `dap_node_dialog_schema`, `dap_workflow_create`,
+Tools: `dap_search_nodes`, `dap_node_dialog_schema`, `dap_workflow_create`,
 `dap_add_node`, `dap_connect`, `dap_run`, `dap_get_table`, `dap_profile_table`,
-`dap_ingest`, `dap_save_workflow`, `dap_load_workflow`, `dap_shutdown` и остальные
-`dap_*` — 30 штук, плюс MCP resources (`dap://catalog`, `dap://recipes`) и prompts. Полный список с аргументами —
+`dap_ingest`, `dap_save_workflow`, `dap_load_workflow`, `dap_shutdown` and the
+rest of `dap_*` — 33 in total, plus MCP resources (`dap://catalog`,
+`dap://recipes`) and prompts. The full list with arguments is in
 [adapters/mcp/README.md](adapters/mcp/README.md).
 
-## Проверки
+## Checks
 
 ```bash
-make test-native    # JUnit: 534 теста
-make goldens        # 25 golden-workflow на отдельном экземпляре :7811
-make coverage       # 69 задач таксономии через /v1 (сейчас 68/69, F6 — не-цель)
-make smoke          # чёрный smoke по HTTP против запущенного движка (DAP_BASE)
-make mcp-e2e        # create → add_node → connect → run → table → delete через MCP
-make mcp-recipe-e2e # resources/prompts/recipes/dap_sql через MCP
-make install-e2e    # установка из dist/ во временный HOME + stdio preflight
-make package-e2e    # сборка самодостаточного архива + установка в temp HOME
-make recipe-library-e2e # все 8 рецептов на demo-данных через MCP
-make accuracy       # эталонная точность (27 кейсов, scipy/statsmodels/sklearn)
-make bench-gate     # p6 bench с порогами по точности и токенам
-make extensions     # sqlite/postgres/mysql/httpfs в $DAP_HOME/build/duckdb-ext
-make soak           # 200 × create/run/table/delete
-make lint           # статические проверки репозитория (включая запрет CJK в docs)
+make test-native    # JUnit: 970 tests
+make goldens        # 35 golden workflows on a dedicated :7811 engine
+make coverage       # 69 taxonomy tasks through /v1 (currently 68/69, F6 is a non-goal)
+make smoke          # black-box HTTP smoke against a running engine (DAP_BASE)
+make mcp-e2e        # create -> add_node -> connect -> run -> table -> delete over MCP
+make mcp-recipe-e2e # resources/prompts/recipes/dap_sql over MCP
+make install-e2e    # install from dist/ into a temp HOME + stdio preflight
+make package-e2e    # build the self-contained archive + install into a temp HOME
+make recipe-library-e2e # all 8 recipes on demo data over MCP
+make accuracy       # reference accuracy (27 cases, scipy/statsmodels/sklearn)
+make bench-gate     # p6 bench with accuracy and token thresholds
+make extensions     # sqlite/postgres/mysql/httpfs into $DAP_HOME/build/duckdb-ext
+make soak           # 200 x create/run/table/delete
+make lint           # static repository checks (including no CJK in docs)
 make check          # test-native + goldens + test-python + mcp-e2e + lint
 ```
 
-## Структура репозитория
+## Repository layout
 
 ```
-engine-native/   движок: Java 21, specs/*.json, JUnit-тесты
-adapters/mcp/    stdio MCP-адаптер (Python, только stdlib)
-api/             контракт /v1: openapi.yaml
-recipes/         8 готовых рецептов (dap-native-workflow/1 + recipe)
-examples/        демо-данные для рецептов
-dsh-plugin/      DSH bundle dap-dsh (MCP-сервер + диагностика)
+engine-native/   engine: Java 21, specs/*.json, JUnit tests
+adapters/mcp/    stdio MCP adapter (Python, stdlib only)
+api/             /v1 contract: openapi.yaml
+recipes/         8 ready-made recipes (dap-native-workflow/1 + recipe)
+examples/        demo data for the recipes
+dsh-plugin/      DSH bundle dap-dsh (MCP server + diagnostics)
 docs/            INSTALL, PACKAGING, DSH-PLUGIN, ARCHITECTURE, NODES, QUALITY, ROADMAP
 tests/           goldens-native/, native_smoke.py, mcp_e2e.py, package_e2e.py, bench.py
-deploy/          опциональный Dockerfile (Docker не нужен для локальной работы)
-scripts/         install.sh, dap.sh, jlink/python runtime, package.py, проверки
+deploy/          optional Dockerfile (Docker is not needed for local work)
+scripts/         install.sh, dap.sh, jlink/python runtime, package.py, checks
 Makefile         build-native, package, test-native, goldens, check
 ```
 
-## Документация
+## Documentation
 
-- [docs/INSTALL.md](docs/INSTALL.md) — установка одной командой, обновление, удаление.
-- [docs/PACKAGING.md](docs/PACKAGING.md) — jlink/Python runtime, сборка архива.
-- [docs/RELEASING.md](docs/RELEASING.md) — тег, CI, GitHub Release, npm-плагин.
-- [docs/DSH-PLUGIN.md](docs/DSH-PLUGIN.md) — плагин `dap-dsh`.
-- [docs/NATIVE-IMAGE.md](docs/NATIVE-IMAGE.md) — спайк GraalVM native-image.
-- [recipes/README.md](recipes/README.md) — 8 сценариев для агента.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — компоненты, жизненный цикл запроса,
-  память и ресурсы DuckDB, отмена, MCP-адаптер.
-- [docs/NODES.md](docs/NODES.md) — 66 узлов: назначение, config, примеры JSON.
-- [docs/QUALITY.md](docs/QUALITY.md) — unit-тесты, goldens, правила сравнения,
-  контракт ошибок, критерий готовности узла.
-- [docs/ROADMAP.md](docs/ROADMAP.md) — план продукта и пул узлов.
-- [docs/API.md](docs/API.md) — человекочитаемый контракт `/v1`;
-- [docs/MCP.md](docs/MCP.md) — подключение одной командой, локальные Postgres/MySQL,
-  сценарий «два вызова», инструменты и lifecycle;
-  [api/openapi.yaml](api/openapi.yaml) — машинный.
-- [docs/BENCH-P7.md](docs/BENCH-P7.md) — эффект правок A–E: чтение, пейджинг,
-  отчёты, статистика на больших данных, MCP;
-- [docs/ACCURACY.md](docs/ACCURACY.md) — эталонная проверка статистики (scipy,
-  statsmodels, sklearn, lifelines) и границы приближений;
-- [docs/BENCH.md](docs/BENCH.md) — замеры ingest, cold start, памяти;
-  [docs/BENCH-P6.md](docs/BENCH-P6.md) — 10 больших датасетов, MCP overhead,
-  точность и найденные слабые места.
+- [docs/INSTALL.md](docs/INSTALL.md) — one-command install, upgrade, removal.
+- [docs/PACKAGING.md](docs/PACKAGING.md) — jlink/Python runtime, archive build.
+- [docs/RELEASING.md](docs/RELEASING.md) — tag, CI, GitHub Release, npm plugin.
+- [docs/DSH-PLUGIN.md](docs/DSH-PLUGIN.md) — the `dap-dsh` plugin.
+- [docs/NATIVE-IMAGE.md](docs/NATIVE-IMAGE.md) — GraalVM native-image spike.
+- [recipes/README.md](recipes/README.md) — 8 scenarios for the agent.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — components, request lifecycle,
+  memory and DuckDB resources, cancellation, MCP adapter.
+- [docs/NODES.md](docs/NODES.md) — 66 nodes: purpose, config, JSON examples.
+- [docs/QUALITY.md](docs/QUALITY.md) — unit tests, goldens, comparison rules,
+  error contract, definition of done for a node.
+- [docs/ROADMAP.md](docs/ROADMAP.md) — product plan and node pool.
+- [docs/API.md](docs/API.md) — human-readable `/v1` contract;
+  [docs/MCP.md](docs/MCP.md) — one-command setup, local Postgres/MySQL, the
+  "two calls" scenario, tools and lifecycle;
+  [api/openapi.yaml](api/openapi.yaml) — machine-readable.
+- [docs/BENCH-P7.md](docs/BENCH-P7.md) — effect of changes A–E: reads, paging,
+  reports, statistics on large data, MCP.
+- [docs/ACCURACY.md](docs/ACCURACY.md) — reference statistics checks (scipy,
+  statsmodels, sklearn, lifelines) and approximation limits.
+- [docs/BENCH.md](docs/BENCH.md) — ingest, cold start and memory measurements;
+  [docs/BENCH-P6.md](docs/BENCH-P6.md) — 10 large datasets, MCP overhead,
+  accuracy and weak spots found.
 
-## Ограничения
+## Limitations
 
-- Один пользователь, аутентификации нет: сервис слушает loopback и не должен
-  выставляться в сеть без прокси.
-- Состояние в памяти: workflow, задания и таблицы исчезают при остановке процесса;
-  `POST .../save` пишет `workflow.json`, `POST /v1/workflows/load` читает его обратно.
-  На диске остаётся только явно сохранённый `workflow.json` и Parquet-кэш ingest.
-- Остановка — явная (`POST /v1/shutdown`, сигнал процессу) или автоматическая по
-  простою: `DAP_IDLE_TIMEOUT_SEC` (900 с по умолчанию, `0` выключает), если нет
-  активных jobs.
-- Каталог — 66 узлов; файловые источники и SQL подчиняются allowlist путей
-  (`DAP_ALLOWED_ROOTS`; по умолчанию home, tmp, DAP_HOME и cache, всегда запрещены
-  `~/.ssh`, `~/.dsh` и другие секреты). `DAP_DENY_ROOTS` расширяет запреты.
-  Расширения DuckDB (sqlite/postgres/httpfs) ставятся один раз `make extensions`
-  в `$DAP_HOME/build/duckdb-ext` и дальше работают офлайн.
-- Out-of-core по умолчанию: `parquet_reader` и `csv_reader` строят ленивые
-  `read_parquet`/`read_csv`; `POST /v1/datasets` тоже конвертирует CSV через `read_csv`
-  без Arrow в heap. `DAP_DUCKDB_MEMORY_LIMIT=512MB` и spill в
-  `$DAP_HOME/build/duckdb-tmp` включены по умолчанию. Потолок теперь задаёт диск, а не `-Xmx`.
+- Single user, no authentication: the service listens on loopback and must not
+  be exposed to a network without a proxy.
+- State lives in memory: workflows, jobs and tables disappear when the process
+  stops; `POST .../save` writes `workflow.json`, `POST /v1/workflows/load` reads
+  it back. Only an explicitly saved `workflow.json` and the ingest Parquet cache
+  remain on disk.
+- Shutdown is explicit (`POST /v1/shutdown`, a process signal) or automatic on
+  idle: `DAP_IDLE_TIMEOUT_SEC` (900 s by default, `0` disables) when no jobs are
+  active.
+- The catalog has 66 nodes; file sources and SQL follow a path allowlist
+  (`DAP_ALLOWED_ROOTS`; defaults are home, tmp, DAP_HOME and cache; `~/.ssh`,
+  `~/.dsh` and other secrets are always denied). `DAP_DENY_ROOTS` adds more.
+  DuckDB extensions (sqlite/postgres/httpfs) are installed once by
+  `make extensions` into `$DAP_HOME/build/duckdb-ext` and then work offline.
+- Out-of-core by default: `parquet_reader` and `csv_reader` build lazy
+  `read_parquet`/`read_csv`; `POST /v1/datasets` also converts CSV through
+  `read_csv` without Arrow in the heap. `DAP_DUCKDB_MEMORY_LIMIT=512MB` and
+  spilling to `$DAP_HOME/build/duckdb-tmp` are on by default. The ceiling is now
+  disk, not `-Xmx`.
 
-## Участие
+## Contributing
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) — сборка, тесты, стиль коммитов, DCO, добавление узла.
-- [SECURITY.md](SECURITY.md) — приватное сообщение об уязвимостях.
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — правила общения.
-- [Issues](https://github.com/wevelostdancin/dap/issues) и
-  [Discussions](https://github.com/wevelostdancin/dap/discussions) — вопросы и идеи.
-- [CITATION.cff](CITATION.cff) — как цитировать DAP.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — build, tests, commit style, DCO, adding a node.
+- [SECURITY.md](SECURITY.md) — private vulnerability reporting.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community rules.
+- [Issues](https://github.com/wevelostdancin/dap/issues) and
+  [Discussions](https://github.com/wevelostdancin/dap/discussions) — questions and ideas.
+- [CITATION.cff](CITATION.cff) — how to cite DAP.
 
-## Лицензия
+## License
 
-DAP распространяется под **Apache-2.0**; текст — [LICENSE](LICENSE),
-сторонние компоненты — [NOTICE](NOTICE). Движок собирается из собственного кода и
-библиотек, перечисленных в [engine-native/pom.xml](engine-native/pom.xml); гарантий нет.
+DAP is distributed under **Apache-2.0**; the text is in [LICENSE](LICENSE),
+third-party components in [NOTICE](NOTICE). The engine is built from its own
+code and the libraries listed in [engine-native/pom.xml](engine-native/pom.xml);
+there is no warranty.
