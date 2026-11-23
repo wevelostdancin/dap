@@ -87,9 +87,10 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 ### Рестарт движка и ошибки
 
 Адаптер запоминает `generation` из `GET /v1/health` при каждой проверке и, если
-она изменилась (движок перезапустился, например после `dap_shutdown`), добавляет
-к следующей ошибке префикс `engine restarted; workflows lost: ` — вместо
-молчаливого 404 на потерянный workflow.
+она изменилась (движок перезапустился после простоя или упал), добавляет к следующей
+ошибке префикс `engine restarted (idle shutdown or crash); workflows lost: ` —
+вместо молчаливого 404 на потерянный workflow; в `error.data` выставляется
+`restarted: true`.
 
 Тело ошибки движка `{"error","code","hint"}` адаптер передаёт в JSON-RPC
 `error.data`: `status` (HTTP-код), `code` и `hint` (если есть) лежат на верхнем
@@ -185,6 +186,24 @@ make extensions    # sqlite/postgres/httpfs в $DAP_HOME/build/duckdb-ext (се�
 показывает rows/operators/plan без материализации. Ручная сборка `dap_workflow_create`
 → `dap_add_node` → `dap_connect` → `dap_run` → `dap_get_table` нужна только для
 нестандартного графа.
+
+Опции чтения принимают `dap_ingest` и одновызовные инструменты `dap_analyze`,
+`dap_profile`, `dap_report`, `dap_explore` и `dap_estimate`:
+
+| Опция | Инструменты | Смысл |
+|---|---|---|
+| `header` | `dap_analyze`, `dap_profile`, `dap_report`, `dap_explore`, `dap_estimate` | первая строка — заголовок (по умолчанию `true`) |
+| `delimiter` | все перечисленные | разделитель CSV; если не задан или пуст, DuckDB определяет диалект сам (`,`, `;`, TAB, `|`) |
+| `encoding` | все перечисленные | `auto` (по умолчанию), `utf-8`, `utf-16`, `latin-1`, `cp1251`, `cp866`, `koi8-r` или имя Java charset |
+| `sheet` | все перечисленные | имя листа Excel или 0-based индекс (`"0"`); по умолчанию первый лист |
+| `allVarchar` | все перечисленные | все колонки CSV как VARCHAR |
+| `decimalComma` | все перечисленные | `5 449,72` → DOUBLE; колонка меняется, только если парсятся все непустые значения |
+
+`delimiter` и `header` `dap_ingest` принимал и раньше; новые опции —
+`encoding`, `sheet`, `allVarchar`, `decimalComma`. Ответы `dap_ingest`,
+`dap_analyze`, `dap_profile` и `dap_report` дополнительно содержат `sheet`
+(фактически прочитанный лист Excel), `sheets` (имена всех листов) и `encoding`
+(фактическая кодировка CSV), когда они применимы к формату.
 
 Все ответы с таблицами — `dap_get_table`, `dap_analyze`, `dap_report`, `dap_sql`,
 `dap_recipe_run` и `dap_workflow_build` — проходят через один форматтер: значение
